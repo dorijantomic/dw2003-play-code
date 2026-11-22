@@ -48,9 +48,7 @@ import { questSpeak } from "./quest-scenes.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 import type { CollisionGrid, GameState, ManifestMap, SceneNpc, SpriteRecord } from './types.js';
 import type { BattleWinResult } from "../battle/core/types.js";
-type FishingExtraEntry =
-  | { kind: "item"; item: string; name?: string }
-  | { kind: "bits"; bits: number };
+import type { FishExtraEntry as FishingExtraEntry } from "../types/misc-game2.js";
 
 
 

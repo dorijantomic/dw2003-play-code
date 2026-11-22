@@ -24,7 +24,7 @@
 
 import { drawText } from "./uifont.js";
 import { packedIsMusicStart, packedSampleResolver } from "./packed-sound.js";
-import type { SoundTestState } from "./types/soundtest.js";
+import type { SoundTestCatalogue, SoundTestCategory, SoundTestMusic, SoundTestPlayable, SoundTestRow, SoundTestSfx, SoundTestState } from "./types/soundtest.js";
 
 /** The overlay's window height (F0x8008443c, eight rows). */
 export const SOUNDTEST_ROWS = 8;
@@ -50,7 +50,7 @@ const MUSIC_INDEX_URL = "assets/music/index.json";
  * eight-row window (`scroll = cursor - 7` when it passes the bottom,
  * `scroll = cursor` when it passes the top). Returns the new pair.
  */
-export function soundTestMove(cursor: number, scroll: number, delta: number, count) {
+export function soundTestMove(cursor: number, scroll: number, delta: number, count: number) {
     if (!(count > 0)) return { cursor: 0, scroll: 0 };
     const c = Math.max(0, Math.min(count - 1, (cursor | 0) + (delta | 0)));
     let s = Math.max(0, scroll | 0);
@@ -65,16 +65,16 @@ export function soundTestMove(cursor: number, scroll: number, delta: number, cou
  * absolute window, and the clamped cursor. `catalogue` is the built
  * soundtst_catalogue.json; `category` is its index.
  */
-export function soundTestView(catalogue, category: number, cursor: number, scroll: number) {
+export function soundTestView(catalogue: SoundTestCatalogue | null | undefined, category: number, cursor: number, scroll: number) {
     const cat = catalogue?.categories?.[category];
     if (!cat) return null;
     const sounds = cat.sounds ?? [];
     const count = sounds.length;
     const pos = soundTestMove(cursor, scroll, 0, count);
-    const rows = [];
+    const rows: SoundTestRow[] = [];
     for (let i = 0; i < SOUNDTEST_ROWS && pos.scroll + i < count; i++) {
         const index = pos.scroll + i;
-        const sound = sounds[index];
+        const sound = sounds[index]!;   // index < count (loop bound)
         rows.push({ index, name: sound.name, id: sound.id, text: sound.name });
     }
     return {
@@ -95,11 +95,11 @@ export function soundTestView(catalogue, category: number, cursor: number, scrol
  * overlay's TTLBGM record: its sound is a music start, not a sample, so it is
  * available through the music player and is not marked missing.
  */
-export function soundTestPlayable(catalogue, builtBanks = []) {
+export function soundTestPlayable(catalogue: SoundTestCatalogue | null | undefined, builtBanks: string[] = []): SoundTestPlayable[] {
     const built = new Set([...builtBanks].map((k) => String(k).toLowerCase()));
     const categories = catalogue?.categories ?? [];
     const last = categories.length - 1;
-    return categories.map((c, index) => {
+    return categories.map((c: SoundTestCategory, index: number) => {
         const sounds = c.sounds ?? [];
         const hasBank = built.has(String(c.name).toLowerCase());
         const music = index === last && sounds.length > 0
@@ -121,14 +121,14 @@ export function soundTestPlayable(catalogue, builtBanks = []) {
  * here); `music` is the bgm player's play/stop pair. Both are optional so the
  * pure helpers above stay importable under node --test.
  */
-export function createSoundTest({ sfx = null, music = null } = {}) {
+export function createSoundTest({ sfx = null, music = null }: { sfx?: SoundTestSfx | null; music?: SoundTestMusic | null } = {}) {
     const d = {
         open: false, stage: "categories", cursor: 0, scroll: 0,
         soundCursor: 0, soundScroll: 0, status: "", playing: null, ready: false,
     } as SoundTestState;
-    let catalogue = null;
-    let playable = null;
-    let resolvePacked = null;
+    let catalogue: SoundTestCatalogue | null = null;
+    let playable: SoundTestPlayable[] | null = null;
+    let resolvePacked: ReturnType<typeof packedSampleResolver> | null = null;
     const musicTracks = new Set();
     let loading: Promise<void> | null = null;
     let failed = false;
@@ -157,7 +157,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
 
     const categoryNow = () => catalogue?.categories?.[d.cursor] ?? null;
 
-    function musicTrackOf(category) {
+    function musicTrackOf(category: SoundTestCategory | null) {
         const name = String(category?.name ?? "").toLowerCase();
         return musicTracks.has(name) ? name : null;
     }

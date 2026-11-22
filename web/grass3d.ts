@@ -19,6 +19,7 @@ import * as THREE from "./lib3d/three.module.js";
 import { waterPixelTest } from "./water3d.js";
 import { classSource } from "./mapclass.js";
 import { getSharedRenderer, sharedLost } from "./gl-shared.js";
+import type { GrassBand, GrassStage } from "./types/misc-game2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
@@ -35,7 +36,7 @@ const SOLID_R = 5;           // a cell needs a solid-grass window of (2R+1)^2 pi
 const SOLID_MIN = 0.9;       // ...of which at least this fraction is grass-coloured
 const WATER_GAP = 5;         // no blades within this many pixels of water
 
-let renderer = null;
+let renderer: THREE.WebGLRenderer | null = null;
 let scene = null;
 let camera = null;
 let uTime = { value: 0 };
@@ -43,7 +44,7 @@ let uTime = { value: 0 };
 const uFeet = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) };
 const uGust = { value: new THREE.Vector2(0, 0) };
 let material: THREE.ShaderMaterial | null = null;
-const stages = new Map();    // stageId -> { bands: [{mesh, y0, y1}], count } | null
+const stages = new Map<string, GrassStage | null>();    // stageId -> { bands: [{mesh, y0, y1}], count } | null
 
 function ensureRenderer() {
     if (renderer && sharedLost()) return false;
@@ -214,7 +215,7 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
     const nearWater = (x: number, y: number) => boxSum(wsat, x, y, WATER_GAP)[0]! > 0;
 
     const bandCount = Math.ceil(H / BAND_H);
-    const perBand = Array.from({ length: bandCount }, () => []);
+    const perBand: number[][] = Array.from({ length: bandCount }, () => []);
     let total = 0;
     const sample = (x: number, y: number) => {
         x = Math.min(W - 1, Math.max(0, x | 0));
@@ -252,7 +253,7 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
         }
     }
 
-    const bands = [];
+    const bands: GrassBand[] = [];
     for (let i = 0; i < bandCount; i++) {
         const arr = perBand[i];
         if (!arr!.length) continue;

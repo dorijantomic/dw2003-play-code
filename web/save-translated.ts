@@ -14,11 +14,13 @@
 //   * loaded mapped fields are read from the image, then the page reloads.
 // Unexplained resident data survives the next save via residentSaveImage.
 import { ui, rosterSlotOfCharId, itemCountEntries, ROSTER_SLOT_CHARIDS } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { composeMemcard } from "./ui-c/screens.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { PackedSfx, ThrownError } from "./types/translated-screens.js";
 import { buildDirectoryBlock, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 import { fetchBytes, fetchJson, loadResidentResources, loadProfileRecords } from "./resident-data.js";
@@ -26,7 +28,7 @@ import type { SaveResult, SaveScreen } from "./types/save-translated.js";
 interface MemcardData {
     tables: Uint8Array;
     font: Uint8Array;
-    cursorGlyphs: Uint8Array;
+    cursorGlyphs: unknown;
     profiles: readonly Uint8Array[];
     textButtons: Uint8Array;
     banks: Map<number, Uint8Array>;
@@ -36,12 +38,12 @@ interface MemcardData {
 /** The card art: 0x029D0000 is disc index 669 (STMCRDCS), 0x02860000 is 646 (CMFONT). */
 const PACKS: Record<string, string> = { 669: "stmcrd", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
-const BANKS = [[0x78, "memcard"], [0xa9, "memcard"], [0x94, "shop-banks"]];
+const BANKS: [number, string][] = [[0x78, "memcard"], [0xa9, "memcard"], [0x94, "shop-banks"]];
 
 const DATA_LABEL = "Memory card data";
 
-const dataByLanguage = new Map();
-function loadData(language): Promise<MemcardData> {
+const dataByLanguage = new Map<number, Promise<MemcardData>>();
+function loadData(language: number): Promise<MemcardData> {
     if (!dataByLanguage.has(language)) {
         dataByLanguage.set(language, Promise.all([
             fetchJson("memcard/manifest.json", DATA_LABEL),
@@ -55,18 +57,18 @@ function loadData(language): Promise<MemcardData> {
             banks: new Map(banks.map((data, i) => [BANKS[i]![0] + language, data])),
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
-    return dataByLanguage.get(language);
+    return dataByLanguage.get(language)!;
 }
 
-export function createSaveTranslated(sfx = null) {
-    const r = {
+export function createSaveTranslated(sfx: PackedSfx | null = null) {
+    const r: SaveScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null,
         _state: null, _mode: "save", _opts: {}, _onClose: null, _clock: null, _ticks: 0, _request: 0,
         _card: null, _commit: null, _summary: null, _lastDiagnostic: null,
-    } as SaveScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "stmcrd", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
-    const playSound = (id) => { sfx?.playPacked(id); };
+    const playSound = (id: number) => { sfx?.playPacked(id); };
 
     /** The session card: a copy of the walker's slots; writes stay here until the commit. */
     function makeCard() {
@@ -80,13 +82,13 @@ export function createSaveTranslated(sfx = null) {
             slots, saved,
             present: () => true,
             directory: (file: Parameters<typeof slotForFile>[0]) => buildDirectoryBlock(slots.map((s) => s?.record ?? null), slotForFile(file)),
-            image: (file) => {
+            image: (file: number) => {
                 const image = slots[slotForFile(file)]?.image;
                 return image ? Uint8Array.from(image) : null;
             },
             // The directory block is rebuilt from the slot records, so its write carries nothing new.
             writeDirectory: () => {},
-            writeImage: (file, bytes) => {
+            writeImage: (file: number, bytes: Uint8Array) => {
                 const slot = slotForFile(file);
                 const opts = { ...(r._opts ?? {}) };
                 const seconds = Math.max(0, Math.floor(opts.playSeconds ?? r._state?.playSeconds ?? 0));
@@ -110,7 +112,7 @@ export function createSaveTranslated(sfx = null) {
     function buildSeed(language: number) {
         const state = r._state ?? {};
         const party = Array.isArray(state.party) ? state.party : [];
-        const slots = r._opts?.partySlots ?? party.map((id) => rosterSlotOfCharId(id) ?? 0xffffffff);
+        const slots = r._opts?.partySlots ?? party.map((id: string) => rosterSlotOfCharId(id) ?? 0xffffffff);
         const view = typeof r._opts.roster === "function" ? r._opts.roster(state) : [];
         const members = [];
         for (let i = 0; i < 3; i++) {
@@ -172,7 +174,7 @@ export function createSaveTranslated(sfx = null) {
         };
     }
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         r._error = error;
         r._failed = true;
         r._lastDiagnostic = `translated save screen failed: ${error?.message ?? error}`;
@@ -186,8 +188,8 @@ export function createSaveTranslated(sfx = null) {
 
     function startSession() {
         r._card = makeCard();
-        r._session = new ui.MemcardSession(buildSeed(language()), r._data, { playSound, card: r._card });
-        r._clock = new ui.MenuDisplayClock();
+        r._session = new (ui as EngineUi).MemcardSession(buildSeed(language()), r._data, { playSound, card: r._card });
+        r._clock = new (ui as EngineUi).MenuDisplayClock();
     }
 
     /** The single commit, after the screen closed: what the card took and which slot was loaded. */

@@ -36,3 +36,57 @@ export interface UiTextDrawOpts extends UiFontPaintOpts {
   glyphMetrics?: ((key: UiGlyphEntry) => UiGlyphBox) | null;
   scale?: number;
 }
+
+/** One colour of a CLUT row: [r, g, b, a]. */
+export type UiClutColor = [number, number, number, number];
+
+/** One CLUT row of a font kind: its colours in slot order. */
+export type UiClutRow = UiClutColor[];
+
+/** One font kind's CLUT rows, keyed by the row number. */
+export interface UiClutKind {
+  rows?: Record<string, UiClutRow | undefined>;
+}
+
+/** `uifont.json`'s `cluts`: the CLUT rows of every font kind, keyed by the kind number. */
+export type UiClutTable = Record<string, UiClutKind | undefined>;
+
+/** One glyph's rect on the sheet and its pen offsets (dx/dy to the cell, adv the advance after it). */
+export interface UiFontGlyph {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  adv?: number;
+  dx?: number;
+  dy?: number;
+}
+
+/** One font kind's two glyph tables, keyed by the index of the charset entry. */
+export interface UiFontFace {
+  basic: Record<string, UiFontGlyph | undefined>;
+  ext: Record<string, UiFontGlyph | undefined>;
+}
+
+/** A named icon's rect on the sheet. */
+export interface UiFontIcon {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** assets/ui/uifont.json, the shipped font manifest. */
+export interface UiFontManifest {
+  chars: Record<string, UiGlyphEntry | undefined>;
+  kinds: Record<string, UiFontFace | undefined>;
+  cluts?: UiClutTable;
+  icons?: Record<string, UiFontIcon | undefined>;
+}
+
+/** One glyph of a laid-out string: the character, the pen before it and its dx. */
+export interface UiGlyphPen {
+  ch: string;
+  x: number;
+  dx: number;
+}

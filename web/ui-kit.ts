@@ -14,6 +14,7 @@ import { buildPanelClip, tileFrames } from "./panel-kit.js";
 import { BAND_TEXT_W, fitByWidth, wrapByWidth } from "./text-fit.js";
 import { partHook } from "./ui-c/capture.js";
 import type { FoldChainOptions } from "./types/ui-kit.js";
+import type { ScreenPack } from "./types/misc-game2.js";
 
 export const BOX_W = 320;
 export const BOX_H = 240;
@@ -55,7 +56,7 @@ export function createFold(steps = OPEN_STEPS) {
  * The windows of one screen, opened one after another in `names` order (each starts when the one before has landed) and
  * shut in the reverse order. `onStart(name, opening)` is where the open / close sound is played.
  */
-export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} }: FoldChainOptions = {}) {
+export function createFoldChain(names: string[], { steps = OPEN_STEPS, onStart = () => {} }: FoldChainOptions = {}) {
     const folds = Object.fromEntries(names.map((n) => [n, createFold(steps)]));
     let phase = "shut";
     let at = 0;
@@ -69,7 +70,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
         },
         close() {
             if (phase === "shut" || phase === "closing") return;
-            const last = names.map((n: string | number) => folds[n].state()).map((s: string) => s !== "shut").lastIndexOf(true);
+            const last = names.map((n) => folds[n]!.state()).map((s) => s !== "shut").lastIndexOf(true);
             if (last < 0) { phase = "shut"; return; }
             phase = "closing"; at = last; start(at, false);
         },
@@ -87,7 +88,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
 }
 
 /** Run `draw` with the window folded to `progress` (0..1) about (px, py). axis "x" squeezes sideways, "y" up and down. Draws nothing at 0. */
-export function withFold(ctx, progress, px: number | undefined, py: number | undefined, axis: string, draw: () => void) {
+export function withFold(ctx: CanvasRenderingContext2D, progress: number, px: number | undefined, py: number | undefined, axis: string, draw: () => void) {
     if (!(progress > 0)) return false;
     if (progress >= 1) { draw(); return true; }
     ctx.save();
@@ -112,7 +113,7 @@ export const TILE_W = 40;
 export const panelPixelHeight = (bands: number) => 22 + 14 * bands + 20;
 
 /** Register (once) and return the id of a `cols` x `bands` panel clip in the cmfont pack, or null while the sheet is not loaded. */
-export function panelClipId(pack, cols: number, bands: number) {
+export function panelClipId(pack: ScreenPack, cols: number, bands: number) {
     const id = `kit-${cols}x${bands}`;
     if (!pack.ids?.[id]) {
         const frames = tileFrames(pack.ids);
@@ -130,7 +131,7 @@ export function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, c
 }
 
 /** x of each tab label: starts at `startX`, `gap` pixels between labels. `widthOf(label)` is textWidth in the real build. */
-export function layoutTabs(labels, widthOf, startX: number, gap: number) {
+export function layoutTabs(labels: string[], widthOf: (label: string) => number, startX: number, gap: number) {
     const out = [];
     let x = startX;
     for (const label of labels) { out.push(x); x += widthOf(label) + gap; }
@@ -138,7 +139,7 @@ export function layoutTabs(labels, widthOf, startX: number, gap: number) {
 }
 
 /** Header plate with a title on the left and, optionally, section tabs (the active one in the white face, the rest dim, clut row 7). */
-export function drawHeader(ctx: CanvasRenderingContext2D | null | undefined, progress: number, title: string, tabs = [], active = 0, { tabStart = null, gap = 12 } = {}) {
+export function drawHeader(ctx: CanvasRenderingContext2D, progress: number, title: string, tabs = [], active = 0, { tabStart = null, gap = 12 } = {}) {
     withFold(ctx, progress, HEADER.pivot[0], HEADER.pivot[1], "x", () => drawClip(ctx, cmfont, HEADER.clip, HEADER.x, HEADER.y));
     if (progress < 1) return;
     if (!tabs.length) { drawText(ctx, title, HEADER.textX, HEADER.textY); return; }
@@ -148,7 +149,7 @@ export function drawHeader(ctx: CanvasRenderingContext2D | null | undefined, pro
 }
 
 /** Footer plate with up to two text lines. */
-export function drawFooter(ctx: CanvasRenderingContext2D | null | undefined, progress: number, line1 = "", line2 = "") {
+export function drawFooter(ctx: CanvasRenderingContext2D, progress: number, line1 = "", line2 = "") {
     withFold(ctx, progress, FOOTER.pivot[0], FOOTER.pivot[1], "x", () => drawClip(ctx, ststat, FOOTER.clip, FOOTER.x, FOOTER.y));
     if (progress < 1) return;
     if (line1) drawText(ctx, line1, FOOTER.textX, FOOTER.textY);
@@ -199,7 +200,7 @@ export function drawListWindow(ctx: CanvasRenderingContext2D, progress: number, 
 export const listRowY = (i: number) => LIST_WINDOW.textY + LIST_WINDOW.pitch * i;
 
 /** The description band with `text` wrapped by measured width to at most two lines (the second cut to fit). */
-export function drawHelpBox(ctx: CanvasRenderingContext2D | null | undefined, progress: number, text: string) {
+export function drawHelpBox(ctx: CanvasRenderingContext2D, progress: number, text: string) {
     const lines = wrapByWidth(text, (s) => textWidth(s), BAND_TEXT_W);
     drawFooter(ctx, progress, lines[0] ?? "", lines[1] ? fitByWidth(lines.slice(1).join(" "), (s) => textWidth(s), BAND_TEXT_W) : "");
 }

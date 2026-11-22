@@ -42,10 +42,11 @@ interface DiffSnapshotsResult {
 }
 
 
+// ETS item 42: snapshots and shelves come from storage or a pasted file; these checks run before anything is used.
 const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
-const isName = (v) => typeof v === "string" && v.trim().length > 0;
-const clone = (v) => JSON.parse(JSON.stringify(v));
+const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isName = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const listOf = (v) => (Array.isArray(v) ? v : []);
 const byName = (shelf: QuestShelfItem[], name: string): QuestShelfItem | null => listOf(shelf).find((x) => x?.name === name) ?? null;
 

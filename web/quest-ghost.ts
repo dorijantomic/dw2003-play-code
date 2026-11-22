@@ -1,6 +1,8 @@
+import type { GhostDrawing, GhostKey } from "./types/misc-game2.js";
+
 interface QuestGhostEvent {
     kind: "ghost";
-    npc?: string;
+    npc?: number | string;
     off?: boolean;
     alpha?: number | string | null;
     tint?: string;
@@ -33,22 +35,22 @@ interface QuestGhostEvent {
 const ghosts = new Map();
 
 /** The actor whose draw closure is running right now (null outside one); read by questGhostImage. */
-let current = null;
+let current: GhostDrawing | null = null;
 
 /** Host callback: put the field camera back on the player (installed once by web/game.js). */
-let cameraToPlayer = null;
+let cameraToPlayer: (() => void) | null = null;
 
 /** Host reader: is the quest layer switched on (F2 -> Extras -> Quests)? Installed once by web/game.js. */
 let questsGate: (() => boolean) | null | null = null;
 
 /** Cache of tinted frames: image -> Map("sx,sy,sw,sh|#rrggbb" -> canvas). Bounded per image; a ghost is a few frames. */
-const tintCache = new WeakMap();
+const tintCache = new WeakMap<CanvasImageSource, Map<string, HTMLCanvasElement>>();
 const TINT_CACHE_PER_IMAGE = 96;
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, Number(v)));
 
 /** The actor key the renderer uses: "player", or the numeric NPC id. */
-function actorKey(who) {
+function actorKey(who: unknown): GhostKey | null {
     if (who === "player") return "player";
     if (who == null || typeof who === "boolean") return null;
     if (typeof who === "string" && who.trim() === "") return null;
@@ -56,7 +58,7 @@ function actorKey(who) {
     return Number.isFinite(n) ? n : null;
 }
 
-const tintOf = (t) => (typeof t === "string" && /^#[0-9a-fA-F]{6}$/.test(t) ? t.toLowerCase() : null);
+const tintOf = (t: unknown) => (typeof t === "string" && /^#[0-9a-fA-F]{6}$/.test(t) ? t.toLowerCase() : null);
 
 /**
  * The `ghost` event: { kind: "ghost", npc: <id>|"player", alpha, tint } fades and tints that actor;
@@ -74,7 +76,7 @@ export function questGhostSet(ev: QuestGhostEvent) {
 }
 
 /** What the renderer should do with that actor, or null for "draw them normally". */
-export function questGhostOf(key) {
+export function questGhostOf(key: unknown) {
     return ghosts.get(actorKey(key)) ?? null;
 }
 
@@ -94,7 +96,7 @@ export const questGhostMap = () => ghosts;
  * One actor's whole draw closure. A ghosted actor is drawn at its alpha -- sprite AND drop shadow, because the alpha is
  * set around the closure rather than around the sprite call. `key` is "player" or the NPC id.
  */
-export function questGhostActor(ctx: CanvasRenderingContext2D | null, key, draw) {
+export function questGhostActor<T>(ctx: CanvasRenderingContext2D | null, key: unknown, draw: () => T) {
     // F2 -> Extras -> Quests switched off mid-scene: the ghosts come off on the next frame drawn, exactly as if the
     // scene had ended. (The quest layer's own switch; the scene itself is the game's cutscene and runs on.)
     if (ghosts.size && !ghostsAllowed()) questGhostClear();
@@ -118,7 +120,7 @@ export function questGhostActor(ctx: CanvasRenderingContext2D | null, key, draw)
  * frame is composited through a cached offscreen copy; every other actor (and every actor while no ghost is on) is the
  * plain call, so the ordinary field costs one comparison.
  */
-export function questGhostImage(ctx: CanvasRenderingContext2D | null, img, sx: number, sy: number, sw, sh, dx: number, dy) {
+export function questGhostImage(ctx: CanvasRenderingContext2D | null, img: CanvasImageSource, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number) {
     const tint = current?.tint;
     if (!tint) {
         ctx!.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
@@ -128,7 +130,7 @@ export function questGhostImage(ctx: CanvasRenderingContext2D | null, img, sx: n
 }
 
 /** The frame, washed with `tint` and cached: at most TINT_CACHE_PER_IMAGE frames per image, oldest out first. */
-function tintedFrame(img, sx: number, sy: number, sw, sh, tint) {
+function tintedFrame(img: CanvasImageSource, sx: number, sy: number, sw: number, sh: number, tint: string) {
     let byKey = tintCache.get(img);
     if (!byKey) { byKey = new Map(); tintCache.set(img, byKey); }
     const key = `${sx},${sy},${sw},${sh}|${tint}`;
@@ -154,7 +156,7 @@ function tintedFrame(img, sx: number, sy: number, sw, sh, tint) {
  * Install the host's "the camera belongs on the player now" action, once. web/game.js supplies the real one (release the
  * scene's fixed FN6B camera and let the field's own follow rule take over), so this module needs no game internals.
  */
-export function installQuestGhostCamera(fn) {
+export function installQuestGhostCamera(fn: (() => void) | null | undefined) {
     cameraToPlayer = typeof fn === "function" ? fn : null;
 }
 

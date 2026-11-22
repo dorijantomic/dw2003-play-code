@@ -15,3 +15,54 @@ export interface SoundTestState {
   status: string;
   tick?: (held: Set<unknown>) => void;
 }
+
+/** One sound record of a category (soundtst_catalogue.json): its packed id as hex text, and its name. */
+export interface SoundTestSound {
+  id: string;
+  name: string;
+}
+
+/** One VAB category of the catalogue. */
+export interface SoundTestCategory {
+  category?: number;
+  name: string;
+  archive_id?: number | string;
+  sounds?: SoundTestSound[];
+}
+
+/** soundtst_catalogue.json as built by tools/build_soundtst_catalogue.py. */
+export interface SoundTestCatalogue {
+  categories: SoundTestCategory[];
+}
+
+/** One category of the catalogue and whether this build can sound it. */
+export interface SoundTestPlayable {
+  category: number;
+  name: string;
+  archiveId: number | string | undefined;
+  count: number;
+  hasBank: boolean;
+  music: boolean;
+  available: boolean;
+}
+
+/** One row the drawer sees. */
+export interface SoundTestRow {
+  index: number;
+  name: string;
+  id: string;
+  text: string;
+}
+
+/** The sample player: the calls the screen makes on web/audio.ts createSfxPlayer. */
+export interface SoundTestSfx {
+  stop?: (name: string) => void;
+  stopAll?: () => void;
+  playBankSound?: (bank: string | null, name: string, opts: { sustain?: boolean }) => string | null | undefined;
+}
+
+/** The music player: the play/stop pair. */
+export interface SoundTestMusic {
+  play?: (track: string) => void;
+  stop?: () => void;
+}

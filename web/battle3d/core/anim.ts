@@ -92,7 +92,7 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
       ? rec.sound_branch[branch]
       : rec.sound;
     B$.contactEvade!.player = false;   // no accuracy roll on the item path
-    let motion = rec.motion;
+    let motion: number | undefined = rec.motion;
     if (rec.motion_random) {
       const count = rec.motion_random.count | 0;
       const k = (elementIndex != null ? elementIndex | 0 : (RAND_U16()! % count)) % count;
@@ -114,11 +114,11 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
     B$.playerAnim = "external-script";
     const overlayHooks = {
       ...hooks,
-      onOverlay: (rec) => {
+      onOverlay: (rec: { type: number; duration: number }) => {
         B$.screenOverlay = { type: rec.type, duration: Math.max(1, rec.duration), t: 0 };
         hooks.onOverlay?.(rec);
       },
-      onMotion: (motion) => { hooks.onMotion?.(motion); },
+      onMotion: (motion: number) => { hooks.onMotion?.(motion); },
     };
     if (!B$.playerAnim8r) return false;
     B$.playerAnim8r.rotationBase = rotationBase;

@@ -39,6 +39,7 @@ import { isThrowItem } from "../../fight/fight-tables.js";
 import { persistPlayerGauge } from "../form-blast.js";
 import { finalizePlayerDamage } from "../../battle.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { TurnStart } from "../../../engine/dw3/battle-combat.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePlayerAction(B: BattleContext) {
@@ -56,7 +57,7 @@ function applyPlayerAction() {
     // tests the sleep bit (0x08) and nothing else. The Frozen roll already happened in
     // front of the command menu (`frozenGateLosesTurn`, F0x800a7418 step 1) and the
     // confuse bit was the joke list, so neither is rolled a second time here.
-    const ts = processTurnStart(b.player, pname, false, false);
+    const ts: TurnStart = processTurnStart(b.player, pname, false, false);
     if (ts.skipped) {
       // The gate's own page: the name on line one, the disc's line on line two
       // ("Asleep!", one of the eight confuse one-liners, "Frozen and can't move!").
@@ -68,7 +69,8 @@ function applyPlayerAction() {
       // typed sentence left on this path. `ts.prefix` is the empty string for the same
       // reason (battle-combat.ts:565), which is why the walker no longer offers its own
       // wording here.
-      B.sayOriginal(b, ts.spec, ts.prefix);
+      // ETS item 9: a skipped turn always carries its spec (see the comment above)
+      B.sayOriginal(b, ts.spec!, ts.prefix);
       b.pendingAction = null;
       return;
     }

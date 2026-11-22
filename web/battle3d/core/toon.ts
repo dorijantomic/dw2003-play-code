@@ -1,9 +1,11 @@
 import { SCENE_LIGHT_WINDING, compileShader } from "../gl.js";
 import { TOON_HULL_VERT_SRC, TOON_HULL_FRAG_SRC } from "../shaders.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
+import type { ToonState, Vec3 } from "../../types/fx3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeToon(B$: Battle3DContext) {
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
 function _litNormals(model, bufs) {
     const pos = bufs?.lastPos; if (!model || !pos) return;
     const n = bufs.totalVerts;
@@ -36,7 +38,7 @@ function _litNormals(model, bufs) {
     B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, bufs.nbo);
     B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, nrm, B$.gl!.DYNAMIC_DRAW);
   }
-function _sceneLightDraw(on) {          // before the fighters (on) and right after them (off)
+function _sceneLightDraw(on: boolean) {          // before the fighters (on) and right after them (off)
     B$.gl!.useProgram(B$.texP!.program);
     const L = on ? B$.sceneLight : null;
     B$.gl!.uniform1f(B$.texP!.uSLOn, L ? 1 : 0);
@@ -117,32 +119,32 @@ function _toonBodies() {
     return out;
   }
 // Before the fighters: normals for every body; Toon shading binds them (litOn) and sets the band uniforms.
-  function _toonBegin(st, eye, look) {
+  function _toonBegin(st: ToonState, eye: Vec3, look: Vec3) {
     const bodies = _toonBodies();
     for (const [m, b] of bodies) { b.toonOk = _toonNormals(m, b); if (st.shade && b.toonOk) b.litOn = true; }
     if (!st.shade) return;
-    let d;
+    let d: number[];
     if (B$.sceneLight) d = B$.sceneLight.dir;
     else {     // key light from above the camera: toward the camera plus up
       let vx = eye[0] - look[0], vy = eye[1] - look[1], vz = eye[2] - look[2];
       const vl = Math.hypot(vx, vy, vz) || 1; vx /= vl; vy /= vl; vz /= vl;
       d = [vx, vy + 1, vz];
     }
-    const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+    const dl = Math.hypot(d[0]!, d[1]!, d[2]!) || 1; // ETS item 9: the light direction is a 3-vector
     B$.gl!.useProgram(B$.texP!.program);
     B$.gl!.uniform1f(B$.texP!.uToon, 1);
-    B$.gl!.uniform3fv(B$.texP!.uToonDir, [d[0] / dl, d[1] / dl, d[2] / dl]);
+    B$.gl!.uniform3fv(B$.texP!.uToonDir, [d[0]! / dl, d[1]! / dl, d[2]! / dl]);
     B$.gl!.uniform1f(B$.texP!.uSLOn, 0);           // no tinted scene light on the Digimon while toon shading is on
   }
 // After the fighters (and the 2 vs 2 extras): the hulls, then everything back to the game's own state.
-  function _toonEnd(st, pv, proj, H) {
+  function _toonEnd(st: ToonState, pv: Float32Array, proj: Float32Array, H: number) {
     const bodies = _toonBodies();
     if (st.outline) {
       try {
         if (!B$.toonProg) {
           const p = B$.gl!.createProgram();
-          B$.gl!.attachShader(p, compileShader(B$.gl, B$.gl!.VERTEX_SHADER, TOON_HULL_VERT_SRC));
-          B$.gl!.attachShader(p, compileShader(B$.gl, B$.gl!.FRAGMENT_SHADER, TOON_HULL_FRAG_SRC));
+          B$.gl!.attachShader(p, compileShader(B$.gl!, B$.gl!.VERTEX_SHADER, TOON_HULL_VERT_SRC));
+          B$.gl!.attachShader(p, compileShader(B$.gl!, B$.gl!.FRAGMENT_SHADER, TOON_HULL_FRAG_SRC));
           // the same attribute slots as the main program, so its enabled arrays stay as it left them
           if (B$.texP!.aPos >= 0) B$.gl!.bindAttribLocation(p, B$.texP!.aPos, "aPos");
           if (B$.texP!.aUV >= 0) B$.gl!.bindAttribLocation(p, B$.texP!.aUV, "aUV");
@@ -155,7 +157,7 @@ function _toonBodies() {
         const px = Math.max(1, B$.TOON_PX_1080! * H / 1080);
         B$.gl!.useProgram(B$.toonProg.program);
         B$.gl!.uniformMatrix4fv(B$.toonProg.uMVP, false, pv);
-        B$.gl!.uniform1f(B$.toonProg.uPush, px * 2 / (H * proj[5]));
+        B$.gl!.uniform1f(B$.toonProg.uPush, px * 2 / (H * proj[5]!));
         B$.gl!.uniform3fv(B$.toonProg.uCol, B$.TOON_COL);
         B$.gl!.uniform1i(B$.toonProg.uTex, 0);
         B$.gl!.activeTexture(B$.gl!.TEXTURE0);

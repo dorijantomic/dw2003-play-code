@@ -16,6 +16,9 @@
 // never greyed, and whose confirm answers with the chosen joke row instead of a
 // command.
 import { ui } from "./vendor/engine.js";
+import type { FightCommandSession } from "../engine/dw3/ui/fight-command-session.js";
+import type { PackedSfx, ResidentGlyphs } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
@@ -69,17 +72,13 @@ interface BattleCommandRecord {
 
 
 interface FightCommandData {
-    tables: number[][];
-    font: CanvasImageSource;
-    banks: Int16Array[];
-    cursorGlyphs?: CanvasImageSource;
+    tables: Uint8Array;
+    font: Uint8Array;
+    banks: ReadonlyMap<number, Uint8Array>;
+    cursorGlyphs?: ResidentGlyphs;
 }
 
 
-interface FightCommandSession {
-    update(dt: number): void;
-    draw(): void;
-}
 
 
 /** The row picture pack: handle 0x04550000 is disc index 1109, PGFGTC00. */
@@ -122,7 +121,7 @@ export function battleAilmentByte(member) {
         | (member?.cantFlee ? 0x10 : 0) | (member?.cantDigivolve ? 0x20 : 0);
 }
 
-export function createBattleCommandTranslated(sfx = null, options = {}) {
+export function createBattleCommandTranslated(sfx: PackedSfx | null = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ pack: "pgfgc00", packs: PACKS },
             (directory: number) => PACKS[directory >>> 16] ?? null),
@@ -151,15 +150,15 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
 
         onOpen: (r: { _pulseTicks: number; }) => { r._pulseTicks = 0; },
 
-        start: (r: BattleCommandRecord, data: FightCommandData, language: string, playSound: (soundId: number) => void): FightCommandSession => {
+        start: (r: BattleCommandRecord, data: FightCommandData, language: number, playSound: (soundId: number) => void): FightCommandSession => {
             const joke = r._seed.jokeIndices;
-            return new ui.FightCommandSession(language, {
+            return new (ui as EngineUi).FightCommandSession(language, {
                 // The joke owner always opens on its first row (F0x8009AB74 stores 0).
                 initialRow: joke ? 0 : r._row,
                 activeIndex: r._seed.activeIndex,
                 ailmentBits: r._seed.ailmentBits,
                 // FIGHTSTG_F0x8009A2DC adds 0x6B to the shuffled table's entry per row.
-                jokeLabels: joke ? joke.map((index) => (Number(index) | 0) + ui.JOKE_LABEL_BASE) : null,
+                jokeLabels: joke ? joke.map((index) => (Number(index) | 0) + (ui as EngineUi).JOKE_LABEL_BASE) : null,
             }, { tables: data.tables, font: data.font, banks: data.banks,
                  ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}) }, { playSound });
         },

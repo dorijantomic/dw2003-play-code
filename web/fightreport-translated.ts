@@ -25,6 +25,8 @@
 // Same public API as createFightReportNative: open/isOpen/handleKey/update/draw/
 // close/diagnostics.
 import { heldCount, itemCountEntries, setHeldCount, setReportOwnedForms, ui, MONEY_CAP } from "./vendor/engine.js";
+import type { PackedSfx, ThrownError } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
@@ -33,7 +35,9 @@ import type { UiPart, UiReportContext } from "./ui-c/types.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
-import type { FightReportScreen } from "./types/fightreport-translated.js";
+import type { FightReportOpts, FightReportParticipant, FightReportScreen } from "./types/fightreport-translated.js";
+import type { FightReportSession } from "../engine/dw3/ui/fight-report-session.js";
+import type { FormLedgerEntry } from "./game/types.js";
 import type { DigimonRecord } from './types/battle.js';
 interface ReportManifest {
     textButtons: { bytes: number[] };
@@ -44,7 +48,7 @@ interface FightReportData {
     tables: Uint8Array;
     profiles: Map<number, DigimonRecord>;
     font: Uint8Array;
-    cursorGlyphs: Uint8Array;
+    cursorGlyphs: unknown;
     textButtons: Uint8Array;
     banks: Map<number, Uint8Array>;
 }
@@ -53,23 +57,13 @@ interface FightReportData {
 /** The report art: 0x079F0000 is disc index 1951 (STFRPT), 0x02860000 is 646 (CMFONT, the banner). */
 const PACKS: Record<string, string> = { 1951: "stfrpt", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
-const BANKS = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, "pause"]];
+const BANKS: [number, string][] = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, "pause"]];
 
-/** What the fight report is handed when it opens: the fight it reports on, the party in it, and what to call on the way out. */
-interface FightReportOpts {
-    onClose?: (() => void) | null;
-    gameState?: unknown;
-    participants?: { pos?: number; name?: string; level?: number; preExp?: unknown; participated?: boolean }[];
-    dropItemId?: number;
-    battleId?: number;
-    activePos?: number;
-    view?: { progress?: unknown[]; reward?: any };
-}
 
 const DATA_LABEL = "Fight report data";
 
-const dataByLanguage = new Map();
-function loadData(language): Promise<FightReportData> {
+const dataByLanguage = new Map<number, Promise<FightReportData>>();
+function loadData(language: number): Promise<FightReportData> {
     if (!dataByLanguage.has(language)) {
         dataByLanguage.set(language, Promise.all([
             fetchJson("report/manifest.json", DATA_LABEL),
@@ -83,35 +77,35 @@ function loadData(language): Promise<FightReportData> {
             banks: new Map(banks.map((data, i) => [BANKS[i]![0] + language, data])),
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
-    return dataByLanguage.get(language);
+    return dataByLanguage.get(language)!;
 }
 
 const rand16 = () => (Math.random() * 0x10000) | 0;
 
-export function createFightReportTranslated(sfx = null, options = {}) {
-    const r = {
+export function createFightReportTranslated(sfx: PackedSfx | null = null, options = {}) {
+    const r: FightReportScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null,
         _state: null, _onClose: null, _opts: null, _clock: null, _ticks: 0, _request: 0,
         _summary: null, _lastDiagnostic: null,
         _seedBits: null, _seedHeld: null,
-    } as FightReportScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "stfrpt", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
 
-    const playSound = (id) => { sfx?.playPacked(id); };
+    const playSound = (id: number) => { sfx?.playPacked(id); };
 
     /** Walker state -> the session's seed (the RAM contract of the disc's screen). */
-    function buildSeed(language) {
+    function buildSeed(language: number) {
         const o = r._opts;
         const state = r._state ?? {};
         const members = (o.participants ?? []).slice()
-            .sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))
-            .map((p) => {
+            .sort((a: FightReportParticipant, b: FightReportParticipant) => (a.pos ?? 0) - (b.pos ?? 0))
+            .map((p: FightReportParticipant) => {
                 // the record has 44 ledger cells; the unlock routine must still know every form this partner owns
-                setReportOwnedForms(p.rosterSlot ?? 0, new Map((p.forms?.formLedger ?? []).map((e) => [Number(e.id), Number(e.formLevel ?? 1)])));
+                setReportOwnedForms(p.rosterSlot ?? 0, new Map((p.forms?.formLedger ?? []).map((e: FormLedgerEntry): [number, number] => [Number(e.id), Number(e.formLevel ?? 1)])));
                 return p;
             })
-            .map((p) => ({
+            .map((p: FightReportParticipant) => ({
                 position: p.pos ?? 0,
                 rosterSlot: p.rosterSlot ?? 0,
                 nameBytes: encodeNativeScreenText(p.name),
@@ -142,7 +136,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         };
     }
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         r._error = error;
         r._failed = true;
         r._lastDiagnostic = `translated fight report failed: ${error?.message ?? error}`;
@@ -152,9 +146,9 @@ export function createFightReportTranslated(sfx = null, options = {}) {
     function startSession() {
         const selected = r._state?.languageByte;
         const language = Number.isInteger(selected) ? selected : 2;
-        r._session = new ui.FightReportSession(buildSeed(language), r._data,
+        r._session = new (ui as EngineUi).FightReportSession(buildSeed(language), r._data,
             { playSound, rand: rand16 });
-        r._clock = new ui.MenuDisplayClock();
+        r._clock = new (ui as EngineUi).MenuDisplayClock();
         // What the walker was carrying when the screen opened: the screen's own
         // save context starts from these, so a change from them IS its payout.
         r._seedBits = r._session!.bits();
@@ -187,7 +181,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
      * put the money in (see the header). It only touches state once the session has
      * actually moved a total away from the value it was seeded with.
      */
-    function payout(session) {
+    function payout(session: FightReportSession) {
         if (!r._open || !r._state) return;
         const bits = session.bits();
         const held = session.heldCount(r._opts?.dropItemId ?? 0);
@@ -206,12 +200,12 @@ export function createFightReportTranslated(sfx = null, options = {}) {
             if (!session) return;
             const finished = session.finished();
             // Read every private and paid value while the session is alive.
-            const positions = (r._opts?.participants ?? []).map((p) => p.pos ?? 0);
+            const positions = (r._opts?.participants ?? []).map((p: FightReportParticipant) => p.pos ?? 0);
             r._summary = {
                 finished, ticks: r._ticks, bits: session.bits(),
                 heldDrop: (r._opts?.dropItemId ?? 0) > 0 ? session.heldCount(r._opts.dropItemId) : null,
                 transition: session.transition(),
-                records: positions.map((pos) => { try { return { pos, ...session.record(pos) }; } catch { return null; } }),
+                records: positions.map((pos: number) => { try { return { pos, ...session.record(pos) }; } catch { return null; } }),
                 sounds: session.sounds.slice(), loadedBanks: session.loadedBanks.slice(),
                 displayCalls: session.displayCalls.map((c) => ({ ...c })),
             };
@@ -219,7 +213,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         },
     });
 
-    r.open = (opts: FightReportOpts = {} as FightReportOpts) => {
+    r.open = (opts: FightReportOpts = {}) => {
         const request = host.begin({ onClose: opts.onClose ?? null });
         r._failed = false;
         r._error = null;
@@ -253,7 +247,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         start: () => startSession(),
         held: () => r._state?.keys ? [...r._state.keys] : [],
         fail,
-        onFrame: (session: FightReportScreen) => payout(session),
+        onFrame: (session: FightReportSession) => payout(session),
     });
 
     // The report is a framebuffer takeover: it fills the whole canvas, at
@@ -272,11 +266,11 @@ export function createFightReportTranslated(sfx = null, options = {}) {
     /** Read-only look data for web/ui-c/vic.js: the battle's progress and reward, the partners' names and levels, the session's live rows. */
     function reportView() {
         const o = r._opts ?? {}, v = o.view ?? {};
-        let rows = [];
+        let rows: unknown[] = [];
         try { rows = r._session ? r._session.rows() : []; } catch { rows = []; }
         return {
             progress: v.progress ?? [], reward: v.reward ?? null, rows,
-            partners: (o.participants ?? []).map((p) => ({ pos: p.pos ?? 0, name: p.name, level: p.level, preExp: Number(p.preExp) || 0, participated: !!p.participated })),
+            partners: (o.participants ?? []).map((p: FightReportParticipant) => ({ pos: p.pos ?? 0, name: p.name, level: p.level, preExp: Number(p.preExp) || 0, participated: !!p.participated })),
         };
     }
 
@@ -305,7 +299,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         loadedBanks: r._session ? r._session.loadedBanks.slice() : (r._summary?.loadedBanks ?? []),
         displayCalls: r._session ? r._session.displayCalls.map((c) => ({ ...c })) : (r._summary?.displayCalls ?? []),
         records: r._session
-            ? (r._opts?.participants ?? []).map((p) => { try { return { pos: p.pos ?? 0, ...r._session!.record(p.pos ?? 0) }; } catch { return null; } })
+            ? (r._opts?.participants ?? []).map((p: FightReportParticipant) => { try { return { pos: p.pos ?? 0, ...r._session!.record(p.pos ?? 0) }; } catch { return null; } })
             : (r._summary?.records ?? []),
         summary: r._summary,
         renderer: renderer.stats,

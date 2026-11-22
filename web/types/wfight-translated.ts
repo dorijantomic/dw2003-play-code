@@ -1,4 +1,6 @@
+import type { WfightLoaderSession } from "../../engine/dw3/ui/wfight-loader-session.js";
 import type { GameState } from "../game/types.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 
 /** What the loader left behind when it retired: the banks it asked for and the VRAM it uploaded. */
 export interface WfightLoaderSummary {
@@ -35,8 +37,8 @@ export interface WfightDiagnostics {
 }
 
 export interface WorldFightScreen {
-  /** vendor object: the ui.MenuDisplayClock the loader session is ticked on */
-  _clock: any;
+  /** the display clock the loader session is ticked on */
+  _clock: MenuDisplayClock | null;
   /** the packed data the loader reads (bank tables) */
   _data: any;
   _done: boolean;
@@ -46,8 +48,8 @@ export interface WorldFightScreen {
   _lastDiagnostic: string | null;
   _open: boolean;
   _pending: boolean;
-  /** vendor object: the engine's ui.WfightLoaderSession */
-  _session: any;
+  /** the engine's loader session; update() hands tick() the display tick it does not read (a BUG-free extra argument), so tick is widened to take it */
+  _session: (Omit<WfightLoaderSession, "tick"> & { tick(displayTick?: number): void; }) | null;
   /** what the last finished loader did, null until one has run */
   _summary: WfightLoaderSummary | null;
   _ticks: number;

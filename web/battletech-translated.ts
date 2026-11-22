@@ -8,10 +8,13 @@
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/
 // preload/diagnostics.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
-import type { BattleTechSeed } from "./types/battletech-translated.js";
+import type { BattleTechSeed, BattleTechWords } from "./types/battletech-translated.js";
+import type { FightTechSession } from "../engine/dw3/ui/fight-tech-session.js";
+import type { BattleMenuData, BattleMenuMove, PackedSfx } from "./types/translated-screens.js";
 import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
 type BattleMenuSession = NonNullable<BattleMenuAdapterState["_session"]>;
 
@@ -51,7 +54,7 @@ function loadData() {
     return dataPromise;
 }
 
-export function createBattleTechTranslated(sfx = null, options = {}) {
+export function createBattleTechTranslated(sfx: PackedSfx | null = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -64,7 +67,7 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
         languageError: "Battle tech language index is invalid",
 
         /** Open on the party member's technique list. */
-        seed: (r, seed: BattleTechSeed = {}) => ({
+        seed: (r: BattleMenuAdapterState, seed: BattleTechSeed = {}) => ({
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             mp: Number(seed.mp ?? 0) & 0xffff,
             maxMp: Number(seed.maxMp ?? 0) & 0xffff,
@@ -72,7 +75,7 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
             techniques: (seed.techniques ?? []).map((t) => ({ word: Number(t.word ?? 0) & 0xffff, cost: Number(t.cost ?? 0) | 0 })),
         }),
 
-        start: (r, data, language, playSound) => new ui.FightTechSession(language, {
+        start: (r: BattleMenuAdapterState & { _seed: BattleTechWords }, data: BattleMenuData, language: number, playSound: (soundId: number) => void) => new (ui as EngineUi).FightTechSession(language, {
             activeIndex: r._seed.activeIndex,
             mp: r._seed.mp,
             maxMp: r._seed.maxMp,
@@ -81,14 +84,14 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
         }, { tables: data.tables, font: data.font, banks: data.banks,
              ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}) }, { playSound }),
 
-        answer: (r, session) => {
+        answer: (r: BattleMenuAdapterState, session: FightTechSession) => {
             if (!session.finished()) return null;
             const chosen = session.chosen();
             r._chosen = chosen;
             return { value: chosen };
         },
 
-        diagnostics: (r): BattleTechDiagnostics => ({
+        diagnostics: (r: BattleMenuAdapterState): BattleTechDiagnostics => ({
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
             page: r._session?.page() ?? null,
@@ -96,7 +99,7 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
             ready: r._session?.ready() ?? false,
             tasks: r._session?.tree.tasks.size ?? 0,
             vsync: r._session?.vsyncInstalled() ?? false,
-            moves: r._session?.moves.map((m) => ({ ...m })) ?? [],
+            moves: r._session?.moves.map((m: BattleMenuMove) => ({ ...m })) ?? [],
             sounds: r._session?.sounds ?? [],
         }),
     });

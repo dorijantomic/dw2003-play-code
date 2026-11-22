@@ -1,6 +1,8 @@
 // Card-shop browser adapter: data loading, held input, painting and persistence.
 // Root, child controllers and reveal execute understood ports in engine/dw3/ui.
 import { ui } from './vendor/engine.js';
+import type { PackedSfx } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from './native-screen-render.js';
 import { paintNativeSession } from './native-session.js';
 import { composeWindow } from './ui-c/screens.js';
@@ -8,6 +10,7 @@ import { fetchJson, fetchBytes, loadResidentResources } from './resident-data.js
 import { cards, persistCollection, loadCatalog, loadBoosters, loadCardPrices,
   loadCardShops, loadCardIcons, drawCardIcon } from './cardstate.js';
 import type { GameState } from "./game/types.js";
+import type { CardShopWallet } from "../engine/dw3/ui/card-shop-session.js";
 import type { CardShopScreen } from "./types/cardshop-translated.js";
 import type { CardShopOptions } from "./types/cardshop-translated.js";
 
@@ -30,7 +33,7 @@ async function loadPackData() {
   return packDataPromise;
 }
 export async function bindCardShopInventory(state: GameState) {
-  const data=await loadPackData();ui.bindCardPacks(cards(),state,data.boosterItems);
+  const data=await loadPackData();(ui as EngineUi).bindCardPacks(cards(),state,data.boosterItems);
 }
 async function loadData(language: number | undefined) {
   dataPromise ??= Promise.all([
@@ -53,7 +56,7 @@ async function loadData(language: number | undefined) {
     shops:shops.shops,prices:prices.prices,boosters:boosters.sets,cards:catalog.cards,
     ...packData };
 }
-export function createCardShopTranslated(sfx=null,options: CardShopOptions={}) {
+export function createCardShopTranslated(sfx: PackedSfx | null = null,options: CardShopOptions={}) {
   const c={_open:false,_session:null,_error:null,_state:null,_clock:null,_request:0} as CardShopScreen;
   const renderer=createNativeScreenRenderer({pack:'stcdsp',packs:PACKS},
     (directory)=>PACKS[directory>>>16]??null, {
@@ -65,17 +68,18 @@ export function createCardShopTranslated(sfx=null,options: CardShopOptions={}) {
     });
   c.open=(state,onClose=null,onEditFolder=null,shopId=null)=>{
     c._open=true;c._state=state;c._session=null;c._error=null;
-    c._clock=new ui.MenuDisplayClock();c._onClose=onClose;c._onEditFolder=onEditFolder;
+    c._clock=new (ui as EngineUi).MenuDisplayClock();c._onClose=onClose;c._onEditFolder=onEditFolder;
     const request=++c._request;
     const language=Number.isInteger(state?.languageByte)?state.languageByte:2;
     loadCardIcons();
     Promise.all([loadData(language),loadCatalog(),loadBoosters(),loadCardPrices(),loadCardShops()])
       .then(([data])=>{
         if(!c._open||request!==c._request)return;
-        ui.bindCardPacks(cards(),state,data.boosterItems);
+        (ui as EngineUi).bindCardPacks(cards(),state,data.boosterItems);
         c._savedRevision=0;
-        c._session=new ui.CardShopSession(Number.isInteger(shopId)?shopId:0,language,
-          state,cards(),data,(sound)=>sfx?.playPacked(sound),undefined,options.stage?.(state)??0);
+        c._session=new (ui as EngineUi).CardShopSession(Number.isInteger(shopId)?shopId:0,language,
+          // ETS item 9: the field state always holds the player's BIT; GameState only marks `bits` optional
+          state as GameState & CardShopWallet,cards(),data,(sound)=>sfx?.playPacked(sound),undefined,options.stage?.(state)??0);
       }).catch((error)=>{c._error=error;console.error('Translated card shop failed to open',error);});
   };
   c.isOpen=()=>c._open;

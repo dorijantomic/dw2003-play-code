@@ -20,6 +20,7 @@ import { isPadButton } from "./vendor/engine.js";
 import * as uiC from "./ui-c/index.js";
 import { partHook } from "./ui-c/capture.js";
 import { composeBookScreen } from "./ui-c/screens.js";
+import type { Book, BookBack, BookHost, BookHostArgs } from "./types/screens.js";
 
 /** The look C layer of the open book (web/ui-c/books.js composes it). */
 export const BOOK_UI_KEY = "ui-book";
@@ -29,16 +30,16 @@ const backdropScroll = (t: number) => (t * 25) % 96;
 /** After the book has shut, wait for the player to let go of the pad (at most this many displayed frames) before the pause list returns. */
 export const RELEASE_WAIT_FRAMES = 25;
 
-export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFx = (k, v) => window.__setFx?.(k, v), setFxMany = (o) => window.__setFxMany?.(o) } = {}) {
+export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFx = (k, v) => window.__setFx?.(k, v), setFxMany = (o) => window.__setFxMany?.(o) }: BookHostArgs = {}): BookHost {
     const input = createKitInput();
     const backdrop = createStatusBackdrop();
-    let book = null, chain = null, onBack = null;
+    let book: Book | null = null, chain: ReturnType<typeof createFoldChain> | null = null, onBack: BookBack | null = null;
     let ticks = 0, closing = false, waited = 0, lastDt = 0;
 
-    const host = {
+    const host: BookHost = {
         isOpen: () => book !== null,
         /** Open `name` (a key of `factories`). `held` is the pad set right now (the confirm that chose the row is still down). */
-        open(name, back = null, held: any = []) {
+        open(name: string, back: BookBack | null = null, held: any = []) {
             const make = factories[name];
             if (!make || book) return false;
             book = make({ sfx, fx, setFx, setFxMany, host });

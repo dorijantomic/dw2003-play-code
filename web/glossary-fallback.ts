@@ -3,14 +3,15 @@
 // writes "No picture". The disc's eight partners have models, and their pictures live in the status pack, not here.
 import { newPartnerList } from "./vendor/engine.js";
 import { drawPartnerPicture } from "./partner-pictures.js";
+import type { PartnerFallbackDeps, PartnerFallbackTarget } from "./types/screens.js";
 
 const BASE = 0x400;
 const STEPS = [0, 1, 2, 1];          // the engine's frame order for a new partner's picture
 const STEP_MS = 200;
 
 /** `(ctx, { partnerId }, x, y, w, h) -> boolean`; the 32 x 32 picture is drawn at 2x, centred in the rectangle. */
-export function createPartnerFallback({ partners = newPartnerList, draw = drawPartnerPicture, now = () => Date.now() } = {}) {
-    return (ctx, who, x, y, w, h) => {
+export function createPartnerFallback({ partners = newPartnerList, draw = drawPartnerPicture, now = () => Date.now() }: PartnerFallbackDeps = {}) {
+    return (ctx: CanvasRenderingContext2D, who: PartnerFallbackTarget | null | undefined, x: number, y: number, w: number, h: number) => {
         if (who?.partnerId == null) return false;
         const p = partners().find((q) => q && q.id === who.partnerId);
         if (!p) return false;

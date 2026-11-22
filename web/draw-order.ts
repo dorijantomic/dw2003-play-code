@@ -80,7 +80,7 @@ export function actorDrawsUnderMap(bucket: number) {
 
 // Debug-only: producers record what they submit when a verifier arms the log,
 // so an assertion can read the band each producer chose without pixel-probing.
-let orderLog: { key: number; tag: null; parts: number; }[] | null = null;
+let orderLog: { key: number; tag: string | null; parts: number; }[] | null = null;
 export function beginDrawOrderLog() { orderLog = []; }
 export function takeDrawOrderLog() { const l = orderLog; orderLog = null; return l; }
 
@@ -97,7 +97,7 @@ export function takeDrawOrderLog() { const l = orderLog; orderLog = null; return
  * interleave with other objects -- the fault this replaces, where six
  * hand-written producers each pushed their sub-parts at an invented y.
  */
-export function pushComposite(drawables: { y: number; draw: () => void; }[], key: number, parts: (() => void)[], tag = null) {
+export function pushComposite(drawables: { y: number; draw: () => void; }[], key: number, parts: (() => void)[], tag: string | null = null) {
     const draws = (Array.isArray(parts) ? parts : [parts]).filter((d) => typeof d === "function");
     if (!draws.length) return;
     if (orderLog) orderLog.push({ key, tag, parts: draws.length });
@@ -129,15 +129,16 @@ export function pushComposite(drawables: { y: number; draw: () => void; }[], key
  * producers already submit in bucket order (the map fg at 3 before the
  * bucket-2 records and glows), so they are left in insertion order.
  */
-export function sortDrawables(drawables) {
+export function sortDrawables(drawables: { y: number; draw: () => void; }[]) {
     drawables.sort((a: { y: number; }, b: { y: number; }) => (a.y - b.y) || 0);
     for (let i = 0, n = drawables.length; i < n; ) {
         let j = i + 1;
-        while (j < n && drawables[j].y === drawables[i].y) j += 1;
-        if (j - i > 1 && Number.isFinite(drawables[i].y)) {
+        // ETS item 9: i, j < n and k, m lie in [i, j), all inside the list
+        while (j < n && drawables[j]!.y === drawables[i]!.y) j += 1;
+        if (j - i > 1 && Number.isFinite(drawables[i]!.y)) {
             for (let k = i, m = j - 1; k < m; k += 1, m -= 1) {
-                const swap = drawables[k];
-                drawables[k] = drawables[m];
+                const swap = drawables[k]!;
+                drawables[k] = drawables[m]!;
                 drawables[m] = swap;
             }
         }

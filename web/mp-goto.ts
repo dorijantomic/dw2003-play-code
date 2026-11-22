@@ -6,7 +6,7 @@ export const GOTO_TIMEOUT_MS = 14000;       // like a co-op invite
 const RING_FIRST = 20, RING_STEP = 8, RING_LAST = 140, SPOTS = 16;
 
 /** The spot next to (tx, ty) or null when none is free within RING_LAST pixels. `size` = { w, h } of the map. */
-export function pickSpotNear(free, tx: number, ty: number, size) {
+export function pickSpotNear(free: (x: number, y: number) => boolean, tx: number, ty: number, size: { w: number; h: number; } | null | undefined) {
     const inside = (x: number, y: number) => !size || (x >= 0 && y >= 0 && x < size.w && y < size.h);
     for (let r = RING_FIRST; r <= RING_LAST; r += RING_STEP) {
         for (let i = 0; i < SPOTS; i++) {

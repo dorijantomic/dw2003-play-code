@@ -5,16 +5,19 @@
 // packed sounds. It never executes original instructions and never runs events: the menu starts
 // none, so closing it hands control straight back.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import * as uiC from "./ui-c/index.js";
 import { composeHelp } from "./ui-c/screens.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { HelpMenuSession } from "../engine/dw3/ui/help-menu-session.js";
+import type { PackedSfx, ResidentGlyphs, ThrownError } from "./types/translated-screens.js";
 import type { HelpMenuScreen } from "./types/help-menu-translated.js";
 
 const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 /**
  * Game key -> pad bit (identity logical-button map: Up 4, Down 6, confirm 13, Cancel 14). The
  * Cancel bit is the one the Yes/No box does not need: the help menu closes on it (wstag210
@@ -24,11 +27,11 @@ const KEY_BITS: [string, number][] = [["up", 1 << 4], ["down", 1 << 6], ["circle
 
 const DATA_LABEL = "Help menu data";
 
-export function createHelpMenuTranslated(sfx = null) {
-    const g = {
+export function createHelpMenuTranslated(sfx: PackedSfx | null = null) {
+    const g: HelpMenuScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null, _pad: null,
         _ticks: 0, _request: 0, _closes: 0, _sounds: [], _packed: {}, _primed: false, _row: null,
-    } as HelpMenuScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Abandoned by the caller, the menu disposes its session and runs nothing, as web/help-menu.js
@@ -37,7 +40,7 @@ export function createHelpMenuTranslated(sfx = null) {
         closeMode: CLOSE_SILENT, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
     });
 
-    const playSound = (id) => {
+    const playSound = (id: number) => {
         const key = id >>> 0;
         g._packed[key] = (g._packed[key] ?? 0) + 1;
         g._sounds.push(key);
@@ -45,7 +48,7 @@ export function createHelpMenuTranslated(sfx = null) {
         sfx?.playPacked(key);
     };
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         g._error = error;
         g._failed = true;
         console.error("Translated help menu failed", error);
@@ -68,14 +71,15 @@ export function createHelpMenuTranslated(sfx = null) {
         try {
             const [shared, pack] = await Promise.all([
                 loadResidentResources(),
-                packBytes ?? loadEsdmgEntry(ui.yesNoTextFile(menuRow.textHandle), menuRow.textHandle & 0xffff, DATA_LABEL),
+                packBytes ?? loadEsdmgEntry((ui as EngineUi).yesNoTextFile(menuRow.textHandle), menuRow.textHandle & 0xffff, DATA_LABEL),
             ]);
             if (!host.current(request)) return;
-            const session = new ui.HelpMenuSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
+            // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+            const session = new (ui as EngineUi).HelpMenuSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs as ResidentGlyphs });
             session.open(menuRow, pack, { onClose: () => host.finish() });
             g._session = session;
-            g._clock = new ui.MenuDisplayClock();
-            g._pad = new ui.MenuPadWords();
+            g._clock = new (ui as EngineUi).MenuDisplayClock();
+            g._pad = new (ui as EngineUi).MenuPadWords();
             g._pending = false;
         } catch (error) {
             if (host.current(request)) fail(error);
@@ -93,7 +97,7 @@ export function createHelpMenuTranslated(sfx = null) {
         try {
             for (const frame of g._clock!.advance(dt)) {
                 const { pressed, repeated } = g._pad!.update(held, frame.tick);
-                const session = g._session;
+                const session: HelpMenuSession = g._session;
                 session.tick({ pressed, repeat: repeated });
                 g._ticks++;
                 for (const id of session.takeSounds()) playSound(id);

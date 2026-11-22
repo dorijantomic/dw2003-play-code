@@ -131,7 +131,7 @@ import { makeFighters } from "./battle3d/core/fighters.js";
 import { makeAtmos } from "./battle3d/core/atmos.js";
 import { makePano } from "./battle3d/core/pano.js";
 import { makeRender } from "./battle3d/core/render.js";
-import type { Battle3DContext, Battle3DInitOptions, CaptureCanvas, SkelBufs } from "./types/battle3d.js";
+import type { Battle3dCanvas, Battle3DContext, Battle3DInitOptions, CaptureCanvas, SkelBufs } from "./types/battle3d.js";
 import type { BattleSide } from "./types/audio.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export {
@@ -240,7 +240,7 @@ export function resolveContactSoundType(type: number, contactType: number | null
   return evaded ? CONTACT_EVADE_TYPE : contactType;
 }
 
-export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {}) {
+export function createBattle3D(canvas: Battle3dCanvas, sfx = null, opts: Battle3DInitOptions = {}) {
   // opts.alpha (Arena Viewer "built" look only): a see-through canvas, so a three.js world drawn on another canvas
   // shows under the fighters. Every other caller keeps the opaque canvas.
   const B$ = {} as Battle3DContext;
@@ -1074,7 +1074,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       return true;
     },
     debugTimelineTables() {
-      return (B$.playerModel?.timeline || []).map((p, i) => ({ idx: i, len: p.table?.length || 0 }))
+      return (B$.playerModel?.timeline || []).map((p: { table?: unknown[] }, i: number) => ({ idx: i, len: p.table?.length || 0 }))
         .filter(x => x.len > 0);
     },
     // Debug (fight-action-lab): play an ORDERED SEQUENCE of timeline tables back-to-back on the
@@ -1390,7 +1390,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
         nearCamera: { giant: B$.giantNearCam,
           fit: B$.fittedNearCam?.folder === B$.playerFolder
             ? { giant: B$.fittedNearCam.giant,
-                shots: (B$.fittedNearCam.shots ?? []).map((s) => s
+                shots: (B$.fittedNearCam.shots ?? []).map((s: { changed: boolean; lift: number; pull: number; H: number } | null) => s
                   ? { changed: s.changed, lift: +s.lift.toFixed(3), pull: +s.pull.toFixed(2), H: s.H }
                   : null) }
             : null },

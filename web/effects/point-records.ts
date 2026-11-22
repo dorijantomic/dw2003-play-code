@@ -21,6 +21,15 @@ import {
 import { loadAssetImage } from "../assets.js";
 import { sceneVariantSlotIndex, sceneVariantSlotActive } from "../ordinal-scene-variant.js";
 import { S } from "./state.js";
+import type {
+    ActorPositionPatch,
+    PointRecordAnchorActor,
+    PointRecordRow,
+    PointRuntimeRow,
+    PointSlotWrite,
+    PointStageData,
+    ScreenAtlas,
+} from "../types/fx3d.js";
 interface PointRecordPatch {
     active?: number;
     sprite?: number;
@@ -41,54 +50,40 @@ interface PointRecordReadout {
 
 
 interface PointRecordHost {
-    write(index: string | number, patch: PointRecordPatch): void;
-    read(index: string | number): PointRecordReadout;
+    write(index: number, patch: PointRecordPatch): void;
+    read(index: number): PointRecordReadout;
     sound(packed: number): void;
     charY(): number;
     setCharY(fixed: number): void;
-    anchor(type: number, p1: number, p2: number): number | null;
-    anchorPos(handle: number): { x: number; y: number } | null;
+    anchor(type: number, p1: number, p2: number): PointRecordAnchorActor | null;
+    anchorPos(handle: PointRecordAnchorActor): { x: number; y: number } | null;
 }
 
-interface PointSpriteRecord {
-    readonly atlas: number;
-    readonly x: number;
-    readonly y: number;
-    readonly z?: number;
-    readonly width?: number;
-    readonly height?: number;
-    readonly scale?: number;
-    readonly rotation?: number;
-    readonly flipX?: boolean;
-    readonly flipY?: boolean;
-    readonly palette?: number;
-    readonly tile?: number;
-    readonly layer?: number;
-    readonly blend?: number;
-    readonly hidden?: boolean;
-}
+type StageSoundSink = (packed: number, stageId: string | number) => void;
+type AnchorFind = (stageId: string | number, type: number, p1: number, p2: number) => PointRecordAnchorActor | null;
+type AnchorPosition = (handle: PointRecordAnchorActor) => { x: number; y: number } | null;
 
+// ETS item 42: the two tables are JSON read from disk and handed to the engine, which checks them.
+let actorData: Record<string, unknown> | null = null; // point_record_actors.json -- the ONE table
 
-let actorData = null; // point_record_actors.json -- the ONE table
+let parentData: Record<string, unknown> | null = null; // child_pool_parents.json -- the child-array parents
 
-let parentData = null; // child_pool_parents.json -- the child-array parents
+let playStageSound: StageSoundSink | null = null; // (packedWord) => void, wired once by the game loop
 
-let playStageSound: ((arg0: number, arg1: string | number) => void) | null = null; // (packedWord) => void, wired once by the game loop
+const sheets: Record<string, HTMLImageElement | "loading" | null> = {}; // stageId -> Image | "loading"
 
-const sheets = {}; // stageId -> Image | "loading"
+const sheetPromises: Record<string, Promise<HTMLImageElement | null>> = {}; // stageId -> in-flight load
 
-const sheetPromises = {}; // stageId -> in-flight load
+const semiSheets: Record<string, HTMLImageElement | "loading" | null> = {}; // stageId -> Image | null | "loading" (STP texels only)
 
-const semiSheets = {}; // stageId -> Image | null | "loading" (STP texels only)
+const semiSheetPromises: Record<string, Promise<HTMLImageElement | null>> = {}; // stageId -> in-flight load
 
-const semiSheetPromises = {}; // stageId -> in-flight load
-
-const runtime = {}; // stageId -> [{sprite, timer}] parallel to records
+const runtime: Record<string, PointRuntimeRow[]> = {}; // stageId -> [{sprite, timer}] parallel to records
 
 // Translated display-slot writers (engine/systems/stage-slot-player.ts): a
 // stage object that owns a point record writes its live flag and sprite here,
 // and `prepareEffects` reads the same arrays the interpreter bridge fills.
-export const slotWrites = {}; // stageId -> Map<recordIndex, {active, sprite}>
+export const slotWrites: Record<string, Map<number, PointSlotWrite>> = {}; // stageId -> Map<recordIndex, {active, sprite}>
 
 // The map setup's display-slot variant flag (fieldstg F0x80084B40): at every
 // stage setup the walker writes the FIRST chain record whose tag byte (+1) is 1
@@ -97,14 +92,14 @@ export const slotWrites = {}; // stageId -> Map<recordIndex, {active, sprite}>
 // per stage, at the point the original's own setup runs, so a per-frame stage
 // actor (a slot player, a street light) still overrides it. stageId -> the
 // ordinal already applied.
-const variantSlotApplied = new Map();
+const variantSlotApplied = new Map<string, number>();
 
 // The character anchor the `picture-steps` machine draws at, wired once by the
 // game loop: `(stageId, type, p1, p2) -> live actor | null` and
 // `(actor) -> {x, y} | null`.  See `setPointRecordAnchor`.
-let anchorFind = null;
+let anchorFind: AnchorFind | null = null;
 
-let anchorPos = null;
+let anchorPos: AnchorPosition | null = null;
 
 export async function loadPointSprites() {
     [S.data, actorData, S.padData, parentData, S.overlayShapeData] = await Promise.all([
@@ -147,7 +142,7 @@ export async function loadPointSprites() {
  * already draws from.  Returns true when the id was claimed, so
  * web/stage-objects.js skips the generic bubble.
  */
-export function firePointRecordStageObject(stageId, id, sub) {
+export function firePointRecordStageObject(stageId: string | number, id: string | number, sub: string | number) {
     if (actorData && firePointRecordActor(stageId, id, sub)) return true;
     if (parentData && fireChildPoolParent(stageId, id, sub)) return true;
     return false;
@@ -175,7 +170,7 @@ export function constructPointRecordStageObjects(stageId: string, ordinal = 0) {
  * imports this module), so the same number is handed over twice rather than a
  * second copy of it being read out of the story engine.
  */
-export function setPointRecordOrdinal(fn: { (): number; (): number; }) {
+export function setPointRecordOrdinal(fn: () => number) {
     S.readOrdinal = typeof fn === "function" ? fn : () => 0;
 }
 
@@ -185,13 +180,13 @@ export function setPointRecordOrdinal(fn: { (): number; (): number; }) {
  * found.  web/game.js owns both because it owns the live cast; a game with no
  * wiring draws no anchored pictures rather than inventing a position.
  */
-export function setPointRecordAnchor(find, position) {
+export function setPointRecordAnchor(find: AnchorFind | null, position: AnchorPosition | null) {
     anchorFind = typeof find === "function" ? find : null;
     anchorPos = typeof position === "function" ? position : null;
 }
 
 /** The engine's packed-sound sink for these actors' own sounds. */
-export function setPointRecordActorSound(fn) {
+export function setPointRecordActorSound(fn: StageSoundSink | null) {
     playStageSound = fn;
     // Two channels, one sink. `playStageSound` above carries the cues a TICK
     // plays, because the tick is handed a per-stage host; the cues an actor
@@ -211,12 +206,12 @@ export function setPointRecordActorSound(fn) {
  * (wstag212.s file 0x3e8-0x408 plays the slot's table word on every configure),
  * and this module only forwards the wiring.
  */
-export function setPointRecordActorMusic(fn) {
+export function setPointRecordActorMusic(fn: ((word: number) => void) | null) {
     setEnginePointRecordActorMusic(fn);
 }
 
 /** Debug dump for `window.__pointRecordActors`. */
-export function pointRecordActors(stageId: number) {
+export function pointRecordActors(stageId: string | number) {
     return pointRecordActorState(stageId);
 }
 
@@ -225,19 +220,20 @@ export function pointRecordActors(stageId: number) {
  * headless verifier can read the frames a decor driver put there (the same rows
  * `eachRecord` paints from).
  */
-export function pointSpriteProbe(stageId: number) {
-    const s = S.data?.[stageId];
+export function pointSpriteProbe(stageId: string | number) {
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return [];
     const rt = stageRuntime(stageId, s.records);
-    return rt.map((st, i: string | number) => ({
+    // ETS item 9: rt was built from s.records one line up, so every index of rt is an index of s.records.
+    return rt.map((st, i) => ({
         index: i,
-        atlasFlag: s.records[i].atlasFlag,
-        active: st.active ?? s.records[i].active,
+        atlasFlag: s.records[i]!.atlasFlag,
+        active: st.active ?? s.records[i]!.active,
         sprite: st.sprite,
         ctr: st.ctr,
-        x: st.x ?? s.records[i].x,
-        y: st.y ?? s.records[i].y,
-        ysort: st.ysort ?? s.records[i].ysort,
+        x: st.x ?? s.records[i]!.x,
+        y: st.y ?? s.records[i]!.y,
+        ysort: st.ysort ?? s.records[i]!.ysort,
         drawn: Boolean(st.sprite in s.sprites || st.sprite in (s.sprites ?? {})),
     }));
 }
@@ -250,7 +246,7 @@ export function pointSpriteProbe(stageId: number) {
  * through web/stage-objects.js on the SETANIM registry route, so asking here
  * cannot start it twice.
  */
-export function padRunSound(stageId) {
+export function padRunSound(stageId: string | number) {
     return pointRecordPadRun(stageId)?.sound ?? null;
 }
 
@@ -260,14 +256,15 @@ export function padRunSound(stageId) {
 // being kicked (fieldstg file 0x9f50-0x9fc0). Here that is one poke into the
 // same runtime slot the point renderer draws from, so the kicked palm animates
 // in place with no second renderer.
-export function setPointSprite(stageId: string | number, recIndex: string | number, spriteId: number) {
-    const s = S.data?.[stageId];
+export function setPointSprite(stageId: string | number, recIndex: number, spriteId: number) {
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s || !s.records[recIndex]) return;
-    stageRuntime(stageId, s.records)[recIndex].sprite = spriteId;
+    // ETS item 9: the check above proved recIndex is a record, and the runtime has one row per record.
+    stageRuntime(stageId, s.records)[recIndex]!.sprite = spriteId;
 }
 
 /** The record-position patches the pad-flash arm asked for this frame. */
-export const actorPositions = {}; // stageId -> { recordIndex: {x, y, ysort} }
+export const actorPositions: Record<string, Record<string, ActorPositionPatch>> = {}; // stageId -> { recordIndex: {x, y, ysort} }
 
 /**
  * The host engine/systems/point-record-actor.ts drives: the three record bytes
@@ -276,10 +273,10 @@ export const actorPositions = {}; // stageId -> { recordIndex: {x, y, ysort} }
  * moves its three records onto -- plus a read side, because s790's reveal waits
  * on a record's live `ctr`.
  */
-function pointRecordHost(stageId: string | number, records: readonly PointSpriteRecord[]): PointRecordHost {
+function pointRecordHost(stageId: string | number, records: readonly PointRecordRow[]): PointRecordHost {
     const rt = stageRuntime(stageId, records);
     return {
-        write(index: string | number, patch: { active: undefined; sprite: undefined; ctr: undefined; x: undefined; y: undefined; ysort: undefined; }) {
+        write(index: number, patch: PointRecordPatch) {
             const st = rt[index];
             if (!st) return;
             if (patch.active !== undefined) st.active = patch.active;
@@ -294,7 +291,7 @@ function pointRecordHost(stageId: string | number, records: readonly PointSprite
                 };
             }
         },
-        read(index: string | number) {
+        read(index: number) {
             const st = rt[index];
             const rec = records[index];
             return {
@@ -341,7 +338,7 @@ function pointRecordHost(stageId: string | number, records: readonly PointSprite
 }
 
 /** The stage's point-sprite records, for an actor claiming them by atlas byte. */
-export function pointSpriteRecords(stageId: string | number): PointSpriteRecord[] | null {
+export function pointSpriteRecords(stageId: string | number): PointRecordRow[] | null {
     return S.data?.[stageId]?.records ?? null;
 }
 
@@ -364,7 +361,7 @@ export function tickPointRecordStageObjects(stageId: string | number, delta = 1)
  * helper's `-0x18`, so the existing `drawStageObjectSprites` path resolves it
  * against the same sheet everything else draws from.
  */
-export function pictureStepDraws(stageId) {
+export function pictureStepDraws(stageId: string | number) {
     return enginePictureStepDraws(stageId).map((d) => ({
         clip: d.pic, x: d.x, y: d.y,
     }));
@@ -378,7 +375,7 @@ export function pictureStepDraws(stageId) {
 // strip is the stage's own background art (the rock wall with its pipes, rails
 // and struts), and it belongs to a fixed-viewport stage, so it draws in SCREEN
 // coordinates.
-const scrollSheets = {}; // sheet path -> Image | null
+const scrollSheets: Record<string, HTMLImageElement | null> = {}; // sheet path -> Image | null
 
 function ensureScrollSheet(rel: string) {
     if (rel in scrollSheets) return scrollSheets[rel];
@@ -394,13 +391,13 @@ function ensureScrollSheet(rel: string) {
  * game loop to the SAME flag store every other gate reads, so the layer takes a
  * first visit / revisit branch exactly as the disc's scene entry does.
  */
-export function setPointRecordFlag(fn) {
+export function setPointRecordFlag(fn: ((id: number) => number) | null) {
     S.readFlag = typeof fn === "function" ? fn : null;
-    setScrollLayerFlag(typeof fn === "function" ? (id) => (fn(id) ? 1 : 0) : null);
+    setScrollLayerFlag(typeof fn === "function" ? (id: number) => (fn(id) ? 1 : 0) : null);
 }
 
 /** The live scenery layer's position this blank, for the debug hook/verifier. */
-export function scrollLayerEntries(stageId) {
+export function scrollLayerEntries(stageId: string | number) {
     return engineScrollLayerDraws(stageId);
 }
 
@@ -409,7 +406,7 @@ export function scrollLayerEntries(stageId) {
  * coordinates, drawn over the base backdrop and under the props/entities so the
  * platform and the point sprites stay in front of it.
  */
-export function drawScrollLayers(ctx: CanvasRenderingContext2D | null, stageId) {
+export function drawScrollLayers(ctx: CanvasRenderingContext2D | null, stageId: string | number) {
     for (const d of engineScrollLayerDraws(stageId)) {
         const img = scrollSheets[d.sheet] ?? ensureScrollSheet(d.sheet);
         if (!(img instanceof Image)) continue;
@@ -419,7 +416,7 @@ export function drawScrollLayers(ctx: CanvasRenderingContext2D | null, stageId) 
 }
 
 /** Drop every actor on a stage (or everywhere) -- on a stage change, and by tests. */
-export function clearPointRecordStageObjects(stageId) {
+export function clearPointRecordStageObjects(stageId: string | number) {
     clearPointRecordActors(stageId);
     delete actorPositions[stageId];
 }
@@ -432,23 +429,24 @@ export function clearPointRecordStageObjects(stageId) {
  * tell one script from another.
  */
 export function pointRecordProbe(stageId: string | number) {
-    const records = S.data?.[stageId]?.records;
+    const records: PointRecordRow[] | undefined = S.data?.[stageId]?.records;
     if (!records) return null;
     const rt = stageRuntime(stageId, records);
+    // ETS item 9: rt was built from records one line up, so every index of records is an index of rt.
     return {
-        records: records.map((r, i: string | number) => ({
+        records: records.map((r, i) => ({
             i,
             atlasFlag: r.atlasFlag,
             at: [r.x, r.y],
             // where the record is drawn from, which a pad flash has moved
-            x: rt[i].x ?? r.x,
-            y: rt[i].y ?? r.y,
-            ysort: rt[i].ysort ?? r.ysort,
+            x: rt[i]!.x ?? r.x,
+            y: rt[i]!.y ?? r.y,
+            ysort: rt[i]!.ysort ?? r.ysort,
             // The record's own ROM byte until an actor writes over it, so a
             // record the original never touches reads dark here.
-            active: rt[i].active ?? r.active,
-            sprite: rt[i].sprite,
-            ctr: rt[i].ctr,
+            active: rt[i]!.active ?? r.active,
+            sprite: rt[i]!.sprite,
+            ctr: rt[i]!.ctr,
         })),
     };
 }
@@ -461,7 +459,7 @@ export function pointRecordProbe(stageId: string | number) {
  * the record renders exactly as before, so a member that never fires changes
  * nothing.
  */
-export function setPointSlot(stageId: string | number, recIndex: number, patch) {
+export function setPointSlot(stageId: string | number, recIndex: number, patch: PointSlotWrite) {
     if (!(recIndex >= 0)) return;
     let m = slotWrites[stageId];
     if (!m) m = slotWrites[stageId] = new Map();
@@ -494,7 +492,7 @@ export function ensureSheet(stageId: string | number) {
 // The blended half of a stage's sprites: every texel whose CLUT entry has the
 // STP bit, over the same rect as its plain layer. Drawn under the clip's ABR
 // mode by drawSprite; stages with none (hasSemi false) never fetch.
-export function ensureSemiSheet(stageId: string): HTMLImageElement | "loading" | null {
+export function ensureSemiSheet(stageId: string): HTMLImageElement | "loading" | null | undefined {
     if (stageId in semiSheets) return semiSheets[stageId];
     if (!S.data?.[stageId]?.hasSemi) {
         semiSheets[stageId] = null;
@@ -513,9 +511,9 @@ export function ensureSemiSheet(stageId: string): HTMLImageElement | "loading" |
 // they never appear as point records or sprite ids. The interpreter captures
 // the quads (engine/native/runtime.ts screenQuads); these pages give them
 // pixels. Keyed per stage, fetched lazily; absence just means no quads drawn.
-export const screenAtlases = {}; // stageId -> {data, img} | null
+export const screenAtlases: Record<string, ScreenAtlas | null> = {}; // stageId -> {data, img} | null
 
-const screenAtlasPromises = {};
+const screenAtlasPromises: Record<string, Promise<ScreenAtlas | null | undefined>> = {};
 
 export function ensureScreenAtlas(stageId: string) {
     if (stageId in screenAtlases) return screenAtlases[stageId];
@@ -545,7 +543,7 @@ export function preloadPointSpriteStage(stageId: string) {
 }
 
 /** Release decoded atlases/runtimes outside the current stage neighborhood. */
-export function retainPointSpriteStages(stageIds) {
+export function retainPointSpriteStages(stageIds: Iterable<string>) {
     const keep = new Set(stageIds);
     for (const id of Object.keys(sheets)) {
         if (!keep.has(id)) {
@@ -569,16 +567,17 @@ export function retainPointSpriteStages(stageIds) {
  * stage actor still wins. `records` is the stage's point_sprites.json array in
  * memory order; `rt` is its runtime array.
  */
-export function applySceneVariantSlot(stageId: string, records, rt) {
+export function applySceneVariantSlot(stageId: string, records: readonly PointRecordRow[], rt: PointRuntimeRow[]) {
     const ordinal = S.readOrdinal();
     if (variantSlotApplied.get(stageId) === ordinal) return;
     variantSlotApplied.set(stageId, ordinal);
     const idx = sceneVariantSlotIndex(records);
     if (idx < 0 || idx >= rt.length) return;
-    rt[idx].active = sceneVariantSlotActive(ordinal);
+    // ETS item 9: idx was checked against rt.length on the line above.
+    rt[idx]!.active = sceneVariantSlotActive(ordinal);
 }
 
-export function stageRuntime(stageId: string | number, records) {
+export function stageRuntime(stageId: string | number, records: readonly PointRecordRow[]): PointRuntimeRow[] {
     let rt = runtime[stageId];
     if (!rt) {
         rt = records.map((r) => ({

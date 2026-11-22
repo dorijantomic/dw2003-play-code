@@ -3,9 +3,9 @@ import { modelKeyFromFolder } from "./camera-shots.js";
 import { buildBoneWorldMatrices } from "./rotation.js";
 import { posedVertex } from "./skeleton.js";
 import { cross3, dot3, normalize, sub3 } from "./math.js";
-import type { GiantShotOptions, PlacementTable } from "../types/battle3d.js";
+import type { GiantShotOptions, NearCamera, PlacementTable } from "../types/battle3d.js";
 interface GiantNearCameraInput {
-  eye: [number, number, number][];
+  eye: number[][];
   look: number[][];
   view: number[];
 }
@@ -22,6 +22,13 @@ interface GiantNearCameraFitResult {
   changed: boolean;
 }
 
+/** What the rest-size measure reads of a loaded model: its bones' faces and its first clip. */
+interface RestPoseModel {
+  bones?: { faces?: number[][] }[];
+  clips?: { start_frame?: number }[];
+  _restSize?: { h: number; w: number } | null;
+}
+
 /** A PS1 shot as the projection reads it: eye, target and the height H its fov comes from. */
 interface ShotLike {
   eye: readonly number[];
@@ -30,7 +37,7 @@ interface ShotLike {
 }
 
 interface GiantShotRef {
-  eye: [number, number, number];
+  eye: number[];
   target: number[];
   H: number;
 }
@@ -110,15 +117,16 @@ export function arenaShotFor(placementTable: PlacementTable | null | undefined, 
  */
 const _nearCamCache = new WeakMap();
 
-export function nearCameraFor(placementTable: PlacementTable, key: string | null) {
+export function nearCameraFor(placementTable: PlacementTable | null | undefined, key: string | null) {
   const rec = key != null ? placementTable?.[key] : null;
   if (!rec) return null;
   if ((rec.camera?.eye?.length! | 0) >= 12) return rec.camera;
-  let cache = _nearCamCache.get(placementTable);
-  if (!cache) { cache = new Map(); _nearCamCache.set(placementTable, cache); }
+  // ETS item 9: rec was read out of placementTable above, so the table is there
+  let cache = _nearCamCache.get(placementTable!);
+  if (!cache) { cache = new Map(); _nearCamCache.set(placementTable!, cache); }
   if (cache.has(key)) return cache.get(key);
   let best = null, bestD = Infinity;
-  for (const r of Object.values(placementTable)) {
+  for (const r of Object.values(placementTable!)) {
     if ((r?.camera?.eye?.length! | 0) < 12) continue;
     const d = Math.abs((r.standoff! | 0) - (rec.standoff! | 0)) * 4 + Math.abs((r.hover! | 0) - (rec.hover! | 0));
     if (d < bestD) { best = r; bestD = d; }
@@ -152,7 +160,7 @@ export function closestCameraRef(sizes: Record<string, [number, number]>, rest: 
  * so the framing is the reference partner's — Agumon's close-up of Agumon becomes the same
  * close-up of Kunemon, however big or small Kunemon is.
  */
-export function fitNearCamera(refCam, refSlot: { x: number; y: number; z: number; }, ownSlot: { x: number; y: number; z: number; }, k: number) {
+export function fitNearCamera(refCam: NearCamera | null | undefined, refSlot: { x: number; y: number; z: number; }, ownSlot: { x: number; y: number; z: number; }, k: number) {
   if (!refCam) return null;
   const fit = (p: number[]) => p && [
     ownSlot.x + (p[0]! - refSlot.x) * k,
@@ -166,19 +174,19 @@ export function fitNearCamera(refCam, refSlot: { x: number; y: number; z: number
  *  the height or half the width, whichever is larger: the shots are about as wide as they
  *  are tall and a partner fills roughly half the height, so only a very wide wingspan needs
  *  the camera further back than its height asks for. */
-export function modelFrameSize(model) {
+export function modelFrameSize(model: RestPoseModel | null | undefined) {
   const r = modelRestSize(model);
   return r ? Math.max(r.h, 0.5 * r.w) : null;
 }
 
 /** A model's rest pose (clip 0's first frame) height and width, PS1 units. */
-export function modelRestSize(model) {
+export function modelRestSize(model: RestPoseModel | null | undefined) {
   if (!model?.bones) return null;
   if (model._restSize !== undefined) return model._restSize;
   const { mats } = buildBoneWorldMatrices(model, model.clips?.[0]?.start_frame ?? 0, null);
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let b = 0; b < model.bones.length; b++) {
-    const bone = model.bones[b];
+    const bone = model.bones[b]!;   // b < model.bones.length
     for (const face of bone.faces || []) for (const vi of face) {
       const [x, y] = posedVertex(bone, vi, b, mats);
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
@@ -260,7 +268,7 @@ export function shotPointNdc(shot: ShotLike | null | undefined, p: number[], asp
 
 /** The NDC bounds of a body box (plus the opposing fighter's centre, when that shot has it in
  *  front of the eye) through ONE shot. `behind` counts body corners the eye cannot see. */
-export function shotBodyBounds(shot: ShotLike | null | undefined, slot: { x: number; y: number; z: number; }, rest, target = null, aspect = GIANT_FIT_ASPECT) {
+export function shotBodyBounds(shot: ShotLike | null | undefined, slot: { x: number; y: number; z: number; }, rest: { h: number; w: number; }, target: number[] | null = null, aspect = GIANT_FIT_ASPECT) {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   let behind = 0, maxDepth = 0;
   for (const p of bodyBoxCorners(rest, slot)) {
@@ -289,7 +297,7 @@ export function shotBodyBounds(shot: ShotLike | null | undefined, slot: { x: num
  * (`changed: false`) when it already frames the body, which is the identity every small model
  * takes. `target` is a CONSTRAINT (the opposing fighter must stay on screen), never the aim.
  */
-export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number; z: number; }, rest: { h: number; }, target = null, opts: GiantShotOptions = {}): GiantShotFit {
+export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number; z: number; }, rest: { h: number; w: number; }, target: number[] | null = null, opts: GiantShotOptions = {}): GiantShotFit {
   const fill = opts.fill ?? GIANT_FRAME_FILL;
   const hMin = opts.hMin ?? GIANT_H_MIN;
   const pullMax = opts.pullMax ?? GIANT_PULL_MAX;
@@ -311,12 +319,13 @@ export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number
     const b = shotBodyBounds({ eye, target: bodyC, H }, slot, rest, keep, aspect);
     return !b.behind && b.fill <= fill;
   };
-  const dx = refShot.eye[0] - slot.x, dz = refShot.eye[2] - slot.z;
+  // ETS item 9: a shot eye is a point of three numbers
+  const dx = refShot.eye[0]! - slot.x, dz = refShot.eye[2]! - slot.z;
   const topY = slot.y - h;
   const hFloor = Math.min(hMin, refShot.H);
   for (let step = 0; step <= steps; step++) {
     const lift = step / steps;
-    const eyeY = refShot.eye[1] + (topY - refShot.eye[1]) * lift;
+    const eyeY = refShot.eye[1]! + (topY - refShot.eye[1]!) * lift;
     for (let pull = 1; pull <= pullMax + 1e-9; pull += 0.1) {
       const eye = [slot.x + dx * pull, eyeY, slot.z + dz * pull];
       for (let H = refShot.H; H >= hFloor; H -= 4) {
@@ -338,7 +347,7 @@ export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number
 /** A fitted near-shot table (fitNearCamera) refitted for a giant: per shot, `giantShotFor`. Returns
  *  the same `cam` object and `changed: false` when every shot already framed the body, so a model
  *  the reference framing holds is untouched. */
-export function fitGiantNearCamera(cam: GiantNearCameraInput | null, slot: { x: number; y: number; z: number }, rest: { h: number; w: number; } | null, target = null, opts = {}): GiantNearCameraFitResult {
+export function fitGiantNearCamera(cam: GiantNearCameraInput | null, slot: { x: number; y: number; z: number }, rest: { h: number; w: number; } | null, target: number[] | null = null, opts: GiantShotOptions = {}): GiantNearCameraFitResult {
   if (!cam?.eye?.length) return { cam, shots: [], changed: false };
   const shots: (GiantShotFit | null)[] = [];
   let changed = false;

@@ -7,6 +7,7 @@ import type { ArenaGroupBuf, Battle3DContext } from "../../types/battle3d.js";
 
 import type { ArenaPack } from "../../types/battle3d.js";
 import type { Battle3dTexturePage } from "./types.js";
+import type { ArenaGeometryGroup } from "../../types/fx3d.js";
 interface TexturePatchSourceRect {
   x: number;
   y: number;
@@ -23,7 +24,8 @@ interface TexturePatchEntry {
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeBackdrop(B$: Battle3DContext) {
-function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
+function _bdGroupBuf(g: ArenaGeometryGroup): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
     const vbo = B$.gl!.createBuffer();
     B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, vbo);
     B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl!.STATIC_DRAW);
@@ -36,8 +38,8 @@ function loadBackdropPack(packName: string | number) {
     if (!packName) return null;
     let pk = B$.backdropPacks![packName];
     if (pk) return pk;
-    pk = { floorTex: loadTexture(B$.gl, `assets/battle/backdrops/${packName}/floor.png`),
-           wallTex:  loadTexture(B$.gl, `assets/battle/backdrops/${packName}/wall.png`),
+    pk = { floorTex: loadTexture(B$.gl!, `assets/battle/backdrops/${packName}/floor.png`),
+           wallTex:  loadTexture(B$.gl!, `assets/battle/backdrops/${packName}/wall.png`),
            groups: null };
     B$.backdropPacks![packName] = pk;
     fetch(`assets/battle/backdrops/${packName}/geometry.json`)
@@ -76,7 +78,7 @@ function armDataField(techId: number) {
   // for the seven field items), so the pack is bySig[motion] — the same MEFT10<motion> pack the
   // tech path shows for that element. Item 84 rolls its motion, so its pack follows the rolled
   // element. Clips 14/17 (items 85-90) carry no op4, so arming is a no-op for them.
-  function backdropEntryForSig(sig) {
+  function backdropEntryForSig(sig: string | number | null | undefined) {
     const m = B$.backdropManifest;
     if (!m || !m.bySig || sig == null) return null;
     const entry = m.bySig[String(sig)];
@@ -133,7 +135,7 @@ function setArenaDebug(d: { legacy?: boolean; cull?: boolean; opaque?: boolean; 
     }
     return B$.arenaDebug;
   }
-function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (static spinDeg == 0)
+function _arenaGroupBuf(g: ArenaGeometryGroup): ArenaGroupBuf {   // same shape as _bdGroupBuf (static spinDeg == 0)
     const b = _bdGroupBuf(g);
     // HD sheets are LINEAR-sampled. The pack's UVs are whole texel numbers (all 166002 of them, every pack): the
     // original's NEAREST read at u = 128.0 is texel 128, but a LINEAR read there is half texel 127, the NEXT picture
@@ -158,14 +160,14 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
     if (B$.arenaLegacy) {   // debug/before-after: one palette per page, the pre-decode render
       const leg = `${g.page || "wall"}.png`;
       if (!pk.tex) pk.tex = {};
-      if (!pk.tex[leg]) pk.tex[leg] = loadTexture(B$.gl, `assets/battle/arenas/${pk.name}/${leg}`);
+      if (!pk.tex[leg]) pk.tex[leg] = loadTexture(B$.gl!, `assets/battle/arenas/${pk.name}/${leg}`);
       return pk.tex[leg];
     }
     const col = g.clut ? g.clut[0] : 0, row = g.clut ? g.clut[1] : 255;
     const key = `${g.page || "wall"}_c${col}_r${row}`;
     const file = B$.arenaDebug!.voidRaw ? `${key}_void.png` : `${key}.png`;
     if (!pk.tex) pk.tex = {};
-    if (!pk.tex[file]) pk.tex[file] = loadTexture(B$.gl, `assets/battle/arenas/${pk.name}/${file}`);
+    if (!pk.tex[file]) pk.tex[file] = loadTexture(B$.gl!, `assets/battle/arenas/${pk.name}/${file}`);
     return pk.tex[file];
   }
 function loadArenaPack(packName: string) {

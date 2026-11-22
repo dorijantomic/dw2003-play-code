@@ -22,7 +22,7 @@ import { faceBoxSource, fieldsFromShot, applyOp5 } from "../../fight/battle-came
 import { createIdleDirector } from "../../fight/battle-idle-director.js";
 import { createBattleOpenCamera, setSlowMotion as engineSetSlowMotion } from "../../vendor/engine.js";
 import { authoredSide, mirrorCameraWords, mirrorPresetShot } from "../../fight/side-mirror.js";
-import type { BattleOpenCameraArgs, Battle3DContext, CameraModeOptions } from "../../types/battle3d.js";
+import type { AnimHooks, BattleOpenCameraArgs, Battle3DContext, CameraModeOptions } from "../../types/battle3d.js";
 import type { ActorAnimator } from "../../fight/actor-animator.js";
 
 // moved by tools/rewrite/split-closure.mjs
@@ -52,7 +52,7 @@ export function makeCamera(B$: Battle3DContext) {
   // fighter's record before models->setId): near shot 10 of the incoming partner form, far shot 2 of the incoming
   // enemy. Until the swap `folder` is not the live model, so the record is read by its key; once swapped it is
   // the live model and cannedShotSlot answers (the fitted near table for a model without its own).
-  function entranceShot(side, folder: string | null | undefined, index: number) {
+  function entranceShot(side: number, folder: string | null | undefined, index: number) {
     const name = side ? "enemy" : "player";
     if (!folder || folder === (side ? B$.enemyFolder : B$.playerFolder)) return cannedShotSlot(name, index);
     const key = modelKeyFromFolder(folder);
@@ -134,11 +134,11 @@ function playerNearCamera() {
     // the way the reference's lands on the reference's. A 0x48 record's own face-box read runs past the
     // record (see faceBoxShot) and frames nothing.
     const kh = Math.min(3, Math.max(0.3, ownRest.h / pick!.h));
-    const face = {};
+    const face: Record<string, { eye: number[]; target: number[] } | null> = {};
     for (const side of ["player", "enemy"]) {
       const s = faceBoxSource(B$.placementTable, refKey, side).shot;
-      const fit = (p) => [ownSlot.x + (p[0] - refSlot.x) * kh, ownSlot.y + (p[1] - refSlot.y) * kh,
-        ownSlot.z + (p[2] - refSlot.z) * kh];
+      const fit = (p: number[]) => [ownSlot.x + (p[0]! - refSlot.x) * kh, ownSlot.y + (p[1]! - refSlot.y) * kh,
+        ownSlot.z + (p[2]! - refSlot.z) * kh];
       face[side] = s ? { ...s, eye: fit(s.eye), target: fit(s.target) } : null;
     }
     B$.fittedNearCam = { folder: B$.playerFolder, scale: playerScale, cam, face, giant, shots: giantShots };
@@ -450,7 +450,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
   // and command path (`_reactionCamFor` above), not to the op-1 attack reaction, so an ordinary
   // landed hit leaves the camera alone — to the idle director, which re-publishes its own shot on
   // every tick it runs (`fightstg.s:5096-5105`, see the render camera block below).
-  function _impactContact(extra) {
+  function _impactContact(extra?: AnimHooks) {
     const e = extra || {};
     return {
       ...e,
@@ -461,15 +461,15 @@ function getFaceCamRect() { return B$.faceCamRect; }
     };
   }
 // Compose the internal camera hook with any caller hooks (coordinator passes onHit, etc.).
-  function _playerHooks(extra) {
+  function _playerHooks(extra?: AnimHooks) {
     const e = extra || {};
     const cam = _camHookFor("player");
-    return { ...e, onCamera: (rec) => { cam(rec); e.onCamera?.(rec); } };
+    return { ...e, onCamera: (rec: Parameters<typeof applyOp5>[1]) => { cam(rec); e.onCamera?.(rec); } };
   }
-function _enemyHooks(extra) {
+function _enemyHooks(extra?: AnimHooks) {
     const e = extra || {};
     const cam = _camHookFor("enemy");
-    return { ...e, onCamera: (rec) => { cam(rec); e.onCamera?.(rec); } };
+    return { ...e, onCamera: (rec: Parameters<typeof applyOp5>[1]) => { cam(rec); e.onCamera?.(rec); } };
   }
   return { cannedShot, cannedShotSlot, entranceShot, lossShot, introShot, setGiantCameraFit, playerNearCamera, fittedFaceShot, applyArenaShot, setCameraMode, getCameraMode, setSlowMotion, getAnimationReadout, setGameCamParam, getCameraInfo, getFaceCamRect, setFaceCamVisible, syncFaceBox, makeIdleDirector, retireIdleDirector, makeOpenCamera, beginOpeningCamera, _arenaFields, _camHookFor, _reactionCamFor, _impactContact, _playerHooks, _enemyHooks };
 }

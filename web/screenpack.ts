@@ -11,25 +11,9 @@ import { loadAssetImage } from "./assets.js";
 import { registerPausePanels } from "./panel-kit.js";
 import { noteBackdropBlend } from "./battle-layer.js";
 import { clipHook } from "./ui-c/capture.js";
-interface ScreenPack {
-  name: string;
-  img: HTMLImageElement | null;
-  map: ScreenPackSheet | null;
-  ids: ScreenPackIds | null;
-  patterns: Record<string, CanvasPattern>;
-}
+import type { ScreenPack, ScreenPackLayer } from "./types/misc-game2.js";
 
-interface ScreenPackSheet {
-  ids?: ScreenPackIds;
-  [key: string]: ScreenPackIds | number[] | undefined;
-}
-
-interface ScreenPackIds {
-  [clip: string]: number[] | undefined;
-}
-
-
-const packs = {}; // name -> { img, map, ids, patterns }
+const packs: Record<string, ScreenPack> = {}; // name -> { img, map, ids, patterns }
 
 // Packs whose source data is not present in this checkout, so no
 // `<name>_sheet.*` can exist. Requesting one would 404 and, under a strict
@@ -45,7 +29,7 @@ export function loadPack(name: string): ScreenPack {
   // patterns is keyed by clip id, not one per pack: sttrng3 alone holds eight
   // different scrolling walls (0x2d..0x34, one per training ground), so a
   // single cached pattern would draw the wrong cave.
-  const p = { name, img: null, map: null, ids: null, patterns: {} };
+  const p: ScreenPack = { name, img: null, map: null, ids: null, patterns: {} };
   packs[name] = p;
   if (ABSENT_PACKS.has(name)) return p;
   // Guarded so pure-logic modules that import screen-pack-drawing helpers
@@ -63,14 +47,14 @@ export function loadPack(name: string): ScreenPack {
   return p;
 }
 
-export function packReady(p) { return !!(p.img && p.ids); }
+export function packReady(p: ScreenPack) { return !!(p.img && p.ids); }
 
 /**
  * The native pixel size of clip `id`, taken from the sheet's own layer records.
  * Used by the battle HUD read-out so a check can ask what the player actually sees
  * in a rectangle rather than only which cel was asked for.
  */
-export function clipSize(p, id: string) {
+export function clipSize(p: ScreenPack | null | undefined, id: string) {
   const clip = p?.ids?.[String(id)];
   if (!clip || !Array.isArray(clip.layers)) return null;
   let w = 0, h = 0;
@@ -82,7 +66,7 @@ export function clipSize(p, id: string) {
 }
 
 /** Draw clip `id` of pack `p` with its top-left at (x, y). Native pixels × scale. */
-export function drawClip(ctx, p, id, x, y, scale = 1) {
+export function drawClip(ctx: CanvasRenderingContext2D, p: ScreenPack, id: string | number, x: number, y: number, scale = 1) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClip(c, p, id, x, y, scale))) return true;   // look C capture scope (web/ui-c)
   const clip = p.ids?.[String(id)];
   if (!clip || !p.img) return false;
@@ -124,7 +108,7 @@ export function drawClip(ctx, p, id, x, y, scale = 1) {
  * tail asks for the raw art. See
  * docs/research/ui/dialogue-window-placement-decoded-2026-07-02.md.
  */
-export function drawClipOpaque(ctx: CanvasRenderingContext2D, p, id: number, x: number, y: number, scale = 1) {
+export function drawClipOpaque(ctx: CanvasRenderingContext2D, p: ScreenPack, id: number, x: number, y: number, scale = 1) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClipOpaque(c, p, id, x, y, scale))) return true;
   const clip = p?.ids?.[String(id)];
   if (!clip || !p.img) return false;
@@ -141,7 +125,7 @@ export function drawClipOpaque(ctx: CanvasRenderingContext2D, p, id: number, x: 
  * (the source rectangle is clipped, never scaled). Used by the DV/Blast gauge,
  * whose sprite is an authored 40x8 fill revealed up to the gauge's own width.
  */
-export function drawClipWidth(ctx, p, id: string, x, y, width: number | null | undefined) {
+export function drawClipWidth(ctx: CanvasRenderingContext2D, p: ScreenPack, id: string, x: number, y: number, width: number | null | undefined) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClipWidth(c, p, id, x, y, width), width!)) return true;
   const clip = p.ids?.[String(id)];
   if (!clip || !p.img || !(width! > 0)) return false;
@@ -185,7 +169,7 @@ export function drawClipWidth(ctx, p, id: string, x, y, width: number | null | u
  * place that spelling is written, because eight call sites had spelled it three
  * different ways.
  */
-export function paletteClipId(id, row = 0) {
+export function paletteClipId(id: string | number, row = 0) {
   return row ? `${id}#${row}` : String(id);
 }
 
@@ -194,7 +178,7 @@ export function paletteClipId(id, row = 0) {
  * the variant was never cut, so a screen that asks for a row the extractor does
  * not hold still draws rather than vanishing.
  */
-export function drawClipAtPaletteRow(ctx: CanvasRenderingContext2D | null | undefined, p, id, row, x: number, y: number, scale = 1) {
+export function drawClipAtPaletteRow(ctx: CanvasRenderingContext2D, p: ScreenPack, id: string | number, row: number, x: number, y: number, scale = 1) {
   const shifted = paletteClipId(id, row);
   if (p.ids?.[shifted]) return drawClip(ctx, p, shifted, x, y, scale);
   return drawClip(ctx, p, id, x, y, scale);
@@ -237,13 +221,13 @@ export function drawClipAtPaletteRow(ctx: CanvasRenderingContext2D | null | unde
  * The card duel is the one exception and is NOT routed here: its tiles are
  * 64×64 with a 0x40 wrap, and web/cardduel-native.js already draws it correctly.
  */
-export function drawPackBackdrop(ctx: CanvasRenderingContext2D, p, clipId: number, viewW: number, viewH: number, timeSec: number) {
+export function drawPackBackdrop(ctx: CanvasRenderingContext2D, p: ScreenPack, clipId: number, viewW: number, viewH: number, timeSec?: number) {
   const grid = p.ids?.[String(clipId)];
   if (!grid || !p.img) return false;
   if (!p.patterns) p.patterns = {};
   const key = String(clipId);
   if (!p.patterns[key]) {
-    const cell = {};
+    const cell: Record<string, ScreenPackLayer> = {};
     for (const l of grid.layers) cell[`${((l.dx % 96) + 96) % 96},${((l.dy % 96) + 96) % 96}`] = l;
     const off = document.createElement("canvas");
     off.width = off.height = 96;

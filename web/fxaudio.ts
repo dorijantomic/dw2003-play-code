@@ -1,3 +1,4 @@
+import type { MusicRoute, NoiseLoop, PlaceAmbience, RoutableMusicElement } from "./types/misc-game.js";
 interface AmbienceLevels {
     water?: number;
     forest?: number;
@@ -14,7 +15,7 @@ interface SoundLevels {
 // rain, wind, blizzard howl, sandstorm hiss, night crickets and thunder.
 // One AudioContext of its own, created on the first key press or click (browsers
 // block sound before a gesture) and driven every frame by the ambience layer.
-let ac = null, master: GainNode | null = null, rain = null, wind = null, sand = null, crickets: { out: GainNode; } | null = null, gust = null;
+let ac: AudioContext | null = null, master: GainNode | null = null, rain: NoiseLoop | null = null, wind: NoiseLoop | null = null, sand: NoiseLoop | null = null, crickets: { out: GainNode; } | null = null, gust: OscillatorNode | null = null;
 let armed = false;
 let level = 1;                 // the OPTIONS sound volume (web/volume-levels.js); 1 = the game's own 0.55
 window.__fxaudioVer = "no-wind-2";
@@ -26,7 +27,7 @@ function noiseBuffer(ctx: AudioContext, seconds = 2) {
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = (w * 0.6 + last * 6) * 0.5; }
     return buf;
 }
-function loopNoise(ctx, buf: AudioBuffer, type: string, freq: number, q: number) {
+function loopNoise(ctx: AudioContext, buf: AudioBuffer, type: BiquadFilterType, freq: number, q: number) {
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = ctx.createGain(); g.gain.value = 0;
@@ -64,7 +65,7 @@ function arm() {
 }
 arm();
 
-const ease = (param: AudioParam, v: number, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
+const ease = (param: AudioParam, v: number, ctx: AudioContext, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
 
 /** OPTIONS sound volume, 0..1 (1 = today). Takes effect on the next setSound call, which runs every frame. */
 export function setWeatherVolume(v: number) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }
@@ -98,7 +99,7 @@ export function thunder(on: boolean, delayMs: number, pan = 0) {
 export function footstep(on: boolean, type: string, vol = 1) {
     if (!on || !ac || ac.state !== "running") return;
     const t0 = ac.currentTime, buf = noiseBuffer(ac, 1);
-    const burst = (kind: string, freq: number, q: number, peak: number, dur: number, delay = 0) => {
+    const burst = (kind: BiquadFilterType, freq: number, q: number, peak: number, dur: number, delay = 0) => {
         const src = ac.createBufferSource(); src.buffer = buf;
         const f = ac.createBiquadFilter(); f.type = kind; f.frequency.value = freq; f.Q.value = q;
         const g = ac.createGain(); const a = t0 + delay;
@@ -133,7 +134,7 @@ export function footstep(on: boolean, type: string, vol = 1) {
 // ---------------------------------------------------------- place ambience
 // Water lapping, forest rustle, city hum and daytime birdsong, each eased in and out by
 // how much of it the current map has (levels 0..1). Built lazily on first use.
-let pa = null, birdTimer: number | ReturnType<typeof setTimeout> = 0, birdLevel = 0, birdPan = 0;
+let pa: PlaceAmbience | null = null, birdTimer: number | ReturnType<typeof setTimeout> = 0, birdLevel = 0, birdPan = 0;
 function buildPlace() {
     if (pa || !ac) return !!pa;
     const buf = noiseBuffer(ac, 3);
@@ -186,7 +187,7 @@ export function setAmbience(on: boolean, lv: AmbienceLevels) {
 // The game's own music element is routed through a low-pass filter and a gain, so weather can
 // duck it and muffle it. Connected only the first time it is wanted (and only once the
 // AudioContext is running, so it can never silence the music).
-let mus = null;
+let mus: MusicRoute | null = null;
 let musLevel = 1;              // the OPTIONS music volume. Once the element is routed through `mus`, THIS gain scales it
                                // and the element itself stays at the game's own 0.6 (el.routedToGain, read by audio.js), so the level never applies twice.
 let musOn = false, musDuck = 0;
@@ -196,7 +197,7 @@ export function setMusicVolume(v: string | number | null | undefined) {
     const n = Number(v); musLevel = v === undefined || v === null || v === "" || !Number.isFinite(n) ? 1 : Math.min(1, Math.max(0, n));
     if (mus && ac) ease(mus.g.gain, musicGainTarget(), ac, 0.05);
 }
-export function setMusic(el, on: boolean, duck: number, muffle: number) {
+export function setMusic(el: RoutableMusicElement | null | undefined, on: boolean, duck: number, muffle: number) {
     if (!ac || ac.state !== "running" || !el) return;
     if (!mus) {
         if (!on) return;

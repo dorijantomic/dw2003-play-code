@@ -161,7 +161,7 @@ export function levelUpThreshold(growthXp: number, nextLevel: number, lu: Pick<L
   if (nextLevel >= 100) return Infinity;
   const bounds = lu.exp_tier_bounds; // [5, 20, 40, 100]
   let tier = bounds.length - 1;
-  for (let i = 0; i < bounds.length; i++) if (nextLevel < bounds[i]) { tier = i; break; }
+  for (let i = 0; i < bounds.length; i++) if (nextLevel < bounds[i]!) { tier = i; break; }   // i < bounds.length
   const cubic = Math.floor(growthXp * (nextLevel ** 3 + 5 * nextLevel - 6) / 10);
   return cubic + lu.exp_tier_const[tier];
 }
@@ -226,7 +226,7 @@ export function rollLevelUpGains(profile: DigimonRecord, newLevel: number, lu: L
   const hpmp = (growth: number) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng()! % 9];
   const bounds = lu.core_tier_bounds; // [5, 20, 40, 60, 80]
   let tier6 = bounds.length;
-  for (let i = 0; i < bounds.length; i++) if (newLevel < bounds[i]) { tier6 = i; break; }
+  for (let i = 0; i < bounds.length; i++) if (newLevel < bounds[i]!) { tier6 = i; break; }   // i < bounds.length
   // The disc reads the six 9-word core rows and the 8-word element table as ONE
   // contiguous block (core at 0x800891B0, the element table right after it at
   // 0x80089288, overlay end at 0x800892A8). A roll can run off a row's end, and

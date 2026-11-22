@@ -70,7 +70,7 @@ export function makeFusion(B: BattleContext) {
     b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(en));
     b._turnSeq = (b._turnSeq ?? 0) + 1;
     // One body only: once the fused fighter falls there is nothing left to fuse.
-    if (b.party?.[b.partyIndex]) b.party[b.partyIndex].fuseInto = null;
+    if (b.party?.[b.partyIndex]) b.party[b.partyIndex]!.fuseInto = null;
     if (boss.transform === "whiteout") B.renderer3d?.whiteOut?.(20);
     setFighterTint("enemy", boss.tint ?? null);
     // A Fusion Lab boss is drawn as its own built model folder, not as a species name.

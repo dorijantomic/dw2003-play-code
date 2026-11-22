@@ -9,46 +9,26 @@
 //
 // web/glossary-digimon.js reads these rows; the future glossary ITEMS page reads the drop index.
 // The odds are the disc's, not a percentage: a rate byte of 128 means 129 in 1024 per win.
-import type { CodexRow, CodexSkill, StageEncounters } from "./types/codex-data.js";
-import type { DigimonRecord } from './types/battle.js';
-interface CodexMapEntry {
-  id?: string;
-  name?: string;
-}
-
-
-interface CodexMapManifest {
-  maps?: CodexMapEntry[];
-}
-
-interface DropRecord {
-  droppers: DigimonRecord[];
-  stages: string[];
-}
-interface DropEntry extends DropRecord {
-  item: string;
-}
-type DropIndex = Record<string, DropRecord>;
-
-
+import type { CodexItemRecord, CodexItemsSource, CodexMapEntry, CodexMapManifest, CodexPartnerRow, CodexRow, CodexSkill, DropDropper, DropEntry, DropIndex, DropRecord, EncounterIndex, EncounterRow, EvolutionLinesFile, ScreenSource, ScreenTable, StageSource, StageTable } from "./types/codex-data.js";
+import type { DigimonRecord, ElementNumbers, EnemyRecord, StatusNumbers } from './types/battle.js';
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
-const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
-const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
-const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
+const ELEMENTS: (keyof ElementNumbers)[] = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
+const STATUSES: (keyof StatusNumbers)[] = ["poison", "paralyze", "confuse", "sleep", "ko"];
+const WILD_STATS: (keyof EnemyRecord)[] = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
 
-const pick = (source, keys: string[]) =>
-  Object.fromEntries(keys.map((k: string | number) => [k, Number(source?.[k] ?? 0)]));
+const pick = <T extends object>(source: T | null | undefined, keys: (keyof T)[]) =>
+  Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
 
 /**
  * One row per profile in a digimon.json-shaped table (`digimon` rows + `skills`). Pure.
  * `digimon` may be the whole JSON object or just the profile array; `skills` overrides the
  * JSON's own list when given.
  */
-export function partnerRows(digimon: DigimonRecord[] | { digimon: DigimonRecord[]; skills?: CodexSkill[] }, skills: CodexSkill[] | undefined) {
+export function partnerRows(digimon: DigimonRecord[] | { digimon: DigimonRecord[]; skills?: CodexSkill[] }, skills: CodexSkill[] | undefined): CodexPartnerRow[] {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   const skillList = Array.isArray(skills) ? skills : Array.isArray(digimon) ? [] : digimon?.skills ?? [];
-  const skillById = new Map<number, CodexSkill>(skillList.map((s) => [s.id, s]));
+  const skillById = new Map<number | null | undefined, CodexSkill>(skillList.map((s) => [s.id, s]));
   const nameById = new Map(profiles.map((p) => [p.id, p.name]));
   return profiles.map((p) => {
     const skill = skillById.get(p.tech_signature) ?? null;
@@ -70,7 +50,7 @@ export function partnerRows(digimon: DigimonRecord[] | { digimon: DigimonRecord[
       // the five Blast forms are profile ids: resolve them through the same profile table
       blasts: (p.blasts ?? [])
         .map((id) => nameById.get(id))
-        .filter((name) => typeof name === "string"),
+        .filter((name): name is string => typeof name === "string"),
       techSlots: [...(p.tech_slots ?? [])],
       learnLevels: [...(p.tech_learn_levels ?? [])],
       loadLevels: [...(p.tech_load_levels ?? [])],
@@ -83,15 +63,17 @@ export function partnerRows(digimon: DigimonRecord[] | { digimon: DigimonRecord[
  * record's `to` is a profile id). Pure. An unknown slot is an empty list, never a guess.
  * `profiles` may be the profile array or a digimon.json-shaped object.
  */
-export function lineTargets(evolutions, slot: string | number, profiles) {
+export function lineTargets(evolutions: EvolutionLinesFile | null | undefined, slot: number, profiles: DigimonRecord[] | { digimon?: DigimonRecord[] } | null | undefined): string[] {
   const list = Array.isArray(profiles) ? profiles : profiles?.digimon ?? [];
-  const nameById = new Map(list.map((p) => [p.id, p.name]));
-  const line = evolutions?.lines?.[slot];
+  const nameById = new Map<string | number | undefined, string>(list.map((p) => [p.id, p.name]));
+  const line = evolutions?.lines?.[slot]
+;
   if (!line) return [];
   return (line.records ?? [])
-    .map((record: { to: unknown; }) => nameById.get(record.to))
-    .filter((name) => typeof name === "string");
+    .map((record) => nameById.get(record.to))
+    .filter((name): name is string => typeof name === "string");
 }
+
 
 // The field-element ids the disc stores at 0x800a4530 (engine/dw3/battle-formulas.ts ELEMENT_ID).
 const FIELD_ELEMENT_NAMES: Record<string, string> = { 1: "normal", 2: "Fire", 3: "Water", 4: "Ice", 5: "Wind", 6: "Thunder", 7: "Machine", 8: "Dark" };
@@ -158,7 +140,7 @@ function actionText(action: number, row: CodexRow) {
  * array (or the whole object) and resolves attack / move_1 / move_2 names; `models`
  * is model_map.json (species -> model folder). Pure.
  */
-export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill> | { skills?: CodexSkill[] } = [], models = null) {
+export function wildRows(enemies: EnemyRecord[] | { enemies?: EnemyRecord[] } | null | undefined, skills: CodexSkill[] | Map<number, CodexSkill> | { skills?: CodexSkill[] } = [], models: Record<string, string> | null = null): CodexRow[] {
   const list = Array.isArray(enemies) ? enemies : enemies?.enemies ?? [];
   const skillList = Array.isArray(skills)
     ? skills
@@ -167,15 +149,15 @@ export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill>
       : skills?.skills ?? [];
   const skillById = new Map<number, CodexSkill>(skillList.map((s) => [s.id, s]));
   const modelMap = models && typeof models === "object" ? models : null;
-  const skill = (id) => {
+  const skill = (id: number) => {
     const n = Number(id) || 0;
     const s = skillById.get(n);
     return { id: n, name: s ? s.name : null };
   };
-  const rows = [];
+  const rows: CodexRow[] = [];
   for (const e of list) {
     if (!e || e.enemy_id === "Null") continue;   // the disc's one placeholder record
-    const row = {
+    const row: CodexRow = {
       number: rows.length + 1,
       name: e.enemy_id,
       digimonId: e.digimon_id,
@@ -189,7 +171,7 @@ export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill>
       move2: skill(e.move_2),
       drop: e.drop_item ?? "Null",
       dropRate: Number(e.drop_rate) || 0,
-    } as CodexRow;
+    };
     row.aiRows = (Array.isArray(e.ai_moves) ? e.ai_moves : []).slice(0, 4).map((a, i: number) => {
       const action = Number(a?.action) || 0;
       const comparator = Number(a?.comparator) || 0;
@@ -211,7 +193,8 @@ export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill>
 }
 
 /** The wild rows whose name contains `query`, ignoring case and surrounding spaces. Pure. */
-export function wildSearch(rows, query) {
+export function wildSearch<T extends { name?: string | null }>(rows: T[] | null | undefined, query: string | null | undefined): T[] {
+
   const q = String(query ?? "").trim().toLowerCase();
   const list = Array.isArray(rows) ? rows : [];
   if (!q) return list.slice();
@@ -224,11 +207,12 @@ export function wildSearch(rows, query) {
  * A `{ key: table }` object (the extracted JSON ships a header key) or the table itself.
  * Anything else is an empty table, never a guess.
  */
-function innerTable(value, key: string) {
+// ETS item 40: the casts stay inside this small function; the two files are JSON tables, and the caller names the table shape (T) it reads from them.
+function innerTable<T extends object>(value: unknown, key: string): T | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const inner = value[key];
-  if (inner && typeof inner === "object" && !Array.isArray(inner)) return inner;
-  return value;
+  const inner = (value as Record<string, unknown>)[key];
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) return inner as T;
+  return value as T;
 }
 
 /** The manifest's map list (the whole manifest object or the array). */
@@ -252,15 +236,15 @@ function mapList(value: CodexMapEntry[] | CodexMapManifest | null | undefined): 
  * Row = {stage, stageName, zone, slot, screen, name, level, hp, statScale, rateLevel},
  * all 1-based where the game counts from 1 (zone, slot). `stage` is the numeric key.
  */
-export function encounterIndex(stages, screens, maps = null) {
-  const stageTable = innerTable(stages, "stages") ?? {};
-  const screenTable = innerTable(screens, "screens") ?? {};
+export function encounterIndex(stages: StageSource | null | undefined, screens: ScreenSource | null | undefined, maps: CodexMapEntry[] | CodexMapManifest | null = null): EncounterIndex {
+  const stageTable: StageTable = innerTable<StageTable>(stages, "stages") ?? {};
+  const screenTable: ScreenTable = innerTable<ScreenTable>(screens, "screens") ?? {};
   const nameById = new Map(
     mapList(maps).filter((m) => m && typeof m.id === "string").map((m) => [m.id, m.name]),
   );
-  const rows = [];
-  const bySpecies = new Map();
-  for (const [key, stage] of Object.entries(stageTable as Record<string, StageEncounters>)) {
+  const rows: EncounterRow[] = [];
+  const bySpecies = new Map<string, EncounterRow[]>();
+  for (const [key, stage] of Object.entries(stageTable)) {
     const zones = Array.isArray(stage?.zones) ? stage.zones : null;
     const stageNo = Number(key);
     if (!zones || !Number.isFinite(stageNo)) continue;
@@ -306,7 +290,8 @@ export function encounterIndex(stages, screens, maps = null) {
  * surrounding spaces) wins outright, so "Kunemon" never drags in a numbered variant;
  * otherwise every name containing the text is returned. An empty query is every name. Pure.
  */
-export function encounterSpecies(index: { bySpecies?: Map<string, CodexRow[]> } | null | undefined, query = ""): string[] {
+export function encounterSpecies(index: { bySpecies?: Map<string, EncounterRow[]> } | null | undefined
+, query = ""): string[] {
   const names = index?.bySpecies instanceof Map ? [...index.bySpecies.keys()].sort() : [];
   const q = String(query ?? "").trim().toLowerCase();
   if (!q) return names;
@@ -316,9 +301,9 @@ export function encounterSpecies(index: { bySpecies?: Map<string, CodexRow[]> } 
 }
 
 /** Every real row of the species matching `query`; an unknown or empty query is []. Pure. */
-export function encounterSearch(index, query: string | undefined) {
+export function encounterSearch(index: EncounterIndex, query: string | undefined): EncounterRow[] {
   if (!String(query ?? "").trim()) return [];
-  const rows = [];
+  const rows: EncounterRow[] = [];
   for (const name of encounterSpecies(index, query)) rows.push(...(index.bySpecies.get(name) ?? []));
   return rows;
 }
@@ -332,7 +317,7 @@ export function dropText(row: { drop: string; }) {
 // --------------------------------------------------------------- drop finder
 
 /** Plain code-unit order, so the list is the same on every machine. */
-const nameOrder = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
+const nameOrder = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * The disc's drop odds for one rate byte: the fight rolls `rate + 1` in 1024, so the
@@ -343,7 +328,7 @@ export function dropOdds(rate: number) {
 }
 
 /** Every stage number a species' real encounter pools can roll, ascending. Pure. */
-export function enemyStages(stageIndex, enemy) {
+export function enemyStages(stageIndex: EncounterIndex | null | undefined, enemy: string): number[] {
   const rows = stageIndex?.bySpecies instanceof Map ? stageIndex.bySpecies.get(enemy) ?? [] : [];
   const stages: number[] = [];
   for (const row of rows) {
@@ -365,9 +350,9 @@ export function enemyStages(stageIndex, enemy) {
  * and the entry's `stages` is the union of its droppers' real pools from `stageIndex`
  * (part 3's encounterIndex). Nothing is invented: no pool means an empty stage list. Pure.
  */
-export function dropIndex(enemies, stageIndex = null) {
+export function dropIndex(enemies: EnemyRecord[] | { enemies?: EnemyRecord[] } | null | undefined, stageIndex: EncounterIndex | null = null): DropIndex {
   const list = Array.isArray(enemies) ? enemies : Array.isArray(enemies?.enemies) ? enemies.enemies : [];
-  const byItem = new Map();
+  const byItem = new Map<string, DropRecord>();
   for (const e of list) {
     const enemy = typeof e?.enemy_id === "string" ? e.enemy_id : "";
     const item = typeof e?.drop_item === "string" ? e.drop_item : "Null";
@@ -398,13 +383,14 @@ export function dropItems(index: DropIndex) {
  * One item's entry as the tab lists it: `{item, droppers, stages}`, or null for a name the
  * index does not hold. The lookup ignores case and surrounding spaces. Pure.
  */
-export function dropEntry(index: DropIndex, item) {
+export function dropEntry(index: DropIndex, item: string | null | undefined): DropEntry | null {
   if (!(index?.byItem instanceof Map)) return null;
   const wanted = String(item ?? "").trim();
   if (!wanted) return null;
   const name = dropItems(index).find((n) => n.toLowerCase() === wanted.toLowerCase());
   if (!name) return null;
-  const entry = index.byItem.get(name);
+  // ETS item 9: name came out of the keys of this very index, so the entry is there
+  const entry = index.byItem.get(name)!;
   return { item: name, droppers: entry.droppers, stages: entry.stages };
 }
 
@@ -427,7 +413,7 @@ export function dropSearch(index: DropIndex, query = ""): (DropEntry | null)[] {
  * consumables — or a bare array). Both lists are name sources; the richer `items` record
  * wins when a name is in both. An unknown name is null, never a guessed record. Pure.
  */
-export function itemByName(items, name) {
+export function itemByName(items: CodexItemsSource | null | undefined, name: string | null | undefined): CodexItemRecord | null {
   const wanted = String(name ?? "").trim();
   if (!wanted) return null;
   const list = Array.isArray(items)
@@ -436,7 +422,8 @@ export function itemByName(items, name) {
       ...(Array.isArray(items?.catalog) ? items.catalog : []),
       ...(Array.isArray(items?.items) ? items.items : []),
     ];
-  let found = null;
+  let found: CodexItemRecord | null = null;
+
   for (const record of list) {
     if (!record || typeof record.name !== "string") continue;
     if (record.name === wanted) found = record;

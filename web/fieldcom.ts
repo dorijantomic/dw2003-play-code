@@ -13,11 +13,12 @@ import {
     balloonFace, balloonAnchorY as engineBalloonAnchorY,
     BALLOON_ANCHOR_LIFT, BALLOON_SET_0,
 } from "./vendor/engine.js";
+import type { FieldcomManifest, FieldcomProgramStep, SparkleStep } from "./types/misc-game2.js";
 
-let sheets = [null, null];
-let semiSheets = [null, null];
-let manifest = null;
-let shadowImg = null;
+let sheets: (HTMLImageElement | null)[] = [null, null];
+let semiSheets: (HTMLImageElement | null)[] = [null, null];
+let manifest: FieldcomManifest | null = null;
+let shadowImg: HTMLImageElement | null = null;
 
 export async function loadFieldcom(loadImage: (url: string) => Promise<HTMLImageElement>) {
     // The character drop shadow is cut from the same FIELDCOM atlas (sub-entry 2,
@@ -56,7 +57,7 @@ export function fieldcomReady() {
 // gives exact matches for 0/1/3; mode 2 (subtractive) has no canvas composite
 // op and no FIELDCOM clip uses it, so it falls back to the plain draw rather
 // than to a look-alike blend.
-function applyAbr(ctx, mode: number) {
+function applyAbr(ctx: CanvasRenderingContext2D, mode: number) {
     if (mode === 1) { ctx.globalCompositeOperation = "lighter"; return true; }
     if (mode === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; return true; }
     if (mode === 0) { ctx.globalAlpha = 0.5; return true; }
@@ -65,7 +66,7 @@ function applyAbr(ctx, mode: number) {
 
 // Dest is not rounded: point-sprite records that draw FIELDCOM clips fill map
 // cut-outs and must share the map's camera phase (same as web/effects.js).
-export function drawFieldcomIcon(ctx, dir: number, id, x: number, y, clutRow = 0) {
+export function drawFieldcomIcon(ctx: CanvasRenderingContext2D, dir: number, id: number, x: number, y: number, clutRow = 0) {
     if (!manifest) return;
     const d = manifest[`dir${dir}`];
     const entry = (clutRow ? d?.[`${id}@${clutRow}`] : null) ?? d?.[String(id)];
@@ -157,7 +158,7 @@ export function partyIndicatorFrame(tick: number) {
     return ORB_CYCLE[Math.floor(tick / ORB_FRAMES) % ORB_CYCLE.length];
 }
 
-function programStep(program, tick: number) {
+function programStep(program: FieldcomProgramStep[], tick: number) {
     const total = program.reduce((s, p) => s + Math.max(1, Math.round(p.delay / TICKS_PER_FRAME)), 0);
     let t = tick % total;
     for (const p of program) {
@@ -167,7 +168,7 @@ function programStep(program, tick: number) {
     return program[0].id;
 }
 
-export function drawIndicatorBubble(ctx: CanvasRenderingContext2D | null, x: number, y: number, kind, tick: number) {
+export function drawIndicatorBubble(ctx: CanvasRenderingContext2D, x: number, y: number, kind: number, tick: number) {
     const program = manifest?.programs?.[kind];
     if (!program?.length) return;
     drawFieldcomIcon(ctx, 0, BALLOON, x, y);
@@ -188,7 +189,7 @@ export function storyBubbleFrame(openFrames: number, closeFrames: number | null)
 }
 
 // Draw a story bubble; returns false when there is nothing left to draw.
-export function drawStoryBubble(ctx: CanvasRenderingContext2D | null, x: number, y: number, row, openFrames: number, closeFrames: number | null, tick: number) {
+export function drawStoryBubble(ctx: CanvasRenderingContext2D, x: number, y: number, row: number,openFrames: number, closeFrames: number | null, tick: number) {
     const f = storyBubbleFrame(openFrames, closeFrames);
     if (!f) return false;
     drawFieldcomIcon(ctx, 0, f.cel, x, y);
@@ -213,7 +214,7 @@ export function drawStoryBubble(ctx: CanvasRenderingContext2D | null, x: number,
 // index in the following byte. These 24 pairs are its one-shot FLARE head,
 // transcribed byte-for-byte; the program then falls into the four-step orb loop
 // (0x23..0x26 at duration 8 = ORB_CYCLE) and loops there forever via `ff 18`.
-const SPARKLE_FLOURISH = [
+const SPARKLE_FLOURISH: SparkleStep[] = [
     [0x23, 3], [0x27, 4], [0x28, 4], [0x2d, 4], [0x2e, 4], [0x2f, 3],
     [0x30, 2], [0x2e, 2], [0x2d, 2], [0x2e, 2],
     [0x30, 2], [0x2e, 2], [0x2d, 2], [0x2e, 2],
@@ -241,7 +242,7 @@ const SPARKLE_UNIT_FRAMES = ORB_FRAMES / 8;
 export function sparkleActorFrame(frames: number) {
     let t = frames;
     for (const [id, dur] of SPARKLE_FLOURISH) {
-        const n = Math.max(1, Math.round(dur! * SPARKLE_UNIT_FRAMES));
+        const n = Math.max(1, Math.round(dur * SPARKLE_UNIT_FRAMES));
         if (t < n) return id;
         t -= n;
     }
@@ -249,7 +250,7 @@ export function sparkleActorFrame(frames: number) {
 }
 
 export const SPARKLE_ACTOR_FRAMES = SPARKLE_FLOURISH.reduce(
-    (s, [, dur]) => s + Math.max(1, Math.round(dur! * SPARKLE_UNIT_FRAMES)), 0);
+    (s, [, dur]) => s + Math.max(1, Math.round(dur * SPARKLE_UNIT_FRAMES)), 0);
 
 // The type-0x16 actor's other two scripts, decoded 2026-09-13 from the program
 // table at RAM 0x8009771c (fieldstg image file 0x14a6c):
@@ -260,7 +261,7 @@ export const SPARKLE_ACTOR_FRAMES = SPARKLE_FLOURISH.reduce(
 // A step is [spriteId, duration]; 0xff means "jump to pair index = duration".
 // Both hold forever, so unlike program 3 they never finish. Their arming notify
 // (0x800837ec, manager type 0x32d) is not modelled by the walker yet.
-export const SPARKLE_PROGRAMS: Record<string, number[][]> = {
+export const SPARKLE_PROGRAMS: Record<string, SparkleStep[]> = {
     1: [
         [0x23, 3], [0x27, 4], [0x28, 4], [0x2d, 4], [0x2e, 4], [0x2f, 3],
         [0x30, 2], [0x2e, 2], [0x2d, 2], [0x2e, 2],
@@ -277,7 +278,7 @@ export const SPARKLE_PROGRAMS: Record<string, number[][]> = {
 };
 
 /** The sprite id of a jump-resolved sparkle script at `frames`, or null. */
-export function sparkleProgramFrame(program, frames: number) {
+export function sparkleProgramFrame(program: SparkleStep[], frames: number) {
     let cursor = 0, t = Math.max(0, frames);
     for (let guard = 0; guard < 10000; guard++) {
         const step = program[cursor];
@@ -302,7 +303,7 @@ export function sparkleProgramFrame(program, frames: number) {
 // elapsed frames since the program was armed, or null when none is running;
 // `program` selects the script (3 = the acquisition flare, 1/2 the other two).
 // Returns true while an actor is still playing.
-export function drawSparkleActor(ctx: CanvasRenderingContext2D | null, x: number, y: number, tick: number, flareFrames: number | null, program = 3) {
+export function drawSparkleActor(ctx: CanvasRenderingContext2D, x: number, y: number, tick: number, flareFrames: number | null, program = 3) {
     const script = SPARKLE_PROGRAMS[program];
     if (script) {
         const id = sparkleProgramFrame(script, flareFrames ?? 0);
@@ -324,7 +325,7 @@ export function drawSparkleActor(ctx: CanvasRenderingContext2D | null, x: number
 // Geometry comes from the engine (engine/systems/field-shadow.ts); this module
 // owns nothing but the texture and the blit.
 /** The same drop-shadow image, centred on a ground point at any size (a mount's footprint). */
-export function drawGroundShadow(ctx, cx, cy, w, h, alpha = 1) {
+export function drawGroundShadow(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, alpha = 1) {
     if (!shadowImg || alpha <= 0) return false;
     const was = ctx.globalAlpha;
     ctx.globalAlpha = was * alpha;
@@ -333,9 +334,9 @@ export function drawGroundShadow(ctx, cx, cy, w, h, alpha = 1) {
     return true;
 }
 
-export function drawFieldShadow(ctx: CanvasRenderingContext2D | null, input: { screenX: number; actorScreenY: number; actorHeightFixed: number; groundOffsetFixed: number; }) {
+export function drawFieldShadow(ctx: CanvasRenderingContext2D, input: { screenX: number; actorScreenY: number; actorHeightFixed: number; groundOffsetFixed: number; }) {
     if (!shadowImg) return false;
     const r = fieldShadowRect(input);
-    ctx!.drawImage(shadowImg, r.x, r.y, r.w, r.h);
+    ctx.drawImage(shadowImg, r.x, r.y, r.w, r.h);
     return true;
 }

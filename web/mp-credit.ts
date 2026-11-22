@@ -7,22 +7,23 @@
 // fight's `setup` packet — so both tamers' quests tick for the one fight.
 //
 // Nothing here touches the DOM, storage or the network; the toggle and the emit live in mpbattle.js.
+import type { MpFoeRef, MpWinEvent } from "./types/mp-match.js";
 
 /**
  * The `battleWon` event of a co-op fight, or null when no foe carries a name (there is then no species to credit).
  * @param {Array<{name?: string}|string>} foes  the fight's foes, as the setup packet carries them
  * @param {{mapId?: string|null, screenId?: number|null}} [at]  the fight's map and screen
  */
-export function winEvent(foes, { mapId = null, screenId = null } = {}) {
+export function winEvent(foes: MpFoeRef[] | null | undefined, { mapId = null, screenId = null }: { mapId?: string | null; screenId?: number | null; } = {}): MpWinEvent | null {
     const enemies = (Array.isArray(foes) ? foes : [])
         .map((f) => (typeof f === "string" ? f : f?.name))
-        .filter((n) => typeof n === "string" && n.length > 0);
+        .filter((n): n is string => typeof n === "string" && n.length > 0);
     if (!enemies.length) return null;
     return { enemies, mapId: mapId ?? null, screenId: screenId ?? null };
 }
 
 /** Are these the same fight's event? (What the host built and what the guest built from the packet must agree.) */
-export function sameEvent(a, b) {
+export function sameEvent(a: MpWinEvent | null | undefined, b: MpWinEvent | null | undefined) {
     if (!a || !b) return !a && !b;
     const ae = a.enemies ?? [], be = b.enemies ?? [];
     if (ae.length !== be.length) return false;

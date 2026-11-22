@@ -4,20 +4,22 @@
 // data, forwards pad state, paints the recorded draw intents and commits the
 // folder records back to the walker's collection.
 import { ui } from "./vendor/engine.js";
+import type { PackedSfx, ResidentGlyphs } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import { composeDeck } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards, persistCollection, loadCatalog, catalog, loadCardIcons, drawCardIcon } from "./cardstate.js";
 import type { CardDeckScreen } from "./types/carddeck-translated.js";
-interface CardDeckBank {
-  offset: number;
+interface CardDeckSlab {
+  base: number;
   bytes: Uint8Array;
 }
 interface CardDeckLoadedData {
   resident: Awaited<ReturnType<typeof loadResidentResources>>;
-  banks: CardDeckBank[];
-  tables: Record<string, Uint8Array>;
+  banks: Map<number, Uint8Array>;
+  tables: CardDeckSlab[];
 }
 
 
@@ -31,10 +33,10 @@ const LABEL = "Card folder";
 // (CRDSHP) and the rename keyboard's NAMEDT bank.
 const SHOP_OFFSET = 0x32;
 const BANK_SOURCES = [
-  { offset: 0x16, path: (id) => `album/banks/${id}.bin` },   // CARDNM
-  { offset: 0x1d, path: (id) => `album/banks/${id}.bin` },   // CARDST
-  { offset: 0x32, path: (id) => null },                      // CRDSHP (from cardshop-data)
-  { offset: 0x86, path: (id) => `name/${id}.bin` },          // NAMEDT
+  { offset: 0x16, path: (id: number) => `album/banks/${id}.bin` },   // CARDNM
+  { offset: 0x1d, path: (id: number) => `album/banks/${id}.bin` },   // CARDST
+  { offset: 0x32, path: (id: number) => null },                      // CRDSHP (from cardshop-data)
+  { offset: 0x86, path: (id: number) => `name/${id}.bin` },          // NAMEDT
 ];
 
 let dataPromise = null;
@@ -43,7 +45,7 @@ function loadData(language: number | undefined): Promise<CardDeckLoadedData> {
   return dataPromise;
 }
 
-async function loadAll(language) {
+async function loadAll(language: number): Promise<CardDeckLoadedData> {
   const [resident] = await Promise.all([loadResidentResources(), loadCatalog()]);
   const shopBank = await fetch(`cardshop-data/${SHOP_OFFSET + language}.bin`).then((response) => {
     if (!response.ok) throw new Error(`Folder text bank ${SHOP_OFFSET + language}: ${response.status}`);
@@ -56,13 +58,13 @@ async function loadAll(language) {
     banks.set(id, await fetchBytes(path(id), LABEL));
   }
   const spec = await fetchJson("stcrddek_tables.json", LABEL);
-  const tables = spec.slabs.map((slab) => ({
+  const tables = spec.slabs.map((slab: { base: number; bytes_base64: string }) => ({
     base: slab.base, bytes: Uint8Array.from(atob(slab.bytes_base64), (c) => c.charCodeAt(0)),
   }));
   return { resident, banks, tables };
 }
 
-function resources(resident, banks, tables) {
+function resources(resident: CardDeckLoadedData["resident"], banks: CardDeckLoadedData["banks"], tables: CardDeckLoadedData["tables"]) {
   const col = cards();
   const catalogue = catalog() ?? { cards: [] };
   // The full disc record: the shared card-view text context reads AP, HP, kind,
@@ -82,7 +84,8 @@ function resources(resident, banks, tables) {
     banks,
     cards: cardRecords,
     font: resident.font,
-    cursorGlyphs: resident.cursorGlyphs,
+    // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+    cursorGlyphs: resident.cursorGlyphs as ResidentGlyphs,
     folders,
     owned: col?.owned ?? new Map(),
     seen: col?.seen ?? [],
@@ -90,11 +93,11 @@ function resources(resident, banks, tables) {
   };
 }
 
-export function createCardDeckTranslated(sfx = null, _options = {}) {
-  const deck = {
+export function createCardDeckTranslated(sfx: PackedSfx | null = null, _options = {}) {
+  const deck: CardDeckScreen = {
     _open: false, _session: null, _state: null, _onClose: null,
     _renderer: null, _clock: null, _error: null, _request: 0,
-  } as CardDeckScreen;
+  };
   const renderer = createNativeScreenRenderer({ pack: "stcdsp", packs: PACKS },
     (directory) => PACKS[directory >>> 16] ?? null, {
       // the grid cell's card picture (same painter as the card shop)
@@ -117,12 +120,12 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     deck._error = null;
     deck._session = null;
     loadCardIcons();
-    deck._clock = new ui.MenuDisplayClock();
+    deck._clock = new (ui as EngineUi).MenuDisplayClock();
     const request = ++deck._request;
     const language = Number.isInteger(deck._state?.languageByte) ? deck._state!.languageByte : 2;
     loadData(language).then(({ resident, banks, tables }) => {
       if (!deck._open || request !== deck._request) return;
-      deck._session = new ui.FolderSession(language, resources(resident, banks, tables),
+      deck._session = new (ui as EngineUi).FolderSession(language, resources(resident, banks, tables),
         { playSound(sound) { sfx?.playPacked(sound); } });
     }).catch((error) => {
       if (request !== deck._request) return;
@@ -135,7 +138,7 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
   deck.handleKey = (_key, state) => { if (state) deck._state = state; };
   deck.update = (dt) => {
     if (!deck._open || !deck._session || deck._error) return;
-    for (const frame of deck._clock.advance(dt)) {
+    for (const frame of deck._clock!.advance(dt)) {
       deck._session.tick(deck._state?.keys ?? [], frame.tick);
       if (deck._session.finished()) { deck._finish!(); break; }
     }

@@ -12,10 +12,12 @@ import type { AttackOptions, Battle3DContext } from "../../types/battle3d.js";
 import type { ArenaGroupBuf, ArenaPack } from "../../types/battle3d.js";
 import type { BattleSide } from "../../types/audio.js";
 import type { AnimHooks } from "../../types/battle3d.js";
+import type { LungeRecord } from "../../types/fx3d.js";
 interface RockCoverCam { eye: number[]; look: number[]; up?: number[]; fovDeg?: number; H?: number; roll?: number; defeatYaw?: number; defeatDelta?: number; }
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeFighters(B$: Battle3DContext) {
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
 function _layoutExtras() {
     if (!B$.multiCam) { B$.arenaScale = 1; for (const f of B$.extras!.values()) { f.dxT = f.dx0; f.dz = 0; } return; }
     let scale = 1;
@@ -42,11 +44,11 @@ function _layoutExtras() {
     B$.arenaScale = window.__fx?.smartcam ? Math.min(B$.MULTI_ARENA_MAX!, scale) : _arenaScaleClear(Math.min(B$.MULTI_ARENA_MAX!, scale));
   }
 function _rockCover(groups: ArenaGroupBuf[], s: number, cam: RockCoverCam, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) {
-    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+    const sub = (a: number[], b: number[]) => [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
     const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0]!, a[1]!, a[2]!) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2]!, 0, fwd[0]]);
     const up = [right[1]! * fwd[2]! - right[2]! * fwd[1]!, right[2]! * fwd[0]! - right[0]! * fwd[2]!, right[0]! * fwd[1]! - right[1]! * fwd[0]!];
-    const t = Math.tan(cam.fovDeg * Math.PI / 360);
+    const t = Math.tan(cam.fovDeg! * Math.PI / 360);
     let near = Infinity, feet = Infinity;
     for (const f of fs) {
       const c = [(f.aabb!.min[0]! + f.aabb!.max[0]!) / 2, (f.aabb!.min[1]! + f.aabb!.max[1]!) / 2, (f.aabb!.min[2]! + f.aabb!.max[2]!) / 2];
@@ -82,7 +84,7 @@ function _rockCover(groups: ArenaGroupBuf[], s: number, cam: RockCoverCam, fs: P
     let n = 0; for (const h of hit) n += h;
     return n / (GW * GH);
   }
-function _arenaScaleClear(want: number, pk: ArenaPack | null = B$.activeArena) {
+function _arenaScaleClear(want: number, pk: ArenaPack | null | undefined = B$.activeArena) {
     if (!(want > 1)) return 1;
     const groups = pk?.groups, fs = [...B$.extras!.values()].filter((f) => f.aabb);
     if (!groups?.length || !B$.lastCamInfo || !fs.length) return B$.arenaScale;   // not ready: keep what is drawn now
@@ -109,11 +111,11 @@ function addFighter(id: string, side: BattleSide, folder: string, dx: number = 0
       lat: 0, latT: 0, follow: null, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
       visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null } as Battle3dFighter;
     B$.extras!.set(id, f);
-    f.tex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
+    f.tex = loadTexture(B$.gl!, `assets/battle/textures/${folder}.png`);
     return loadSkeletalModel(folder).then((m) => {
       if (!m || B$.extras!.get(id) !== f) return false;
       f.model = m;
-      f.bufs = buildSkeletalGLBuffers(B$.gl, m);
+      f.bufs = buildSkeletalGLBuffers(B$.gl!, m);
       f.frame = m.clips?.[0]?.start_frame ?? 0;
       f.anim8r = new ActorAnimator(m);
       f.anim8r.resetSlotPlacement(arenaSlotFor(folder, side, B$.placementTable));
@@ -190,8 +192,8 @@ function fighterVictory(id: string) {
     const val = (v: number | (() => number) | (() => number)) => (typeof v === "function" ? v() : v);
     const shiftFx = (h: AnimHooks, laneNear: number | (() => number), laneFar: number, defSide: string, zNear: number | (() => number), zFar: number) => ({
       ...h,
-      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + val(atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + val(atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
-      setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + val(laneNear), ...l.from.slice(1)] } : l),
+      onEffect: (rec: { x: number; z: number }) => h.onEffect?.({ ...rec, x: (rec.x | 0) + val(atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + val(atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
+      setLunge: (l: LungeRecord) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0]! + val(laneNear), ...l.from.slice(1)] } : l),
     });
     const attHooks = shiftFx(B$._fxHooks(A.side, B$._impactContact({ ...hooks, onMotion: B$.dataFieldMotion })), nearX, dLane, D.side, nearZ, dDz);
     const defHooks = shiftFx(B$._fxHooks(D.side), dLane, dLane, D.side, dDz, dDz);
@@ -216,7 +218,7 @@ function fighterVictory(id: string) {
       if (sample) f.frame = sample.frame;
       const bwm = buildBoneWorldMatrices(f.model, f.frame, sample ? sample.blend : null, a.currentHiddenParts?.());
       f.pos = pos;
-      f.aabb = _updateSkeletalVBOGL(B$.gl, f.model, f.bufs, bwm, pos, MODEL_SCALE, false, yaw);
+      f.aabb = _updateSkeletalVBOGL(B$.gl!, f.model, f.bufs, bwm, pos, MODEL_SCALE, false, yaw);
       if (f.born == null) f.born = B$.animTime;
       if (f.aabb && B$.animTime! - f.born! < B$.MULTI_MEASURE_S! && !B$.coordinator!.active)       // its own width, while it idles
       { f.restW = Math.max(f.restW, (f.aabb.max[0]! - f.aabb.min[0]!) / ARENA); f.restH = Math.max(f.restH || 0, f.aabb.max[1]! - f.aabb.min[1]!); }
@@ -225,7 +227,7 @@ function fighterVictory(id: string) {
 function _drawExtras(pv: Float32Array) {
     for (const f of B$.extras!.values()) {
       if (!f.visible || !f.model || !f.bufs) continue;
-      drawSkeletalMesh(B$.gl, B$.texP, pv, f.bufs, f.tex || B$.whiteTex, fighterTint(f.side === "enemy" ? "enemy" : "player"));
+      drawSkeletalMesh(B$.gl!, B$.texP!, pv, f.bufs, f.tex || B$.whiteTex, fighterTint(f.side === "enemy" ? "enemy" : "player"));
       B$.drawShadow(B$.gl!, B$.texP!, pv, f.pos, 20, 8);
     }
   }

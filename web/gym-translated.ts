@@ -17,6 +17,7 @@
 //
 // Same public API as createGymNative: open/isOpen/handleKey/update/draw/close/diagnostics.
 import { elementValues, rosterSlotOfCharId, ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
@@ -26,13 +27,29 @@ import { ensureStoredStats } from "./battle.js";
 import { createGymPrimPainter } from "./gym-vram-paint.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { PackedSfx, ThrownError } from "./types/translated-screens.js";
 import { composeWindow } from "./ui-c/screens.js";
 import type { GymScreen } from "./types/gym-translated.js";
 
-import type { InventoryRow } from "./game/types.js";
+import type { NativeScreenDrawIntent } from "./types/native-screen-render.js";
+import type { DigimonRecord } from "./types/battle.js";
+import type { InventoryRow, PartnerStats } from "./game/types.js";
+/** What the gym keeps of its prim painter (web/gym-vram-paint.ts): the renderer hands `paint` its own call shape, so it is declared as a method. */
+interface GymPainter {
+    paint(ctx: CanvasRenderingContext2D, call: NativeScreenDrawIntent): void;
+    beginFrame(): void;
+    stats: ReturnType<typeof createGymPrimPainter>["stats"];
+}
+
+/** One TRANIN pack the manifest lists. */
+interface GymManifestPack { id: number; file: string; sectors: number; }
+/** One gym of gym_ranks.json: the stage it stands on and the rank groups its ID-card gates give. */
+interface GymRankEntry { stage: number; options: { group: number; requires: { item: number; owned: boolean }[] }[]; }
+interface GymRanks { gyms?: GymRankEntry[]; }
+
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
 const PACK_NAMES: Record<string, string> = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const PARTY_SLOTS = 3;
@@ -49,12 +66,12 @@ const loadShared = () => {
             fetchJson("shop_catalog.json", DATA_LABEL), fetchBytes("shop_item_records.bin", DATA_LABEL),
             fetchBytes("shop_descriptors_main.bin", DATA_LABEL), fetchBytes("shop_descriptors_extra.bin", DATA_LABEL),
             fetchJson("digimon.json", DATA_LABEL), fetchJson("gym_ranks.json", DATA_LABEL),
-            ...manifest.packs.map((pack) => fetchBytes(`gym/${pack.file}`, DATA_LABEL)),
+            ...manifest.packs.map((pack: GymManifestPack) => fetchBytes(`gym/${pack.file}`, DATA_LABEL)),
         ]);
         return {
             manifest, tables, profiles, signature, font, cursorGlyphs, catalog, itemRecords, descriptors: [main, extra],
-            packs: new Map(manifest.packs.map((pack, i) => [pack.id, { id: pack.id, sectors: pack.sectors, data: packs[i] }])),
-            digimonById: Object.fromEntries(digimon.digimon.map((d) => [d.id, d])), ranks,
+            packs: new Map(manifest.packs.map((pack: GymManifestPack, i: number) => [pack.id, { id: pack.id, sectors: pack.sectors, data: packs[i] }])),
+            digimonById: Object.fromEntries(digimon.digimon.map((d: DigimonRecord) => [d.id, d])), ranks,
         };
     })().catch((error) => { sharedPromise = null; throw error; });
     return sharedPromise;
@@ -69,27 +86,27 @@ const loadBank = (language: number | undefined) => {
 };
 
 /** The rank group a greeter's ID-card gates give (GYM-C010), for the lab path that has no greeter. */
-export function gymGroupForStage(stage: number, inventory: InventoryRow[], ranks) {
-    const has = (id) => !!inventory?.some((s) => s.id === id && s.qty > 0);
-    const gym = ranks?.gyms?.find((g) => g.stage === stage);
+export function gymGroupForStage(stage: number, inventory: InventoryRow[], ranks: GymRanks | null | undefined) {
+    const has = (id: number) => !!inventory?.some((s) => s.id === id && s.qty > 0);
+    const gym = ranks?.gyms?.find((g: GymRankEntry) => g.stage === stage);
     if (!gym) return null;
-    for (const opt of gym.options) if (opt.requires.every((r) => has(r.item) === r.owned)) return opt.group;
+    for (const opt of gym.options) if (opt.requires.every((r: { item: number; owned: boolean }) => has(r.item) === r.owned)) return opt.group;
     return null;
 }
 
 const rand16 = () => (Math.random() * 0x10000) | 0;
 
-export function createGymTranslated(sfx = null) {
+export function createGymTranslated(sfx: PackedSfx | null = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null, _state: null,
         _onClose: null, _group: 0, _stage: null, _clock: null, _ticks: 0, _request: 0, _seeded: [], _summary: null,
         _lastDiagnostic: null, _committed: 0,
     } as GymScreen;
-    let painter = null;
+    let painter: GymPainter | null = null;
     const renderer = createNativeScreenRenderer({ pack: "sttrng3", packs: { "652:0": "sttrng0", "652:3": "sttrng3", "646:0": "cmfont" } },
         packName, { paintPrim: (ctx, call) => painter?.paint(ctx, call) });
 
-    const playSound = (id) => { sfx?.playPacked(id); };
+    const playSound = (id: number) => { sfx?.playPacked(id); };
 
     // Closed by the caller, the gym still runs onClose; a training session that never finished is
     // disposed, one that finished already tore itself down (web/gym-translated.js always did this).
@@ -109,10 +126,10 @@ export function createGymTranslated(sfx = null) {
     });
 
     /** Roster slot of a manifest character id; -1 when it is not a roster species. */
-    const rosterSlotFor = (charId) => rosterSlotOfCharId(String(charId)) ?? -1;
+    const rosterSlotFor = (charId: string | null) => rosterSlotOfCharId(String(charId)) ?? -1;
 
     /** Walker state -> the session's seed (the RAM contract of the disc's screen). */
-    function buildSeed(language) {
+    function buildSeed(language: number) {
         const state = g._state ?? {};
         const party = Array.isArray(state.party) ? state.party : [];
         const members = [];
@@ -122,7 +139,8 @@ export function createGymTranslated(sfx = null) {
             if (slot < 0) break; // a pod is only ever shown for a roster species, and positions stay contiguous
             const ps = driStatsAt(state, i, g._data.digimonById) ?? {};
             const profile = g._data.digimonById[ps.digimonId ?? 0];
-            const core = profile ? ensureStoredStats(ps, g._data.digimonById[CHARID_TO_DIGID[party[i]]] ?? profile) : (ps.stats ?? {});
+            // ETS item 9: ps is the partner's stored stats block; DriStats only marks hp optional, and ensureStoredStats reads level and stats alone (web/battle/progress.ts should take Partial<PartnerStats>)
+            const core = profile ? ensureStoredStats(ps as PartnerStats, g._data.digimonById[CHARID_TO_DIGID[party[i]]] ?? profile) : (ps.stats ?? {});
             const bonus = ELEMENTS.map((k) => Number(ps.elemBonuses?.[k]) || 0);
             const member = {
                 position: i,
@@ -150,7 +168,7 @@ export function createGymTranslated(sfx = null) {
         return { language, group: g._group, previousScreen: Number.isInteger(g._stage) ? g._stage : 0, members };
     }
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         g._error = error;
         g._failed = true;
         g._lastDiagnostic = `translated gym failed: ${error?.message ?? error}`;
@@ -167,9 +185,9 @@ export function createGymTranslated(sfx = null) {
             banks: new Map([[0x10b + language, bank]]), packs: data.packs,
             catalog: data.catalog, itemRecords: data.itemRecords, descriptors: data.descriptors,
         };
-        g._session = new ui.GymSession(buildSeed(language), resources, { playSound, rand: rand16 });
+        g._session = new (ui as EngineUi).GymSession(buildSeed(language), resources, { playSound, rand: rand16 });
         painter = createGymPrimPainter(() => g._session?.vram ?? null);
-        g._clock = new ui.MenuDisplayClock();
+        g._clock = new (ui as EngineUi).MenuDisplayClock();
     }
 
     /** The screen's record -> the walker's partner blocks (once). */
@@ -244,7 +262,7 @@ export function createGymTranslated(sfx = null) {
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         ctx.save();
         ctx.scale(s, s);
-        painter.beginFrame();
+        painter!.beginFrame();
         paintNativeSession(ctx, renderer, g._session, { ui: { key: "ui-gym", compose: composeWindow } });
         ctx.restore();
     };

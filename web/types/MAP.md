@@ -55,6 +55,7 @@ tools/rewrite/split-types.mjs.
 | quest-scenes.ts | 11 | types of web/quest-scenes.ts |
 | redirect-view.ts | 1 | types of web/redirect-view.ts |
 | save-translated.ts | 2 | types of web/save-translated.ts |
+| screens.ts | 43 | shared shapes of the book and screen modules: web/glossary-items.ts, glossary-stage.ts, glossary-book.ts, glossary-fallback.ts, book-host.ts, cntysel-native.ts |
 | save.ts | 1 | types of web/save.ts |
 | scene-dryrun.ts | 1 | types of web/scene-dryrun.ts |
 | sceneEditor.ts | 1 | types of web/sceneEditor.ts |

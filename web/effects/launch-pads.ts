@@ -1,6 +1,7 @@
 import { PAD_IDLE_SCRIPT, newPadCursor, advancePadScript } from "../vendor/engine.js";
 import { pushComposite } from "../draw-order.js";
 import { S } from "./state.js";
+import type { LaunchPadRecord, LaunchPadState, PointStageData } from "../types/fx3d.js";
 import { ensureSemiSheet, ensureSheet } from "./point-records.js";
 import { drawSprite } from "./draw.js";
 
@@ -19,9 +20,9 @@ import { drawSprite } from "./draw.js";
 // display-list sort key (a3 = [obj+0x58], +0x12 for the strobe pass).
 
 /** The stage's pad records, or [] — used by game.js to pick the nearest pad. */
-export function launchPads(stageId) {
+export function launchPads(stageId: string | number): LaunchPadRecord[] {
     return S.padData?.[String(stageId).replace(/^s/, "")]?.pads?.filter(
-        (p) => p.enabled,
+        (p: LaunchPadRecord) => p.enabled,
     ) ?? [];
 }
 
@@ -33,7 +34,7 @@ export const PAD_STROBE_DY = -0x20;
 // background art cannot satisfy.
 let padsEnabled = true;
 
-export function setLaunchPadsEnabled(on) {
+export function setLaunchPadsEnabled(on: unknown) {
     padsEnabled = !!on;
 }
 
@@ -42,7 +43,7 @@ export function setLaunchPadsEnabled(on) {
  *  headless verifier can read the idle pulse directly instead of inferring it
  *  from averaged canvas pixels (an averaged signature cannot tell a 3-row
  *  script from a 6-value alias). */
-let padDebug = { calls: 0, palette: [] };
+let padDebug: { calls: number; palette: number[] } = { calls: 0, palette: [] };
 
 export function launchPadDebug() {
     return { calls: padDebug.calls, palette: padDebug.palette.slice() };
@@ -51,7 +52,7 @@ export function launchPadDebug() {
 /** Per-stage idle cursors, one per pad — every pad runs its own copy of the
  *  looping idle script from the moment the stage loads (state 0 seeds the
  *  cursor at entry 0), so they pulse in step until a launch rewinds one. */
-const padIdle = {}; // stageId -> [PadCursor] parallel to launchPads(stageId)
+const padIdle: Record<string, { index: number; timer: number }[]> = {}; // stageId -> [PadCursor] parallel to launchPads(stageId)
 
 function padIdleScript(stageId: string | number) {
     const entries = S.padData?.[String(stageId).replace(/^s/, "")]?.idleScript
@@ -60,7 +61,7 @@ function padIdleScript(stageId: string | number) {
 }
 
 /** Advance every pad's idle colour cursor one rendered frame (= one tick). */
-function tickPadIdle(stageId: string | number, pads, launch) {
+function tickPadIdle(stageId: string | number, pads: LaunchPadRecord[], launch: LaunchPadState | null | undefined) {
     const script = padIdleScript(stageId);
     let cur = padIdle[stageId];
     if (!cur || cur.length !== pads.length) {
@@ -69,12 +70,13 @@ function tickPadIdle(stageId: string | number, pads, launch) {
     }
     const out = new Array(pads.length);
     for (let i = 0; i < pads.length; i++) {
+        // ETS item 9: i is below pads.length, so pads[i] is there.
         // Entering state 2 rewinds this pad's cursor (the native stores 0 to
         // +0x60 and reloads +0x62 before it runs the animator that frame).
         if (
             launch?.padIdleReset &&
-            pads[i].x === launch.padOriginX &&
-            pads[i].y === launch.padOriginY
+            pads[i]!.x === launch.padOriginX &&
+            pads[i]!.y === launch.padOriginY
         ) {
             cur[i] = newPadCursor(script);
         }
@@ -83,11 +85,11 @@ function tickPadIdle(stageId: string | number, pads, launch) {
     return out;
 }
 
-export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], launch) {
+export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], launch: LaunchPadState | null | undefined) {
     if (!padsEnabled) return;
     const pads = launchPads(stageId);
     if (!pads.length) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     // Tick before the sheet check so the colour cycle keeps native time while
     // the stage's sprite sheet is still loading.
@@ -102,7 +104,8 @@ export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId: st
     const liveX = launch?.padOriginX;
     const liveY = launch?.padOriginY;
     for (let i = 0; i < pads.length; i++) {
-        const pad = pads[i];
+        // ETS item 9: i is below pads.length.
+        const pad = pads[i]!;
         // The idle value is a CLUT-row offset on the pad's own disc, pre-cut by
         // the extractor as "clip@ctr" (a missing row falls back to the base
         // palette, exactly as the mode-2/3 point sprites do).

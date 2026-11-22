@@ -9,6 +9,7 @@
 import { DEV_TABS, DEV_FILTERS, DEV_OPEN, tabCounts, selectRows, groupRows } from "./dev-panel-model.js";
 import { shipClass } from "./ship-list.js";
 import type { AmbienceSettings } from "./types/ambience.js";
+import type { DevPanelState } from "./types/misc-game.js";
 interface DevPanelField extends Element {
     value?: string;
     disabled?: boolean;
@@ -23,7 +24,7 @@ interface DevRow {
 }
 
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 const BADGE: Record<string, string[]> = {
     in: ["In", "In the game: on at the start, and the player may switch it in OPTIONS."],
     auto: ["Auto", "In the game: always on, there is no switch."],
@@ -130,7 +131,7 @@ export interface DevPanelApi {
 
 export function createDevView(panel, api: DevPanelApi) {
     const shipOf = api.shipOf || shipClass;
-    const st = { tab: "world", query: "", filter: "all", na: new Set(), note: "" };
+    const st: DevPanelState = { tab: "world", query: "", filter: "all", na: new Set(), note: "" };
     let built = false, main = null, tabsEl = null, searchEl = null, counts = null;
 
     function rowHtml(r: DevRow) {
@@ -168,7 +169,7 @@ export function createDevView(panel, api: DevPanelApi) {
     function sync() {
         if (!built) return;
         const fx = api.fx;
-        const locked = (k) => !!api.locked?.(k);        // multiplayer: the host decides this key (web/host-rules.js)
+        const locked = (k: string) => !!api.locked?.(k);        // multiplayer: the host decides this key (web/host-rules.js)
         for (const el of main.querySelectorAll("[data-fx]")) { el.checked = !!fx[el.dataset.fx]; el.disabled = locked(el.dataset.fx); }
         for (const el of main.querySelectorAll("[data-host-lock]")) el.hidden = !locked(el.dataset.hostLock);
         for (const b of main.querySelectorAll("[data-act^='open:']")) b.disabled = !fx[b.dataset.act.slice(5)];

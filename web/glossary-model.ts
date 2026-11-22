@@ -4,7 +4,7 @@
 export const VISIBLE = 8;          // species rows in the list window (its first line is the counts)
 export const REVEAL_EVERY = 2;     // frames per card line (the album's cell-by-cell flip, one every 2 frames)
 
-export function createGlossaryModel({ count }) {
+export function createGlossaryModel({ count }: { count: number }) {
     const last = Math.max(0, (count | 0) - 1);
     let index = 0, top = 0, page = 0, line = 0, shown = 0;
     const settle = () => {

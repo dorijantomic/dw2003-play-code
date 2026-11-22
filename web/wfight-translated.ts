@@ -6,7 +6,10 @@
 // Public API: open/update/close/isOpen/isPending/active/
 // isDone/diagnostics.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { fetchBytes, fetchJson } from "./resident-data.js";
+import type { ThrownError } from "./types/translated-screens.js";
+import type { WfightUpload } from "../engine/dw3/ui/wfight-loader-session.js";
 import type { WfightLoaderOptions, WorldFightScreen } from "./types/wfight-translated.js";
 interface WfightManifestResource {
     id: string;
@@ -24,31 +27,31 @@ const DATA_LABEL = "Battle loader data";
 let dataPromise = null;
 function loadData(): Promise<{ manifest: WfightManifest; packs: Map<string, Uint8Array> }> {
     dataPromise ??= fetchJson(`${LOADER_DIR}/manifest.json`, DATA_LABEL).then(async (manifest): Promise<{ manifest: WfightManifest; packs: Map<string, Uint8Array> }> => {
-        const shipped = manifest.resources.filter((r) => r.file);
-        const files = await Promise.all(shipped.map((r) => fetchBytes(`${LOADER_DIR}/${r.file}`, DATA_LABEL)));
-        return { manifest, packs: new Map(shipped.map((r, i: string | number) => [r.id, files[i]])) };
+        const shipped = manifest.resources.filter((r: WfightManifestResource) => r.file);
+        const files = await Promise.all(shipped.map((r: WfightManifestResource) => fetchBytes(`${LOADER_DIR}/${r.file}`, DATA_LABEL)));
+        return { manifest, packs: new Map(shipped.map((r: WfightManifestResource, i: number) => [r.id, files[i]])) };
     }).catch((error) => { dataPromise = null; throw error; });
     return dataPromise;
 }
 
 /** The VRAM the latest completed loader left behind (the command list's marker strip lives in it). */
-let lastVram = null;
+let lastVram: ((x: number, y: number, w: number, h: number) => Uint8Array | null) | null = null;
 
 /**
  * The pixels the loader uploaded to exactly this VRAM rectangle, or null when no
  * loader has run this page or it did not upload that rectangle.
  */
-export function wfightLoaderRegion(x, y, w, h) {
+export function wfightLoaderRegion(x: number, y: number, w: number, h: number) {
     return lastVram?.(x, y, w, h) ?? null;
 }
 
 export function createWfightTranslated(options: WfightLoaderOptions = {}) {
-    const w = {
+    const w: WorldFightScreen = {
         _open: false, _pending: false, _done: false, _failed: false, _session: null, _data: null,
         _clock: null, _ticks: 0, _error: null, _lastDiagnostic: null, _summary: null,
-    } as WorldFightScreen;
+    };
 
-    const fail = (error) => {
+    const fail = (error: ThrownError) => {
         w._error = error;
         w._failed = true;
         w._lastDiagnostic = `translated battle loader failed: ${error?.message ?? error}`;
@@ -59,8 +62,8 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
     function start() {
         const selected = options.getState?.()?.languageByte;
         const language = Number.isInteger(selected) ? selected : 2;
-        w._session = new ui.WfightLoaderSession(language, w._data);
-        w._clock = new ui.MenuDisplayClock();
+        w._session = new (ui as EngineUi).WfightLoaderSession(language, w._data);
+        w._clock = new (ui as EngineUi).MenuDisplayClock();
     }
 
     /** Start the battle boot loader. */
@@ -93,10 +96,10 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
             w._pending = false;
         }
         try {
-            for (const frame of w._clock.advance(dt)) {
-                w._session.tick(frame.tick);
+            for (const frame of w._clock!.advance(dt)) {
+                w._session!.tick(frame.tick);
                 w._ticks++;
-                if (w._session.finished()) break;
+                if (w._session!.finished()) break;
             }
         } catch (error) {
             fail(error);
@@ -116,10 +119,10 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
             const finished = session.finished();
             w._summary = {
                 requested: session.requested.slice(), released: session.released.slice(),
-                uploads: session.uploads.map((u) => ({ ...u })), retired: finished,
+                uploads: session.uploads.map((u: WfightUpload) => ({ ...u })), retired: finished,
             };
             // Only a loader that retired by itself leaves its uploads behind.
-            if (finished && !w._failed) lastVram = (x, y, ww, h) => session.vramRegion(x, y, ww, h);
+            if (finished && !w._failed) lastVram = (x: number, y: number, ww: number, h: number) => session.vramRegion(x, y, ww, h);
             if (!finished) session.dispose();
         }
         w._session = null;
@@ -141,7 +144,7 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
         state: w._session?.state() ?? null,
         bankIds: w._session ? w._session.requested.slice() : (w._summary?.requested ?? []),
         released: w._summary?.released ?? [],
-        uploads: w._session ? w._session.uploads.map((u) => ({ ...u })) : (w._summary?.uploads ?? []),
+        uploads: w._session ? w._session.uploads.map((u: WfightUpload) => ({ ...u })) : (w._summary?.uploads ?? []),
         retired: w._summary?.retired ?? false,
         host: null,
         lastDiagnostic: w._lastDiagnostic,

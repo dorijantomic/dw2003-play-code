@@ -5,6 +5,8 @@ import {
   commitMerchantClose, ui, rosterSlotOfCharId,
   wornCount, wornItemIds,
 } from "./vendor/engine.js";
+import type { WalkerState, PackedSfx } from "./types/translated-screens.js";
+import type { DigimonRecord, EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession } from "./native-session.js";
@@ -16,7 +18,7 @@ import { composeWindow } from "./ui-c/screens.js";
 import type { ShopOpenOpts } from "./types/shop.js";
 import type { ShopTranslatedOptions, ShopTranslatedScreen } from "./types/shop-translated.js";
 interface ShopCatalogRecord { file: string; }
-interface ShopCatalog { itemRecords: ShopCatalogRecord; itemDescriptors: ShopCatalogRecord[]; }
+type ShopCatalog = import("../engine/dw3/ui/shop-catalog.js").ShopCatalogData;
 interface ShopLoadedCatalog { catalog: ShopCatalog; itemRecords: Uint8Array<ArrayBuffer>; descriptors: Uint8Array<ArrayBuffer>[]; font: Uint8Array<ArrayBufferLike>; }
 
 
@@ -25,20 +27,20 @@ const PACKS: Record<string, string> = { 646: "cmfont", 1026: "stshop" };
 
 const DATA_LABEL = "Merchant data";
 const readJson = (path: string) => fetchJson(path, DATA_LABEL);
-const readBytes = (path) => fetchBytes(path, DATA_LABEL);
+const readBytes = (path: string) => fetchBytes(path, DATA_LABEL);
 
 let catalogPromise = null;
 function loadCatalog(): Promise<ShopLoadedCatalog> {
   catalogPromise ??= readJson("shop_catalog.json").then(async (catalog): Promise<ShopLoadedCatalog> => ({
     catalog,
     itemRecords: await readBytes(catalog.itemRecords.file),
-    descriptors: await Promise.all(catalog.itemDescriptors.map((row) => readBytes(row.file))),
+    descriptors: await Promise.all(catalog.itemDescriptors.map((row: { file: string }) => readBytes(row.file))),
     font: (await loadResidentResources()).font,
   })).catch((error) => { catalogPromise = null; throw error; });
   return catalogPromise;
 }
 
-function saveSeed(state, db) {
+function saveSeed(state: WalkerState, db: Record<number, DigimonRecord>) {
   const view = partyRosterView(state.party, state.partnerStats, state.partyStats,
     db, state.digimonNames);
   return {
@@ -72,7 +74,7 @@ function saveSeed(state, db) {
   };
 }
 
-export function createShopTranslated(sfx = null, options: ShopTranslatedOptions = {}) {
+export function createShopTranslated(sfx: PackedSfx | null = null, options: ShopTranslatedOptions = {}) {
   const shop = {
     _open: false, _session: null, _state: null, _onClose: null,
     _renderer: null, _clock: null, _error: null, _request: 0,
@@ -89,7 +91,7 @@ export function createShopTranslated(sfx = null, options: ShopTranslatedOptions 
     const request = host.begin({ onClose });
     shop._state = opts.state ?? shop._state;
     shop._error = null;
-    shop._clock = new ui.MenuDisplayClock();
+    shop._clock = new (ui as EngineUi).MenuDisplayClock();
     shop._session = null;
     loadCatalog().then(async (data) => {
       const selectedLanguage = shop._state?.languageByte;
@@ -100,7 +102,7 @@ export function createShopTranslated(sfx = null, options: ShopTranslatedOptions 
         return [bank, await readBytes(`shop-banks/${bank}.bin`)];
       })));
       if (!host.current(request)) return;
-      shop._session = new ui.ShopRootSession(id, language,
+      shop._session = new (ui as EngineUi).ShopRootSession(id, language,
         saveSeed(shop._state ?? {}, options.digimonDB?.() ?? {}),
         { ...data, banks },
         { playSound(sound) { sfx?.playPacked(sound); }, closeSave() {} });

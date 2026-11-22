@@ -1,8 +1,5 @@
-interface PanelClip {
-    semi: number;
-    stp: boolean;
-    layers: number[];
-}
+import type { ScreenPackClip } from "./types/misc-game2.js";
+type PanelClip = ScreenPackClip;
 // web/panel-kit.js -- free-height panels built from the game's own pause-list tiles. Pure: no DOM, no imports.
 //
 // The pause list's row panel is not one picture. cmfont clips 0x1c (five rows), 0x1b (six) and 0x19 (seven) are each a

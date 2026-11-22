@@ -1,3 +1,5 @@
+import type { DialogueSession } from "../../engine/dw3/ui/dialogue-session.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
 
 /**
@@ -48,14 +50,14 @@ export interface DialogueDiagnostics {
   packed: Record<string, number>;
   /** the last 256 sound keys (packed ids) the box asked the resident sound layer to play */
   sounds: number[];
-  /** vendor object: the session's own state */
-  state: any;
+  /** the session's own state */
+  state: ReturnType<DialogueSession["state"]> | null;
   renderer: NativeScreenRenderStats;
 }
 
 export interface DialogueScreen {
-  /** vendor object: the ui.MenuDisplayClock the text reveals on */
-  _clock: any;
+  /** the display clock the text reveals on */
+  _clock: MenuDisplayClock | null;
   _closes: number;
   _error: Error | null;
   _failed: boolean;
@@ -75,7 +77,7 @@ export interface DialogueScreen {
   _prevHeld: boolean;
   _primed: boolean;
   _request: number;
-  /** vendor object: the engine's DialogueSession */
+  /** the engine's DialogueSession. Left loose until web/types/native-screen-render.ts lets renderer.draw take the session's raw intents (DialogueIntent[], which has frameFill and tailLine kinds NativeRawPrim lacks) */
   _session: any;
   /** the sound keys (packed ids) the box asked for (the last 256) */
   _sounds: number[];

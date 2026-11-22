@@ -13,6 +13,7 @@ import type { Battle3DContext } from "../../types/battle3d.js";
 
 import type { BattleSide } from "../../types/audio.js";
 import type { SkelBufs } from "../../types/battle3d.js";
+import type { LungeRecord, ProjDrawGroup } from "../../types/fx3d.js";
 interface EffectSpawnRecord {
   type: number | string;
   x: number;
@@ -22,6 +23,7 @@ interface EffectSpawnRecord {
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeModel(B$: Battle3DContext) {
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
 function contactSoundTypeFor(techId: number) {
     const rec = techRecord(techId);
     if (!rec) return (techId >= 1 && techId <= 52) ? 30 : null;
@@ -76,12 +78,12 @@ function loadProjMesh(id: number) {
           const ubo = B$.gl!.createBuffer();
           B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, ubo);
           B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl!.STATIC_DRAW);
-          const rec = { vbo, ubo, count: g.pos.length / 3, abr: g.abr,
+          const rec: ProjDrawGroup = { vbo, ubo, count: g.pos.length / 3, abr: g.abr,
                         texReady: !g.tex, tex: null };
           // `texReady` exists only so a headless capture can wait for the atlas: loadTexture
           // returns a 1x1 placeholder immediately and swaps the real image in later, so the
           // texture handle being non-null is not evidence that anything is drawable yet.
-          if (g.tex) rec.tex = loadTexture(B$.gl, `${B$.PROJ_BASE}/${g.tex}`, () => { rec.texReady = true; });
+          if (g.tex) rec.tex = loadTexture(B$.gl!, `${B$.PROJ_BASE}/${g.tex}`, () => { rec.texReady = true; });
           drawn.push(rec);
           total += rec.count;
         }
@@ -153,7 +155,7 @@ function loadProjMesh(id: number) {
       // op6 = projectile flight (registry @0x800a2550 -> MEFT00xx mesh packs). sub=1 is
       // the readiness poll (F0x8008bea8 rewinds until the pack loads) — kick the async mesh
       // fetch there so the mesh is ready by the sub=0 spawn. sub=0 launches the flight.
-      setLunge: (l) => {
+      setLunge: (l: LungeRecord) => {
         if (l && B$.effectPlayer) {
           const id = l.id ?? l.words?.[1];
           if (l.sub === 1 && id != null) loadProjMesh(id);
@@ -208,12 +210,12 @@ function setPlayerDigimon(folder: string | null | undefined) {
     B$._freeFaceBoxBuffers(B$.gl!);
     B$.playerAnim8r = null; B$.coordinator!.player = null;
     if (!folder) return Promise.resolve(true);
-    B$.playerTex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
+    B$.playerTex = loadTexture(B$.gl!, `assets/battle/textures/${folder}.png`);
     B$.setupTexturePatches("player", folder);
     return loadSkeletalModel(folder).then(m => {
       if (m && folder === B$.playerFolder) {
         B$.playerModel = m;
-        B$.playerSkelBufs = buildSkeletalGLBuffers(B$.gl, m);
+        B$.playerSkelBufs = buildSkeletalGLBuffers(B$.gl!, m);
         B$.playerFrame = m.clips?.[0]?.start_frame ?? 0;
         // ActorAnimator owns idle (TimelinePlayer over the idle position table) and actions
         // (ActionVM over model.actions[clip]). Models without a timeline fall back to advanceFrame.
@@ -236,12 +238,12 @@ function setEnemyDigimon(folder: string | null | undefined) {
     B$._freeFaceBoxBuffers(B$.gl!);
     B$.enemyAnim8r = null; B$.coordinator!.enemy = null;
     if (!folder) return;
-    B$.enemyTex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
+    B$.enemyTex = loadTexture(B$.gl!, `assets/battle/textures/${folder}.png`);
     B$.setupTexturePatches("enemy", folder);
     loadSkeletalModel(folder).then(m => {
       if (m && folder === B$.enemyFolder) {
         B$.enemyModel = m;
-        B$.enemySkelBufs = buildSkeletalGLBuffers(B$.gl, m);
+        B$.enemySkelBufs = buildSkeletalGLBuffers(B$.gl!, m);
         B$.enemyFrame = m.clips?.[0]?.start_frame ?? 0;
         B$.enemyAnim8r = new ActorAnimator(m);
         B$.enemyAnim8r.resetSlotPlacement(arenaSlotFor(folder, "enemy", B$.placementTable));

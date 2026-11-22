@@ -12,36 +12,7 @@
 // instead of re-deriving them.
 
 /** `close()` runs the held onClose, the same way a finish the screen reached does. */
-import type { TranslatedScreenHostOptions } from "./types/translated-screen-host.js";
-interface TranslatedScreenSession {
-    finished?(): boolean;
-    dispose(): void;
-}
-
-
-interface TranslatedScreenOwner {
-    _open: boolean;
-    _pending?: boolean;
-    _closes?: number;
-    _request: number;
-    _session?: TranslatedScreenSession | null;
-    _onClose?: (() => void) | null;
-}
-
-
-interface TranslatedScreenBeginOptions {
-    onClose?: (() => void) | null;
-}
-
-
-interface TranslatedScreenHost {
-    begin(options?: TranslatedScreenBeginOptions): number;
-    attach(onClose: (() => void) | null | undefined): void;
-    current(token: number): boolean;
-    abandon(): boolean;
-    finish(): boolean;
-    close(): boolean;
-}
+import type { DisposePolicy, TranslatedScreenBeginOptions, TranslatedScreenHost, TranslatedScreenHostOptions, TranslatedScreenOwner, TranslatedScreenSession } from "./types/translated-screen-host.js";
 
 
 export const CLOSE_NOTIFY = "notify";
@@ -69,7 +40,7 @@ export const DISPOSE_UNLESS_FINISHED = "unless-finished";
  *   clearSession   false to leave `_session` pointing at the closed session (default true).
  *   release(session)  runs once, while the session is still alive: read the summary, commit.
  */
-export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options: TranslatedScreenHostOptions = {}): TranslatedScreenHost {
+export function createTranslatedScreenHost<S extends TranslatedScreenSession>(owner: TranslatedScreenOwner<S>, options: TranslatedScreenHostOptions<S> = {}): TranslatedScreenHost {
     const closeMode = options.closeMode === CLOSE_NOTIFY ? CLOSE_NOTIFY : CLOSE_SILENT;
     const closeDispose = options.closeDispose ?? DISPOSE_NEVER;
     const finishDispose = options.finishDispose ?? DISPOSE_NEVER;
@@ -78,7 +49,7 @@ export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options
     const clearSession = options.clearSession !== false;
     const release = options.release ?? null;
 
-    function teardown(session, policy: string) {
+    function teardown(session: S | null | undefined, policy: DisposePolicy) {
         if (!session || policy === DISPOSE_NEVER) return;
         if (policy === DISPOSE_UNLESS_FINISHED) {
             if (!session.finished()) session.dispose();
@@ -87,7 +58,7 @@ export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options
         session.dispose();
     }
 
-    function end(policy: string, notify: boolean) {
+    function end(policy: DisposePolicy, notify: boolean) {
         if (!owner._open) return false;
         owner._open = false;
         if (tracksPending) owner._pending = false;
@@ -108,7 +79,7 @@ export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options
 
     const host = {
         /** Raise the screen. Returns the request token the load checks with `host.current`. */
-        begin({ onClose = null } = {}) {
+        begin({ onClose = null }: TranslatedScreenBeginOptions = {}) {
             owner._open = true;
             if (tracksPending) owner._pending = true;
             owner._onClose = onClose;
@@ -116,7 +87,7 @@ export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options
         },
 
         /** Hold the continuation later than `begin` (a screen that only takes one once loaded). */
-        attach(onClose) {
+        attach(onClose: (() => void) | null | undefined) {
             owner._onClose = onClose ?? null;
         },
 

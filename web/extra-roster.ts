@@ -17,11 +17,13 @@
 // exactly the original 55 species.
 import { registerExtraProfiles, registerExtraEvolutionRows, registerNewPartners } from "./vendor/engine.js";
 import { CHARID_TO_DIGID } from "./party.js";
+import type { PartnerStats } from "./game/types.js";
+import type { DigimonTableJson, EvolutionsJson, ExtraSpeciesData } from "./types/misc-game2.js";
 
 const DATA = /assets\/data\/(digimon|evolutions)\.json(?:\?|$)/;
 
 /** digimon.json with the extra species' rows appended. Pure. */
-export function mergeDigimon(json, extra) {
+export function mergeDigimon(json: DigimonTableJson | null | undefined, extra: ExtraSpeciesData | null | undefined) {
   if (!extra?.digimon?.length || !Array.isArray(json?.digimon)) return json;
   const have = new Set(json.digimon.map((d) => d.id));
   return { ...json, digimon: [...json.digimon, ...extra.digimon.filter((d) => !have.has(d.id))] };
@@ -31,7 +33,7 @@ export function mergeDigimon(json, extra) {
  * evolutions.json with each line's extra unlock records after the disc's 44, then one whole line per new partner
  * (its tree is all ours, so nothing is appended to it). Pure.
  */
-export function mergeEvolutions(json, extra) {
+export function mergeEvolutions(json: EvolutionsJson | null | undefined, extra: ExtraSpeciesData | null | undefined) {
   if (!extra?.tree || !Array.isArray(json?.lines)) return json;
   const lines = json.lines.map((line) => {
     const more = extra.tree[String(line.slot)];
@@ -47,14 +49,14 @@ export function mergeEvolutions(json, extra) {
 }
 
 /** The new partners as the engine's roster registers them. Pure. */
-export function newPartnersOf(extra) {
+export function newPartnersOf(extra: ExtraSpeciesData | null | undefined) {
   return (extra?.starters ?? []).map((p) => ({
     slot: p.slot, id: p.id, charId: p.charId, name: p.name, formId: p.formId, gearSlot: p.gearSlot,
   }));
 }
 
 /** Give the new partners their roster slots, starter ids and unlock rows (idempotent). */
-export function installNewPartners(extra) {
+export function installNewPartners(extra: ExtraSpeciesData | null | undefined) {
   const partners = newPartnersOf(extra);
   registerNewPartners(partners);
   for (const p of partners) CHARID_TO_DIGID[p.charId] = p.id;
@@ -75,7 +77,7 @@ export const NEW_PARTNERS_ENABLED = false;
  */
 export const ASPECT_ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 export const ASPECT_SEED = 40;
-export function applyAspect(ps, element, seed = ASPECT_SEED) {
+export function applyAspect(ps: PartnerStats | null | undefined, element: string, seed = ASPECT_SEED) {
   if (!ps || !ASPECT_ELEMENTS.includes(element) || ps.aspect) return false;
   const points = Math.max(0, Math.min(seed, ASPECT_SEED));
   ps.aspect = element;
@@ -85,7 +87,7 @@ export function applyAspect(ps, element, seed = ASPECT_SEED) {
 }
 
 /** `extra` without the new partners: no starter rows, no roster slots, no lines of their own. Pure. */
-export function withoutNewPartners(extra) {
+export function withoutNewPartners(extra: ExtraSpeciesData) {
   const gone = new Set((extra?.starters ?? []).map((p) => p.id));
   if (!gone.size) return extra;
   const slots = new Set(extra.starters.map((p) => String(p.slot)));
@@ -97,9 +99,9 @@ export function withoutNewPartners(extra) {
   };
 }
 
-let loading = null;
+let loading: Promise<ExtraSpeciesData | null> | null = null;
 /** The extra species data (and registers their profile records), or null when the build has none. Cached. */
-export function loadExtraRoster(realFetch = globalThis.fetch.bind(globalThis)) {
+export function loadExtraRoster(realFetch: typeof fetch = globalThis.fetch.bind(globalThis)) {
   loading ??= (async () => {
     try {
       const [meta, bin] = await Promise.all([
@@ -108,7 +110,7 @@ export function loadExtraRoster(realFetch = globalThis.fetch.bind(globalThis)) {
         realFetch("assets/data/extra_profiles.bin"),
       ]);
       if (!meta.ok || !bin.ok) return null;
-      let data = await meta.json();
+      let data: ExtraSpeciesData = await meta.json();
       if (!NEW_PARTNERS_ENABLED) data = withoutNewPartners(data);
       registerExtraProfiles(new Uint8Array(await bin.arrayBuffer()));
       const partners = installNewPartners(data);
@@ -150,12 +152,12 @@ if (typeof window !== "undefined" && !/[?&]noextras=1\b/.test(window.location?.s
      * Testing aid (browser console): teach the lead Digimon every enemy-only species as a form at once, so they can be
      * picked in the Digimon Lab and the battle Digivolve list without playing for them. `ids` limits it to some.
      */
-    async learnAll(ids = null) {
+    async learnAll(ids: number[] | null = null) {
       const extra = await loadExtraRoster(realFetch);
       const st = window.__state?.partnerStats;
       if (!extra || !st) return 0;
       st.formLedger ??= [];
-      const have = new Set(st.formLedger.map((e) => Number(e.id)));
+      const have = new Set(st.formLedger.map((e: { id: number }) => Number(e.id)));
       let added = 0;
       for (const d of extra.digimon) {
         if (have.has(d.id) || (ids && !ids.includes(d.id))) continue;

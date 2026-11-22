@@ -59,14 +59,14 @@ export function gymTrainingResult(drillEntry: GymDrill, tpChoice: number, ultra:
     if (id >= 1 && id <= 5) {
       if (isPrimary) { // core gain (0x8008c304): (super?6:0) + ultra*3 + tpChoice
         const row = gym.core_rows[(superDrill ? 6 : 0) + (ultra ? 3 : 0) + tpChoice];
-        effects.push({ stat: GYM_CORE_STATS[id], delta: roll(row) });
+        effects.push({ stat: GYM_CORE_STATS[id]!, delta: roll(row) });   // ETS item 9: id is 1..5, every one of them a named stat
       } else if ((rng()! & 1) === 0) {
         // core loss (0x8008c364), applier 0x800862d0: only rolled in when rand()&1 == 0
         // (50% of trainings); the store floor-clamps the stat at 0.
-        effects.push({ stat: GYM_CORE_STATS[id], delta: -roll(gym.loss_rows[tpChoice]) });
+        effects.push({ stat: GYM_CORE_STATS[id]!, delta: -roll(gym.loss_rows[tpChoice]) });
       }
     } else if (id >= 8 && id <= 14) { // elemental gain: bracket by current stat + growth
-      const elem = GYM_ELEM_STATS[id];
+      const elem = GYM_ELEM_STATS[id]!;   // ETS item 9: id is 8..14, every one of them a named element
       const cur = dig?.elemCur?.[elem] ?? 0;
       const bracket = cur < gym.elem_brackets[0] ? 0 : cur < gym.elem_brackets[1] ? 1 : 2;
       const growth = Math.min(Math.max(dig?.elemGrowth?.[elem] ?? 1, 1), gym.elem_ptr.length);

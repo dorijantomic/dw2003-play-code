@@ -13,6 +13,7 @@ import type { BattlePartyEntry } from "./core/types.js";
 
 import type { DigimonRecord, BattleState, PlayerRecord } from "../types/battle.js";
 import type { FormLedgerEntry } from "../game/types.js";
+import type { MpPlayerRec } from "../types/mp-match.js";
 interface FormChangeView {
   activeSlot: () => number;
   liveFormId: (slot: number) => number;
@@ -172,7 +173,7 @@ export function blastTargetProfile(rec: PlayerRecord, db: { [k: string]: Digimon
  * object online, so the online call is plain `endBlast(r)`. Returns true when a
  * Blast was ended.
  */
-export function endBlast(holder: BattleState, { rec = holder, form = false, persist = null }: { rec?: BattleState | PlayerRecord; form?: boolean; persist?: (() => void) | null; } = {}) {
+export function endBlast(holder: BattleState | MpPlayerRec, { rec = holder, form = false, persist = null }: { rec?: BattleState | PlayerRecord; form?: boolean; persist?: (() => void) | null; } = {}) {
   const blast = holder?.blast;
   if (!blast?.active) return false;
   if (form && blast.saved) setLiveBattleForm(rec, blast.saved);

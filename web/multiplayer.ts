@@ -24,7 +24,7 @@ import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
 import { pickRules } from "./host-rules.js";
 import type { GameState } from "./game/types.js";
-import type { MultiplayerUi, MpListener, MpTimer } from "./types/multiplayer.js";
+import type { MpChatMark, MultiplayerUi, MpGhost, MpListener, MpPeer, MpState, MpTimer, MpWant } from "./types/multiplayer.js";
 interface GhostLabelInfo {
     name: string;
     emote: string;
@@ -43,14 +43,13 @@ const SAY_MS = 6500;            // how long a speech bubble stays over a head
 const CHAT_GAP_MS = 650;        // F2 "Chat: keep every line I type": over the relay's 600 ms drop, so a line waits instead
 export const EMOTES = ["♥", "!", "?", "...", "♪", ":)", "GG", "zZ"];   // 0..7
 
-// ETS item 9: the literal null would type id as null; the room hands me a number id when I am welcomed
-const mp = {
-    ws: null, status: "off", room: null, id: null as number | null, name: "", hostId: null,
+const mp: MpState = {
+    ws: null, status: "off", room: null, id: null, name: "", hostId: null,
     addresses: [], hosting: false, host: "",   // the host's own addresses, to show to friends
     peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteIx, emoteUntil, say, sayUntil, card }
     me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteIx: null, emoteUntil: 0 },
     sent: { map: null, x: 0, y: 0, dir: "", mv: 0, at: 0 },
-    retry: 0, retryTimer: 0 as MpTimer, want: null, beat: 0 as MpTimer, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
+    retry: 0, retryTimer: 0, want: null, beat: 0, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
     ui: null, lastTick: 0,
     rules: null, rulesSent: "", rulesAt: 0,   // rules: the host's battle settings (what the relay last told me); rulesSent: what I last sent as host
 };
@@ -105,17 +104,17 @@ function loadSeat() {
         return s && typeof s.base === "string" && SEAT_ROOM.test(s.room ?? "") && SEAT_KEY.test(s.key ?? "") ? s : null;
     } catch { return null; }
 }
-function saveSeat(s) { try { localStorage.setItem(KEY_SEAT, JSON.stringify({ base: s.base, room: s.room, key: s.key })); } catch { /* storage blocked */ } }
+function saveSeat(s: { base: string; room: string; key: string; }) { try { localStorage.setItem(KEY_SEAT, JSON.stringify({ base: s.base, room: s.room, key: s.key })); } catch { /* storage blocked */ } }
 function clearSeat() { try { localStorage.removeItem(KEY_SEAT); } catch { /* storage blocked */ } }
 /** Clear the saved seat only when it is the one named (another tab's seat is not mine to erase). */
-function dropSeat({ key = null, room = null } = {}) {
+function dropSeat({ key = null, room = null }: { key?: string | null | undefined; room?: string | null | undefined; } = {}) {
     const s = loadSeat();
     if (s && (!key || s.key === key) && (!room || s.room === String(room).toUpperCase())) clearSeat();
 }
 /** The saved key for this base and room, or null (a seat for another room is ignored). */
-const seatKeyFor = (base, room) => { const s = loadSeat(); return s && s.base === base && s.room === String(room ?? "").toUpperCase() ? s.key : null; };
+const seatKeyFor = (base: string, room?: string) => { const s = loadSeat(); return s && s.base === base && s.room === String(room ?? "").toUpperCase() ? s.key : null; };
 /** Save the seat from a welcome, unless it is a NEW player who joined because the seat in storage was still live (that seat is another tab's). */
-function keepSeat(base, m) {
+function keepSeat(base: string, m: { resumed?: boolean; room: string; key: string; }) {
     const old = loadSeat();
     if (m.resumed || !old || old.base !== base || old.room !== m.room || old.key === m.key) saveSeat({ base, room: m.room, key: m.key });
 }
@@ -143,14 +142,14 @@ function sendRules() {
 function setStatus(s: string, text?: string) { mp.status = s; render(text); emit("status", { status: s }); }
 
 /** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE", key?: seat key } */
-export function connect(want) {
+export function connect(want: MpWant) {
     disconnect(true);
     const base = want.base;
     if (!base) { setStatus("off", "That address does not look right. Use the numbers your friend shows, like 25.1.2.3"); return; }
     mp.want = want;
     mp.name = (mp.name || "Tamer").slice(0, 12);
     const q = new URLSearchParams({ name: mp.name, rj: "1" });          // always: "I know about seats"
-    let sentKey = null;
+    let sentKey: string | null | undefined = null;
     if (want.create) q.set("create", "1");
     else { q.set("room", want.room); sentKey = want.key ?? seatKeyFor(base, want.room); if (sentKey) q.set("key", sentKey); }
     let ws: WebSocket | undefined;
@@ -296,7 +295,7 @@ export function disconnect(quiet = false) {
 
 /** Page start: if my last room left a seat in storage, try ONCE to take it back (same id, name, place). A failure stops with a message;
  *  it never joins as a new player and never retries. Returns true when it started a try. */
-export function rejoinSaved(defaultName) {
+export function rejoinSaved(defaultName: string | (() => string)) {
     if (mp.status !== "off") return false;
     const seat = loadSeat(); if (!seat) return false;
     mp.name = String((typeof defaultName === "function" ? defaultName() : defaultName) || "Tamer").slice(0, 12);
@@ -306,9 +305,9 @@ export function rejoinSaved(defaultName) {
     return true;
 }
 
-function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false, away: false }; }
+function newPeer(name: string): MpPeer { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false, away: false }; }
 export const sendRaw = (o: object) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
-const sayTime = (text) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
+const sayTime = (text: string) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
 
 // ------------------------------------------------------------ the chat queue (F2 -> Extras -> Chat)
 // One queue per connection. The relay drops a line that arrives under CHAT_GAP (600 ms, server/room-core.mjs);
@@ -317,7 +316,7 @@ let chatQ = null;
 function chatQueue() {
     if (!chatQ) chatQ = createChatQueue({
         gap: CHAT_GAP_MS,
-        send: (text, meta) => {
+        send: (text: string, meta?: MpChatMark) => {
             const ok = sendRaw({ t: "chat", text });
             if (meta && (meta.queued || !ok)) { meta.queued = false; meta.dropped = !ok; emit("chatstate", { mark: meta }); }
             return ok;
@@ -365,7 +364,7 @@ export const sendLeague = (o: object) => serverChampOn() ? sendRaw({ t: "lg", ..
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */
-export function multiplayerTick(mapId, st: GameState) {
+export function multiplayerTick(mapId: string, st: GameState) {
     const now = performance.now();
     const dt = Math.min(0.1, (now - (mp.lastTick || now)) / 1000);
     mp.lastTick = now;
@@ -394,9 +393,9 @@ function sendPresence() {
 }
 
 /** The other players standing in this stage: [{ id, name, x, y, dir, moving, animTime, emote, emoteIx, say }] */
-export function multiplayerGhosts(mapId) {
+export function multiplayerGhosts(mapId: string) {
     if (mp.status !== "online") return [];
-    const now = performance.now(), out = [];
+    const now = performance.now(), out: MpGhost[] = [];
     for (const [id, p] of mp.peers) {
         if (p.map !== mapId || p.hidden || p.x == null || now - p.seen > STALE_MS) continue;
         const on = now < p.emoteUntil;
@@ -474,7 +473,7 @@ function openPanel(show?: boolean) {
     if (!mp.ui.panel.hidden) { mp.ui.fillName(); render(); }
 }
 
-export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
+export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }: { stageEl: HTMLElement; defaultName?: () => string; }) {
     const css = document.createElement("style");
     css.textContent = `
       #mp-panel { position:absolute; top:44px; left:8px; z-index:41; width:262px; padding:10px 12px; background:rgba(14,14,28,.94); color:#e8e8f0;
@@ -525,7 +524,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     if (hudEl && typeof ResizeObserver === "function") new ResizeObserver(placeBadge).observe(hudEl);
     placeBadge();
     const $ = (id: string): HTMLElement => panel.querySelector("#" + id) as HTMLElement;
-    mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") } as MultiplayerUi;
+    mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") };
     mp.defaultName = defaultName;               // the first multiplayerTick uses it for the page-start rejoin
     EMOTES.forEach((t, i) => {
         const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.title = `Emote ${i + 1}`;

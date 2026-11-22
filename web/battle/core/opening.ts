@@ -417,7 +417,7 @@ async function _init3DRenderer(b: BattleState) {
    * `name` is the entering fighter's model (species name or id). The clock waits until that model is loaded.
    */
   function startEntrance(b: BattleState, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }: BattleEntranceArgs): BattleEntranceShow {
-    const show = {
+    const show: BattleEntranceShow = {
       program: side ? FormChangeProgram.ENTRANCE_ENEMY : FormChangeProgram.BLAST_REVERT,
       frame: 0, target: null, swapped: false, healed: false, state: null, sounded: false,
       endMessage, endSpec, swapName: name, entranceSide: side ? 1 : 0, onSwap, onDone,

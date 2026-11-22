@@ -1,3 +1,5 @@
+import type { InnSession } from "../../engine/dw3/ui/inn-session.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
 
 /** What quoteInnStay() prices a stay at. */
@@ -34,8 +36,8 @@ export interface InnScreenDiagnostics {
 export interface InnScreen {
   /** vendor object: the bgm player (web/audio/bgm.js) the caller handed in */
   _bgm: any;
-  /** vendor object: the ui.MenuDisplayClock the session is ticked on */
-  _clock: any;
+  /** the display clock the session is ticked on */
+  _clock: MenuDisplayClock | null;
   _closes: number;
   _error: Error | null;
   _failed: boolean;
@@ -52,8 +54,7 @@ export interface InnScreen {
   /** the inn record the screen was opened at: { stage, name, pricePerDigimon } */
   _record: any;
   _request: number;
-  /** vendor object: the engine's ui.InnSession */
-  _session: any;
+  _session: InnSession | null;
   _sounds: number[];
   /** the walker state (bits, party, partnerStats/partyStats, languageByte) */
   _state: any;

@@ -270,11 +270,11 @@ async function mpKit() {
         }
         const progress = paidParticipants(b).map((index) => ({ index, ...B.applyParticipantProgress(b, index) }));
         if (!progress.length) return null;
-        const rewards = B.winRewards(b, progress[0].index);
+        const rewards = B.winRewards(b, progress[0]!.index);   // progress.length checked above
         b._winProgress = progress; b._winApplied = true;
-        b._winReward = { xp: rewards.xp, bits: rewards.bits, dvexp: rewards.dvexp, droppedItem: null, levelUp: progress[0].levelUp };
+        b._winReward = { xp: rewards.xp, bits: rewards.bits, dvexp: rewards.dvexp, droppedItem: null, levelUp: progress[0]!.levelUp };
         b._winReportRows = buildFightReportRows(b.playerRoster, b.playerRecords, B.digimonDB);
-        const lead = progress[0];
+        const lead = progress[0]!;
         return { b, save: persist, reward: { xp: rewards.xp, bits: rewards.bits, from: lead.oldLevel, to: Math.max(lead.oldLevel, lead.newLevel) } };
       },
       /** The data tables the rules read: technique rows, the decoded technique records, and the item menu. */

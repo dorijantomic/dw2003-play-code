@@ -1,4 +1,7 @@
 import { ELEMENT_KEYS, elementValue, elementValues } from "./vendor/engine.js";
+import type { DigimonRecord } from "./types/battle.js";
+import type { DigimonTable } from "./types/battle-core.js";
+import type { DriStats } from "./types/misc-game.js";
 interface ElementProfile {
   resistances: Record<string, number | undefined>;
 }
@@ -56,7 +59,7 @@ export const CHARID_TO_DIGID: Record<string, number> = {
 // state.partnerStats. Used to seed the two field-party members who never enter battle
 // in the current engine (only the lead fights), so the status menu has real numbers
 // to show instead of blanks.
-export function baseStatsFor(digimonProfile) {
+export function baseStatsFor(digimonProfile: Pick<DigimonRecord, "id" | "hp" | "mp"> | null | undefined): DriStats | null {
   if (!digimonProfile) return null;
   return {
     digimonId: digimonProfile.id,
@@ -76,7 +79,7 @@ export function baseStatsFor(digimonProfile) {
 // the two arrays from whatever form happens to be worn. `fallbackProfile` is
 // reached only when the char id has no row in digimonDB (old callers fell back
 // to the profile they had).
-export function storedNumbers(charId, stats, digimonDB, fallbackProfile = null) {
+export function storedNumbers(charId: string, stats: DriStats | null | undefined, digimonDB: DigimonTable | null | undefined, fallbackProfile: DigimonRecord | null = null) {
   const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? fallbackProfile ?? null;
   return {
     core: CORE_STATS.map((k) => (Number(stats?.stats?.[k] ?? rookie?.[k] ?? 0) || 0)
@@ -92,7 +95,7 @@ export function storedNumbers(charId, stats, digimonDB, fallbackProfile = null) 
 // base into the trained points — and the next visit counts both twice. Take
 // the chips off the core halfwords and the STARTER's base off the element
 // halfwords instead.
-export function storedFromRecord(charId, recCore, recElements, stats, digimonDB) {
+export function storedFromRecord(charId: string, recCore: ArrayLike<number> | null | undefined, recElements: ArrayLike<number> | null | undefined, stats: DriStats | null | undefined, digimonDB: DigimonTable | null | undefined) {
   const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? null;
   const base = elementValues(rookie, null);
   return {
@@ -113,8 +116,8 @@ export function storedFromRecord(charId, recCore, recElements, stats, digimonDB)
 // `elemBonuses` means once the gear is folded in), `elementValueWithGear` the
 // capped value elementValue produces from it. Screens call the second; battle,
 // which carries the merged table on its fighter record, calls the first.
-export function elementPointsWithGear(elemBonuses, elemResists) {
-  const points = { ...(elemBonuses ?? {}) };
+export function elementPointsWithGear(elemBonuses: Record<string, number | undefined> | null | undefined, elemResists: Record<string, number | undefined> | null | undefined) {
+  const points: Record<string, number | undefined> = { ...(elemBonuses ?? {}) };
   for (const [el, v] of Object.entries(elemResists ?? {})) {
     const add = Number(v) || 0;
     if (add) points[el] = (Number(points[el]) || 0) + add;

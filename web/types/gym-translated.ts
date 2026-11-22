@@ -1,11 +1,13 @@
+import type { GymSession } from "../../engine/dw3/ui/gym-session.js";
 import type { GameState } from "../game/types.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
 
 /** What the gym commits when the session ends: the training results, read off the live session. */
 export interface GymSummary {
   finished: boolean;
   ticks: number;
-  transition: string | null;
+  transition: [number, number];
   /** one record per pedestal, in roster order */
   records: unknown[];
   sounds: number[];
@@ -26,8 +28,8 @@ export interface GymScreenDiagnostics {
   host: null;
   /** the 0-based rank menu the session was opened on */
   group: number;
-  /** the session's current menu state id */
-  state: number | null;
+  /** the session's current menu state words */
+  state: ReturnType<GymSession["state"]>;
   /** the session's training page state */
   training: unknown;
   tasks: number;
@@ -45,8 +47,8 @@ export interface GymScreenDiagnostics {
 export interface GymScreen {
   /** the decoded bank the session's resources come from */
   _bank?: Uint8Array | null;
-  /** vendor object: the ui.MenuDisplayClock the frames come from */
-  _clock: any;
+  /** the display clock the frames come from */
+  _clock: MenuDisplayClock | null;
   _committed: number;
   /** the loaded pack (manifest, tables, profiles, catalog); read by key */
   _data: any;
@@ -62,8 +64,7 @@ export interface GymScreen {
   _request: number;
   /** one entry per pedestal: { ps, member, bonus } */
   _seeded: any[];
-  /** vendor object: the engine's ui.GymSession */
-  _session: any;
+  _session: GymSession | null;
   /** the stage the gym was opened from (previousScreen in the seed) */
   _stage: number | null;
   /** the walker state, read only through `state.party` / `state.equipment` / `state.keys`; the

@@ -41,7 +41,12 @@ import { baseStatsFor, CHARID_TO_DIGID } from "./party.js";
 import { ensureFormLedger } from "./dri-model.js";
 import { persistDriState } from "./dri.js";
 import type { GameState } from "./game/types.js";
-import type { DriHost } from "./types/dri-native.js";
+import type { DriDiagnostics, DriHost, DriWorldObject, DriTables, OwnedSlotsSource } from "./types/dri-native.js";
+import type { DigimonRecord } from "./types/battle.js";
+import type { DriFormLedgerEntry, DriManifestCharacter } from "./types/misc-game.js";
+import type { NativeScreenHost } from "./types/native-screen-host.js";
+import type { NativeScreenIo } from "./types/native-screen.js";
+import type { PackedSfx } from "./types/translated-screens.js";
 type SlotStatBlock = NonNullable<GameState["partnerStats"]>;
 
 
@@ -62,8 +67,8 @@ const EMPTY_SLOT = 0xffffffff;
 /** Record offsets the shared party seeder writes (digimon-cur-stats-helpers.md). */
 const REC = { exp: 0x20, level: 0x24, tp: 0x26, hp: 0x28, maxHp: 0x2a, mp: 0x2c, maxMp: 0x2e, core: 0x30, elements: 0x3c };
 
-let TABLES = null;
-let tablesPromise = null;
+let TABLES: DriTables | null = null;
+let tablesPromise: Promise<DriTables | null> | null = null;
 /** digimon.json: profiles for the base-stat fallback and species names. The
  *  screen's own chart tables are inside the overlay image, not here. */
 function loadTables() {
@@ -71,7 +76,7 @@ function loadTables() {
         tablesPromise = fetch("assets/data/digimon.json")
             .then((r) => r.json())
             .then((j) => {
-                TABLES = { digimonById: Object.fromEntries(j.digimon.map((d) => [d.id, d])) };
+                TABLES = { digimonById: Object.fromEntries(j.digimon.map((d: DigimonRecord): [number, DigimonRecord] => [d.id, d])) };
                 return TABLES;
             })
             .catch(() => null);
@@ -87,7 +92,7 @@ function rosterSlotFor(charId: string | null | undefined) {
  *  the deployed party too (the lab seeds a record for every member it shows).
  *  The one home for this walk — web/dri-native.js and web/lab-translated.js both
  *  take their slot list from here. */
-export function ownedSlots(state, { includeParty = false } = {}) {
+export function ownedSlots(state: OwnedSlotsSource | null | undefined, { includeParty = false }: { includeParty?: boolean } = {}) {
     const mask = Number(state?.rosterOwned) || 0;
     const slots = new Set<number>();
     for (let s = 0; s < ROSTER_SLOTS; s++) if (mask & (1 << s)) slots.add(s);
@@ -103,7 +108,7 @@ export function ownedSlots(state, { includeParty = false } = {}) {
 /** The walker's stats object for a roster slot: the deployed party's live
  *  block, or the reserve store keyed by character id. Shared with web/game.js
  *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
-export function slotStats(state: GameState, slot: number): SlotStatBlock | null {
+export function slotStats(state: Partial<GameState>, slot: number): SlotStatBlock | null {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId!);
     if (pos === 0) return state.partnerStats ?? null;
@@ -111,7 +116,7 @@ export function slotStats(state: GameState, slot: number): SlotStatBlock | null 
     return state.reserveStats?.[charId] ?? null;
 }
 
-function slotEquipment(state, slot: number) {
+function slotEquipment(state: Partial<GameState>, slot: number) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId);
     if (pos >= 0) return state.equipment?.[pos] ?? null;
@@ -119,9 +124,9 @@ function slotEquipment(state, slot: number) {
 }
 
 /** The runtime's own profile table, both directions. */
-function profileMaps(read) {
-    const v0ById = new Map();
-    const idByV0 = new Map();
+function profileMaps(read: (addr: number, size?: number) => number | null) {
+    const v0ById = new Map<number, number>();
+    const idByV0 = new Map<number, number>();
     for (let id = 1; id <= PROFILE_ROWS; id++) {
         const v = Number(read(PROFILE_TABLE + (id - 1) * PROFILE_STRIDE, 2)) & 0xffff;
         if (!v) continue;
@@ -131,8 +136,8 @@ function profileMaps(read) {
     return { v0ById, idByV0 };
 }
 
-export function createDriNative(sfx = null) {
-    const d = {
+export function createDriNative(sfx: PackedSfx | null = null) {
+    const d: DriHost & { _begin?: () => void } = {
         _open: false,
         _pending: false,
         _host: null,
@@ -140,9 +145,9 @@ export function createDriNative(sfx = null) {
         _onClose: null,
         _packed: {},
         _lastDiagnostic: null,
-    } as DriHost & { _begin?: () => void };
+    };
     loadTables().catch(() => {});
-    const playPackedSound = (id) => {
+    const playPackedSound = (id: number) => {
         const key = id >>> 0;
         d._packed[key] = (d._packed[key] ?? 0) + 1;
         sfx?.playPacked(key);
@@ -151,10 +156,10 @@ export function createDriNative(sfx = null) {
     /** Walker state -> the save cells the lab reads. Every owned roster slot
      *  gets a full record: owned marker, name, stats, gear, current form,
      *  equipped triple and its form ledger. */
-    function seed(read: (offset: number) => number, write: (offset: number, value: number, size?: number) => void, state: GameState) {
+    function seed(read: NativeScreenIo["read"], write: NativeScreenIo["write"], state: Partial<GameState>) {
         const db = TABLES?.digimonById ?? {};
         const { v0ById } = profileMaps(read);
-        const w16 = (addr: number, v) => write(addr, (Number(v) || 0) & 0xffff, 2);
+        const w16 = (addr: number, v: number | undefined) => write(addr, (Number(v) || 0) & 0xffff, 2);
         const party = Array.isArray(state.party) ? state.party : [];
         for (let i = 0; i < 3; i++) {
             const slot = party[i] ? rosterSlotFor(party[i]) : EMPTY_SLOT;
@@ -180,8 +185,8 @@ export function createDriNative(sfx = null) {
             w16(rec + REC.maxHp, stats.maxHp);
             w16(rec + REC.mp, stats.mp);
             w16(rec + REC.maxMp, stats.maxMp);
-            (stats.core ?? []).forEach((v, i) => w16(rec + REC.core + i * 2, v));
-            (stats.elements ?? []).forEach((v, i) => w16(rec + REC.elements + i * 2, v));
+            (stats.core ?? []).forEach((v: number, i: number) => w16(rec + REC.core + i * 2, v));
+            (stats.elements ?? []).forEach((v: number, i: number) => w16(rec + REC.elements + i * 2, v));
             const eq = slotEquipment(state, slot) ?? {};
             for (const [name_, off] of RECORD_EQUIP_OFFSETS) w16(rec + off, eq[name_]);
             const equipped = Array.isArray(stats.equippedForms) ? stats.equippedForms : [];
@@ -227,10 +232,10 @@ export function createDriNative(sfx = null) {
      *  and the rest of the owned slots are the reserve. Each member keeps its
      *  own stats/equipment object, so a switched-out partner returns with the
      *  same block it left with. */
-    function readBack(host) {
+    function readBack(host: NativeScreenHost) {
         const state = d._state;
         if (!state) return;
-        const read = (a, s) => host.read(a, s);
+        const read = (a: number, s?: number) => host.read(a, s);
         const { idByV0 } = profileMaps(read);
         const slots = [];
         for (let i = 0; i < 3; i++) {
@@ -238,13 +243,13 @@ export function createDriNative(sfx = null) {
             if (v !== EMPTY_SLOT && v < ROSTER_SLOTS) slots.push(v);
         }
         const owned = ownedSlots(state);
-        const statBySlot = new Map();
-        const equipBySlot = new Map();
-        for (const slot of owned as number[]) {
+        const statBySlot = new Map<number, SlotStatBlock>();
+        const equipBySlot = new Map<number, ReturnType<typeof slotEquipment>>();
+        for (const slot of owned) {
             statBySlot.set(slot, slotStats(state, slot) ?? {});
             equipBySlot.set(slot, slotEquipment(state, slot) ?? {});
         }
-        for (const slot of owned as number[]) {
+        for (const slot of owned) {
             const stats = statBySlot.get(slot);
             const rec = ROSTER + slot * ROSTER_STRIDE;
             const form = read(rec + CURRENT_FORM, 4) >>> 0;
@@ -255,7 +260,7 @@ export function createDriNative(sfx = null) {
                 const v = read(rec + EQUIPPED + i * 2, 2) & 0xffff;
                 return v === 0xffff ? 0 : (idByV0.get(v) ?? 0);
             });
-            const ledger = [];
+            const ledger: DriFormLedgerEntry[] = [];
             for (let i = 0; i < LEDGER_ENTRIES; i++) {
                 const base = rec + LEDGER + i * LEDGER_STRIDE;
                 const value = read(base + 0x00, 2) & 0xffff;
@@ -286,7 +291,7 @@ export function createDriNative(sfx = null) {
             syncWornFromEquipment(state);
             state.partnerStats = partyStats[0];
             state.charId = party[0];
-            const charIndex = state.manifest?.characters?.findIndex((c) => c.id === state.charId) ?? -1;
+            const charIndex = state.manifest?.characters?.findIndex((c: DriManifestCharacter) => c.id === state.charId) ?? -1;
             if (charIndex >= 0) state.charIdx = charIndex;
             const char = state.manifest?.characters?.[state.charIdx];
             if (char && state.partnerStats?.digimonId) char.digimonId = state.partnerStats.digimonId;
@@ -300,7 +305,7 @@ export function createDriNative(sfx = null) {
         for (const charId of Object.keys(state.reserveEquipment)) {
             if (party.includes(charId)) delete state.reserveEquipment[charId];
         }
-        for (const slot of owned as number[]) {
+        for (const slot of owned) {
             if (deployed.has(slot)) continue;
             const charId = ROSTER_SLOT_CHARIDS[slot];
             state.reserveStats[charId] = statBySlot.get(slot);
@@ -312,7 +317,7 @@ export function createDriNative(sfx = null) {
     /** Focused-verification hook: write into the running screen's RAM. */
     d.writeMemory = (addr, value, size = 4) => d._host?.write?.(addr, value, size) ?? null;
 
-    d.diagnostics = () => ({
+    d.diagnostics = (): DriDiagnostics => ({
         open: d._open,
         pending: d._pending,
         packed: { ...d._packed },
@@ -320,12 +325,12 @@ export function createDriNative(sfx = null) {
         screen: (() => {
             const rt = d._host?.rt;
             if (!rt) return null;
-            const read = (a) => d._host.read(a, 4) >>> 0;
+            const read = (a: number) => d._host.read(a, 4) >>> 0;
             const root = rt.world.objects[0]?.addr ?? 0;
             const aux = root ? read(root + 0x24) : 0;
             return {
                 root, aux,
-                objects: rt.world.objects.map((o) => ({ addr: o.addr >>> 0, cb: o.cb >>> 0, alive: o.alive })),
+                objects: rt.world.objects.map((o: DriWorldObject) => ({ addr: o.addr >>> 0, cb: o.cb >>> 0, alive: o.alive })),
                 rootState: root ? read(root + 0xc) : null,
                 rootUnk10: root ? read(root + 0x10) : null,
                 auxChild: aux ? read(aux + 4) : null,
@@ -349,7 +354,7 @@ export function createDriNative(sfx = null) {
         moduleId: MODULE_ID,
         hostOptions: {
             playPackedSound,
-            seed: ({ read, write }: { read: (offset: number) => number; write: (offset: number, value: number) => void }) => seed(read, write, d._state ?? {}),
+            seed: ({ read, write }: NativeScreenIo) => seed(read, write, d._state ?? {}),
         },
         // The lab's profile table has to be in memory before the boot: the
         // screen packs the party map itself, and seeding needs the id map.

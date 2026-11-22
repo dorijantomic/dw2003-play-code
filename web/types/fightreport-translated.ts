@@ -1,4 +1,5 @@
 import type { FightReportSession } from "../../engine/dw3/ui/fight-report-session.js";
+import type { FormLedgerEntry } from "../game/types.js";
 import type { MenuDisplayClock } from "../../engine/dw3/ui/pad-words.js";
 
 /** What the report screen reads back out of its session before that session is disposed:
@@ -32,6 +33,39 @@ export interface FightReportDiagnostics {
   [extra: string]: unknown;
 }
 
+/** One partner in the fight as the report is handed it. */
+export interface FightReportParticipant {
+  pos?: number;
+  rosterSlot?: number;
+  name?: string;
+  level?: number;
+  preExp?: unknown;
+  participated?: boolean;
+  tp?: number;
+  hp?: number;
+  maxHp?: number;
+  mp?: number;
+  maxMp?: number;
+  core?: number[];
+  elements?: number[];
+  equipment?: Record<string, number>;
+  forms?: { digimonId?: number; equippedForms?: number[]; formLedger?: FormLedgerEntry[]; };
+  formFlags?: unknown;
+}
+
+/** What the fight report is handed when it opens: the fight it reports on, the party in it, and what to call on the way out. */
+export interface FightReportOpts {
+  onClose?: (() => void) | null;
+  gameState?: unknown;
+  participants?: FightReportParticipant[];
+  dropItemId?: number;
+  battleId?: number;
+  activePos?: number;
+  /** the roster slot standing at each party position (the caller's own list) */
+  partySlots?: number[];
+  view?: { progress?: unknown[]; reward?: unknown; };
+}
+
 /** The post-fight results screen (web/fightreport-translated.ts). */
 export interface FightReportScreen {
   /** MenuDisplayClock the session is ticked on */
@@ -46,7 +80,7 @@ export interface FightReportScreen {
   /** the hook the closing screen calls once */
   _onClose: (() => void) | null;
   _open: boolean;
-  /** the module's own FightReportOpts; not exported, so it stays loose here */
+  /** what open() was handed; read through optional chains and `o.` alike, so it stays loose until the null checks move into the code */
   _opts: any;
   _pending: boolean;
   _request: number;
@@ -64,7 +98,7 @@ export interface FightReportScreen {
   /** `_k` is the key name ("ok", "cancel", ...) */
   handleKey?: (_k: string, state?: unknown) => void;
   isOpen?: () => boolean;
-  open?: (opts?: unknown) => void;
+  open?: (opts?: FightReportOpts) => void;
   textWidgets?: () => unknown[];
   update?: (dt: number) => void;
 }

@@ -13,6 +13,8 @@
 // one card callback with that tick's frame delta, and every due tick runs: there is no catch-up
 // cap, because the original has none.
 import { ui } from "./vendor/engine.js";
+import type { ThrownError } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import * as uiC from "./ui-c/index.js";
 import { composePlaceCard } from "./ui-c/message.js";
@@ -36,8 +38,9 @@ const DEFAULT_LANGUAGE = 2;
 
 const DATA_LABEL = "Place card data";
 
-let data = null;
-let loading = null;
+type PlaceCardData = ConstructorParameters<EngineUi["PlaceCardSession"]>[0] & { stages?: Record<string, { scene?: number | null } | undefined>; banks: Uint8Array[][] };
+let data: PlaceCardData | null = null;
+let loading: Promise<PlaceCardData> | null = null;
 
 /** Load the name table, bar templates, every language's two banks and the font. Safe to call repeatedly. */
 export async function loadPlaceCardTranslated() {
@@ -50,7 +53,7 @@ export async function loadPlaceCardTranslated() {
         ]);
         const banks = [];
         for (let lang = 0; lang < 7; lang++) {
-            const ids = ui.placeCardBankIds(lang);
+            const ids = (ui as EngineUi).placeCardBankIds(lang);
             banks.push(Promise.all([fetchBytes(`place-banks/${ids.area}.bin`, DATA_LABEL), fetchBytes(`place-banks/${ids.place}.bin`, DATA_LABEL)]));
         }
         data = { font, nameTable, barTemplates, stages: json.stages, banks: await Promise.all(banks) };
@@ -79,7 +82,7 @@ export function createPlaceCardTranslated() {
         _painted: [],
     } as PlaceCardScreen;
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         card._error = error;
         card._failed = true;
         console.error("Translated place card failed", error);
@@ -105,10 +108,10 @@ export function createPlaceCardTranslated() {
         textCard.cancel!();                     // an arrival is not a scene's card: the arrival takes the screen
         if (!data || scene == null) return false;
         try {
-            card._session ??= new ui.PlaceCardSession(data);
+            card._session ??= new (ui as EngineUi).PlaceCardSession(data);
             const [areaBank, placeBank] = data.banks[card._language];
             card._session.begin({ scene, language: card._language, areaBank, placeBank });
-            card._clock = new ui.MenuDisplayClock();
+            card._clock = new (ui as EngineUi).MenuDisplayClock();
             card._held = false;
             card._failed = false;
             card._error = null;
@@ -195,7 +198,7 @@ export function createPlaceCardTranslated() {
         if (textCard.isActive!()) return textCard.state!();     // a scene's own card (beginText) is what is on screen
         const st = card._session?.state();
         if (!st) return null;
-        const name = (n) => ({ revealed: n?.revealed ?? 0, total: n?.total ?? 0, ended: !!n?.ended });
+        const name = (n: { revealed?: number; total?: number; ended?: boolean } | undefined) => ({ revealed: n?.revealed ?? 0, total: n?.total ?? 0, ended: !!n?.ended });
         return {
             phase: st.state, step: st.step, hold: st.hold, released: st.released, busy: st.busy,
             area: name(st.names[0]), place: name(st.names[1]),

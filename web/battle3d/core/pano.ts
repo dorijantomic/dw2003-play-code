@@ -16,6 +16,7 @@ type Vec3 = Float32Array | number[];
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePano(B$: Battle3DContext) {
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
 function _panoTex(px: { data: ImageDataArray; width: number; height: number; scale: number; }, repeat: boolean) {
     const tex = B$.gl!.createTexture();
     B$.gl!.bindTexture(B$.gl!.TEXTURE_2D, tex);
@@ -72,9 +73,9 @@ function _paintFloorMask(g) {
     }
     return (g.paintFloor = m);
   }
-function _drawArenaPaint(p, mvp: Iterable<number>, world: Iterable<number>, atm: { gradeSub: Iterable<number>; }) {
+function _drawArenaPaint(p, mvp: Float32List, world: Iterable<number>, atm: { gradeSub: Iterable<number>; }) {
     if (!B$.panoPaintProg) {
-      const pr = createProgram(B$.gl, `
+      const pr = createProgram(B$.gl!, `
 attribute vec3 aPos;
 uniform mat4 uMVP;
 uniform mat4 uWorld;
@@ -118,12 +119,13 @@ void main() {
     for (const g of B$.activeArena!.groups!) {
       if (!g.count) continue;
       const idx = arenaCullIndices(mvp, g); if (!idx) continue;
-      const fm = _paintFloorMask(g), fl = [], ot = [];
-      for (let i = 0; i < idx.length; i += 3) (fm[idx[i]! / 3] ? fl : ot).push(idx[i], idx[i + 1], idx[i + 2]);
+      const fm = _paintFloorMask(g), fl: number[] = [], ot: number[] = [];
+      // ETS item 9: the cull pass hands back whole triangles, so idx holds a multiple of three entries.
+      for (let i = 0; i < idx.length; i += 3) (fm[idx[i]! / 3] ? fl : ot).push(idx[i]!, idx[i + 1]!, idx[i + 2]!);
       B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, g.vbo); B$.gl!.enableVertexAttribArray(g0.aPos); B$.gl!.vertexAttribPointer(g0.aPos, 3, B$.gl!.FLOAT, false, 0, 0);
       if (!g.paintIbo) g.paintIbo = B$.gl!.createBuffer();
       B$.gl!.bindBuffer(B$.gl!.ELEMENT_ARRAY_BUFFER, g.paintIbo);
-      for (const [list, mode] of [[fl, 1], [ot, 0]] as [any[], number][]) {
+      for (const [list, mode] of [[fl, 1], [ot, 0]] as [number[], number][]) {
         if (!list.length) continue;
         B$.gl!.uniform1f(g0.uMode, mode);
         B$.gl!.bufferData(B$.gl!.ELEMENT_ARRAY_BUFFER, new Uint16Array(list), B$.gl!.DYNAMIC_DRAW);
@@ -169,7 +171,7 @@ function _panoBufs(pos: number[], uv: number[], idx: number[]) {
   }
 function _panoGround(bdPV: Iterable<number>, tex: WebGLTexture | null, atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
     if (!B$.panoGroundProg) {
-      const p = createProgram(B$.gl, `
+      const p = createProgram(B$.gl!, `
 attribute vec3 aPos;
 uniform mat4 uMVP;
 varying vec2 vXZ;
@@ -196,7 +198,7 @@ void main() {
     const g = B$.panoGroundProg, b = _panoDiskBufs();
     B$.gl!.useProgram(g.program);
     B$.gl!.uniformMatrix4fv(g.uMVP, false, bdPV);
-    B$.gl!.uniform3fv(g.uP, [B$.PANO_TILE, B$.PANO_FADE![0], B$.PANO_FADE![1]]);
+    B$.gl!.uniform3fv(g.uP, [B$.PANO_TILE!, B$.PANO_FADE![0]!, B$.PANO_FADE![1]!]);
     B$.gl!.uniform3fv(g.uGradeSub, atm ? atm.gradeSub : [0, 0, 0]);
     B$.gl!.uniform3fv(g.uFogCol, atm ? atm.fogCol : [0, 0, 0]);
     B$.gl!.uniform3fv(g.uFogP, atm ? atm.fogP : [0, 0, 0]);
@@ -207,17 +209,17 @@ void main() {
     B$.gl!.drawElements(B$.gl!.TRIANGLES, b.indexCount, B$.gl!.UNSIGNED_SHORT, 0);
   }
 // the picture's texel along unit direction d (the dome is centred on the eye); sky only
-  function _panoTexel(p, eye, d: number[]) {
+  function _panoTexel(p: PanoState, eye: number[], d: number[]) {
     if (d[1]! <= 0) return null;
     return { px: p.px, u: 0.5 + Math.atan2(d[0]!, -d[2]!) / (2 * Math.PI), v: 0.5 - Math.asin(Math.min(1, d[1]!)) / Math.PI };
   }
-function _panoMeshBuild(meta, vals: number[] | Float32Array<ArrayBuffer>) {
-    const C = meta.cols, R = meta.rows, k = B$.PANO_UNIT_M, EYE = meta.cameraHeightM * k!, FLAT_Y = B$.PANO_FLAT_M! * k!;
+function _panoMeshBuild(meta: { cols: number; rows: number; cameraHeightM: number }, vals: number[] | Float32Array<ArrayBuffer>) {
+    const C = meta.cols, R = meta.rows, k = B$.PANO_UNIT_M!, EYE = meta.cameraHeightM * k!, FLAT_Y = B$.PANO_FLAT_M! * k!;
     const pos = new Float32Array(C * R * 3), uv = new Float32Array(C * R * 2), dist = new Float32Array(C * R), skyF = new Uint8Array(C * R);
     for (let j = 0; j < R; j++) {
       const lat = Math.PI / 2 - j * Math.PI / (R - 1), cl = Math.cos(lat), sl = Math.sin(lat);
       for (let i = 0; i < C; i++) {
-        const n = j * C + i, az = -Math.PI + i * 2 * Math.PI / (C - 1), sky = !(vals[n]! > 0), v = Math.min(sky ? Infinity : vals[n], B$.PANO_FAR_M) * k!;
+        const n = j * C + i, az = -Math.PI + i * 2 * Math.PI / (C - 1), sky = !(vals[n]! > 0), v = Math.min(sky ? Infinity : vals[n]!, B$.PANO_FAR_M!) * k!;
         dist[n] = v; skyF[n] = sky ? 1 : 0;
         uv[n * 2] = i / (C - 1); uv[n * 2 + 1] = j / (R - 1);
         if (!(v > 0)) { pos[n * 3] = pos[n * 3 + 1] = pos[n * 3 + 2] = NaN; continue; }
@@ -227,12 +229,12 @@ function _panoMeshBuild(meta, vals: number[] | Float32Array<ArrayBuffer>) {
         pos[n * 3] = x; pos[n * 3 + 1] = y; pos[n * 3 + 2] = z;
       }
     }
-    const idx = []; let torn = 0;
+    const idx: number[] = []; let torn = 0;
     const P = (n: number | undefined) => [pos[n! * 3], pos[n! * 3 + 1], pos[n! * 3 + 2]];
     for (let j = 0; j < R - 1; j++) for (let i = 0; i < C - 1; i++) {
-      const q = [j * C + i, j * C + i + 1, (j + 1) * C + i, (j + 1) * C + i + 1];
+      const q: [number, number, number, number] = [j * C + i, j * C + i + 1, (j + 1) * C + i, (j + 1) * C + i + 1];
       if (q.some((n) => !(dist[n]! > 0))) continue;
-      const ds = q.map((n) => dist[n]);
+      const ds = q.map((n) => dist[n]!);
       if (!q.some((n) => skyF[n]) && Math.max(...ds) / Math.min(...ds) > 1.3) {   // the sky's edge is never torn: nothing is behind it
         const a = P(q[0]), b = P(q[3]), c = P(q[1]), d = P(q[2]);
         const e1 = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!], e2 = [d[0]! - c[0]!, d[1]! - c[1]!, d[2]! - c[2]!];
@@ -265,15 +267,15 @@ function _panoMeshBuild(meta, vals: number[] | Float32Array<ArrayBuffer>) {
     return best;
   }
 function _drawPano(p: PanoState, bdPV: number[] | Float32Array<ArrayBuffer>, eye: number[], atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
-    const M = new Float32Array([B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, eye[0], eye[1], eye[2], 1]);
+    const M = new Float32Array([B$.PANO_R!, 0, 0, 0, 0, B$.PANO_R!, 0, 0, 0, 0, B$.PANO_R!, 0, eye[0]!, eye[1]!, eye[2]!, 1]);
     const depth = B$.gl!.isEnabled(B$.gl!.DEPTH_TEST);
     B$.gl!.disable(B$.gl!.DEPTH_TEST); B$.gl!.depthMask(false); B$.gl!.disable(B$.gl!.BLEND);
     if (atm) { B$.gl!.useProgram(B$.texP!.program); B$.gl!.uniformMatrix4fv(B$.texP!.uSkyM, false, M); B$.gl!.uniform2fv(B$.texP!.uWater, [0, 0]); }
-    if (!p.mesh) drawSkeletalMesh(B$.gl, B$.texP, mat4Mul(bdPV, M), _panoDomeBufs(), p.tex, [1, 1, 1, 1]);
+    if (!p.mesh) drawSkeletalMesh(B$.gl!, B$.texP!, mat4Mul(bdPV, M), _panoDomeBufs(), p.tex, [1, 1, 1, 1]);
     if (p.mesh) {               // the place in 3D: it sorts itself by depth (cleared after the arena branch, like the arena)
       B$.gl!.enable(B$.gl!.DEPTH_TEST); B$.gl!.depthMask(true);
-      if (atm) B$.gl!.uniformMatrix4fv(B$.texP!.uSkyM, false, B$.PANO_IDENT);
-      drawSkeletalMesh(B$.gl, B$.texP, bdPV, p.mesh, p.tex, [1, 1, 1, 1]);
+      if (atm) B$.gl!.uniformMatrix4fv(B$.texP!.uSkyM, false, B$.PANO_IDENT!);
+      drawSkeletalMesh(B$.gl!, B$.texP!, bdPV, p.mesh, p.tex, [1, 1, 1, 1]);
       B$.gl!.disable(B$.gl!.DEPTH_TEST);
     } else if (p.ground) _panoGround(bdPV, p.ground, atm);
     if (depth) B$.gl!.enable(B$.gl!.DEPTH_TEST);
@@ -302,13 +304,13 @@ function _drawPano(p: PanoState, bdPV: number[] | Float32Array<ArrayBuffer>, eye
     B$.gl!.clearColor(0, 0, 0, 1); B$.gl!.clear(B$.gl!.COLOR_BUFFER_BIT | B$.gl!.DEPTH_BUFFER_BIT);
     B$.gl!.enable(B$.gl!.DEPTH_TEST); B$.gl!.depthFunc(B$.gl!.LEQUAL);
     B$.gl!.depthMask(false); B$.gl!.enable(B$.gl!.BLEND); B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
-    drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, B$.arenaBg || [0, 0, 0, 1]);
+    drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, 1, B$.arenaBg || [0, 0, 0, 1]);
     let proj = mat4Perspective(Math.PI / 2, 1, 1, 60000);
     if (opts.ortho) { const L = opts.ortho, n = 0, f = opts.far || 60000; proj = new Float32Array(16);
       proj[0] = 1 / L; proj[5] = 1 / L; proj[10] = -2 / (f - n); proj[14] = -(f + n) / (f - n); proj[15] = 1; }
     const mvp = mat4Mul(mat4Mul(proj, mat4LookAt(eye, look, up)), ps1ToRenderMatrix(MODEL_SCALE));
     B$.gl!.depthMask(true); B$.gl!.disable(B$.gl!.BLEND);
-    for (const g of B$.activeArena.groups) { if (g.count) drawProjLayerIndexed(B$.gl, B$.texP, mvp, g, B$.arenaTextureFor(B$.activeArena, g), arenaCullIndices(mvp, g)); }
+    for (const g of B$.activeArena.groups) { if (g.count) drawProjLayerIndexed(B$.gl!, B$.texP!, mvp, g, B$.arenaTextureFor(B$.activeArena, g), arenaCullIndices(mvp, g)); }
     const px = new Uint8Array(size * size * 4);
     B$.gl!.readPixels(0, 0, size, size, B$.gl!.RGBA, B$.gl!.UNSIGNED_BYTE, px);
     B$.gl!.bindFramebuffer(B$.gl!.FRAMEBUFFER, null); B$.gl!.enable(B$.gl!.BLEND); B$.gl!.viewport(0, 0, B$.canvas!.width, B$.canvas!.height);
@@ -347,7 +349,7 @@ function getPanorama() { return { ...B$.panoLog, on: !!window.__fx?.battlepano, 
     B$.gl!.texParameteri(B$.gl!.TEXTURE_2D, B$.gl!.TEXTURE_WRAP_S, B$.gl!.CLAMP_TO_EDGE);
     B$.gl!.texParameteri(B$.gl!.TEXTURE_2D, B$.gl!.TEXTURE_WRAP_T, B$.gl!.CLAMP_TO_EDGE);
     B$.viewerGridTex = tex;
-    B$.viewerGridBufs = makeQuadBuffers(B$.gl, [
+    B$.viewerGridBufs = makeQuadBuffers(B$.gl!, [
       [-0.5, 0, -0.5], [0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5],
     ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }
@@ -359,10 +361,10 @@ function drawViewerGrid(pv: number[] | Float32Array<ArrayBuffer>) {
     const cz = (box.min[2]! + box.max[2]!) / 2;
     const h = Math.max(200, box.max[1]! - box.min[1]!);
     const size = Math.max(1200, h * 14);
-    const mvp = mat4Mul(pv, mat4Mul(mat4Translate(cx, box.min[1], cz), mat4Scale(size, 1, size)));
+    const mvp = mat4Mul(pv, mat4Mul(mat4Translate(cx, box.min[1]!, cz), mat4Scale(size, 1, size)));
     B$.gl!.enable(B$.gl!.BLEND);
     B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
-    drawQuad(B$.gl, B$.texP, mvp, B$.viewerGridBufs, B$.viewerGridTex, 1, [1, 1, 1, 0.95]);
+    drawQuad(B$.gl!, B$.texP!, mvp, B$.viewerGridBufs!, B$.viewerGridTex!, 1, [1, 1, 1, 0.95]);
   }
   return { _panoTex, _panoActive, _paintFloorMask, _drawArenaPaint, _panoBufs, _panoDomeBufs, _panoDiskBufs, _panoGround, _panoTexel, _panoMeshBuild, probePanoGround, _drawPano, captureArenaFace, getPanorama, ensureViewerGrid, drawViewerGrid };
 }

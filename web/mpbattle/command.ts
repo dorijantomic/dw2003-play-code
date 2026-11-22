@@ -5,6 +5,7 @@ import { battleAilmentByte } from "../battlecmd-translated.js";
 import { MB } from "./state.js";
 import { mk } from "./ui-scene.js";
 import { hostCommand } from "./host.js";
+import type { MpNativeResult, MpPartyMember, MpPlayerEntry, MpTargetSpec, MpWireCommand } from "../types/mp-match.js";
 
 export const TURN_MS = 45000;              // how long a player may think
 
@@ -38,7 +39,7 @@ export function renderCmd() {
     if (MB.F.nat) {                                                  // the game's own screens draw the menus; here only the target marks
         const cmd = MB.F.cmd;
         if (cmd?.stage === "target") {
-            cmd.options.forEach((key, i) => { const r = (U.plateMap.get(key) ?? U.cards.get(key))?.root; if (r) { r.classList.add("pick"); if (i === cmd.cur) r.classList.add("cur"); } });
+            cmd.options.forEach((key: string, i: number) => { const r = (U.plateMap.get(key) ?? U.cards.get(key))?.root; if (r) { r.classList.add("pick"); if (i === cmd.cur) r.classList.add("cur"); } });
         }
         return;
     }
@@ -49,17 +50,17 @@ export function renderCmd() {
         bar.append(mk("span", "hint", MB.F.iFled ? "You ran away. Watching the rest of the fight." : S?.ph === "play" ? (S.pz ? pzText(S.pz, S.P) : "Waiting...") : ""));
         return;
     }
-    const btn = (label, fn, disabled?: any) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
+    const btn = (label: string, fn: () => void, disabled?: boolean) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
     if (!MB.F.cmd) MB.F.cmd = { stage: "menu" };
     const cmd = MB.F.cmd;
     const back = () => btn("Back", () => { MB.F.cmd = { stage: "menu" }; renderCmd(); });
     if (cmd.stage === "menu") {
-        btn("Fight", () => askTarget({ foes: true }, (t) => send({ k: "fight", t: Number(t.slice(1)) }), "Pick a target"));
+        btn("Fight", () => askTarget({ foes: true }, (t: string) => send({ k: "fight", t: Number(t.slice(1)) }), "Pick a target"));
         btn("Tech", () => { MB.F.cmd = { stage: "tech" }; renderCmd(); }, !MB.F.techs.length);
         btn("Item", () => { MB.F.items = MB.F.kit.items(); MB.F.cmd = { stage: "item" }; renderCmd(); }, !MB.F.kit.items().length);
         const forms = MB.F.kit.forms(MB.F.me);
         if (forms.length) btn("Digivolve", () => { MB.F.cmd = { stage: "dv" }; renderCmd(); }, !!MB.F.me.cantDigivolve);
-        if (MB.F.party.length > 1) btn("Tag", () => { MB.F.cmd = { stage: "tag" }; renderCmd(); }, !MB.F.party.some((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0));
+        if (MB.F.party.length > 1) btn("Tag", () => { MB.F.cmd = { stage: "tag" }; renderCmd(); }, !MB.F.party.some((m: { rec: { hp: number; }; }, i: number) => i !== MB.F.act && m.rec.hp > 0));
         btn("Run", () => { MB.F.cmd = { stage: "run" }; renderCmd(); });
         bar.append(mk("span", "hint", `HP ${MB.F.me.hp}/${MB.F.me.maxHp}   MP ${MB.F.me.mp}/${MB.F.me.maxMp}`));
     } else if (cmd.stage === "run") {
@@ -71,8 +72,8 @@ export function renderCmd() {
             const spread = t.type === "attack" && isSpread(t.skill), ok = MB.F.me.mp >= t.cost;
             btn(`${t.name}  (${t.cost} MP)${spread ? "  [all]" : t.type !== "attack" ? "  [support]" : ""}`, () => {
                 if (spread) send({ k: "tech", sk: t.id, tw: t.tw, t: -1 });
-                else if (t.type === "attack") askTarget({ foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Pick a target for ${t.name}`);
-                else askTarget({ allies: true, foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Pick a target for ${t.name}`);
+                else if (t.type === "attack") askTarget({ foes: true }, (k: string) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Pick a target for ${t.name}`);
+                else askTarget({ allies: true, foes: true }, (k: string) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Pick a target for ${t.name}`);
             }, !ok);
         }
         back();
@@ -80,13 +81,13 @@ export function renderCmd() {
         for (const f of MB.F.kit.forms(MB.F.me)) btn(f.name, () => send({ k: "dv", form: f.id }));
         back();
     } else if (cmd.stage === "tag") {
-        MB.F.party.forEach((m, i) => { if (i !== MB.F.act) btn(`${m.rec.profile?.name ?? "?"}  HP ${Math.max(0, m.rec.hp | 0)}/${m.rec.maxHp | 0}`, () => send({ k: "tag", slot: i }), m.rec.hp <= 0); });
+        MB.F.party.forEach((m: MpPartyMember, i: number) => { if (i !== MB.F.act) btn(`${m.rec.profile?.name ?? "?"}  HP ${Math.max(0, m.rec.hp | 0)}/${m.rec.maxHp | 0}`, () => send({ k: "tag", slot: i }), m.rec.hp <= 0); });
         if (!MB.F.S?.ft) back();
     } else if (cmd.stage === "item") {
         for (const it of MB.F.items) {
             btn(`${it.name}  x${it.qty}`, () => {
                 const tg = itemTargets(ITEM_BY_ID[it.id] ?? it);
-                askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k) => { send({ k: "item", item: it.id, to: k[0] === "p" ? k : myKey, t: k[0] === "e" ? Number(k.slice(1)) : -1 }); MB.F.kit.spendItem(it.id); }, `Use ${it.name} on...`);
+                askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k: string) => { send({ k: "item", item: it.id, to: k[0] === "p" ? k : myKey, t: k[0] === "e" ? Number(k.slice(1)) : -1 }); MB.F.kit.spendItem(it.id); }, `Use ${it.name} on...`);
             });
         }
         back();
@@ -98,7 +99,7 @@ export function renderCmd() {
 }
 
 /** Ask for a target on the screen: { foes, allies } say which plates may be picked. Only one choice? it is taken for me. */
-function askTarget(spec, done, label: string) {
+function askTarget(spec: MpTargetSpec, done: (k: string) => void, label: string) {
     const options = [];
     if (spec.allies) for (const p of MB.F.S.P) if (!p.ko || spec.revive) options.push("p" + p.id);
     if (spec.foes) for (const e of MB.F.S.E) if (!e.ko) options.push("e" + e.i);
@@ -137,7 +138,7 @@ export function mpbKey(btn: string | undefined) {
 export function driveNative(dt: number) {
     const N = MB.F.nat, S = MB.F.S;
     const myId = MB.A.myId(), myKey = "p" + myId;
-    const mine = S?.P.find((p) => p.id === myId);
+    const mine = S?.P.find((p: MpPlayerEntry) => p.id === myId);
     const forced = !!(S && S.ft && S.t === myKey);
     const mineTurn = !!(S && S.ph === "play" && S.t === myKey && !MB.F.iFled && !MB.F.link.active && mine && (forced || !mine.ko));
     MB.F.ui.pad.classList.toggle("on", mineTurn);
@@ -155,9 +156,9 @@ export function driveNative(dt: number) {
         else if (stage === "item") N.open("item", MB.F.kit.itemSeed());
         else if (stage === "dv") N.open("form", MB.F.kit.formSeed(MB.F.me, MB.F.party[MB.F.act].member));
         else if (stage === "tag") {
-            const seed = MB.F.kit.tagSeed(MB.F.party.map((m) => m.member), MB.F.party.map((m) => m.rec), MB.F.act);
+            const seed = MB.F.kit.tagSeed(MB.F.party.map((m: MpPartyMember) => m.member), MB.F.party.map((m: MpPartyMember) => m.rec), MB.F.act);
             seed.interactive = forced ? 0 : 1;
-            if (forced) seed.cursorRow = Math.max(0, MB.F.party.findIndex((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0));
+            if (forced) seed.cursorRow = Math.max(0, MB.F.party.findIndex((m: { rec: { hp: number; }; }, i: number) => i !== MB.F.act && m.rec.hp > 0));
             N.open("tag", seed);
         }
     }
@@ -167,15 +168,15 @@ export function driveNative(dt: number) {
 
 function notice(text: string) { MB.F.nat.say([text], { ms: 1100 }); MB.F.cmd = { stage: "notice" }; }
 
-function onNativeResult(res, forced: boolean, mine) {
+function onNativeResult(res: MpNativeResult, forced: boolean, mine: MpPlayerEntry) {
     if (res.failed) { console.warn("[mpbattle] a native screen failed; using buttons"); MB.F.ui.nat = null; MB.F.nat = null; MB.F.ui.root.classList.remove("nat"); MB.F.cmd = null; renderCmd(); return; }
     const v = res.value;
     if (res.mode === "cmd") {
         MB.F.cmdRow = v | 0;
-        if (v === 0) askTarget({ foes: true }, (k) => send({ k: "fight", t: Number(k.slice(1)) }), "Choose a target.");
+        if (v === 0) askTarget({ foes: true }, (k: string) => send({ k: "fight", t: Number(k.slice(1)) }), "Choose a target.");
         else if (v === 1) { if (MB.F.techs.length) MB.F.cmd = { stage: "tech" }; else notice("No techs!"); }
         else if (v === 2) { if (MB.F.kit.forms(MB.F.me).length && !MB.F.me.cantDigivolve) MB.F.cmd = { stage: "dv" }; else notice("Cannot digivolve."); }
-        else if (v === 3) { if (MB.F.party.some((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0)) MB.F.cmd = { stage: "tag" }; else notice("Cannot tag."); }
+        else if (v === 3) { if (MB.F.party.some((m: { rec: { hp: number; }; }, i: number) => i !== MB.F.act && m.rec.hp > 0)) MB.F.cmd = { stage: "tag" }; else notice("Cannot tag."); }
         else if (v === 4) { if (MB.F.kit.items().length) MB.F.cmd = { stage: "item" }; else notice("No items!"); }
         else if (v === 5) send({ k: "run" });
         else MB.F.cmd = { stage: "menu" };
@@ -185,14 +186,14 @@ function onNativeResult(res, forced: boolean, mine) {
         if (!t) { MB.F.cmd = { stage: "menu" }; return; }
         const spread = t.type === "attack" && isSpread(t.skill);
         if (spread) send({ k: "tech", sk: t.id, tw: t.tw, t: -1 });
-        else if (t.type === "attack") askTarget({ foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Choose a target for ${t.name}.`);
-        else askTarget({ allies: true, foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Choose a target for ${t.name}.`);
+        else if (t.type === "attack") askTarget({ foes: true }, (k: string) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Choose a target for ${t.name}.`);
+        else askTarget({ allies: true, foes: true }, (k: string) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Choose a target for ${t.name}.`);
     } else if (res.mode === "item") {
         if (v === -2) { MB.F.cmd = { stage: "menu" }; return; }
         const it = MB.F.kit.items().find((x: { id: number; }) => (x.id | 0) === (v | 0));
         if (!it) { MB.F.cmd = { stage: "menu" }; return; }
         const tg = itemTargets(ITEM_BY_ID[it.id] ?? it);
-        askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k) => {
+        askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k: string) => {
             send({ k: "item", item: it.id, to: k[0] === "p" ? k : "p" + MB.A.myId(), t: k[0] === "e" ? Number(k.slice(1)) : -1 }); MB.F.kit.spendItem(it.id);
         }, `Use ${it.name} on...`);
     } else if (res.mode === "form") {
@@ -206,7 +207,7 @@ function onNativeResult(res, forced: boolean, mine) {
 }
 
 /** My choice for this turn goes to the referee (or is taken straight in when it is me). */
-function send(c) {
+function send(c: MpWireCommand) {
     MB.F.cmd = null;
     if (MB.F.nat) { MB.F.nat.close(); MB.F.nat.clearSay(); MB.F.cmdRow = 0; }
     const d = { k: "cmd", fid: MB.F.fid, c };

@@ -33,7 +33,7 @@ import {
   resolveDamage,
   formulas,
 } from "./vendor/engine.js";
-import type { DamageLabAttacker, DamageLabFighter, DamageLabSkill, DamageLabStages } from "./types/damage-lab.js";
+import type { DamageLabAttacker, DamageLabDigimonFile, DamageLabDigimonRow, DamageLabEnemyFile, DamageLabEnemyRow, DamageLabFighter, DamageLabFighterRow, DamageLabRow, DamageLabSkill, DamageLabSkillBankRow, DamageLabStage, DamageLabState, DamageLabStages, DamageLabTechRow } from "./types/damage-lab.js";
 
 export { physicalBase, magicalBase, resolveDamage };
 
@@ -42,7 +42,7 @@ const { elementalFieldAdjustment, critProc, magicalCritProc, multiCrestPlainAtta
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const FIELD_POWER = 64;   // the field techniques' own +0x0C byte (records 213..219)
 
-const num = (value) => {
+const num = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 };
@@ -69,7 +69,7 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
   const power = num(S.power);
   const magical = !!S.magical;
   const base = magical ? magicalBase(A, D, power) : physicalBase(A, D, power);
-  const stages: { name: string; value: number; note: string; }[] = [];
+  const stages: DamageLabStage[] = [];
   let running = base;
 
   // 1 — base
@@ -272,7 +272,7 @@ const FIELD_LABELS = ["none (no field)", ...ELEMENTS.map((e) => `${e} field ${FI
 
 const defaultRng = () => (Math.random() * 0x10000) | 0;
 
-const S = {
+const S: DamageLabState = {
   open: false,
   wasOn: false,
   loading: null,
@@ -288,7 +288,7 @@ const S = {
 };
 
 /** One form row from digimon.json (the profile the battle reads). */
-function formRows(digimon) {
+function formRows(digimon: DamageLabDigimonFile | DamageLabDigimonRow[] | null | undefined): DamageLabFighterRow[] {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   return profiles.map((p) => ({
     id: p.id,
@@ -300,7 +300,7 @@ function formRows(digimon) {
 }
 
 /** One enemy row from enemies.json. `digimon_type` is the record's family byte. */
-function enemyRows(enemies) {
+function enemyRows(enemies: DamageLabEnemyFile | DamageLabEnemyRow[] | null | undefined): DamageLabFighterRow[] {
   const list = Array.isArray(enemies) ? enemies : enemies?.enemies ?? [];
   return list.map((e) => ({
     id: e.enemy_id,
@@ -321,10 +321,10 @@ function enemyRows(enemies) {
  * special op gates on. The element name comes from the skill bank's own pairing, the
  * same id→name map web/battle.js builds.
  */
-function techniqueRows(techTable, skills) {
+function techniqueRows(techTable, skills: DamageLabSkillBankRow[] | null | undefined): DamageLabTechRow[] {
   const list = Array.isArray(skills) ? skills : [];
   const skillById = new Map(list.map((s) => [s.id, s]));
-  const elementName = {};
+  const elementName: Record<number, string> = {};
   for (const skill of list) {
     const rec = techTable?.[String(skill.id)];
     if (rec && skill.element) elementName[num(rec.elem1)] = skill.element;
@@ -355,7 +355,7 @@ function techniqueRows(techTable, skills) {
     });
 }
 
-function setLabData(digimon, enemies, techTable) {
+function setLabData(digimon: DamageLabDigimonFile, enemies: DamageLabEnemyFile, techTable) {
   S.forms = formRows(digimon);
   S.enemies = enemyRows(enemies);
   S.techniques = techniqueRows(techTable, digimon?.skills ?? []);
@@ -401,7 +401,7 @@ export function damageLabOpen() {
 }
 
 /** The loaded rows of one picker: "forms", "enemies" or "techniques". */
-export function damageLabTable(kind: string) {
+export function damageLabTable(kind: string): DamageLabRow[] {
   if (kind === "forms") return S.forms;
   if (kind === "enemies") return S.enemies;
   if (kind === "techniques") return S.techniques;
@@ -415,7 +415,7 @@ export function damageLabRow(kind: string, id: string) {
 }
 
 /** Test/demo hook: the roll stream the page hands `damageStages` in "roll" mode. */
-export function damageLabSetRng(fn) {
+export function damageLabSetRng(fn: (() => number) | null | undefined) {
   S.rng = typeof fn === "function" ? fn : defaultRng;
   if (S.open) recompute();
 }
@@ -443,7 +443,7 @@ function rollStream() {
 }
 
 /** The skill object the damage leaves read, built from the selected record. */
-function skillOf(row) {
+function skillOf(row: DamageLabTechRow) {
   return {
     id: row.id,
     name: row.name,
@@ -515,7 +515,7 @@ function changePick(key: string, delta: number) {
  * mode), Cross/Start close, every other press is swallowed. Returns false when the
  * page is closed, so the press falls through exactly as before.
  */
-export function damageLabPress(button) {
+export function damageLabPress(button: string) {
   if (!S.open) return false;
   const key = OPTION_KEYS[S.sel];
   if (button === "up") S.sel = (S.sel + OPTION_KEYS.length - 1) % OPTION_KEYS.length;
@@ -596,13 +596,13 @@ export function damageLabOptions() {
 }
 
 /** Cut a note to what one line of the page can hold. */
-function shorten(text, max: number) {
+function shorten(text: string, max: number) {
   const s = String(text);
   return s.length > max ? `${s.slice(0, max - 3)}...` : s;
 }
 
 /** Break a sentence into lines no longer than `cols`, on spaces. */
-function wrapText(text, cols: number) {
+function wrapText(text: string, cols: number) {
   const out: string[] = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
@@ -620,7 +620,7 @@ function wrapText(text, cols: number) {
  * game). Returns false when the page is closed — and then it makes no canvas call
  * at all, so the frame loop pays one comparison.
  */
-export function damageLabDraw(ctx, W = 640, H = 480) {
+export function damageLabDraw(ctx: CanvasRenderingContext2D, W = 640, H = 480) {
   if (!S.open) return false;
   const x = Math.round(W * 0.03);
   const y = Math.round(H * 0.02);

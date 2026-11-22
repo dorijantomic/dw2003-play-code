@@ -9,11 +9,15 @@
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/
 // preload/diagnostics.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import { itemIconClip } from "./itemicons.js";
 import type { BattleItemSeed } from "./types/battleitem-translated.js";
+import type { FightItemSeed, FightItemSession } from "../engine/dw3/ui/fight-item-session.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+import type { BattleMenuData, PackedSfx } from "./types/translated-screens.js";
 interface BattleItemDiagnosticsSession {
   selection(): string | number | null;
   page(): string | number | null;
@@ -90,7 +94,7 @@ function loadData() {
     return dataPromise;
 }
 
-export function createBattleItemTranslated(sfx = null, options = {}) {
+export function createBattleItemTranslated(sfx: PackedSfx | null = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -103,7 +107,7 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
         languageError: "Battle item language index is invalid",
 
         /** Open on the carried items the original's own filter would offer. */
-        seed: (r, seed: BattleItemSeed = {}) => ({
+        seed: (r: BattleMenuAdapterState, seed: BattleItemSeed = {}) => ({
             items: (seed.items ?? []).map((item) => ({
                 id: Number(item.id ?? 0) & 0xffff,
                 qty: Number(item.qty ?? 0) & 0xff,
@@ -113,12 +117,12 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
             })),
         }),
 
-        start: (r, data, language, playSound) => new ui.FightItemSession(language, { items: r._seed.items },
-            { tables: data.tables.subarray(0, ui.FIGHT_ITEM_TABLES_SIZE), font: data.font,
+        start: (r: BattleMenuAdapterState & { _seed: FightItemSeed }, data: BattleMenuData, language: number, playSound: (soundId: number) => void) => new (ui as EngineUi).FightItemSession(language, { items: r._seed.items },
+            { tables: data.tables.subarray(0, (ui as EngineUi).FIGHT_ITEM_TABLES_SIZE), font: data.font,
                 banks: data.banks,
                 ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}) }, { playSound }),
 
-        answer: (r, session) => {
+        answer: (r: BattleMenuAdapterState, session: FightItemSession) => {
             if (!session.finished()) return null;
             const chosen = session.chosen();
             r._chosen = chosen;
@@ -135,7 +139,7 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
             ready: r._session?.ready() ?? false,
             tasks: r._session?.tree.tasks.size ?? 0,
             vsync: r._session?.vsyncInstalled() ?? false,
-            moves: r._session?.moves.map((m) => ({ ...m })) ?? [],
+            moves: r._session?.moves.map((m: BattleItemMove) => ({ ...m })) ?? [],
             sounds: r._session?.sounds ?? [],
             icons: r._seed?.items.map((item: { id: string | number; }) => ({ id: item.id, clip: itemIconClip(item.id) })) ?? [],
         }),

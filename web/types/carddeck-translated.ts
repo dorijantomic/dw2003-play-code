@@ -1,4 +1,5 @@
 import type { GameState } from "../game/types.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
 
 /** What diagnostics() reports for the debug overlay. */
@@ -17,8 +18,8 @@ export interface CardDeckDiagnostics {
 }
 
 export interface CardDeckScreen {
-  /** vendor object: the ui.MenuDisplayClock the deck runs on */
-  _clock: any;
+  /** the display clock the deck runs on */
+  _clock: MenuDisplayClock | null;
   _error: Error | null;
   _finish?: () => void;
   _onClose: (() => void) | null;
@@ -26,7 +27,7 @@ export interface CardDeckScreen {
   /** the native screen renderer object createNativeScreenRenderer() returns */
   _renderer: unknown;
   _request: number;
-  /** vendor object: the engine's FolderSession */
+  /** the engine's FolderSession; left loose because update() ticks it with the walker's key names (Set<string>), which are not the engine's PadButton union */
   _session: any;
   _state: GameState | null;
   close?: () => void;

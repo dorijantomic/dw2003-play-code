@@ -4,28 +4,31 @@
 // pressed / repeat pad words, paints the CMFONT window clip and the text, and maps the packed sounds.
 // It never executes original instructions and never runs events: start_event is handed to the host.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import * as uiC from "./ui-c/index.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { YesNoSession } from "../engine/dw3/ui/yesno-session.js";
+import type { PackedSfx, ResidentGlyphs, ThrownError } from "./types/translated-screens.js";
 import type { YesNoScreen } from "./types/yesno-translated.js";
 
 const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 /** Game key -> pad bit (identity logical-button map: Up 4, Down 6, confirm 13). */
 const KEY_BITS: [string, number][] = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13]];
 
 const DATA_LABEL = "YesNo data";
 let boxCount = 0;
 
-export function createYesNoTranslated(sfx = null) {
-    const g = {
+export function createYesNoTranslated(sfx: PackedSfx | null = null) {
+    const g: YesNoScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null, _pad: null,
         _ticks: 0, _request: 0, _closes: 0, _events: [], _sounds: [], _packed: {}, _primed: false, _row: null,
         _key: `yesno${++boxCount}`,
-    } as YesNoScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Abandoned by the caller, the box disposes its session and runs nothing: the host's answer is
@@ -34,7 +37,7 @@ export function createYesNoTranslated(sfx = null) {
         closeMode: CLOSE_SILENT, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
     });
 
-    const playSound = (id) => {
+    const playSound = (id: number) => {
         const key = id >>> 0;
         g._packed[key] = (g._packed[key] ?? 0) + 1;
         g._sounds.push(key);
@@ -42,7 +45,7 @@ export function createYesNoTranslated(sfx = null) {
         sfx?.playPacked(key);
     };
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         g._error = error;
         g._failed = true;
         console.error("Translated yes/no box failed", error);
@@ -66,17 +69,18 @@ export function createYesNoTranslated(sfx = null) {
         try {
             const [shared, pack] = await Promise.all([
                 loadResidentResources(),
-                packBytes ?? loadEsdmgEntry(ui.yesNoTextFile(launcherRow.textHandle), launcherRow.textHandle & 0xffff, DATA_LABEL),
+                packBytes ?? loadEsdmgEntry((ui as EngineUi).yesNoTextFile(launcherRow.textHandle), launcherRow.textHandle & 0xffff, DATA_LABEL),
             ]);
             if (!host.current(request)) return;
-            const session = new ui.YesNoSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
+            // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+            const session = new (ui as EngineUi).YesNoSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs as ResidentGlyphs });
             session.open(launcherRow, pack, {
                 onStartEvent: (id) => { g._events.push(id); onStartEvent?.(id); },
                 onClose: () => { host.finish(); },
             });
             g._session = session;
-            g._clock = new ui.MenuDisplayClock();
-            g._pad = new ui.MenuPadWords();
+            g._clock = new (ui as EngineUi).MenuDisplayClock();
+            g._pad = new (ui as EngineUi).MenuPadWords();
             g._pending = false;
         } catch (error) {
             if (host.current(request)) fail(error);
@@ -92,11 +96,11 @@ export function createYesNoTranslated(sfx = null) {
         let held = 0;
         for (const [key, bit] of KEY_BITS) if (keys?.has(key)) held |= bit;
         // The press that opened the box is still down: it is not a new press.
-        if (!g._primed) { g._primed = true; g._pad.update(held, 0); }
+        if (!g._primed) { g._primed = true; g._pad!.update(held, 0); }
         try {
-            for (const frame of g._clock.advance(dt)) {
-                const { pressed, repeated } = g._pad.update(held, frame.tick);
-                const session = g._session;
+            for (const frame of g._clock!.advance(dt)) {
+                const { pressed, repeated } = g._pad!.update(held, frame.tick);
+                const session: YesNoSession = g._session;
                 session.tick({ pressed, repeat: repeated });
                 g._ticks++;
                 for (const id of session.takeSounds()) playSound(id);
@@ -117,7 +121,7 @@ export function createYesNoTranslated(sfx = null) {
         ctx.scale(s, s);
         uiC.scope(g._key, ctx, { enable: true, compose: composeWindow }, () => {
             renderer.draw(ctx, calls, null, [], contextMarkers, []);
-            g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets()).texts;
+            g._painted = drawNativeTextWidgets(ctx, g._session!.textWidgets()).texts;
         });
         ctx.restore();
     };

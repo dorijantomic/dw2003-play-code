@@ -10,10 +10,14 @@
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/
 // preload/diagnostics.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleFormSeed } from "./types/battleform-translated.js";
+import type { FightFormSeed, FightFormSession } from "../engine/dw3/ui/fight-form-session.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+import type { BattleMenuData, PackedSfx } from "./types/translated-screens.js";
 interface BattleFormRuntime {
   _ticks: number;
   _session?: BattleFormSession | null;
@@ -90,7 +94,7 @@ function loadData() {
     return dataPromise;
 }
 
-export function createBattleFormTranslated(sfx = null, options = {}) {
+export function createBattleFormTranslated(sfx: PackedSfx | null = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -107,7 +111,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
         queueLimit: 2,
 
         /** Open on one party member's four forms. */
-        seed: (r, seed: BattleFormSeed = {}) => ({
+        seed: (r: BattleMenuAdapterState, seed: BattleFormSeed = {}) => ({
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             slotIndex: Number(seed.slotIndex ?? 0) | 0,
             currentSpecies: Number(seed.currentSpecies ?? 1) & 0xffff,
@@ -129,7 +133,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
             preselected: Number(seed.preselected ?? 0) & 0xffff,
         }),
 
-        start: (r, data, language, playSound) => new ui.FightFormSession(language, {
+        start: (r: BattleMenuAdapterState & { _seed: FightFormSeed }, data: BattleMenuData, language: number, playSound: (soundId: number) => void) => new (ui as EngineUi).FightFormSession(language, {
             activeIndex: r._seed.activeIndex,
             slotIndex: r._seed.slotIndex,
             currentSpecies: r._seed.currentSpecies,
@@ -143,7 +147,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
         }, { tables: data.tables, profiles: data.profiles, font: data.font, banks: data.banks,
              ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}) }, { playSound }),
 
-        answer: (r, session) => {
+        answer: (r: BattleMenuAdapterState, session: FightFormSession) => {
             if (!session.finished()) return null;
             const chosen = session.chosen();
             r._chosen = chosen;
@@ -156,7 +160,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
          * Digivolve phase falls back to once failed() is true (web/battle.js
          * handleKey PLAYER_DV, draw PLAYER_DV).
          */
-        onFail: (r) => {
+        onFail: (r: BattleMenuAdapterState) => {
             const session = r._session;
             r._session = null;
             r._queue.length = 0;
@@ -177,13 +181,13 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
             ready: r._session?.ready() ?? false,
             tasks: r._session?.tree.tasks.size ?? 0,
             vsync: r._session?.vsyncInstalled() ?? false,
-            moves: r._session?.moves.map((m) => ({ ...m })) ?? [],
+            moves: r._session?.moves.map((m: BattleFormMenuMove) => ({ ...m })) ?? [],
             sounds: r._session?.sounds ?? [],
         }),
 
         /** The disc's own profile table this screen reads, for the callers that
          *  need the same row lookup (web/battle.js formProfileRow). */
-        extraApi: (r) => {
+        extraApi: (r: BattleMenuAdapterState & { tables?: () => { profiles: Uint8Array } | null }) => {
             r.tables = () => (r._data ? { profiles: r._data.profiles } : null);
         },
     });

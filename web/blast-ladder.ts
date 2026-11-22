@@ -34,7 +34,7 @@
 // context; the browser hands it the real one.
 
 import { levelTier } from "./vendor/engine.js";
-import type { BlastProfile, BlastSkill } from "./types/blast-ladder.js";
+import type { BlastCard, BlastFetch, BlastFetched, BlastProfile, BlastSkill, BlastState, BlastTable } from "./types/blast-ladder.js";
 
 /**
  * The partner-level brackets, one per tier: [min, max], level 1..99.
@@ -44,7 +44,7 @@ import type { BlastProfile, BlastSkill } from "./types/blast-ladder.js";
  * shown here are read back out of that function instead of being repeated.
  */
 export const BLAST_BRACKETS = (() => {
-  const rows = [];
+  const rows: [number, number][] = [];
   for (let level = 1; level <= 99; level++) {
     const tier = levelTier(level);
     if (rows[tier]) rows[tier][1] = level;
@@ -76,7 +76,7 @@ export function bracketLabel(tier: number) {
  * card was read from and `technique` the form's signature technique name
  * ("" when no skill table was handed in).
  */
-export function blastCards(digimon, skills) {
+export function blastCards(digimon: BlastProfile[] | BlastTable | null | undefined, skills?: BlastSkill[] | null): BlastCard[] {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   const skillList = Array.isArray(skills) ? skills : Array.isArray(digimon) ? [] : digimon?.skills ?? [];
   const skillById = new Map<number, BlastSkill>(skillList.map((s) => [s.id, s]));
@@ -104,7 +104,7 @@ export function blastCards(digimon, skills) {
     }));
 }
 
-const S = {
+const S: BlastState = {
   open: false,        // the page is up
   wasOn: false,       // the F2 flag last frame: it opens on the rising edge only
   index: 0,           // which starter's card
@@ -124,7 +124,7 @@ export function blastReset() {
 }
 
 /** Install a loaded table (the browser load and the tests both land here). */
-export function setBlastData(digimon, skills) {
+export function setBlastData(digimon: BlastProfile[] | BlastTable | null | undefined, skills?: BlastSkill[] | null) {
   S.cards = blastCards(digimon, skills);
   S.index = Math.min(S.index, Math.max(0, S.cards.length - 1));
   return S.cards;
@@ -146,14 +146,14 @@ export function blastCardCount() {
   return S.cards.length;
 }
 
-const asJson = (value) => (typeof value?.json === "function" ? value.json() : value);
+const asJson = (value: BlastFetched | null | undefined) => (typeof value?.json === "function" ? value.json() : value);
 
 /**
  * Fetch and install digimon.json through the page's own fetch, so the extra
  * roster's wrapped fetch has already merged the added species. Cached per load.
  * `fetchJson` is injectable for tests.
  */
-export function blastLoad(fetchJson = globalThis.fetch) {
+export function blastLoad(fetchJson: BlastFetch = globalThis.fetch) {
   if (S.loading) return S.loading;
   if (typeof fetchJson !== "function") return Promise.resolve(false);
   S.loading = (async () => {
@@ -198,7 +198,7 @@ export function tickBlastLadder(on: boolean) {
  * Cross/Start close, every other press is swallowed. Returns false when the page
  * is closed, so the press falls through exactly as before.
  */
-export function blastPress(button) {
+export function blastPress(button: string) {
   if (!S.open) return false;
   if (button === "left" || button === "right") {
     const n = S.cards.length;
@@ -211,7 +211,7 @@ export function blastPress(button) {
 
 /** Break text into lines no longer than `cols` characters, on spaces. */
 function wrapText(text: string, cols: number) {
-  const out = [];
+  const out: string[] = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
     if (!word) continue;
@@ -262,7 +262,7 @@ function drawMessage(ctx: CanvasRenderingContext2D, W: number, H: number, messag
  * card also reads correctly in a smaller test canvas. Returns false when the page
  * is closed — with the F2 switch off this draws nothing at all.
  */
-export function blastDraw(ctx: CanvasRenderingContext2D, page = null, W = 640, H = 480) {
+export function blastDraw(ctx: CanvasRenderingContext2D, page: number | null = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (!S.cards.length) {
     drawMessage(ctx, W, H, S.error ? `The ladder could not be read: ${S.error}` : "Reading the partner table…");

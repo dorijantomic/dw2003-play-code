@@ -10,6 +10,14 @@ import { IN_FRONT_OF_ENTITIES, pushComposite, BEHIND_ENTITIES } from "../draw-or
 import { ensureScreenAtlas, ensureSemiSheet, ensureSheet, screenAtlases } from "./point-records.js";
 import { drawSprite } from "./draw.js";
 import { S } from "./state.js";
+import type {
+  AnnotatorRequest,
+  OverlayShapeInfo,
+  PointSpriteLayer,
+  PointStageData,
+  ScreenCombo,
+  ScreenQuad,
+} from "../types/fx3d.js";
 
 // Street vehicles — the cars that drive across the street during a broadcast
 // (engine/systems/street-vehicles.ts, translated from wstag780's broadcast
@@ -19,7 +27,7 @@ import { S } from "./state.js";
 // id). Decode:
 // docs/research/field/asuka-city-cars-and-news-screens-2026-10-04.md
 /** Verification hook: the live cars on a stage (sprite id + map pixel). */
-export function streetVehicleProbe(stageId) {
+export function streetVehicleProbe(stageId: string) {
     return streetVehicleDraws(stageId);
 }
 
@@ -32,11 +40,11 @@ export function streetVehicleProbe(stageId) {
 // palette supplies the blending mode — the same two steps drawNativeIntents takes
 // for the interpreter's capture of the original driver.
 // Decode: docs/research/field/asuka-city-cars-and-news-screens-2026-10-04.md
-export function streetScreenProbe(stageId) {
+export function streetScreenProbe(stageId: string) {
     return streetScreenDraws(stageId);
 }
 
-export function drawStreetScreens(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], quads) {
+export function drawStreetScreens(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], quads: readonly ScreenQuad[] | null | undefined) {
     if (!quads?.length) return;
     ensureScreenAtlas(stageId);
     const screen = screenAtlases[stageId];
@@ -58,18 +66,18 @@ export function drawStreetScreens(ctx: CanvasRenderingContext2D | null, stageId,
 // street-prop drawer 0x800a6b4c). Both use the stage's own TMPK clips, which is
 // what the original's draw resolves too — a clip id IS a TMPK clip id.
 // Decode: docs/research/field/asuka-city-cars-and-news-screens-2026-10-04.md
-export function streetGlowProbe(stageId) {
+export function streetGlowProbe(stageId: string) {
     return { glows: streetGlowDraws(stageId), props: streetPropDraws(stageId) };
 }
 
 /** One clip at one map pixel, on the shared point-sprite sheet. */
-function drawClip(ctx: CanvasRenderingContext2D | null, sheet: HTMLImageElement, semiSheet: string | HTMLImageElement | null, layers, x: number, y: number) {
+function drawClip(ctx: CanvasRenderingContext2D | null, sheet: HTMLImageElement, semiSheet: string | HTMLImageElement | null | undefined, layers: PointSpriteLayer[], x: number, y: number) {
     drawSprite(ctx, sheet, layers, x, y, semiSheet);
 }
 
-export function drawStreetGlows(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
+export function drawStreetGlows(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     if (nativeStage(stageId)) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     const sheet = ensureSheet(stageId);
     if (!(sheet instanceof Image)) return;
@@ -78,7 +86,7 @@ export function drawStreetGlows(ctx: CanvasRenderingContext2D | null, stageId, c
     // draw-context's own ordering list at the glow's y (wstag780 file 0x864,
     // slot +0x14c, a3 = obj+0x58), exactly as a point record with an `ysort`
     // baseline does -> key = the glow's own y.
-    const glows = streetGlowDraws(stageId).map((g) => ({
+    const glows = streetGlowDraws(stageId).map((g: { clip: number; x: number; y: number; }) => ({
         clip: g.clip, x: g.x, y: g.y, key: g.y, tag: "corner-glow",
     }));
     // The broadcast's street-prop drawer (0x800a6b4c) is a FIXED-bucket draw:
@@ -102,15 +110,15 @@ export function drawStreetGlows(ctx: CanvasRenderingContext2D | null, stageId, c
 // The corner stinger (engine/systems/stinger-popup.ts, the overlay's popup
 // object 0x800a61c8 and its draw 0x800a6130): one TMPK clip at a fixed map
 // pixel, on ordering-table bucket 7 — over the map, behind the entities.
-export function stingerPopupProbe(stageId) {
+export function stingerPopupProbe(stageId: string) {
     return stingerPopupDraws(stageId);
 }
 
-export function drawStingerPopup(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
+export function drawStingerPopup(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     if (nativeStage(stageId)) return;
     const entries = stingerPopupDraws(stageId);
     if (!entries?.length) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     const sheet = ensureSheet(stageId);
     if (!(sheet instanceof Image)) return;
@@ -149,9 +157,9 @@ export function drawStingerPopup(ctx: CanvasRenderingContext2D | null, stageId, 
 // leaves the packet list untouched.
 //
 // Decode: docs/research/field/draw-context-service-2026-10-04.md
-export function drawAnnotatorShapes(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], requests) {
+export function drawAnnotatorShapes(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], requests: readonly AnnotatorRequest[] | null | undefined) {
     if (!requests?.length) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     const sheet = ensureSheet(stageId);
     if (!(sheet instanceof Image)) return;
@@ -187,14 +195,14 @@ export function drawAnnotatorShapes(ctx: CanvasRenderingContext2D | null, stageI
 // (bucket 7) and behind every entity, so this is the under-map pass (painted
 // before the base map). The parallax term is the base tick's own:
 // `(context scroll - base) >> shift`, scroll in whole pixels.
-export function stageOverlayShapeProbe(stageId: string | number) {
+export function stageOverlayShapeProbe(stageId: string) {
     return S.overlayShapeData?.[stageId] ?? null;
 }
 
-export function drawStageOverlayShapes(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number) {
-    const info = S.overlayShapeData?.[stageId];
+export function drawStageOverlayShapes(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number) {
+    const info: OverlayShapeInfo | undefined = S.overlayShapeData?.[stageId];
     if (!info) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     const sheet = ensureSheet(stageId);
     if (!(sheet instanceof Image)) return;
@@ -209,10 +217,10 @@ export function drawStageOverlayShapes(ctx: CanvasRenderingContext2D | null, sta
     }
 }
 
-export function drawStreetVehicles(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
+export function drawStreetVehicles(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     const draws = streetVehicleDraws(stageId);
     if (!draws.length) return;
-    const s = S.data?.[stageId];
+    const s: PointStageData | undefined = S.data?.[stageId];
     if (!s) return;
     const sheet = ensureSheet(stageId);
     if (!(sheet instanceof Image)) return;
@@ -229,7 +237,8 @@ export function drawStreetVehicles(ctx: CanvasRenderingContext2D | null, stageId
 /** One captured GPU quad: map texture (u,v) to the quad's screen parallelogram
  *  and blit the baked page under the primitive's ABR mode (cmd 0x2E = ABR on;
  *  the texpage word's bits 5-6 select the mode, 0 = B/2+F/2). */
-export function drawScreenQuad(ctx, sheet, combo, q, camX: number, camY: number) {
+// ETS item 9: callers pass the field canvas context, which is never null while a frame is drawn.
+export function drawScreenQuad(ctx: CanvasRenderingContext2D | null, sheet: HTMLImageElement, combo: ScreenCombo, q: ScreenQuad, camX: number, camY: number) {
     const du = q.u[1] - q.u[0];
     const dv = q.v[2] - q.v[0];
     if (!du || !dv) return;
@@ -239,19 +248,19 @@ export function drawScreenQuad(ctx, sheet, combo, q, camX: number, camY: number)
     const d = (q.y[2] - q.y[0]) / dv;
     const e = (q.x[0] - camX) - a * q.u[0] - c * q.v[0];
     const f = (q.y[0] - camY) - b * q.u[0] - d * q.v[0];
-    ctx.save();
+    ctx!.save();
     if (q.cmd === 0x2e) {
         const abr = combo.abr & 3;
-        if (abr === 1) ctx.globalCompositeOperation = "lighter";
-        else if (abr === 2) ctx.globalCompositeOperation = "difference";
-        else if (abr === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; }
-        else ctx.globalAlpha = 0.5;
+        if (abr === 1) ctx!.globalCompositeOperation = "lighter";
+        else if (abr === 2) ctx!.globalCompositeOperation = "difference";
+        else if (abr === 3) { ctx!.globalCompositeOperation = "lighter"; ctx!.globalAlpha = 0.25; }
+        else ctx!.globalAlpha = 0.5;
     }
-    ctx.transform(a, b, c, d, e, f);
-    ctx.drawImage(
+    ctx!.transform(a, b, c, d, e, f);
+    ctx!.drawImage(
         sheet,
         combo.x + q.u[0], combo.y + q.v[0], du, dv,
         q.u[0], q.v[0], du, dv,
     );
-    ctx.restore();
+    ctx!.restore();
 }

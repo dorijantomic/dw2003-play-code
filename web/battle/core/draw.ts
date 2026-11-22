@@ -76,7 +76,7 @@ function draw() {
       if (fx) {
         B.ctx!.save();
         B.ctx!.scale(cw / B.offscreen3d.width, ch / B.offscreen3d.height);
-        drawEffects(B.ctx, fx.list, fx.manifest, fx.images, fx.view);
+        drawEffects(B.ctx!, fx.list, fx.manifest, fx.images, fx.view);
         B.ctx!.restore();
       }
       // The flash washes those sprites, so it sits on top of them — and still
@@ -164,7 +164,7 @@ function draw() {
         }
       }
     };
-    uiC.scope("ui-battle", B.ctx, {
+    uiC.scope("ui-battle", B.ctx!, {
       enable: packReady(pgfgc00), texts: true, top: true,
       dim: b.state === ST.LOSE && b._loseFade > 0 ? Math.min(1, b._loseFade) : 0,
       compose: (sc) => composeBattle(sc, { view: BATTLE_UI_LAYOUT.portraitView, stage: sc.stage }),

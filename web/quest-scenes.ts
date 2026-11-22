@@ -121,8 +121,9 @@
 // thing is that the words come from the quest, not from the disc's esdmg files.
 import type { QuestSceneChase, QuestSceneClip, QuestSceneCompileOpts, QuestSceneFade, QuestSceneFall, QuestSceneGhost, QuestSceneLightning, QuestSceneMotion, QuestSceneMove, QuestScenePlace, QuestSceneShake, QuestSceneTime, QuestSceneWeather } from "./types/quest-scenes.js";
 
-const isPlayer = (w) => w === "player";
-const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
+// ETS item 42: scene steps are quest authoring data; every reader below checks what it takes out of them.
+const isPlayer = (w: unknown) => w === "player";
+const num = (v: unknown, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
 // the game's facing index (cutscene-manager DIR8); a scene may write the name instead
 const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right", "down-right"];
 // The only two clip meanings the research reads (field-actor-anim-engine.md; LOW confidence in the decode): 1 = idle,
@@ -160,7 +161,7 @@ function planTogether(p: { x: number; y: number; }, w: { x: number; y: number; }
     return best;
 }
 
-const facing = (v) => (typeof v === "string" && DIRS.includes(v) ? DIRS.indexOf(v) : v == null ? null : num(v, 0) & 7);
+const facing = (v: unknown) => (typeof v === "string" && DIRS.includes(v) ? DIRS.indexOf(v) : v == null ? null : num(v, 0) & 7);
 
 /** The atmosphere a scene may ask for (web/ambience.js draws them; "storm" is rain + lightning, "clear" is none). */
 const WEATHERS = ["fog", "rain", "storm", "snow", "blizzard", "sand", "leaves", "fireflies", "clear"];
@@ -177,8 +178,8 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
  */
 export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const playerId = opts.playerId ?? 2;
-    const idOf = (w) => (isPlayer(w) ? playerId : Number(w));
-    const opcodes = [], speech = {}, events = [], errors: string[] = [];
+    const idOf = (w: unknown) => (isPlayer(w) ? playerId : Number(w));
+    const opcodes: string[] = [], speech: Record<number, Record<string, unknown>> = {}, events = [], errors: string[] = [];
     let say = 0;
     if (!Array.isArray(steps) || !steps.length) return { opcodes: ["END"], speech, events, errors: ["a scene needs at least one step"] };
     // A point in the world: a pair, or a character plus an offset (resolved once, when the scene begins, like walk targets)
@@ -365,7 +366,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
             if (!pc || typeof pc !== "object" || Array.isArray(pc)) return bad("placecard needs { area, place }: two names");
             // Both names print on the card's own bars: 1 to 20 printable characters (20 is the longest name the
             // disc's own table holds, "Wire Forest Entrance"), never a control character the card's font cannot draw.
-            const name = (v) => typeof v === "string" && /^[\x20-\x7e]+$/.test(v) && v.length <= 20;
+            const name = (v: unknown) => typeof v === "string" && /^[\x20-\x7e]+$/.test(v) && v.length <= 20;
             if (!name(pc.area)) return bad(`placecard area ${JSON.stringify(pc.area)} is not 1 to 20 printable characters`);
             if (!name(pc.place)) return bad(`placecard place ${JSON.stringify(pc.place)} is not 1 to 20 printable characters`);
             event({ kind: "placecard", area: pc.area, place: pc.place });

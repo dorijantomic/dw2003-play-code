@@ -15,6 +15,7 @@ import type {
 } from "../battle3d/core/types.js";
 import type { BattleSide, SfxPlayerContext } from "./audio.js";
 import type { DnaScriptOp } from "../battle/core/types.js";
+import type { ProjDrawGroup, SmartPick } from "./fx3d.js";
 
 // The two per-model GL buffer sets (web/battle3d/core/model.ts builds them, toon.ts and the
 // renderer decorate them as they go).
@@ -82,9 +83,9 @@ export interface DnaOrbs {
 // The HD panorama in use (web/battle3d/core/pano.ts), with the painted floor it may gain.
 export interface PanoState {
   key: string;
-  id: string;
+  id: string | null | undefined;
   tex: WebGLTexture | null;
-  px: Battle3dTexturePage;
+  px: Battle3dTexturePage | null | undefined;
   /** the straight-down floor picture, tiled under the dome */
   ground: WebGLTexture | null;
   /** the painted place in 3D (depth mesh) */
@@ -211,14 +212,14 @@ export interface ArenaPack {
 export interface BackdropPack {
   name?: string;
   tex?: Record<string, WebGLTexture | null> | null;
-  floorTex?: WebGLTexture | null;
-  wallTex?: WebGLTexture | null;
+  floorTex?: WebGLTexture | null | undefined;
+  wallTex?: WebGLTexture | null | undefined;
   groups?: ArenaGroupBuf[] | null;
 }
 
 // One projectile's model (`B$.projCache`): one quad layer per texture page.
 export interface ProjectileMesh {
-  layers: { count: number; groups: any[]; parent: number; tracks: ProjLayer["tracks"]; }[];
+  layers: { count: number; groups: ProjDrawGroup[]; parent: number; tracks?: NonNullable<ProjLayer["tracks"]> | null; }[];
   /** the pack's playback clip, null when it did not decode */
   clip: any;
 }
@@ -238,6 +239,16 @@ export type CameraMode = "opening" | "director" | "behind" | "orbit" | "game" | 
 // A canvas that may be an OffscreenCanvas: the capture path reads it back either way.
 export interface CaptureCanvas extends HTMLCanvasElement {
   convertToBlob?: (opts?: any) => Promise<any>;
+}
+
+// The canvas createBattle3D draws on: a page canvas or an OffscreenCanvas. The page-only readback (toDataURL) is
+// optional here because an OffscreenCanvas has convertToBlob instead.
+export interface Battle3dCanvas {
+  width: number;
+  height: number;
+  getContext(contextId: "webgl", options?: WebGLContextAttributes): WebGLRenderingContext | null;
+  convertToBlob?: CaptureCanvas["convertToBlob"];
+  toDataURL?: HTMLCanvasElement["toDataURL"];
 }
 
 // What createBattle3D is created with (web/battle3d.ts).
@@ -312,8 +323,15 @@ export interface PanoProjectOptions {
 }
 
 // One entry of the extractor's camera placement table (assets/battle/camera_ref*.json).
+/** The twelve near-side shots of one record: eyes, aim points and lens heights, one entry per shot. */
+export interface NearCamera {
+  eye: number[][];
+  look: number[][];
+  view: number[];
+}
+
 export interface PlacementRecord {
-  camera?: { eye?: number[]; };
+  camera?: NearCamera;
   /** the 1-based far-side shot this slot picks from the near camera table */
   shot?: number;
   standoff?: number;
@@ -382,7 +400,7 @@ export interface Battle3DContext {
   _projectExtras: (pv: Float32Array, W: number, H: number) => void;
   _reactionCamFor: (side: BattleSide) => any[];
   _rockCover: (groups: ArenaGroupBuf[], s: number, cam: any, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) => number;
-  _rotY: (v: number[], a: number) => number[];
+  _rotY: (v: [number, number, number], a: number) => [number, number, number];
   _sampleEffectRecord: (type: number, recordIndex: number, tick: number, pos: number[], loop?: boolean) => any;
   _sceneLightDraw: (on: boolean) => void;
   _setupExtraPatches: (f: Battle3dFighter) => void;
@@ -404,7 +422,7 @@ export interface Battle3DContext {
   activeBackdrop?: BackdropPack | null;
   addFighter: (id: string, side: BattleSide, folder: string, dx?: number) => Promise<boolean>;
   /** the seconds of animation the models are posed at */
-  animTime?: number;
+  animTime?: number | undefined;
   applyArenaShot: () => any;
   ARENA_D?: number;
   ARENA_FALLBACK_ID?: number;
@@ -413,11 +431,11 @@ export interface Battle3DContext {
   arenaBg?: number[] | null;
   arenaDebug?: { legacy: boolean; cull: boolean; opaque: boolean; voidRaw: boolean; depthWrite: boolean; depthClear: boolean; };
   arenaIdFor: (mapId: number | string | null | undefined, screenId: number | null | undefined) => number | null;
-  arenaLegacy?: boolean;
+  arenaLegacy?: boolean | undefined;
   arenaManifest?: any;
   arenaPacks?: Record<string, ArenaPack>;
   /** the arena's units-per-model-scale, from its geometry */
-  arenaScale?: number;
+  arenaScale?: number | undefined;
   arenaStageReq?: { mapId: number | string | null; screenId: number | null; } | null;
   arenaTexture?: WebGLTexture | null;
   arenaTextureFor: (pk: ArenaPack, g: ArenaGroupBuf) => WebGLTexture | null;
@@ -435,7 +453,7 @@ export interface Battle3DContext {
   atmColProg?: AtmColProgram | null;
   atmFlash?: number;
   atmLastT?: number;
-  atmMoon?: { arena: string; dir: number[]; since: number; pending: boolean; pick?: any; } | null;
+  atmMoon?: { arena: string; dir: number[] | null; since: number; pending: boolean; pick?: any; } | null;
   atmNextBolt?: number;
   atmParts?: AtmParticle[] | null;
   atmThunderAt?: number;
@@ -463,7 +481,7 @@ export interface Battle3DContext {
   camScriptOwned?: boolean;
   cannedShot: (preset: string | number) => any;
   cannedShotSlot: (side: string, index: number) => any;
-  canvas?: CaptureCanvas;
+  canvas?: Battle3dCanvas;
   captureArenaFace: (eye: number[], look: number[], up: number[], size?: number, opts?: PanoProjectOptions) => any;
   clearFighters: (side?: BattleSide | null) => void;
   contactEvade?: { player: boolean; enemy: boolean; };
@@ -513,7 +531,7 @@ export interface Battle3DContext {
   enemyAnim?: string;
   enemyAnim8r?: ActorAnimator | null;
   enemyAttack: (techId: number, opts?: AttackOptions) => boolean;
-  enemyFolder?: string | null;
+  enemyFolder?: string | null | undefined;
   enemyFrame?: number;
   enemyModel?: any;
   enemyPage?: Battle3dTexturePage | null;
@@ -562,7 +580,7 @@ export interface Battle3DContext {
   giantCamFit?: boolean;
   giantNearCam?: boolean;
   gl?: WebGLRenderingContext | null;
-  GLOBAL_SPEED?: number;
+  GLOBAL_SPEED?: number | undefined;
   IDENT_MVP?: Float32Array;
   idleClock?: { tick(dt: number): number; readonly frames: number; reset(): void; };
   idleDirector?: any;
@@ -631,7 +649,7 @@ export interface Battle3DContext {
   playerAnim8r?: ActorAnimator | null;
   playerAttack: (techId: number, opts?: AttackOptions) => unknown;
   playerBoxBufs?: any;
-  playerFolder?: string | null;
+  playerFolder?: string | null | undefined;
   playerFrame?: number;
   playerModel?: any;
   playerNearCamera: () => unknown;
@@ -695,16 +713,16 @@ export interface Battle3DContext {
   slowMoTicks?: number;
   slowMoTickSpeed?: number;
   slowMoUnits?: number;
-  SMART_CANDS?: unknown[];
+  SMART_CANDS?: SmartPick[] | undefined;
   SMART_D?: number[];
   SMART_H?: number[];
   SMART_YAW?: number[];
-  smartAt?: number;
+  smartAt?: number | undefined;
   smartCur?: { yaw: number; h: number; d: number; };
   smartInfo?: unknown;
   smartJob?: any;
   smartKey?: string;
-  smartLastClock?: number;
+  smartLastClock?: number | undefined;
   smartPick?: any;
   specialLoopKey?: string | null;
   specialLoopMap?: Record<string, string>;

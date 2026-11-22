@@ -1,42 +1,5 @@
-interface ExtrasStageRecord {
-    tier?: number;
-    area?: string;
-}
+import type { FishExtraArea, FishExtraEntry, FishExtrasData, FishExtrasRow, FishFindsStorage } from "./types/misc-game2.js";
 
-
-interface ExtrasAreaRecord {
-    id: string;
-    name: string;
-    tier?: number;
-}
-
-
-interface ExtrasAreaSource {
-    stages?: Record<string, ExtrasStageRecord>;
-    areas?: ExtrasAreaRecord[];
-}
-interface ExtrasStageData {
-    tier: number;
-}
-
-interface ExtrasSource {
-    stages: Record<string, ExtrasStageData>;
-}
-
-interface ExtrasEntry {
-    key: string;
-    found: boolean;
-    label: string;
-    percent: number | null;
-}
-
-interface ExtrasRow {
-    stage: string;
-    area: string;
-    tier: number;
-    total: number;
-    entries: ExtrasEntry[];
-}
 // web/fishing-extras.js — rare extra rewards that can come on top of a fishing win.
 //
 // NEW CONTENT of this project, on for everyone (no option row, no URL flag).
@@ -71,7 +34,7 @@ interface ExtrasRow {
 export const FISH_FINDS_KEY = "dw.fishfinds.v1";
 
 /** The entries of one stage's table: the stage's area entries valid for its tier. */
-export function tableFor(data, stage) {
+export function tableFor(data: FishExtrasData | null | undefined, stage: string): FishExtraEntry[] {
     const rec = data?.stages?.[stage];
     if (!rec) return [];
     const area = (data.areas ?? []).find((a) => a.id === rec.area);
@@ -80,7 +43,7 @@ export function tableFor(data, stage) {
 }
 
 /** Total chance in percent of a table. */
-export function totalPercent(table) {
+export function totalPercent(table: FishExtraEntry[] | null | undefined) {
     return (table ?? []).reduce((n, e) => n + e.chance, 0);
 }
 
@@ -89,7 +52,7 @@ export function totalPercent(table) {
  * `rand` returns a number in [0, 1). The entries sit one after the other on a
  * 0..100 line, each as wide as its percent; anything past the last is no extra.
  */
-export function rollExtra(data, stage, rand: () => number) {
+export function rollExtra(data: FishExtrasData, stage: string, rand: () => number) {
     const table = tableFor(data, stage);
     if (!table.length) return null;
     const point = rand() * 100;
@@ -102,20 +65,20 @@ export function rollExtra(data, stage, rand: () => number) {
 }
 
 /** The area record of a stage, or null. */
-export function areaOf(data: ExtrasAreaSource, stage: string): ExtrasAreaRecord | null {
+export function areaOf(data: FishExtrasData | null | undefined, stage: string): FishExtraArea | null {
     const rec = data?.stages?.[stage];
     return rec ? (data.areas ?? []).find((a) => a.id === rec.area) ?? null : null;
 }
 
 /** The flag name an entry is remembered under. */
-export const findKey = (area, entry) => `${area}:${entry.key}`;
+export const findKey = (area: string, entry: { key: string }) => `${area}:${entry.key}`;
 
 /**
  * The words in the game's message box, built from the disc's text charset
  * (letters, digits and . , ' - : " ! ? only). `itemName` is the game's own item
  * name for an item entry.
  */
-export function messageFor(data, area, entry, itemName) {
+export function messageFor(data: FishExtrasData, area: FishExtraArea, entry: FishExtraEntry, itemName: string | null | undefined) {
     if (entry.kind === "hint") {
         return `An old bottle! There is a note inside.\n\n${data.hints[entry.hint]}`;
     }
@@ -125,7 +88,7 @@ export function messageFor(data, area, entry, itemName) {
 }
 
 /** Found flags, kept in localStorage like the other found-flags: { "area:key": 1 }. */
-export function createFishFinds(storage = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null, setItem: () => {} }) {
+export function createFishFinds(storage: FishFindsStorage = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null, setItem: () => {} }) {
     const read = () => {
         try {
             const j = JSON.parse(storage.getItem(FISH_FINDS_KEY) || "null");
@@ -139,8 +102,8 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
     };
     return {
         read,
-        isFound: (area: string, entry: string) => !!read()[findKey(area, entry)],
-        note(area, entry) {
+        isFound: (area: string, entry: { key: string }) => !!read()[findKey(area, entry)],
+        note(area: string, entry: { key: string }) {
             const all = read();
             const key = findKey(area, entry);
             if (all[key]) return false;
@@ -157,7 +120,7 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
  * An entry not found yet has label "???" and no percent; a found one is named
  * (item name, "N bits", or "Old bottle") with its percent.
  */
-export function extrasRows(data: ExtrasSource, found: Record<string, boolean> | undefined, itemNameOf: (item: any) => string | null = () => null): ExtrasRow[] {
+export function extrasRows(data: FishExtrasData | null | undefined, found: Record<string, number | boolean> | undefined, itemNameOf: (item: number) => string | null = () => null): FishExtrasRow[] {
     const flags = found ?? {};
     return Object.keys(data?.stages ?? {}).sort().map((stage) => {
         const area = areaOf(data, stage);

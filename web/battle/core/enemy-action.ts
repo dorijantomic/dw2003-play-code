@@ -49,6 +49,7 @@ import {
   levelUpThreshold,
 } from "../progress.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { TurnStart } from "../../../engine/dw3/battle-combat.js";
 import type { BattleEndContext } from "./types.js";
 
 import type { EnemyBattleRecord } from "../../types/battle.js";
@@ -73,12 +74,13 @@ function applyEnemyAction() {
     const pname = b.player.profile.name;
 
     // Start-of-turn ailments on the enemy: poison DoT, then frozen/sleep/confuse may skip.
-    const ts = processTurnStart(en, name);
+    const ts: TurnStart = processTurnStart(en, name);
     if (ts.skipped) {
       // The gate's own page (FIGHTSTG_F0x80088564, shared tail at fightstg.s:6017-6025).
       // `ts.spec` is always present for a skipped turn and `ts.prefix` is always empty --
       // see the player-side arm above for why.
-      B.sayOriginal(b, ts.spec, ts.prefix);
+      // ETS item 9: a skipped turn always carries its spec (see the comment above)
+      B.sayOriginal(b, ts.spec!, ts.prefix);
       // No attack animation on a skipped turn.
       return;
     }

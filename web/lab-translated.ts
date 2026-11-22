@@ -35,11 +35,15 @@ import { ensureFormLedger } from "./dri-model.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
-import type { LabScreen } from "./types/lab-translated.js";
+import type { EngineUi, DigimonRecord } from "./types/battle.js";
+import type { FormLedgerEntry, GameState } from "./game/types.js";
+import type { LabScreen, LabData, LabManifest } from "./types/lab-translated.js";
+import type { LabResources } from "../engine/dw3/ui/lab-session.js";
+import type { PackedSfx, ThrownError, WalkerState } from "./types/translated-screens.js";
 
 /** The lab's picture handles: the stdglabo archive (chrome and the chart's portraits) and CMFONT. */
 const PACK_NAMES: Record<string, string> = { 0x02c50000: "stdglabo", 0x02c50001: "stdglabo_portraits", 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 const PARTY_SLOTS = 3;
 const LEDGER_ENTRIES = 44;
 const EMPTY = 0xffff;
@@ -49,8 +53,8 @@ const SHARED_DIRS: Record<string, string> = { wizard: "wizard", pause: "pause" }
 
 const DATA_LABEL = "Lab data";
 
-let sharedPromise = null;
-const loadShared = () => {
+let sharedPromise: Promise<LabData> | null = null;
+const loadShared = (): Promise<LabData> => {
     sharedPromise ??= (async () => {
         const manifest = await fetchJson("lab/manifest.json", DATA_LABEL);
         const [tables, resident, profiles, { font, cursorGlyphs }, catalog, itemRecords, main, extra, digimon] = await Promise.all([
@@ -71,13 +75,13 @@ const loadShared = () => {
         }
         return {
             manifest, tables, resident, profiles, font, cursorGlyphs, catalog, itemRecords, descriptors: [main, extra],
-            digimonById: Object.fromEntries(digimon.digimon.map((d) => [d.id, d])), value0,
+            digimonById: Object.fromEntries(digimon.digimon.map((d: DigimonRecord) => [d.id, d])), value0,
         };
     })().catch((error) => { sharedPromise = null; throw error; });
     return sharedPromise;
 };
-const banksByLanguage = new Map();
-const loadBanks = (manifest, language) => {
+const banksByLanguage = new Map<number, Promise<Map<number, Uint8Array>>>();
+const loadBanks = (manifest: LabManifest, language: number) => {
     if (!banksByLanguage.has(language)) {
         const wanted = [{ id: 0x39 + language, path: `lab/${0x39 + language}.bin` }];
         for (const { offset, dir } of manifest.sharedBanks) wanted.push({ id: offset + language, path: `${SHARED_DIRS[dir]}/${offset + language}.bin` });
@@ -85,21 +89,21 @@ const loadBanks = (manifest, language) => {
             .then((entries) => new Map(entries))
             .catch((error) => { banksByLanguage.delete(language); throw error; }));
     }
-    return banksByLanguage.get(language);
+    return banksByLanguage.get(language)!;
 };
 
-const sameList = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const sameList = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-export function createLabTranslated(sfx = null) {
-    const g = {
+export function createLabTranslated(sfx: PackedSfx | null = null) {
+    const g: LabScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null, _state: null,
         _onClose: null, _clock: null, _ticks: 0, _request: 0, _members: [], _seededParty: [], _summary: null,
         _lastDiagnostic: null, _committed: 0, _banks: null, _packed: {}, _ledgerPages: 1,
-    } as LabScreen;
+    };
     const renderer = createNativeScreenRenderer(
         { pack: "stdglabo", packs: { "709:0": "stdglabo", "709:1": "stdglabo_portraits", "646:0": "cmfont" } }, packName);
 
-    const playSound = (id) => {
+    const playSound = (id: number) => {
         const key = id >>> 0;
         g._packed[key] = (g._packed[key] ?? 0) + 1;
         sfx?.playPacked(key);
@@ -122,24 +126,26 @@ export function createLabTranslated(sfx = null) {
 
     /** Roster slot of a manifest character id; -1 when it is not a partner (this
      *  screen's own miss marker — the engine helper answers null). */
-    const slotOfChar = (charId) => rosterSlotOfCharId(String(charId)) ?? -1;
+    const slotOfChar = (charId: string) => rosterSlotOfCharId(String(charId)) ?? -1;
     /** Owned slots plus the deployed party, from the DRI's single walk. */
-    const ownedSlots = (state) => walkerOwnedSlots(state, { includeParty: true });
+    const ownedSlots = (state: WalkerState) => walkerOwnedSlots(state, { includeParty: true });
     /** The walker's stats object for a roster slot: the deployed party's live block, or the reserve store. */
-    const slotStats = walkerSlotStats;
-    const slotEquipment = (state, slot: number) => {
-        const charId = ROSTER_SLOT_CHARIDS[slot];
+    // needs a small change in web/dri-native.ts: slotStats takes a GameState, but the lab holds a state that may be `{}`
+    const slotStats: (state: WalkerState, slot: number) => ReturnType<typeof walkerSlotStats> = walkerSlotStats;
+    const slotEquipment = (state: WalkerState, slot: number) => {
+        // ETS item 9: slot is a roster slot, and ROSTER_SLOT_CHARIDS has one char id per roster slot
+        const charId = ROSTER_SLOT_CHARIDS[slot]!;
         const pos = (state.party ?? []).indexOf(charId);
         if (pos >= 0) return state.equipment?.[pos] ?? null;
         return state.reserveEquipment?.[charId] ?? null;
     };
 
     /** Walker state -> the session's seed (the RAM contract of the disc's screen). */
-    function buildSeed(language) {
+    function buildSeed(language: number) {
         const state = g._state ?? {};
         const { digimonById: db, value0 } = g._data;
-        const v0ById = new Map();
-        value0.forEach((v, row) => { if (v) v0ById.set(row + 1, v); });
+        const v0ById = new Map<number, number>();
+        value0.forEach((v: number, row: number) => { if (v) v0ById.set(row + 1, v); });
         // the enemy-only species (web/extra-roster.js) are forms too: walker ids 56.. with their own game form ids
         for (let i = 0; i < extraProfileCount(); i++) v0ById.set(EXTRA_FIRST_ID + i, extraRowFormId(i));
         g._ledgerPages = 1;
@@ -147,7 +153,8 @@ export function createLabTranslated(sfx = null) {
         g._seededParty = party.slice();
         g._members = [];
         const members = ownedSlots(state).map((slot: number) => {
-            const charId = ROSTER_SLOT_CHARIDS[slot];
+            // ETS item 9: ownedSlots only returns roster slots (it loops 0..ROSTER_SLOTS)
+            const charId = ROSTER_SLOT_CHARIDS[slot]!;
             const starterId = rosterSlotDigimonId(slot);
             const stats = slotStats(state, slot) ?? baseStatsFor(db[starterId]) ?? {};
             ensureFormLedger(stats, db);
@@ -160,7 +167,7 @@ export function createLabTranslated(sfx = null) {
             // The screen's ledger has 44 cells: the current and equipped forms always, then one page of the rest
             // (flip with [ and ]); the walker's own ledger is never cut.
             const pinned = new Set([Number(stats.digimonId), ...(stats.equippedForms ?? []).map(Number)]);
-            const win = ui.windowLedger((stats.formLedger ?? []).filter((e) => v0ById.get(Number(e.id))), pinned, ui.getLedgerPage(), LEDGER_ENTRIES);
+            const win = (ui as EngineUi).windowLedger<FormLedgerEntry>((stats.formLedger ?? []).filter((e: FormLedgerEntry) => v0ById.get(Number(e.id))), pinned, (ui as EngineUi).getLedgerPage(), LEDGER_ENTRIES);
             g._ledgerPages = Math.max(g._ledgerPages, win.pages);
             const ledger = Array.from({ length: LEDGER_ENTRIES }, (_, i) => {
                 const entry = win.shown[i];
@@ -187,7 +194,7 @@ export function createLabTranslated(sfx = null) {
         return { language, party, members, returnSelector: Number(g._returnSelector) || 0 };
     }
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         g._error = error;
         g._failed = true;
         g._lastDiagnostic = `translated lab failed: ${error?.message ?? error}`;
@@ -201,15 +208,17 @@ export function createLabTranslated(sfx = null) {
         const resources = {
             tables: data.tables, resident: data.resident, ranges: data.manifest.resident.ranges,
             profiles: data.profiles,
-            textButtons: Uint8Array.from(data.manifest.textButtons.bytes), font: data.font, cursorGlyphs: data.cursorGlyphs,
+            textButtons: Uint8Array.from(data.manifest.textButtons.bytes), font: data.font,
+            // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+            cursorGlyphs: data.cursorGlyphs as LabResources["cursorGlyphs"],
             banks: g._banks,
             catalog: data.catalog, itemRecords: data.itemRecords, descriptors: data.descriptors,
         };
-        g._session = new ui.LabSession(buildSeed(language), resources, { playSound });
-        g._clock = new ui.MenuDisplayClock();
+        g._session = new (ui as EngineUi).LabSession(buildSeed(language), resources, { playSound });
+        g._clock = new (ui as EngineUi).MenuDisplayClock();
     }
 
-    function persist(state) {
+    function persist(state: WalkerState) {
         if (typeof localStorage === "undefined") return;
         localStorage.setItem("party", JSON.stringify(state.party ?? []));
         localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));
@@ -227,8 +236,8 @@ export function createLabTranslated(sfx = null) {
         if (!session || !state || g._committed) return;
         g._committed++;
         const { value0 } = g._data;
-        const idByV0 = new Map();
-        value0.forEach((v, row) => { if (v) idByV0.set(v, row + 1); });
+        const idByV0 = new Map<number, number>();
+        value0.forEach((v: number, row: number) => { if (v) idByV0.set(v, row + 1); });
         for (let i = 0; i < extraProfileCount(); i++) idByV0.set(extraRowFormId(i), EXTRA_FIRST_ID + i);
         let changed = false;
         // The current form, the equipped triple and the ledger entries, per roster record.
@@ -263,7 +272,7 @@ export function createLabTranslated(sfx = null) {
                 syncWornFromEquipment(state); // same gear, different records
                 state.partnerStats = state.partyStats[0];
                 state.charId = party[0];
-                const charIndex = state.manifest?.characters?.findIndex((c) => c.id === state.charId) ?? -1;
+                const charIndex = state.manifest?.characters?.findIndex((c: { id: string; }) => c.id === state.charId) ?? -1;
                 if (charIndex >= 0) state.charIdx = charIndex;
                 const char = state.manifest?.characters?.[state.charIdx];
                 if (char && state.partnerStats?.digimonId) char.digimonId = state.partnerStats.digimonId;
@@ -323,12 +332,12 @@ export function createLabTranslated(sfx = null) {
 
     /** Show the next / previous page of a ledger longer than the screen's 44 cells: keep the edits, rebuild the screen. */
     function flipLedgerPage(dir: number) {
-        const now = ui.getLedgerPage();
+        const now = (ui as EngineUi).getLedgerPage();
         const next = Math.max(0, Math.min(g._ledgerPages - 1, now + dir));
         if (next === now) return;
         commit();
         g._committed = 0;
-        ui.setLedgerPage(next);
+        (ui as EngineUi).setLedgerPage(next);
         try { g._session?.dispose?.(); } catch (_) { /* a screen that already closed */ }
         g._session = null;
         g._ticks = 0;
@@ -353,7 +362,7 @@ export function createLabTranslated(sfx = null) {
         if (g._ledgerPages > 1) {
             ctx.font = "8px monospace";
             ctx.fillStyle = "#ffe36b";
-            ctx.fillText(`Forms ${ui.getLedgerPage() + 1}/${g._ledgerPages}  [ ] to flip`, 6, 236);
+            ctx.fillText(`Forms ${(ui as EngineUi).getLedgerPage() + 1}/${g._ledgerPages}  [ ] to flip`, 6, 236);
         }
         ctx.restore();
     };

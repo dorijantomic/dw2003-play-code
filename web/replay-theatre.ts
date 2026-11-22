@@ -1,16 +1,3 @@
-interface ReplayEvent {
-  id: number;
-}
-
-
-interface ReplayRow {
-  mapId: string;
-  stage: string;
-  eventId: number;
-  firstSay: string;
-  playable: boolean;
-  elsewhere: boolean;
-}
 // web/replay-theatre.js — the story scenes of the room you are standing in, played back with
 // no writes.
 //
@@ -60,8 +47,8 @@ const ELSEWHERE_ROWS = 6;   // greyed lines under the list, one per other reache
  *   names    { "s200": "Central Sector — Asuka City", ... } — the manifest's own stage names
  * A plain manifest-less ladder is still accepted by replayRows; rows then fall back to the id.
  */
-export function replayLadder(progress, manifest) {
-  const byStage = {};
+export function replayLadder(progress: ReplayLadderSource | null | undefined, manifest: ReplayManifestObject | ReplayManifestList | null | undefined): ReplayLadder {
+  const byStage: Record<string, number[]> = {};
   const beats = Array.isArray(progress) ? progress : (progress?.ladder ?? []);
   for (const row of beats) {
     const stageNum = Number(row?.stage);
@@ -72,7 +59,7 @@ export function replayLadder(progress, manifest) {
       .sort((a, b) => a - b);
     if (ordinals.length) byStage[`s${stageNum}`] = ordinals;
   }
-  const names = {};
+  const names: Record<string, string> = {};
   const maps = Array.isArray(manifest) ? manifest : (manifest?.maps ?? []);
   for (const map of maps) {
     if (map?.id) names[map.id] = map.name ?? map.id;
@@ -81,7 +68,7 @@ export function replayLadder(progress, manifest) {
 }
 
 /** A prepared ladder, a raw progress_ordinal.json or its ladder array, all read the same way. */
-function ladderParts(ladder) {
+function ladderParts(ladder: ReplayLadderSource | null | undefined): ReplayLadder {
   if (ladder && typeof ladder.byStage === "object" && ladder.byStage) {
     return { byStage: ladder.byStage, names: ladder.names ?? {} };
   }
@@ -90,21 +77,21 @@ function ladderParts(ladder) {
 }
 
 /** A native record: no bytecode of its own (the handler lives outside the VM). */
-const isNative = (ev) => !Array.isArray(ev?.disasm) || ev.disasm.length === 0 || Number(ev?.script_offset) === 0;
+const isNative = (ev: ReplayEvent) => !Array.isArray(ev?.disasm) || ev.disasm.length === 0 || Number(ev?.script_offset) === 0;
 
 /**
  * May this record ever be replayed? A native record and the four mutating flag keys never can —
  * their effect lives inside playStoryEvent, where a no-op completion cannot stop it — and an absent
  * record is refused too. This is the one rule both the list and the play path consult.
  */
-export function replayRefused(ev) {
+export function replayRefused(ev: ReplayEvent | null | undefined) {
   if (!ev) return true;
   if (isNative(ev)) return true;
   return REPLAY_DENY.has(String(ev.flag_key));
 }
 
 /** The record's first SAY line, the one line that tells two scenes of a room apart. */
-const firstSayOf = (ev) => (ev?.disasm ?? []).find((line) => typeof line === "string" && /^SAY(?:\s|$)/.test(line)) ?? null;
+const firstSayOf = (ev: ReplayEvent) => (ev?.disasm ?? []).find((line) => typeof line === "string" && /^SAY(?:\s|$)/.test(line)) ?? null;
 
 /**
  * The page's rows for one moment: `mapId` is the room the player stands in, `wstag` the extracted
@@ -116,11 +103,11 @@ const firstSayOf = (ev) => (ev?.disasm ?? []).find((line) => typeof line === "st
  *   elsewhere true for a reached room they must walk to (its Play returns false)
  * Rows come in ladder order (the disc's own play order), then by event id.
  */
-export function replayRows(mapId, wstag, ladder, ordinal: number): ReplayRow[] {
+export function replayRows(mapId: string | undefined, wstag: Record<string, ReplayEvent[]> | null | undefined, ladder: ReplayLadderSource | null | undefined, ordinal: number): ReplayRow[] {
   const { byStage, names } = ladderParts(ladder);
   const reached = Number(ordinal) || 0;
-  const rows = [];
-  for (const [stageId, events] of Object.entries(wstag ?? {}) as [string, any[]][]) {
+  const rows: ReplayRow[] = [];
+  for (const [stageId, events] of Object.entries(wstag ?? {})) {
     const beats = byStage[stageId];
     if (!beats || !beats.length) continue;
     if (!beats.some((beat) => beat <= reached)) continue;   // the stage's first beat is still ahead
@@ -142,19 +129,19 @@ export function replayRows(mapId, wstag, ladder, ordinal: number): ReplayRow[] {
 }
 
 /** May a row of `stageId` be played while standing in `mapId`? Only the same room. */
-export function replayOnMap(stageId, mapId) {
+export function replayOnMap(stageId: string | null | undefined, mapId: string | null | undefined) {
   return !!stageId && !!mapId && stageId === mapId;
 }
 
 /** The greyed line under another room's scene: its place name, and how to get there. */
-export function elsewhereNotice(row) {
+export function elsewhereNotice(row: ReplayRow | null | undefined) {
   return `${row?.stage ?? "another room"} — walk there to replay it.`;
 }
 
 // ── the panel ──────────────────────────────────────────────────────────────────────────────
-import type { ReplayView } from "./types/replay-theatre.js";
+import type { ReplayEvent, ReplayLadder, ReplayLadderSource, ReplayManifestList, ReplayManifestObject, ReplayRow, ReplayState, ReplayView } from "./types/replay-theatre.js";
 
-const S = {
+const S: ReplayState = {
   open: false,
   wasOn: false,    // the F2 flag last frame: the page opens on its rising edge only
   place: "",
@@ -208,7 +195,7 @@ export function closeReplay() {
  * Switching the switch off closes it; Start or Cross close it too. `rowsNow` and `free` are kept so the
  * call shape is unchanged; nothing is built here.
  */
-export function tickReplay(enabled: boolean, rowsNow, free = true) {
+export function tickReplay(enabled: boolean, rowsNow: unknown, free = true) {
   const on = enabled === true;
   if (!on && S.open) closeReplay();
   S.wasOn = on;
@@ -220,7 +207,7 @@ export function tickReplay(enabled: boolean, rowsNow, free = true) {
  * (and closes the page), Start closes it, every other press is swallowed. A room with no scene of
  * its own chooses nothing on Cross. Returns false when the page is closed, so nothing changes then.
  */
-export function replayPress(k) {
+export function replayPress(k: string) {
   if (!S.open) return false;
   const n = S.here.length;
   if (k === "up") S.cursor = n ? (S.cursor + n - 1) % n : 0;
@@ -245,7 +232,7 @@ export function replayTake() {
  * Draw the page over the whole view. `W`/`H` are the canvas box (640x480 in the game); the panel
  * is inset from them, so it also reads correctly in a smaller test canvas.
  */
-export function replayDraw(ctx, W = 640, H = 480) {
+export function replayDraw(ctx: CanvasRenderingContext2D, W = 640, H = 480) {
   if (!S.open) return false;
 
   const x = Math.round(W * 0.04), y = Math.round(H * 0.04);

@@ -15,29 +15,29 @@ export const LINK_TEXT = { lost: "Connection lost. Reconnecting...", ref: "Waiti
 const real = { now: () => Date.now(), setT: (fn: () => void, ms: number | undefined) => setTimeout(fn, ms), clearT: (h: string | number | NodeJS.Timeout | undefined) => clearTimeout(h) };
 
 export function createPause({ now = real.now, setT = real.setT, clearT = real.clearT, awayMs = AWAY_MS } = {}) {
-    const away = new Map();            // id -> { at, timer }
-    let parked = [];                   // [{ name, fn }]
+    const away = new Map<string | number, { at: number; timer: number | ReturnType<typeof setTimeout>; }>();            // id -> { at, timer }
+    let parked: { name: string; fn: () => void; }[] = [];                   // [{ name, fn }]
     return {
         get size() { return away.size; },
-        has: (id) => away.has(id),
+        has: (id: string | number) => away.has(id),
         /** Mark `id` away. onExpire(id) runs after awayMs; onExpire null = held until remove() (the referee's own link). False if already away. */
-        add(id, onExpire) {
+        add(id: string | number, onExpire: ((id: string | number) => void) | null) {
             if (away.has(id)) return false;
             const e = { at: now(), timer: 0 as number | ReturnType<typeof setTimeout> };
             if (onExpire) e.timer = setT(() => { if (away.get(id) !== e) return; away.delete(id); onExpire(id); }, awayMs);
             away.set(id, e);
             return true;
         },
-        remove(id) { const e = away.get(id); if (!e) return false; clearT(e.timer); away.delete(id); return true; },
+        remove(id: string | number) { const e = away.get(id); if (!e) return false; clearT(e.timer); away.delete(id); return true; },
         /** True = someone is away: `fn` is remembered (one per name) and the caller must return. False = go on. */
-        gate(name, fn) {
+        gate(name: string, fn: () => void) {
             if (!away.size) return false;
             parked = parked.filter((p) => p.name !== name);
             parked.push({ name, fn });
             return true;
         },
         /** null while someone is still away; otherwise the remembered calls (minus `covered` names), and the memory is emptied. */
-        release({ covered = [] } = {}) {
+        release({ covered = [] }: { covered?: string[]; } = {}) {
             if (away.size) return null;
             const out = parked.filter((p) => !covered.includes(p.name)).map((p) => p.fn);
             parked = [];
@@ -55,7 +55,7 @@ export function createPause({ now = real.now, setT = real.setT, clearT = real.cl
 }
 
 /** "Waiting for Ana (45s)". players = the snapshot's S.P rows ({ id, pn }). */
-export function pzText(pz, players = []) {
+export function pzText(pz: { ids: (string | number)[]; s: number; }, players: { id: number; pn: string; }[] = []) {
     const names = pz.ids.map((id) => players.find((p) => p.id === id)?.pn ?? "player");
     return `Waiting for ${names.join(", ")} (${pz.s}s)`;
 }

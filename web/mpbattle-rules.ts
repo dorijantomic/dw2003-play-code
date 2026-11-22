@@ -38,14 +38,10 @@ import {
 } from "./battle.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { battleMsgText } from "./battlemsg-translated.js";
-import type { MpAttackResult, MpEnemyAttackResult, MpRunResult, MpTagResult } from "./types/mpbattle-rules.js";
 import type { PlayerRecord } from './types/battle.js';
 import type { EnemyBattleRecord } from './types/battle.js';
 import type { BattleSkill } from './types/battle.js';
-interface MpStrikeCombatant {
-    gauge?: number;
-    blast?: { active?: boolean };
-}
+import type { MpArenaOptions, MpCommand, MpField, MpFoeRec, MpHitResult, MpKit, MpPlayerRec, MpRow, MpSeat, MpSeatFoe, MpSeatPlayer, MpTurnResult } from "./types/mp-match.js";
 
 
 interface MpStrikeResult {
@@ -53,25 +49,20 @@ interface MpStrikeResult {
     dmg: number;
     lines: string[];
     instantDeath?: boolean;
-    stolen?: string | number | null;
+    stolen?: string | number | null | undefined;
 }
 
-interface MpBattleFoe { key: string; i: number; fled?: boolean; rec: EnemyBattleRecord; }
-
-interface MpBattlePlayer {
-  key: string;
-  fled?: boolean;
-  rec: PlayerRecord;
-}
+type MpBattleFoe = MpSeatFoe;
+type MpBattlePlayer = MpSeatPlayer;
 
 
 export const SPREAD_FACTOR = 0.65;
 export const SPREAD_MP = 40;                 // a magical technique that costs at least this much hits everyone
 /** A technique that hits everyone on the other side. */
-export const isSpread = (skill) => !!skill && skill.attack_category === "magical" && (skill.mp_cost ?? 0) >= SPREAD_MP;
+export const isSpread = (skill: Partial<BattleSkill> | null | undefined) => !!skill && skill.attack_category === "magical" && (skill.mp_cost ?? 0) >= SPREAD_MP;
 
 /** One of the game's own battle strings, with {1} {2}... filled in. */
-export function T(index: number, ...slots: (number | undefined)[]) {
+export function T(index: number, ...slots: (number | string | undefined)[]) {
     let s = battleMsgText(0x7f, index) || "";
     slots.forEach((v, i) => { s = s.replace(`{${i + 1}}`, String(v)); });
     // an invisible tag ( index , numbers ) lets the fight screen open the game's own message page for this line
@@ -82,7 +73,7 @@ export function T(index: number, ...slots: (number | undefined)[]) {
 export const plainLine = (l: string) => String(l ?? "").replace(/[^]*/g, "");
 const MSG = { ATTACK: 0x08, DAMAGE: 0x0b, EVADE: 0x1d, HEALED: 0x22, NO_EFFECT: 0x2f, RUN: 0x41, COULDNT_RUN: 0x42, RUN_AWAY: 0x43, POISON_TICK: 0x55, DEFEATED: 0x51, KO: 0x50, FLEEING: 0x5f, DID_NOT_FLEE: 0x60 };
 // the item-menu "actor page" ids the engine's items speak through (kind 2): the words live in the same bank
-const itemWord = (page, name) => {
+const itemWord = (page, name: string) => {
     const idx = page?.payload?.[0];
     const word = Number.isInteger(idx) ? battleMsgText(0x7f, idx) : "";
     return word ? `${name}: ${word.replace("{1}", page.slots?.[0] ?? page.payload?.[1] ?? "")}`.trim() : "";
@@ -91,22 +82,22 @@ const itemWord = (page, name) => {
 const SIDE_PLAYER = 0, SIDE_FOE = 0x10;
 
 export class Arena {
-  declare E: any;
-  declare field: { element: any; power: any; };
-  declare kit: any;
-  declare lastTarget: Map<any, any>;
+  declare E: MpSeatFoe[];
+  declare field: MpField | null;
+  declare kit: MpKit;
+  declare lastTarget: Map<string, string>;
   declare P: any;
   declare pool: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[];
-  declare rng: () => number;
-  declare screenId: any;
-  declare time: Map<any, any>;
+  declare rng: () => number | undefined;
+  declare screenId: number | null;
+  declare time: Map<string, number>;
   declare wave: number;
   declare waveSize: number;
     /**
      * players: [{ id, name, rec }]   foes: [{ name, rec }]   (rec = a fighter record, the engine's own shape)
      * waveSize: how many enemies stand at once
      */
-    constructor({ kit, players, foes, screenId = null, waveSize = 2, rng = RAND_U16 }) {
+    constructor({ kit, players, foes, screenId = null, waveSize = 2, rng = RAND_U16 }: MpArenaOptions) {
         this.kit = kit; this.screenId = screenId; this.rng = rng;
         this.pool = emptyStatusEventPool();
         this.field = null;
@@ -118,13 +109,13 @@ export class Arena {
             return { key: "p" + p.id, id: p.id, name: p.name, rec: this.#seat(p.rec, SIDE_PLAYER, i), fled: false, party, act: Math.max(0, party.indexOf(p.rec)), needTag: false };
         });
         for (const p of this.P) if (!p.party.includes(p.rec)) { p.party[0] = p.rec; p.act = 0; }
-        this.E = foes.map((f, i: string) => ({ key: "e" + i, i, name: f.name, rec: this.#seat(f.rec, SIDE_FOE, i), fled: false }));
+        this.E = foes.map((f, i) => ({ key: "e" + i, i, name: f.name, rec: this.#seat(f.rec, SIDE_FOE, i), fled: false }));
         this.time = new Map();                    // actor key -> when it next acts (the shared timeline)
         this.lastTarget = new Map();              // foe key -> the player it hit last (to spread the hits around)
         this.#seatWave();
     }
 
-    #seat(rec, sideByte: number, slot) {
+    #seat<R extends MpPlayerRec | MpFoeRec>(rec: R, sideByte: number, slot: number): R {
         rec.sideByte = sideByte; rec.slot = slot; rec.statusEvents = this.pool; rec.ailments ??= {};
         return rec;
     }
@@ -132,27 +123,27 @@ export class Arena {
 
     // ---------------------------------------------------------- who is standing
     get players() { return this.P; }
-    alivePlayers(): MpBattlePlayer[] { return this.P.filter((p) => p.rec.hp > 0 && !p.fled); }
-    #reserve(p) { return p.party.some((r: { hp: number; }, i) => i !== p.act && r.hp > 0); }
+    alivePlayers(): MpBattlePlayer[] { return this.P.filter((p: MpSeatPlayer) => p.rec.hp > 0 && !p.fled); }
+    #reserve(p: MpSeatPlayer) { return p.party.some((r, i) => i !== p.act && r.hp > 0); }
     /** Players still in the fight: the Digimon out is up, or a reserve can take its place. */
-    standing() { return this.P.filter((p) => !p.fled && (p.rec.hp > 0 || this.#reserve(p))); }
+    standing() { return this.P.filter((p: MpSeatPlayer) => !p.fled && (p.rec.hp > 0 || this.#reserve(p))); }
     /** A player whose Digimon fell and who must pick the next one before anything else happens. */
-    forcedTag() { return this.P.find((p) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
-    waveFoes() { return this.E.filter((e: { i: number; }) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
+    forcedTag() { return this.P.find((p: MpSeatPlayer) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
+    waveFoes() { return this.E.filter((e) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
     aliveFoes(): MpBattleFoe[] { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
-    byKey(key: string) { return this.P.find((p: { key: string; }) => p.key === key) ?? this.E.find((e: { key: string; }) => e.key === key) ?? null; }
+    byKey(key: string) { return this.P.find((p: MpSeatPlayer) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
     recAt(side: number, slot: number) { return ((side | 0) < 1 ? this.P[slot | 0] : this.E[slot | 0])?.rec ?? null; }
     waves() { return Math.ceil(this.E.length / this.waveSize); }
     /** "play" | "won" | "lost" | "fled" */
     state() {
-        if (!this.standing().length) return this.P.some((p) => p.rec.hp <= 0 && !p.fled) ? "lost" : "fled";
+        if (!this.standing().length) return this.P.some((p: MpSeatPlayer) => p.rec.hp <= 0 && !p.fled) ? "lost" : "fled";
         const cleared = this.aliveFoes().length === 0;
         if (cleared && (this.wave + 1) * this.waveSize >= this.E.length) return "won";
         return "play";
     }
 
     // ---------------------------------------------------------- the action timeline
-    #effSpd(rec) { return Math.max(1, (effStats(rec)?.spd ?? rec.spd) | 0); }
+    #effSpd(rec: MpPlayerRec | MpFoeRec) { return Math.max(1, (effStats(rec)?.spd ?? rec.spd) | 0); }
     #avgSpd(list: (MpBattleFoe | MpBattlePlayer)[]) { return list.length ? list.reduce((s: number, a) => s + this.#effSpd(a.rec), 0) / list.length : 100; }
     #seatWave() {
         const foes = this.waveFoes(), ps = this.alivePlayers();
@@ -188,7 +179,7 @@ export class Arena {
     }
 
     /** After an action: put the actor back on the timeline and let the status-event pool tick once. */
-    finish(key: string, res: { lines: string[]; }, target = null) {
+    finish(key: string, res: MpTurnResult, target: MpSeat | null = null) {
         const a = this.byKey(key);
         if (a && !a.fled) {
             const foes = a.key[0] === "p" ? this.aliveFoes() : this.alivePlayers();
@@ -201,10 +192,10 @@ export class Arena {
     }
 
     /** A swap that costs no turn (the forced replacement of a fallen Digimon): only the Blast / fallen checks. */
-    afterFree(res: MpRunResult): MpRunResult { this.#afterAction(null, res); return res; }
+    afterFree(res: MpTurnResult): MpTurnResult { this.#afterAction(null, res); return res; }
 
     // the automatic Blast (a full DV gauge), its countdown, and the fallen Digimon that must be replaced
-    #afterAction(actor, res) {
+    #afterAction(actor, res: MpTurnResult) {
         if (actor && actor.key[0] === "p" && actor.rec.blast?.active && actor.rec.hp > 0) {
             if (--actor.rec.blast.turns <= 0) {                           // the Blast runs out: the form goes back, the gauge is spent
                 const r = actor.rec;
@@ -235,7 +226,7 @@ export class Arena {
 
     // the pool: poison ticks, recoveries, buffs wearing off, locks releasing
     #tick() {
-        const lines = [];
+        const lines: string[] = [];
         const ps = this.alivePlayers(), fs = this.aliveFoes();
         const delay = statusEventActionDelay(ps[0] ? this.#effSpd(ps[0].rec) : 100, fs[0] ? this.#effSpd(fs[0].rec) : 100);
         for (const exp of advanceStatusEvents(this.pool, delay)) {
@@ -272,14 +263,14 @@ export class Arena {
         }
         return lines;
     }
-    #nameOf(rec) { return (this.P.find((p) => p.rec === rec) ?? this.E.find((e) => e.rec === rec))?.name ?? "?"; }
+    #nameOf(rec: MpPlayerRec | MpFoeRec) { return (this.P.find((p: MpSeatPlayer) => p.rec === rec) ?? this.E.find((e) => e.rec === rec))?.name ?? "?"; }
 
     // ---------------------------------------------------------- one blow, either direction
     /** Resolve one attack of `skill` from att to def with the game's own rolls, and everything that rides on a hit. */
-    #strike(att: (PlayerRecord | EnemyBattleRecord) & MpStrikeCombatant, attName: string | undefined, def: (PlayerRecord | EnemyBattleRecord) & MpStrikeCombatant, defName: string, skill: Partial<BattleSkill>, spread = false): MpStrikeResult {
-        const lines = [];
+    #strike(att: MpPlayerRec | MpFoeRec, attName: string | undefined, def: MpPlayerRec | MpFoeRec, defName: string, skill: Partial<BattleSkill>, spread = false): MpStrikeResult {
+        const lines: string[] = [];
         const hits = skill.basic_attack ? basicAttackHitCount(att.multiAttack, skill) : Math.max(1, skill.hits ?? 1);
-        const r = hits > 1 ? resolveMultiHit(att, def, skill, hits, this.rng, this.field) : resolveAttack(att, def, skill, this.rng, this.field);
+        const r: MpHitResult = hits > 1 ? resolveMultiHit(att, def, skill, hits, this.rng, this.field) : resolveAttack(att, def, skill, this.rng, this.field);
         const landed = !!r.hit;
         let dmg = landed ? Math.max(0, r.dmg | 0) : 0;
         if (landed && spread) dmg = Math.floor(dmg * SPREAD_FACTOR);
@@ -312,8 +303,8 @@ export class Arena {
         return { hit: true, dmg, lines, instantDeath: !!inflicted.text, stolen };
     }
 
-    #row(entry, dmg: number, hit: boolean) { return [entry.key, dmg | 0, hit ? 1 : 0, entry.rec.hp <= 0 ? 1 : 0]; }
-    #koLine(entry) { return `${entry.name}: ${T(entry.key[0] === "e" ? MSG.DEFEATED : MSG.KO)}`; }
+    #row(entry: MpSeat, dmg: number, hit: boolean): MpRow { return [entry.key, dmg | 0, hit ? 1 : 0, entry.rec.hp <= 0 ? 1 : 0]; }
+    #koLine(entry: MpSeat) { return `${entry.name}: ${T(entry.key[0] === "e" ? MSG.DEFEATED : MSG.KO)}`; }
 
     /** A pseudo battle object holding exactly what the game's party-wide helpers read (they were written for one pair). */
     #bLike({ caster, allies = [], enemy = null, side = 0 }) {
@@ -326,8 +317,8 @@ export class Arena {
     }
 
     /** The common middle of an attack: the caster uses `skill` on `targets`; works for both sides. */
-    #damageAction(caster, skill: { id: number; }, targets, defenders?) {
-        const res = { lines: [], rows: [], a: caster.key, sk: skill.id | 0, kind: "atk" } as MpAttackResult;
+    #damageAction(caster: MpSeat, skill: BattleSkill, targets: MpSeat[], defenders?: MpSeat[]) {
+        const res: MpTurnResult = { lines: [], rows: [], a: caster.key, sk: skill.id | 0, kind: "atk" };
         const spread = targets.length > 1;
         for (const t of targets) {
             const out = this.#strike(caster.rec, caster.name, t.rec, t.name, skill, spread);
@@ -341,8 +332,8 @@ export class Arena {
         return res;
     }
 
-    #usableTarget(list, idx) {
-        const wanted = Array.isArray(idx) ? idx : [idx];
+    #usableTarget<T extends { i?: number; id?: number | string; }>(list: T[], idx: string | number | number[] | undefined) {
+        const wanted: (number | string | undefined)[] = Array.isArray(idx) ? idx : [idx];
         const picked = list.filter((x) => wanted.includes(x.i ?? x.id));
         return picked.length ? picked : list.slice(0, 1);
     }
@@ -352,7 +343,7 @@ export class Arena {
      * cmd: { k: "fight", t: foeIndex } | { k: "tech", sk, tw, t: foeIndex | allyKey } | { k: "item", item, to: key } | { k: "run" }
      * Returns { lines, rows, a, sk, kind } (kind "atk" | "self" | "item" | "run"); `fled` when the player left.
      */
-    playerAction(key: string, cmd) {
+    playerAction(key: string, cmd: MpCommand): MpTurnResult {
         const me = this.byKey(key);
         const A = me.rec, foes = this.aliveFoes();
         if (me.needTag) return this.#tag(me, cmd);
@@ -385,14 +376,14 @@ export class Arena {
     }
 
     // heals, cures and buffs: the game's category-4 and category-5 plans, on whoever the player picked
-    #support(me, skill: { name: number | undefined; id: number; }, record: { category: number; }, cmd: { t: string; }) {
+    #support(me: MpSeatPlayer, skill: BattleSkill, record: { category: number; }, cmd: MpCommand) {
         const allies = this.alivePlayers();
         const wanted = allies.find((p) => p.key === cmd.t) ?? me;
         const ordered = [wanted, ...allies.filter((p) => p !== wanted)].slice(0, 3);
         const foe = this.#usableTarget(this.aliveFoes(), typeof cmd.t === "number" ? cmd.t : undefined)[0] ?? null;
         const b = this.#bLike({ caster: me, allies: ordered, enemy: foe, side: 0 });
         b.player = wanted.rec;
-        const res = { lines: [`${me.name}: ${T(0x09, skill.name)}`], rows: [], a: me.key, sk: skill.id | 0, kind: "self" };
+        const res: MpTurnResult = { lines: [`${me.name}: ${T(0x09, skill.name)}`], rows: [], a: me.key, sk: skill.id | 0, kind: "self" };
         if ((record.category | 0) === 4) {
             const plan = battleRestorePlanFor(b, 0, record, skill.id, { name: me.name, wisdom: me.rec.wis });
             if (plan) res.lines.push(restoreWalkerSentence(plan, skill, me.name).replace(/^.*?uses [^!]*!\s*/, `${wanted.name}: `));
@@ -406,11 +397,11 @@ export class Arena {
     }
 
     // items: the game's own effects
-    #item(me, cmd) {
+    #item(me: MpSeatPlayer, cmd: MpCommand) {
         const item = ITEM_BY_ID[cmd.item | 0];
-        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "item" };
+        const res: MpTurnResult = { lines: [], rows: [], a: me.key, sk: 0, kind: "item" };
         if (!item) { res.lines.push(`${me.name}: ${T(MSG.NO_EFFECT)}`); return res; }
-        const to = this.P.find((p) => p.key === cmd.to && !p.fled) ?? me;     // (a downed ally may be picked: a revive item)
+        const to = this.P.find((p: MpSeatPlayer) => p.key === cmd.to && !p.fled) ?? me;     // (a downed ally may be picked: a revive item)
         const rec = to.rec;
         const foe = this.#usableTarget(this.aliveFoes(), typeof cmd.t === "number" ? cmd.t : undefined)[0] ?? null;
         res.lines.push(`${me.name} used ${item.name}!`);
@@ -427,9 +418,9 @@ export class Arena {
             const offensive = item.id >= 85 && item.id !== 84;
             const user = offensive ? me.rec : rec;
             const r = useBattleItem(item.id, user, foe?.rec ?? me.rec, {
-                userName: offensive ? me.name : to.name, enemyName: foe?.name ?? "Enemy", party: this.P.filter((p) => !p.fled).map((p) => p.rec),
+                userName: offensive ? me.name : to.name, enemyName: foe?.name ?? "Enemy", party: this.P.filter((p: MpSeatPlayer) => !p.fled).map((p: MpSeatPlayer) => p.rec),
                 userIndex: this.P.indexOf(offensive ? me : to), effectGates: {}, specialMode: 0,
-                setField: (element, power) => { this.field = { element, power }; },
+                setField: (element: string, power: number) => { this.field = { element, power }; },
             });
             for (const page of r.pages ?? []) { const t = itemWord(page, page.name ?? to.name); if (t) res.lines.push(t); }
             if (!r.ok && !r.pages?.length) res.lines.push(`${to.name}: ${T(MSG.NO_EFFECT)}`);
@@ -440,8 +431,8 @@ export class Arena {
     }
 
     // Tag: another of the player's Digimon takes the fight; the one that was out goes to the reserves
-    #tag(me, cmd: { k: string; slot: number; }) {
-        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "tag" } as MpTagResult;
+    #tag(me, cmd: MpCommand) {
+        const res: MpTurnResult = { lines: [], rows: [], a: me.key, sk: 0, kind: "tag" };
         const forced = me.needTag;
         const slot = cmd.k === "tag" ? cmd.slot | 0 : -1;
         const inc = me.party[slot];
@@ -462,9 +453,9 @@ export class Arena {
     }
 
     // a manual digivolve takes the turn: the Digimon takes the form, and fights with that form's numbers from now on
-    #digivolve(me, cmd: { form: number; }) {
-        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "dv" };
-        const form = this.kit.forms(me.rec).find((f: { id: number; }) => f.id === (cmd.form | 0));
+    #digivolve(me: MpSeatPlayer, cmd: MpCommand) {
+        const res: MpTurnResult = { lines: [], rows: [], a: me.key, sk: 0, kind: "dv" };
+        const form = this.kit.forms(me.rec).find((f) => f.id === (cmd.form | 0));
         if (!form || me.rec.cantDigivolve) { res.lines.push(`${me.name}: ${T(me.rec.cantDigivolve ? 0x45 : MSG.NO_EFFECT)}`); res.kind = "run"; return res; }
         this.kit.digivolve(me.rec, form.id);
         res.lines.push(`${me.name}: ${T(0x37, form.name)}`);                 // "Digivolved! {1}!"
@@ -472,8 +463,8 @@ export class Arena {
         return res;
     }
 
-    #run(me) {
-        const res = { lines: [`${me.name}: ${T(MSG.RUN)}`], rows: [], a: me.key, sk: 0, kind: "run" } as MpRunResult;
+    #run(me: MpSeatPlayer) {
+        const res: MpTurnResult = { lines: [`${me.name}: ${T(MSG.RUN)}`], rows: [], a: me.key, sk: 0, kind: "run" };
         const foes = this.aliveFoes();
         const lvl = foes.length ? foes.reduce((s: number, f: { rec: { level: number; }; }) => s + (f.rec.level | 0), 0) / foes.length : 1;
         const spd = this.#avgSpd(foes);
@@ -489,7 +480,7 @@ export class Arena {
 
     // ---------------------------------------------------------- an enemy's turn
     /** Weigh up the players: the wounded and the helpless draw fire; the last victim is slightly spared. */
-    #pickTarget(foe) {
+    #pickTarget(foe: MpSeat) {
         const alive = this.alivePlayers();
         if (alive.length < 2) return alive[0] ?? null;
         const weights = alive.map((p) => {
@@ -505,7 +496,7 @@ export class Arena {
         return alive[alive.length - 1];
     }
 
-    foeAction(key: string) {
+    foeAction(key: string): MpTurnResult {
         const foe = this.byKey(key), en = foe.rec;
         const alive = this.aliveFoes();
         const target = this.#pickTarget(foe);
@@ -518,7 +509,7 @@ export class Arena {
             activeEnemyIndex: Math.max(0, alive.indexOf(foe)),
         };
         const move = (moves?.length ? pickEnemyAiMove(moves, en, this.rng, target.rec, context) : null) ?? { action: 1 };
-        const res = { lines: [], rows: [], a: key, sk: 0, kind: "atk" } as MpEnemyAttackResult;
+        const res: MpTurnResult = { lines: [], rows: [], a: key, sk: 0, kind: "atk" };
         if (move.action === 4) {                                    // the flee action
             if (enemyFleeProc(target.rec.spd, en.spd, target.rec.binderCrest, this.rng, battleAilmentByte(en))) {
                 foe.fled = true; en.hp = 0;
@@ -566,14 +557,14 @@ export class Arena {
 
     // ---------------------------------------------------------- what everyone sees
     /** Plain data for one fighter's plate and the shared snapshot. */
-    plate(entry) {
+    plate(entry: MpSeat) {
         const r = entry.rec;
         const ail = Object.keys(r.ailments ?? {}).filter((k) => r.ailments[k]).map((k) => k.slice(0, 3).toUpperCase());
         return { hp: Math.max(0, r.hp | 0), mhp: r.maxHp | 0, mp: Math.max(0, r.mp | 0), mmp: r.maxMp | 0, ko: r.hp <= 0 || entry.fled ? 1 : 0, ail,
             dv: r.gauge | 0, bl: r.blast?.active ? 1 : 0 };
     }
     /** A player's whole party for the Tag list: the Digimon in the fight and the reserves. */
-    partyPlate(entry) {
+    partyPlate(entry: MpSeatPlayer) {
         return entry.party.map((r) => ({ n: r.profile?.name ?? "?", hp: Math.max(0, r.hp | 0), mhp: r.maxHp | 0, mp: Math.max(0, r.mp | 0), mmp: r.maxMp | 0, dv: r.gauge | 0 }));
     }
 }

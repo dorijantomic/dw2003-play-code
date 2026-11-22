@@ -35,7 +35,7 @@ export interface Battle3dFighter {
   aabb: Battle3dAABB | null;
   anim8r: ActorAnimator | null;
   /** the animTime the fighter appeared at, for the fade-in */
-  born: number | null;
+  born: number | null | undefined;
   bufs: Battle3dBuffers | null;
   /** the lateral placement as drawn */
   dx: number;

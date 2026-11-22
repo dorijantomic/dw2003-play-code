@@ -1,4 +1,5 @@
 import type { GameState } from "../game/types.js";
+import type { WalkerState } from "./translated-screens.js";
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
 
 /** What diagnostics() reports for the debug overlay: the screen's state and the last launched tasks. */
@@ -44,7 +45,7 @@ export interface StatusScreen {
   _returnClose: (() => void) | null;
   /** vendor object: the engine's PauseRootSession */
   _session: any;
-  _state: GameState;
+  _state: GameState | null;
   _uiKey: string;
   blockUntilReleased?: (words?: unknown[]) => void;
   close?: () => void;
@@ -54,8 +55,8 @@ export interface StatusScreen {
   entry?: () => string | null;
   handleKey?: (k: string, state: GameState) => void;
   isOpen?: () => boolean;
-  open?: (state: GameState, entry?: string, onClose?: () => void, homeFlow?: boolean) => void;
-  openHome?: (state: GameState, onClose?: () => void, row?: number) => void;
+  open?: (state: GameState, entry?: string, onClose?: (() => void) | null, homeFlow?: boolean) => void;
+  openHome?: (state: GameState, onClose?: (() => void) | null, row?: number) => void;
   reopenPage?: (page: string, row?: number) => boolean;
   update?: (dt: number) => void;
 }
@@ -65,9 +66,9 @@ export interface StatusTranslatedOpts {
   /** true when the CARD FOLDERS page may be opened */
   cardFoldersUnlocked?: () => boolean;
   /** the extra rows under the pause home list (the extra quests, the GLOSSARY and OPTIONS books) */
-  extraRows?: (state: GameState) => unknown[];
+  extraRows?: (state: WalkerState) => { label: string; opens: string }[];
   /** the map the party stands on (stage 0 and the seen-map reader come from it) */
-  map?: (state: GameState) => any | null;
+  map?: (state: WalkerState) => any | null;
   /** true when OPTIONS > Map screen should open the new map book instead of the disc's page */
   newMapScreen?: () => boolean;
   /** open a book (the GLOSSARY / OPTIONS browser) on a row */
@@ -75,7 +76,7 @@ export interface StatusTranslatedOpts {
   /** hand off to the walker's own screen for a card folder / deck choice */
   onTransition?: (id: string, arg?: unknown) => void;
   /** the extra QUESTS page */
-  questsPage?: (state: GameState) => any;
+  questsPage?: (state: WalkerState) => any;
   /** the party view: one entry per pedestal (species stats, elements, worn gear) */
-  roster?: (state: GameState) => any[] | null;
+  roster?: (state: WalkerState) => any[] | null;
 }

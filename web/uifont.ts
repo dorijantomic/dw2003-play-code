@@ -36,21 +36,13 @@
 // that pair is written.
 
 import { capturingText, textRunHook, artHook } from "./ui-c/capture.js";
-import type { UiFontPaintOpts, UiTextDrawOpts } from "./types/uifont.js";
+import type { UiClutRow, UiClutTable, UiFontGlyph, UiFontManifest, UiFontPaintOpts, UiGlyphPen, UiTextDrawOpts } from "./types/uifont.js";
 import { assetImageScale, loadAssetImage, tagAssetSource } from "./assets.js";
-type ClutRow = Uint16Array;
 
-interface ClutEntry {
-  rows?: Record<string, ClutRow | undefined>;
-}
-
-type ClutTable = Record<string, ClutEntry | undefined>;
-
-
-let img = null;
-let map = null;
-const tinted = {}; // color -> tinted copy of the sheet (canvas)
-const clutSheets = {}; // "kind:clut" -> remapped sheet
+let img: HTMLImageElement | null = null;
+let map: UiFontManifest | null = null;
+const tinted: Record<string, HTMLCanvasElement | undefined> = {}; // color -> tinted copy of the sheet (canvas)
+const clutSheets: Record<string, HTMLCanvasElement | undefined> = {}; // "kind:clut" -> remapped sheet
 
 // Guarded so pure-logic modules that import this file's helpers (but only
 // call them from browser draw code) stay importable under `node --test`
@@ -77,12 +69,12 @@ export const NUMBER_FONT_KIND = 3;
  * without a DOM. Row 0 is the face the glyphs are baked with, so it is the
  * colour a number element actually shows.
  */
-export function clutRow(cluts, kind: number, row = 0) {
+export function clutRow(cluts: UiClutTable | null | undefined, kind: number, row = 0): UiClutRow | null {
   return cluts?.[String(kind)]?.rows?.[String(row)] ?? null;
 }
 
 /** Row 0 of the number face -- the amber the original draws HP and MP in. */
-export function numberClutRow(cluts = map?.cluts, row = 0): ClutRow | null {
+export function numberClutRow(cluts = map?.cluts, row = 0): UiClutRow | null {
   return clutRow(cluts, NUMBER_FONT_KIND, row);
 }
 
@@ -112,9 +104,9 @@ function sheetForClut(kind: number | undefined, clut: number | undefined) {
   x!.drawImage(img, 0, 0, c.width, c.height);
   const data = x!.getImageData(0, 0, c.width, c.height);
   const px = data.data;
-  const from = new Map();
+  const from = new Map<string, UiClutRow[number] | undefined>();
   for (let i = 0; i < src.length; i++) {
-    const s = src[i];
+    const s = src[i]!;   // i < src.length
     if (!s[3]) continue;
     from.set(`${s[0]},${s[1]},${s[2]}`, dst[i]);
   }
@@ -145,7 +137,7 @@ function sheetFor(color: string | undefined) {
   return tinted[color];
 }
 
-function glyphFor(kind: number, ch: string | number) {
+function glyphFor(kind: number, ch: string): UiFontGlyph | null {
   const c = map.chars[ch];
   if (!c) return null;
   const tbl = c.t === "b" ? "basic" : "ext";
@@ -165,8 +157,8 @@ const ALIASES: Record<string, string> = {
   "▶": "[arrow-right]", "◀": "[arrow-left]", "▲": "[arrow-up]", "▼": "[arrow-down]",
   "△": "[triangle]", "◯": "[circle]", "○": "[circle]", "□": "[square]", "✕": "[cross]",
 };
-function units(text) {
-  const out = [];
+function units(text: string) {
+  const out: string[] = [];
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch === "[") {
@@ -185,11 +177,11 @@ function units(text) {
 // Pen advance per glyph = dx + adv (measured off dri_s2/s3 captures: letters
 // dx=1 step adv+1, space dx=0 steps exactly adv; the record's draw offset
 // shifts the pen too).
-function advanceOf(g) {
+function advanceOf(g: UiFontGlyph) {
   return (g.dx || 0) + (g.adv || g.w + 1);
 }
 
-export function textWidth(text, kind = 1) {
+export function textWidth(text: string, kind = 1) {
   if (!fontReady()) return text.length * 7;
   let w = 0;
   for (const ch of units(text)) {
@@ -255,7 +247,7 @@ export function drawText(ctx: CanvasRenderingContext2D | null | undefined, text:
 export function layoutGlyphs(text: string | undefined, x: number, opts: UiTextDrawOpts = {}) {
   if (!fontReady()) return [];
   const { kind = 1, scale = 1, cellWidth = null, glyphMetrics = null } = opts;
-  const out = [];
+  const out: UiGlyphPen[] = [];
   let cx = x;
   for (const ch of units(text)) {
     const source = glyphFor(kind, ch);
@@ -267,16 +259,16 @@ export function layoutGlyphs(text: string | undefined, x: number, opts: UiTextDr
 }
 
 /** The face colours of CLUT row `row` of font `kind` ([[r,g,b,a], ...]) from the loaded manifest, or null. */
-export function fontClutRow(kind, row = 0) {
+export function fontClutRow(kind: number, row = 0): UiClutRow | null {
   return map?.cluts?.[String(kind)]?.rows?.[String(row)] ?? null;
 }
 
 /** Draw a named icon glyph (str/def/.../dark). Returns false until loaded. */
 export function drawIconGlyph(ctx: CanvasRenderingContext2D | undefined, name: string, x: number, y: number, scale = 1) {
   if (!fontReady()) return false;
-  const r = map.icons?.[name];
+  const r = map!.icons?.[name];   // fontReady() above proved map and img are loaded
   if (!r) return false;
-  const paint = (c: CanvasRenderingContext2D | undefined) => { c!.imageSmoothingEnabled = false; c!.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
+  const paint = (c: CanvasRenderingContext2D | undefined) => { c!.imageSmoothingEnabled = false; c!.drawImage(img!, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
   // a look C scope (web/ui-c) keeps the icon as a picture on its art canvas, over the C plates
   if (!artHook(ctx, paint)) paint(ctx);
   return true;
@@ -311,6 +303,6 @@ export function cursorFrame(vsyncs: number) {
 }
 
 /** Draw the animated list cursor. `vsyncs` is the screen clock in vsyncs. */
-export function drawCursor(ctx: CanvasRenderingContext2D | null | undefined, vsyncs: number, x: number, y: number, opts = {}) {
+export function drawCursor(ctx: CanvasRenderingContext2D | null | undefined, vsyncs: number, x: number, y: number, opts: UiTextDrawOpts = {}) {
   return drawText(ctx, cursorFrame(vsyncs), x, y, opts);
 }

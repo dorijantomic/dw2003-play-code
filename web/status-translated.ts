@@ -9,6 +9,9 @@
 import {
     commitPauseClose, maskFromButtons, rosterSlotOfCharId, wornCount, wornItemIds, ui, ITEM_ID_MAX,
 } from "./vendor/engine.js";
+import type { PauseEntry, PauseRootSession } from "../engine/dw3/ui/pause-root-session.js";
+import type { PackedSfx, ResidentGlyphs, WalkerState } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import * as uiC from "./ui-c/index.js";
@@ -49,8 +52,8 @@ const PACKS: Record<string, string> = {
     0x07990000: "stwmp0map", 0x07990001: "stwmp0area", 0x07990002: "stwmp0icon",
     0x079b0000: "stwmp1map", 0x079b0001: "stwmp1area", 0x079b0002: "stwmp1icon",
 };
-const packNameFor = (handle) => PACKS[handle] ?? PACKS[(handle >>> 16) & 0xffff] ?? null;
-const PAGES = new Set(["home", "items", "sort", "map", "techniques", "status", "cardfolders", "quests"]);
+const packNameFor = (handle: number) => PACKS[handle] ?? PACKS[(handle >>> 16) & 0xffff] ?? null;
+const PAGES = new Set<string>(["home", "items", "sort", "map", "techniques", "status", "cardfolders", "quests"]);
 
 const DATA_LABEL = "Pause data";
 let pauseCount = 0;
@@ -73,8 +76,8 @@ const loadShared = (): Promise<PauseSharedData> => {
 /** The game's own text codec for the roster record's name (web/native-screen.js): a single
  *  byte 0x04+d is a digit, 0x0E+n a capital, 0x28+n a lower-case letter; anything else is
  *  the two-byte space 0x01,0x01. */
-export function encodePauseName(text, maxBytes = 23) {
-    const out = [];
+export function encodePauseName(text: unknown, maxBytes = 23) {
+    const out: number[] = [];
     for (const ch of String(text ?? "")) {
         const code = ch.charCodeAt(0);
         if (ch >= "0" && ch <= "9") out.push(0x04 + code - 0x30);
@@ -89,13 +92,13 @@ export function encodePauseName(text, maxBytes = 23) {
 /** The MAP page's "have I walked into this place" reader: the exact flag id the page's
  *  own scan asks about (F0x8009A6B8, get_flag((stage & 0xff) | 0x2000, 1)) over the PS1
  *  stage ids the walker resolved through the engine's banked store. */
-export function mapSeenReader(context) {
-    const flags = new Set((context?.seen ?? []).map((ps1) => 0x2000 | (ps1 & 0xff)));
-    return (flagId) => flags.has(flagId);
+export function mapSeenReader(context: { seen?: number[] } | null | undefined) {
+    const flags = new Set((context?.seen ?? []).map((ps1: number) => 0x2000 | (ps1 & 0xff)));
+    return (flagId: number) => flags.has(flagId);
 }
 
-export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = {}) {
-    const st = {
+export function createStatusTranslated(sfx: PackedSfx | null = null, opts: StatusTranslatedOpts = {}) {
+    const st: StatusScreen = {
         _open: false, _session: null, _state: null, _onClose: null, _clock: null, _error: null,
         _request: 0, _entry: null, _lastDiagnostic: null, _packed: {},
         _homeFlow: false, _homeOverlay: false, _homeRow: 0,
@@ -106,16 +109,16 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         // web/pause-home.js for the evidence.
         _returnClose: null,
         _uiKey: `pause${++pauseCount}`,
-    } as StatusScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor);
-    const playPackedSound = (id) => {
+    const playPackedSound = (id: number) => {
         const key = id >>> 0;
         st._packed[key] = (st._packed[key] ?? 0) + 1;
         sfx?.playPacked(key);
     };
 
     /** The three party panels: one entry per pedestal, null for an empty one. */
-    function partySeed(state) {
+    function partySeed(state: WalkerState) {
         const roster = Array.isArray(state.partyStats) ? state.partyStats : [];
         const view = typeof opts.roster === "function" ? (opts.roster(state) ?? []) : [];
         const equipment = Array.isArray(state.equipment) ? state.equipment : [];
@@ -153,7 +156,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         return party;
     }
 
-    function seed(state, entry) {
+    function seed(state: WalkerState, entry: PauseEntry) {
         const inventory = [];
         for (const slot of Array.isArray(state.inventory) ? state.inventory : []) {
             const id = Number(slot?.id);
@@ -186,24 +189,26 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         st._error = null;
         st._session = null;
         st._lastDiagnostic = null;
-        st._clock = new ui.MenuDisplayClock();
+        st._clock = new (ui as EngineUi).MenuDisplayClock();
         st._padLag = [];
         const request = ++st._request;
         loadShared().then(async (shared) => {
             const selected = st._state?.languageByte;
             const language = Number.isInteger(selected) ? selected : 2;
             if (language! < 0 || language! > 6) throw new Error("Pause language index is invalid");
-            const own = new Set(shared.manifest.banks.map((bank) => bank.id));
-            const dirs = new Map(shared.manifest.sharedBanks.map((entryRow) => [entryRow.offset, entryRow.dir]));
-            const banks = new Map(await Promise.all(ui.PAUSE_TEXT_BANK_OFFSETS.map(async (offset) => {
+            const own = new Set(shared.manifest.banks.map((bank: { id: number }) => bank.id));
+            const dirs = new Map(shared.manifest.sharedBanks.map((entryRow: { offset: number; dir: string }): [number, string] => [entryRow.offset, entryRow.dir]));
+            const banks = new Map(await Promise.all((ui as EngineUi).PAUSE_TEXT_BANK_OFFSETS.map(async (offset): Promise<[number, Uint8Array]> => {
                 const id = offset + language;
                 return [id, await fetchBytes(own.has(id) ? `pause/${id}.bin` : `${dirs.get(offset)}/${id}.bin`, DATA_LABEL)];
             })));
             if (!st._open || request !== st._request) return;
-            st._session = new ui.PauseRootSession(language, seed(st._state ?? {}, page), {
+            // ETS item 9: `page` is one of the PAGES the line above just checked, and PAGES holds exactly the engine's PauseEntry ids
+            st._session = new (ui as EngineUi).PauseRootSession(language, seed(st._state ?? {}, page as PauseEntry), {
                 tables: shared.tables, resident: shared.resident, residentRanges: shared.manifest.resident.ranges,
                 homeData: shared.homeData, profiles: shared.profiles,
-                font: shared.font, cursorGlyphs: shared.cursorGlyphs, catalog: shared.catalog, itemRecords: shared.itemRecords,
+                // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+                font: shared.font, cursorGlyphs: shared.cursorGlyphs as ResidentGlyphs, catalog: shared.catalog, itemRecords: shared.itemRecords,
                 descriptors: shared.descriptors, banks,
             }, { playSound: playPackedSound });
         }).catch((error) => {
@@ -332,7 +337,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
      *  partner's stats and worn gear. The commit itself is the one shared routine both
      *  pause routes call (engine/dw3/ui/pause-close-commit.ts); this hands it the
      *  numbers the session's own snapshot holds. */
-    function readBack(session) {
+    function readBack(session: PauseRootSession) {
         const state = st._state;
         if (!state) return;
         const snap = session.snapshot();
@@ -355,10 +360,10 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
             money: snap.money,
             inventory: snap.inventory,
             partyMap: snap.partyMap,
-            formId: (value) => ui.nativeFormIds(session.mem).idByValue.get(value),
+            formId: (value: number) => (ui as EngineUi).nativeFormIds(session.mem).idByValue.get(value),
             openedElements,
             storage: typeof localStorage !== "undefined" ? localStorage : null,
-            recordAt: (rosterSlot) => snap.records[rosterSlot] ?? null,
+            recordAt: (rosterSlot: number) => snap.records[rosterSlot] ?? null,
         });
     }
 

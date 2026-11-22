@@ -28,6 +28,15 @@ import { setFlatReader } from "./battle-layer.js";
 /** One tile of a tiled 4x filter run: where it sits in the sheet, and how big it is. */
 interface GpuTile { x: number; y: number; w: number; h: number }
 
+/** A canvas the filter reads from or draws into: on the page, or off it. */
+type PixelCanvas = HTMLCanvasElement | OffscreenCanvas;
+
+/** What createPipeline makes (it returns null when there is no WebGL2). */
+type GpuPipeline = NonNullable<ReturnType<typeof createPipeline>>;
+
+/** The 4x copies of one image by filter name; null = filtering failed or is not wanted. */
+type FilteredCopies = Map<string, PixelCanvas | null>;
+
 export const GPU_FILTER_NAMES = ["bilinear", "epx", "mmpx", "xbr", "xbrblend"];
 const NATIVE_W = 320, NATIVE_H = 240;
 
@@ -169,10 +178,10 @@ void main() {
 }`;
 
 // ── one WebGL2 pipeline on a given canvas ──────────────────────────────────────────────────────
-function createPipeline(canvas) {
+function createPipeline(canvas: PixelCanvas) {
   const gl = canvas.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
   if (!gl) return null;
-  const sh = (type, text: string) => {
+  const sh = (type: number, text: string) => {
     const s = gl.createShader(type); gl.shaderSource(s, text); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
     return s;
@@ -204,7 +213,7 @@ function createPipeline(canvas) {
   };
   // one pass: read `tex` (w x h), write the `outW x outH` result into `target` (a texture, whole) or,
   // with target null, the part `tile` of it into the canvas
-  const pass = (tex, w, h, rule: number, outW, outH, target, blend = 0, tile = { x: 0, y: 0, w: outW, h: outH }) => {
+  const pass = (tex: WebGLTexture | null, w: number, h: number, rule: number, outW: number, outH: number, target: WebGLTexture | null, blend = 0, tile: GpuTile = { x: 0, y: 0, w: outW, h: outH }) => {
     gl.useProgram(prog);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? fb : null);
     if (target) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
@@ -227,7 +236,7 @@ function createPipeline(canvas) {
   // the 4x filter of a w x h texture, drawn into the canvas tile by tile (at most TILE px a side);
   // emit(tile) is called after each tile is drawn. False = the browser gave a smaller buffer than asked.
   const TILE = 2048;
-  const filter4 = (tex: WebGLTexture, w: number, h: number, name: string, emit: (tile: GpuTile) => void = () => {}) => {
+  const filter4 = (tex: WebGLTexture | null, w: number, h: number, name: string, emit: (tile: GpuTile) => void = () => {}) => {
     const W = w * 4, H = h * 4;
     let src = tex, sw = w, sh = h, rule = 2, blend = name === "xbrblend" ? 1 : 0;
     if (name === "bilinear") rule = 8;
@@ -255,9 +264,9 @@ const makeCanvas = (w: number, h: number) => (typeof OffscreenCanvas !== "undefi
   : Object.assign(document.createElement("canvas"), { width: w, height: h }));
 
 // ── one image, 4x (the lab) ────────────────────────────────────────────────────────────────────
-let imagePipe;
+let imagePipe: GpuPipeline | null | undefined;
 /** Filter one image: a 4x canvas, or null (unknown filter, no WebGL2, too big). */
-export function pixelFilterNow(source, name) {
+export function pixelFilterNow(source: HTMLImageElement, name: string) {
   if (!GPU_FILTER_NAMES.includes(name) || !source) return null;
   const w = source.naturalWidth || source.width, h = source.naturalHeight || source.height;
   if (imagePipe === undefined) {
@@ -266,9 +275,10 @@ export function pixelFilterNow(source, name) {
   // the input and the 2x middle step are textures and must fit the GPU's texture size
   if (!imagePipe || !(w > 0 && h > 0) || w * 2 > imagePipe.max || h * 2 > imagePipe.max) return null;
   const canvas = imagePipe.gl.canvas;
-  const out = makeCanvas(w * 4, h * 4), g = out.getContext("2d");
+  // ETS item 9: out.getContext("2d") is a 2D context on both kinds of canvas; TS resolves the union call to the generic overload.
+  const out = makeCanvas(w * 4, h * 4), g = out.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   const ok = imagePipe.filter4(imagePipe.upload(source), w, h, name,
-    (t) => g!.drawImage(canvas, 0, 0, t.w, t.h, t.x, t.y, t.w, t.h));
+    (t: GpuTile) => g!.drawImage(canvas, 0, 0, t.w, t.h, t.x, t.y, t.w, t.h));
   canvas.width = 1; canvas.height = 1;      // give the drawing buffer back
   if (!ok) console.warn("[pixel filter] the browser gave a smaller drawing buffer than asked; image left native");
   return ok ? out : null;
@@ -277,8 +287,8 @@ export function pixelFilterNow(source, name) {
 // ── HD Remaster: native images, filtered once, drawn from the 4x copy ─────────────────────────
 const screens = new WeakSet();
 let imageMode = () => false;
-const cache = new WeakMap();      // image -> Map(name -> canvas | null)
-const queue = [];
+const cache = new WeakMap<HTMLImageElement, FilteredCopies>();      // image -> Map(name -> canvas | null)
+const queue: [HTMLImageElement, string][] = [];
 let pumping = false;
 function pump() {
   const t0 = performance.now();
@@ -305,7 +315,7 @@ export const pixelFilterStats = new Map();     // sheet src -> filtered draws (h
 
 /** assets.js's drawImage wrapper: the 4x filtered canvas for a native <img> drawn onto the game canvas
  * in HD Remaster mode, or null (draw it as it is). The first draw queues it and draws native. */
-export function pixelFiltered(image: CanvasImageSource, target) {
+export function pixelFiltered(image: CanvasImageSource, target: PixelCanvas) {
   if (!screens.has(target) || !imageMode()) return null;
   if (typeof HTMLImageElement === "undefined" || !(image instanceof HTMLImageElement)) return null;
   let name = pixelFilterName();
@@ -326,7 +336,7 @@ export function pixelFiltered(image: CanvasImageSource, target) {
 }
 
 // ── the whole frame (the game) ─────────────────────────────────────────────────────────────────
-let frameCanvas = null;          // the filtered frame while the filter runs, else null
+let frameCanvas: HTMLCanvasElement | null = null;          // the filtered frame while the filter runs, else null
 /** post2d.js reads the frame from here when the pixel filter is on (so HD-2D sits on top of it). */
 export function pixelFilteredFrame() { return frameCanvas; }
 
@@ -341,7 +351,7 @@ export function installPixelFilter(stageEl, gameCanvas, isHd = () => false) {
   ov.id = "pixel-filter";
   ov.style.cssText = "position:absolute;pointer-events:none;display:none;border:none;border-radius:0;background:transparent;max-width:none;max-height:none;z-index:2";
   stageEl.appendChild(ov);
-  let pipe = null, failed = false;
+  let pipe: GpuPipeline | null = null, failed = false;
   function frame() {
     requestAnimationFrame(frame);
     const name = pixelFilterName();

@@ -11,6 +11,7 @@ import {
 } from "../vendor/engine.js";
 
 import type { DigimonRecord } from "../types/battle.js";
+import type { WalkerSentencePlan } from "../types/battle-core.js";
 
 /** assets/data/jogress_scripts.json: the ten DNA actions' decoded director scripts */
 interface JogressScripts {
@@ -197,7 +198,8 @@ export function dnaFusedForm(scripts: JogressScripts | null | undefined, profile
   for (let i = 0; i < DNA_PROFILE_ROWS; i++) {
     const at = DNA_COMBATANT_STRIDE * i;
     if (at + 2 > (profiles?.length ?? 0)) break;
-    if (((profiles[at] | (profiles[at + 1] << 8)) & 0xffff) !== row.fusedModel) continue;
+    // ETS item 9: the length check above proves both bytes are there
+    if (((profiles![at]! | (profiles![at + 1]! << 8)) & 0xffff) !== row.fusedModel) continue;
     profile = digimon?.[i + 1] ?? null;
     break;
   }
@@ -218,7 +220,7 @@ export function dnaFusedForm(scripts: JogressScripts | null | undefined, profile
  * own arms — and it states no number the game never shows. What the arm changed is on
  * `plan` for the tests to read.
  */
-export function scriptedWalkerSentence(plan, skill: { name?: string | number } | null | undefined, who: string) {
+export function scriptedWalkerSentence(plan: WalkerSentencePlan | null | undefined, skill: { name?: string | number } | null | undefined, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   const statName = ["attack", "defense", "speed"][
     (plan?.stats?.[0]?.stat ?? 0) | 0] ?? "stat";
@@ -256,7 +258,7 @@ export function scriptedWalkerSentence(plan, skill: { name?: string | number } |
  * 2026-10-04 reading: it states no number the game never shows, and the byte and the
  * multiplier it buys are on the plan for the tests to read.
  */
-export function chargeWalkerSentence(charge: { charged?: boolean } | null | undefined, skill: { name?: string | number } | null | undefined, who: string) {
+export function chargeWalkerSentence(charge: { charged?: boolean | undefined } | null | undefined, skill: { name?: string | number } | null | undefined, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   if (!charge?.charged) return `${name} No effect!`;
   return `${name} The next attack hits harder!`;

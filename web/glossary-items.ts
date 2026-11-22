@@ -12,6 +12,9 @@
 // Odds are printed as a percent with one decimal, the same as the DIGIMON page ("Drops: ..."): rate+1 of 1024 per win.
 import { dropIndex, dropOdds } from "./codex-data.js";
 import { displayName, metOf } from "./glossary-digimon.js";
+import type { DigimonLog } from "./types/glossary-digimon.js";
+import type { EnemyRecord } from "./types/battle.js";
+import type { BagSlot, EnemyStatsFile, ItemInfo, ItemObtainIndex, ItemObtainRecord, ItemPage, ItemsData, ShopsFile, WhereLine } from "./types/screens.js";
 
 /** Rows of the page's one panel (listRowY 0..8): name row, "What it does" head, description, "Where to get it" head, where lines. */
 export const ITEM_ROWS = 9;
@@ -21,7 +24,7 @@ export const MAX_DESC_LINES = 2;
 export const whereVisible = (descLines: number) => ITEM_ROWS - (descLines > 0 ? 3 + descLines : 2);
 
 /** "12.6%": the odds of one drop as the DIGIMON page prints them. */
-export const oddsText = (n) => `${Math.round((n / 1024) * 1000) / 10}%`;
+export const oddsText = (n: number) => `${Math.round((n / 1024) * 1000) / 10}%`;
 
 /**
  * The tables the page needs, built once. `obtain` = item_obtain_index.json, `shops` = shops.json, `enemies` = enemies.json,
@@ -33,17 +36,17 @@ export const oddsText = (n) => `${Math.round((n / 1024) * 1000) / 10}%`;
  * enemy stats, and the decoded name bank (or null).
  */
 interface ItemTables {
-    obtain?: any;
-    shops?: any;
-    enemies?: any;
-    stats?: { records?: any[] } | null;
+    obtain?: ItemObtainIndex | null;
+    shops?: ShopsFile | null;
+    enemies?: EnemyRecord[] | { enemies?: EnemyRecord[] } | null;
+    stats?: EnemyStatsFile | null;
     nameBank?: string[] | null;
 }
 
-export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null }: ItemTables = {}) {
+export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null }: ItemTables = {}): ItemsData {
     const list = Array.isArray(enemies) ? enemies : Array.isArray(enemies?.enemies) ? enemies.enemies : [];
     const records = Array.isArray(stats?.records) ? stats.records : [];
-    const display = new Map(), groups = new Map();
+    const display = new Map<string, string>(), groups = new Map<string, string[]>();
     list.forEach((e, i) => {
         const id = typeof e?.enemy_id === "string" ? e.enemy_id : "";
         if (!id || id === "Null") return;
@@ -51,19 +54,19 @@ export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null 
         const name = typeof line === "string" && line !== "" ? line : displayName(id);
         display.set(id, name);
         if (!groups.has(name)) groups.set(name, []);
-        groups.get(name).push(id);
+        groups.get(name)!.push(id);
     });
     const index = dropIndex(enemies);
-    const items = obtain?.items && typeof obtain.items === "object" ? obtain.items : {};
+    const items: Record<string, ItemObtainRecord> = obtain?.items && typeof obtain.items === "object" ? obtain.items : {};
     const shopList = Array.isArray(shops) ? shops : Array.isArray(shops?.shops) ? shops.shops : [];
-    const shopNames = new Map(shopList.map((s) => [Number(s.shop_id), typeof s.name === "string" ? s.name : ""]));
+    const shopNames = new Map<number, string>(shopList.map((s) => [Number(s.shop_id), typeof s.name === "string" ? s.name : ""]));
     return {
-        enemyName: (id: number): string => display.get(id) ?? displayName(id),
+        enemyName: (id: string): string => display.get(id) ?? displayName(id),
         groups,
-        shopName: (id) => shopNames.get(Number(id)) || "",
-        obtainName: (itemId) => items[String(itemId)]?.name ?? "",
-        shopIds: (itemId) => (items[String(itemId)]?.sources ?? []).filter((s) => s?.kind === "shop").map((s) => Number(s.shop_id)),
-        droppers: (itemId) => index.byItem.get(items[String(itemId)]?.name ?? "")?.droppers ?? [],
+        shopName: (id: number | string) => shopNames.get(Number(id)) || "",
+        obtainName: (itemId: number | string) => items[String(itemId)]?.name ?? "",
+        shopIds: (itemId: number | string) => (items[String(itemId)]?.sources ?? []).filter((s) => s?.kind === "shop").map((s) => Number(s.shop_id)),
+        droppers: (itemId: number | string) => index.byItem.get(items[String(itemId)]?.name ?? "")?.droppers ?? [],
     };
 }
 
@@ -72,8 +75,8 @@ export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null 
  * best chance first. A line is { kind: "shop" | "drop", text, right? } (`right` = the percent, drawn at the right edge).
  * `log` is a species log snapshot (metCount / beatenCount / ownedCount).
  */
-export function whereLines(data, itemId, log) {
-    const out = [];
+export function whereLines(data: ItemsData, itemId: number, log: DigimonLog): WhereLine[] {
+    const out: WhereLine[] = [];
     const seenShop = new Set();
     for (const sid of data.shopIds(itemId)) {
         const name = data.shopName(sid);
@@ -81,13 +84,13 @@ export function whereLines(data, itemId, log) {
         seenShop.add(name);
         out.push({ kind: "shop", text: `Sold at ${name}` });
     }
-    const best = new Map();                                // display name -> best n over its records
+    const best = new Map<string, number>();                                // display name -> best n over its records
     for (const d of data.droppers(itemId)) {
         const name = data.enemyName(d.enemy);
         const names = data.groups.get(name) ?? [d.enemy];
         if (!metOf({ names }, log)) continue;              // never met: not shown at all
         const n = d.odds?.n ?? dropOdds(d.rate).n;
-        if (!best.has(name) || n > best.get(name)) best.set(name, n);
+        if (!best.has(name) || n > best.get(name)!) best.set(name, n);
     }
     [...best].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
         .forEach(([name, n]) => out.push({ kind: "drop", text: `Dropped by ${name}`, right: oddsText(n) }));
@@ -95,12 +98,12 @@ export function whereLines(data, itemId, log) {
 }
 
 /** Items held in a bag [{id, qty}]. */
-export const heldIn = (bag, id) => (Array.isArray(bag) ? bag : []).reduce((t, s) => (s && s.id === id ? t + (s.qty ?? 1) : t), 0);
+export const heldIn = (bag: BagSlot[] | null | undefined, id: number) => (Array.isArray(bag) ? bag : []).reduce((t, s) => (s && s.id === id ? t + (s.qty ?? 1) : t), 0);
 
 /**
  * One item's page: { id, name, count, does, where }. `info(id)` = { name, desc } from the game's item table.
  */
-export function itemPage(data: Parameters<typeof whereLines>[0], id: Parameters<typeof whereLines>[1], { info, held = 0, log }: { info?: (id: Parameters<typeof whereLines>[1]) => { name?: string; desc?: string } | null | undefined; held?: number; log: Parameters<typeof whereLines>[2] }): { id: Parameters<typeof whereLines>[1]; name: string; count: number; does: string; where: { kind: string; text: string; right?: string }[] } {
+export function itemPage(data: ItemsData | null | undefined, id: number, { info, held = 0, log }: { info?: (id: number) => ItemInfo | null | undefined; held?: number; log: DigimonLog }): ItemPage {
     const i = info?.(id) ?? null;
     return { id, name: i?.name || `Item ${id}`, count: held, does: String(i?.desc ?? ""), where: data ? whereLines(data, id, log) : [] };
 }
@@ -110,17 +113,18 @@ export function itemPage(data: Parameters<typeof whereLines>[0], id: Parameters<
  * Does not wrap. Pure.
  */
 export function createItemsModel() {
-    let id = null, line = 0;
-    const indexIn = (ids) => { const k = ids.indexOf(id); return k < 0 ? 0 : k; };
+    let id: number | null = null, line = 0;
+    // the remembered id starts out null, so the lookups take a list that may hold it
+    const indexIn = (ids: (number | null)[]) => { const k = ids.indexOf(id); return k < 0 ? 0 : k; };
     return {
         /** Current item id for this list (the first one when the remembered item is not in it); null for an empty list. */
-        current(ids) { if (!ids.length) return null; if (!ids.includes(id)) { id = ids[0]; line = 0; } return id; },
-        index: (ids: number[]): number => indexIn(ids),
+        current(ids: (number | null)[]) { if (!ids.length) return null; if (!ids.includes(id)) { id = ids[0]!; line = 0; } return id; },
+        index: (ids: (number | null)[]): number => indexIn(ids),
         move(ids: number[], d: number) {
             if (!ids.length) return false;
             const from = indexIn(ids), to = Math.max(0, Math.min(ids.length - 1, from + d));
             if (to === from) return false;
-            id = ids[to]; line = 0;
+            id = ids[to]!; line = 0;
             return true;
         },
         line: () => line,
@@ -133,10 +137,10 @@ export function createItemsModel() {
     };
 }
 
-const asJson = (v) => (typeof v?.json === "function" ? v.json() : v);
+const asJson = (v: { json?: unknown } | null | undefined) => (typeof v?.json === "function" ? v.json() : v);
 
 /** Fetch the tables and build the data. `loadNameBank()` resolves the decoded name bank lines. Never rejects; null on a failure. */
-export async function loadItemsData(fetchJson = globalThis.fetch, loadNameBank = null) {
+export async function loadItemsData(fetchJson = globalThis.fetch, loadNameBank: (() => string[] | null | Promise<string[] | null>) | null = null) {
     if (typeof fetchJson !== "function") return null;
     try {
         const [obtain, shops, enemies, stats] = await Promise.all([

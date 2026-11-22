@@ -10,10 +10,14 @@
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/
 // preload/diagnostics.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter, battleMenuLanguage } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleDnaSeed } from "./types/battledna-translated.js";
+import type { FightDnaSeed, FightDnaSession } from "../engine/dw3/ui/fight-dna-session.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+import type { BattleMenuData, PackedSfx } from "./types/translated-screens.js";
 interface DnaHandoff {
   [key: string]: string | number | boolean;
 }
@@ -97,6 +101,16 @@ interface DnaSession {
 }
 
 
+/** The adapter state plus the DNA screen's own fields (its seed, its answer word, its species result, its language). */
+type DnaRecord = BattleMenuAdapterState & { _seed: FightDnaSeed & { step: string }; _answer: number | null; _species: number | null; _language: number };
+
+/** What loadData() resolves: the tables the pane reads, the font and the text banks. */
+interface DnaData extends BattleMenuData {
+  tagTables: Uint8Array;
+  panelTable: Uint8Array;
+  techniques: Uint8Array;
+}
+
 interface DnaDiagnosticsSource {
   _session?: DnaSession | null;
   _answer: number;
@@ -126,7 +140,7 @@ const NAME_BANK = 0x4e;
 // The carry-over panel's technique names live in bank 0xA2, the same extracted
 // bank the Digivolve form list reads.
 const TECH_BANK = 0xa2;
-const BANK_DIRS = [[UI_BANK, "battlecmd"], [NAME_BANK, "wizard"]];
+const BANK_DIRS: [number, string][] = [[UI_BANK, "battlecmd"], [NAME_BANK, "wizard"]];
 const DATA_LABEL = "Battle DNA data";
 // The pane's three data blocks live in pro/fightstg's own image: the species strip's
 // eight-word config at 0x800A3594 and the option list's at 0x800A35B4, then the four
@@ -155,7 +169,7 @@ const FORM_PANEL_PAGE0_SIZE = 40;
 const fetchProfileTable = () => loadProfileRecords(DATA_LABEL);
 
 let dataPromise = null;
-function loadData(language) {
+function loadData(language: number) {
     dataPromise ??= Promise.all([
         fetchJson("battlecmd/manifest.json", DATA_LABEL),
         fetchBytes("battlecmd/dna-tables.bin", DATA_LABEL),
@@ -190,7 +204,7 @@ function loadData(language) {
     return dataPromise;
 }
 
-export function createBattleDnaTranslated(sfx = null, options = {}) {
+export function createBattleDnaTranslated(sfx: PackedSfx | null = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -199,21 +213,21 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
         state: { _answer: null, _species: null, _language: 2 },
         // The banks are cut per language, so the language is settled before the
         // data is asked for and the screen's own copy is what start() uses.
-        beforeLoad: (r) => { r._language = battleMenuLanguage(options, "Battle DNA language index is invalid"); },
+        beforeLoad: (r: DnaRecord) => { r._language = battleMenuLanguage(options, "Battle DNA language index is invalid"); },
         load: (r: { _language: number }): Promise<void> => loadData(r._language),
         loadFailure: "battle DNA data failed to load",
         failureMessage: "translated DNA screen failed",
         failureConsole: "Translated battle DNA screen failed",
         languageError: "Battle DNA language index is invalid",
         chosenField: false,
-        readChosen: (r) => r._answer,
+        readChosen: (r: DnaRecord) => r._answer,
 
         /**
          * Open the DNA screen. `seed.step` picks the first step: "list" runs the
          * shared partner list in DNA mode, "pane" (the default) opens the pane on
          * the partner the caller already picked.
          */
-        seed: (r, seed: BattleDnaSeed = {}) => ({
+        seed: (r: BattleMenuAdapterState, seed: BattleDnaSeed = {}) => ({
             step: seed.step === "list" ? "list" : "pane",
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             partnerIndex: Math.max(0, Math.min(2, Number(seed.partnerIndex ?? 1) | 0)),
@@ -235,13 +249,13 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
             })),
         }),
 
-        onOpen: (r: { _answer: null; _species: null; _ticks: number; }) => {
+        onOpen: (r: DnaRecord) => {
             r._answer = null;
             r._species = null;
             r._ticks = 0;
         },
 
-        start: (r, data, language, playSound) => new ui.FightDnaSession(r._language, {
+        start: (r: DnaRecord, data: DnaData, language: number, playSound: (soundId: number) => void) => new (ui as EngineUi).FightDnaSession(r._language, {
             ...r._seed,
         }, {
             tables: data.tagTables,
@@ -259,7 +273,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
         // `self+0x2c(self, 0)`), and the coordinator is what closes it. So the
         // answer is read off that word, and the cancel is the word -2 the pane
         // leaves behind when it does close itself.
-        answer: (r, session) => {
+        answer: (r: DnaRecord, session: FightDnaSession) => {
             const pane = session.pane;
             if (session.step() === "done") {
                 r._answer = pane ? pane.answer() : -2;
@@ -278,9 +292,9 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
         },
 
         // The pane keeps reading the pad after its confirm, until it is done.
-        canQueue: (r, session: { step: () => string; }) => !!session && session.step() !== "done",
+        canQueue: (r: BattleMenuAdapterState, session: { step: () => string; }) => !!session && session.step() !== "done",
         done: (session: { step: () => string; }) => session.step() === "done",
-        paintTarget: (r) => (r._session.step() === "pane" ? r._session.pane : r._session.list),
+        paintTarget: (r: BattleMenuAdapterState) => (r._session.step() === "pane" ? r._session.pane : r._session.list),
 
         /**
          * The two extracted tables the DNA command's own rule reads, once the
@@ -289,7 +303,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
          * battle command path reads the SAME bytes through the shared rule in
          * engine/dw3/ui/native/battle-dna-menu.ts, so one pairing answer serves both.
          */
-        extraApi: (r) => {
+        extraApi: (r: DnaRecord & { speciesOut?: () => number | null; tables?: () => { profiles: Uint8Array; techniques: Uint8Array } | null }) => {
             /** The DNA result species the confirm wrote through self+0x80. */
             r.speciesOut = () => r._species;
             r.tables = () => (r._data ? { profiles: r._data.profiles, techniques: r._data.techniques } : null);

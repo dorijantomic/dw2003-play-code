@@ -17,6 +17,7 @@ import { READY_MS } from "./command.js";
 import type { MpNetFighter, MpNetHost } from "./types.js";
 import type { MpFightResult, MpLaunchOptions } from './types.js';
 import type { DigimonRecord } from '../types/battle.js';
+import type { MpFoeRec, MpPartyMember, MpSetup } from "../types/mp-match.js";
 interface MpHostBot {
     id: number;
     name: string;
@@ -32,21 +33,21 @@ interface MpHostOptions extends MpLaunchOptions {
 
 
 // ------------------------------------------------------------ starting, joining, finishing
-async function begin(setup, isHost: boolean, hostId, done) {
+async function begin(setup: MpSetup, isHost: boolean, hostId: number | string, done: (r: MpFightResult) => void) {
     if (MB.F) return false;
     const kit = await MB.A.getKit();
     const party = kit.party();
     const me = party[0]?.rec;
     if (!me) return false;
     const erec = isHost ? setup.foes.map((e) => kit.enemyRecord(e, setup.screenId ?? null)) : [];
-    if (erec.some((r) => !r)) return false;
+    if (erec.some((r: MpFoeRec) => !r)) return false;
     if (MB.F) return false;
     MB.F = {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
         screenId: setup.screenId ?? null, mapId: setup.mapId ?? MB.A.mapId?.() ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         bots: new Set((setup.bots ?? []).map((b) => b.id)), snap: MB.A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
         link: createLink({ onEnd: () => { if (MB.F) finish(false, { fled: true, hostLeft: true }); } } as LinkOptions),
-    } as MpNetFighter;
+    };
     emit("fightSeen", winEvent(MB.F.foes));            // only the species log listens (web/species-log.js): quests hear battleWon alone
     const U = MB.F.ui = MB.A.ui ?? (MB.A.ui = buildUi());
     U.cards.clear(); U.foes.replaceChildren(); U.mine.replaceChildren(); U.foeKeys = ""; U.bar.replaceChildren(); U.log.replaceChildren(); U.plateMap.clear(); U.plates.replaceChildren();
@@ -67,7 +68,7 @@ async function begin(setup, isHost: boolean, hostId, done) {
     if (!MB.F) return true;
     if (isHost) {
         MB.F.H = {
-            P: new Map([[mePublic.id, { ...mePublic, rec: me, party: party.map((m) => m.rec) }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
+            P: new Map([[mePublic.id, { ...mePublic, rec: me, party: party.map((m: MpPartyMember) => m.rec) }]]), names: erec.map((r: MpFoeRec) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
             arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false, res: new Map(), pause: createPause(),
         } as MpNetHost;
         for (const b of setup.bots ?? []) {                    // a computer-played practice partner is ready at once
@@ -132,7 +133,7 @@ export function mpbPeerAway(id: string) {
 
 /** The relay says a seat is back. Guest: the referee is back, stop waiting for it (it sends a snapshot on its own link back).
  *  Referee: nothing, it waits for that guest's own `back` message (a reloaded page has no fight to come back to). */
-export function mpbPeerBack(id) {
+export function mpbPeerBack(id: string) {
     if (!MB.F || MB.F.isHost) return;
     if (id === MB.F.hostId && MB.F.link.text === LINK_TEXT.ref) { MB.F.link.clear(); render(); }
 }
@@ -147,7 +148,7 @@ export function mpbLinkLost() {
 }
 
 /** MY link is back (`linkback`). resumed = the relay gave me my old id. A new id cannot rejoin the fight: leave cleanly. */
-export function mpbLinkBack(resumed) {
+export function mpbLinkBack(resumed: boolean) {
     if (!MB.F) return;
     if (!resumed) { finish(false, { fled: true, hostLeft: true }); return; }
     if (MB.F.isHost) { MB.F.link.clear(); hostLinkBack(); render(); return; }

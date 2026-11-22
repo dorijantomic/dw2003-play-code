@@ -18,7 +18,12 @@
 import { drawText, fontClutRow, fontReady, layoutGlyphs, textWidth } from "./uifont.js";
 import { ui } from "./vendor/engine.js";
 import { capturing, runsHook } from "./ui-c/capture.js";
-const { decodeTextToken } = ui;
+import type { EngineUi } from "./types/battle.js";
+import type { NativeTextLine, NativeTextStats, NativeTextWidget } from "./types/native-screen.js";
+import type { UiRun } from "./ui-c/types.js";
+import type { TextDecodeMemory } from "../engine/dw3/ui/text-decode.js";
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+const { decodeTextToken } = ui as EngineUi;
 
 const FONT_BANK_BASE = 0x8004dd74; // *(0x8004de00); kind stride 0x18
 
@@ -31,7 +36,8 @@ const basicTokens: Record<string, string> = {};
 fetch("assets/ui/uifont.json")
     .then((r) => r.json())
     .then((j) => {
-        for (const [token, info] of Object.entries((j.chars || {}) as Record<string, { t?: string; i?: number }>)) {
+        // ETS item 42: uifont.json is outside data; every char entry carries its glyph index `i`
+        for (const [token, info] of Object.entries<{ t?: string; i: number }>(j.chars || {})) {
             if (!info) continue;
             if (info.t === "e") extTokens[info.i] = token;
             else if (info.t === "b") basicTokens[info.i] = token;
@@ -51,11 +57,11 @@ const TOKEN_LEN = [1, 2, 3, 2, 5, 3, 3, 2, 3, 2, 0];
  * `slots` = the widget's other line-record decoded strings, indexed by record
  * (F0x8001aa10 renders widget+0x5C+N*0xC inline for 0x02,0x05,N).
  */
-export function decodeNativeText(bytes, slots = []) {
+export function decodeNativeText(bytes: number[], slots: string[] = []) {
     let out = "";
-    const unknown = [];
+    const unknown: number[] = [];
     for (let i = 0; i < bytes.length; i++) {
-        const b = bytes[i];
+        const b = bytes[i]!;
         if (b === 0x00) break;
         if (b === 0x01) {
             // two-byte extended pair: next byte N -> ext glyph N-1
@@ -107,7 +113,7 @@ export function decodeNativeText(bytes, slots = []) {
  * window — so a converted line can be paged exactly like a raw one. Omit it to
  * decode to the line's own end token, the pre-window behaviour.
  */
-export function decodeConvertedText(reader, ptr, font, slots = [], limit = Infinity) {
+export function decodeConvertedText(reader: TextDecodeMemory, ptr: number, font: number, slots: string[] = [], limit = Infinity) {
     let out = "";
     const unknown: number[] = [];
     let cursor = ptr;
@@ -161,7 +167,7 @@ export function decodeConvertedText(reader, ptr, font, slots = [], limit = Infin
     return { text: out, unknown };
 }
 
-function kindOf(w) {
+function kindOf(w: NativeTextWidget) {
     const k = (w.font - FONT_BANK_BASE) / 0x18;
     if (Number.isInteger(k) && k >= 1 && k <= 3) return k;
     // Naming installs an overlay-local font record with its own offsets. Match
@@ -181,7 +187,7 @@ function kindOf(w) {
  * (engine/dw3/ui/text-drawer.ts drawTextElement). A typewriter shows the part
  * revealed so far, and a page after a wait or a clear starts at its own byte.
  */
-export function revealedRun(w): number[] {
+export function revealedRun(w: NativeTextWidget): number[] {
     const bytes = w.lines?.[0]?.bytes ?? [];
     const first = Math.max(0, Math.min(bytes.length, w.revealFirst | 0));
     const end = Math.max(first, Math.min(bytes.length, w.revealEnd | 0));
@@ -200,9 +206,9 @@ export function revealedRun(w): number[] {
  * regression that turned the wizard's name-entry text back into the console
  * encoding: the window is a playback detail, not a change of string source.
  */
-export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } = {}) {
+export function decodeWidgetLine(w: NativeTextWidget, line: NativeTextLine, slots: string[] = [], { revealWindow = false }: { revealWindow?: boolean } = {}) {
     const bytes = line.bytes ?? [];
-    const range = (limit) => {
+    const range = (limit: number): [number, number] => {
         const first = Math.max(0, Math.min(limit, w.revealFirst | 0));
         const end = Math.max(first, Math.min(limit, w.revealEnd | 0));
         return [first, end];
@@ -214,7 +220,7 @@ export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } =
     }
     if (!revealWindow) return decodeConvertedText(w, line.ptr, w.font, slots);
     const [first, end] = range(bytes.length);
-    return decodeConvertedText(w, line.ptr + first, w.font, slots, end! - first!);
+    return decodeConvertedText(w, line.ptr + first, w.font, slots, end - first);
 }
 
 /**
@@ -225,13 +231,13 @@ export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } =
  */
 /** What the text drawing can be told: which widgets to skip or take, and whether the window is revealed. */
 interface NativeTextOpts {
-    skip?: (w: any) => boolean;
-    only?: (w: any) => boolean;
+    skip?: (w: NativeTextWidget) => boolean;
+    only?: (w: NativeTextWidget) => boolean;
     revealWindow?: boolean;
 }
 
-export function drawNativeTextWidgets(ctx, widgets, opts: NativeTextOpts = {}) {
-    const stats = { ready: fontReady(), widgets: widgets.length, lines: 0, drawn: 0, unknown: 0, texts: [] };
+export function drawNativeTextWidgets(ctx: CanvasRenderingContext2D, widgets: NativeTextWidget[], opts: NativeTextOpts = {}) {
+    const stats: NativeTextStats = { ready: fontReady(), widgets: widgets.length, lines: 0, drawn: 0, unknown: 0, texts: [] };
     if (!fontReady()) return stats;
     if (capturing()) {
         // Look C capture scope (web/ui-c): the widgets become runs (data), the overlay writes them as DOM text. Same decode, same window.
@@ -269,7 +275,7 @@ export function drawNativeTextWidgets(ctx, widgets, opts: NativeTextOpts = {}) {
                     glyphMetrics: (info) => {
                         if (!info) return {};
                         const rec = w.read32(w.font + (info.t === "b" ? 4 : 8)) + info.i * 11;
-                        const signed = n => (n << 24) >> 24;
+                        const signed: (n: number) => number = n => (n << 24) >> 24;
                         return { dx: signed(w.read8(rec + 7)), dy: signed(w.read8(rec + 8)), adv: w.read8(rec + 9) };
                     },
                 });
@@ -286,7 +292,7 @@ export function drawNativeTextWidgets(ctx, widgets, opts: NativeTextOpts = {}) {
  * slot the plain row paints its letters with (slot 2: the white 232 of row 0), read from the loaded font manifest at run time -- so a
  * raised stat value (row 1) shows the disc's light blue and a partner that cannot equip (row 7) its grey. Labels only (kind 1).
  */
-export function runFace(kind, clut, rowOf = fontClutRow) {
+export function runFace(kind: number | undefined, clut: number | undefined, rowOf = fontClutRow) {
     if (!clut || kind !== 1) return null;
     const c = rowOf(kind, clut)?.[2];
     return Array.isArray(c) && c[3] ? `rgb(${c[0]},${c[1]},${c[2]})` : null;
@@ -297,8 +303,8 @@ export function runFace(kind, clut, rowOf = fontClutRow) {
  * glyph ({ text, kind, clut, x, y, glyphs: [{ ch, x, dx }] }). The look C overlay (web/ui-c) draws these with a smooth
  * font at the game's own pens. Same decode, same reveal window, same positions; nothing is invented here.
  */
-export function collectNativeTextRuns(widgets, opts: NativeTextOpts = {}) {
-    const runs = [];
+export function collectNativeTextRuns(widgets: NativeTextWidget[], opts: NativeTextOpts = {}) {
+    const runs: UiRun[] = [];
     if (!fontReady()) return runs;
     for (const w of widgets) {
         if (!w.visible) continue;
@@ -319,11 +325,11 @@ export function collectNativeTextRuns(widgets, opts: NativeTextOpts = {}) {
                     glyphMetrics: (info) => {
                         if (!info) return {};
                         const rec = w.read32(w.font + (info.t === "b" ? 4 : 8)) + info.i * 11;
-                        const signed = (n) => (n << 24) >> 24;
+                        const signed = (n: number) => (n << 24) >> 24;
                         return { dx: signed(w.read8(rec + 7)), dy: signed(w.read8(rec + 8)), adv: w.read8(rec + 9) };
                     },
                 });
-                runs.push({ text: parts[k], kind, clut: w.colour | 0, x, y: w.penY + k * w.lineHeight, right: w.alignWidth ? w.penX : null, w: w.alignWidth || textWidth(parts[k], kind), glyphs });
+                runs.push({ text: parts[k]!, kind, clut: w.colour | 0, x, y: w.penY + k * w.lineHeight, right: w.alignWidth ? w.penX : null, w: w.alignWidth || textWidth(parts[k], kind), glyphs });
             }
         }
     }

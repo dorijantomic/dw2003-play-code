@@ -1,4 +1,6 @@
 // Types for web/save-translated.ts: the browser adapter of the SAVE / LOAD memory-card screen.
+import type { MemcardSession } from "../../engine/dw3/ui/memcard-session.js";
+import type { MenuDisplayClock } from "./translated-screens.js";
 
 /** The options the callers of the screen pass with `open` (web/game/ui-openers.ts openMemoryCard). */
 export interface SaveScreenOptions {
@@ -40,10 +42,10 @@ export interface SaveCard {
   slots: (SaveCardSlot | null)[];
   saved: SaveCardWrite[];
   present: () => boolean;
-  directory: (file: string) => Uint8Array;
-  image: (file: string) => Uint8Array | null;
+  directory: (file: number) => Uint8Array;
+  image: (file: number) => Uint8Array | null;
   writeDirectory: () => void;
-  writeImage: (file: string, bytes: Uint8Array) => void;
+  writeImage: (file: number, bytes: Uint8Array) => void;
 }
 
 /** What the screen did, read after it closed: the slots it wrote and the one it loaded. */
@@ -62,7 +64,7 @@ export interface SaveScreenSummary {
   sounds: unknown[];
   ticks: number;
   transfers: unknown[];
-  transition: string | number;
+  transition: [number, number];
 }
 
 /** diagnostics(): what the lab and focused browser checks read. */
@@ -92,8 +94,8 @@ export interface SaveScreenDiagnostics {
 export interface SaveScreen {
   /** the session card (SaveCard); null until the screen opens and clears on close */
   _card: SaveCard | null;
-  /** vendor object: the ui.MenuDisplayClock the frames come from */
-  _clock: any;
+  /** the display clock the frames come from */
+  _clock: MenuDisplayClock | null;
   _commit: SaveResult | null;
   /** the loaded memcard pack: its manifest, tables.bin, the banks and the profile records */
   _data: any;
@@ -108,8 +110,8 @@ export interface SaveScreen {
   _opts: SaveScreenOptions;
   _pending: boolean;
   _request: number;
-  /** vendor object: the ui.MemcardSession running the disc's own screen */
-  _session: any;
+  /** the engine's MemcardSession running the disc's own screen */
+  _session: MemcardSession | null;
   _setNoReload?: (v: boolean) => void;
   /** the walker's game state the card is written from (web/game/types.ts GameState) */
   _state: any;

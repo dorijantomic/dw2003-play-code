@@ -19,6 +19,7 @@
 import type { AnimViewerCamera, FreeCameraOptions } from "./types/anim-viewer-camera.js";
 import type { CameraBounds } from "./types/anim-viewer-camera.js";
 import type { CameraUrlState } from "./types/anim-viewer-camera.js";
+import type { CameraFlyKeys } from "./types/anim-viewer-camera.js";
 
 
 
@@ -28,7 +29,7 @@ const EPS = 1e-9;
 const clamp = (v, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t: number) => a + (b - a) * t;
 // Frame-rate independent exponential damping: fraction of the remaining distance per second.
-const damp = (cur: number | undefined, target: number | undefined, rate: number, dt) => (rate <= 0 || dt <= 0 ? target : lerp(cur, target, 1 - Math.exp(-rate * dt)));
+const damp = (cur: number | undefined, target: number | undefined, rate: number, dt: number) => (rate <= 0 || dt <= 0 ? target : lerp(cur, target, 1 - Math.exp(-rate * dt)));
 
 export const PITCH_LIMIT = 89 * DEG;        // default clamp: never exactly vertical (avoids a degenerate up)
 export const PITCH_LIMIT_FULL = 89.95 * DEG; // "allow full pitch" toggle
@@ -123,12 +124,12 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Mouse orbit: dx pixels right, dy pixels down. 0.4°/px, the usual model-viewer feel. */
-  function orbitPixels(dx, dy, degPerPixel = 0.4) {
+  function orbitPixels(dx: number, dy: number, degPerPixel = 0.4) {
     return orbitBy(-dx * degPerPixel, -dy * degPerPixel);
   }
 
   /** Pan the pivot in the camera's own screen plane; (dx,dy) in pixels. */
-  function panPixels(dx, dy, viewportH = 900) {
+  function panPixels(dx: number, dy: number, viewportH = 900) {
     const { right, up } = basis();
     // world units per pixel at the pivot plane for the CURRENT vertical fov
     const unitsPerPx = (2 * cam.dist * Math.tan(cam.fovDeg * DEG / 2)) / Math.max(1, viewportH);
@@ -146,7 +147,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
    * cursor stays under the cursor: the pivot slides toward that point by the same fraction the
    * distance shrinks by (the standard zoom-to-cursor construction).
    */
-  function zoomBy(factor, cursorNdc = null, aspect = 1) {
+  function zoomBy(factor: number, cursorNdc = null, aspect = 1) {
     const f = clamp(+factor || 1, 0.1, 10);
     const newDist = clamp(cam.dist * f, cam.minDist, cam.maxDist);
     const applied = newDist / cam.dist;
@@ -263,7 +264,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Fly mode translation: WASD in the camera plane, Q/E world-down/up. dt seconds. */
-  function fly(keys, dt) {
+  function fly(keys: CameraFlyKeys | null, dt: number) {
     const active = keys && (keys.w || keys.a || keys.s || keys.d || keys.q || keys.e);
     if (!active || dt <= 0) return false;
     const { forward, right, up } = basis();
@@ -340,7 +341,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
       0, 0, -(far + near) / (far - near), 1,
     ]);
   }
-  function projection(aspect, nearFar = null) {
+  function projection(aspect: number, nearFar: number[] | null = null) {
     const near = nearFar ? nearFar[0] : Math.max(0.5, cam.dist * 0.02);
     const far = nearFar ? nearFar[1] : Math.max(8000, cam.dist * 8 + 60000);
     if (cam.ortho) {
@@ -350,7 +351,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     return mat4Perspective(cam.fovDeg * DEG, Math.max(0.1, aspect), near, far);
   }
   function viewMatrix() { return mat4LookAt(eye(), look(), basis().up); }
-  function viewProjection(aspect) { return mat4Mul(projection(aspect), viewMatrix()); }
+  function viewProjection(aspect: number) { return mat4Mul(projection(aspect), viewMatrix()); }
 
   function mat4Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
     const o = new Float32Array(16);
@@ -361,7 +362,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     }
     return o;
   }
-  function transform(m: Float32Array<ArrayBuffer>, p) {
+  function transform(m: Float32Array<ArrayBuffer>, p: readonly [number, number, number]) {
     const x = p[0], y = p[1], z = p[2];
     const w = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
     return [(m[0]! * x + m[4]! * y + m[8]! * z + m[12]!) / w,
@@ -377,7 +378,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** The camera ray through an NDC point (unit). */
-  function rayAt(ndc, aspect) {
+  function rayAt(ndc, aspect: number) {
     const { forward, right, up } = basis();
     const th = Math.tan(cam.fovDeg * DEG / 2);
     const d = [

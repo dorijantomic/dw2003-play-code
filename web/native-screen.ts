@@ -23,49 +23,21 @@ import { ui, ROSTER_STRIDE } from "./vendor/engine.js";
 // before any screen boots, so boot and tick stay synchronous once loaded.
 import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
-import type { NativeScreenFlags } from "./types/native-screen.js";
+import type { NativePartySeed, NativeScreenDriverState, NativeScreenEntry, NativeScreenFlags, NativeScreenObject, NativeBootOpts, NativeScreenManifest, NativeTextLine, NativeTextWidget, SeedEquipment } from "./types/native-screen.js";
+import type { NativeRuntimeView } from "./types/native-screen.js";
+import type { NativeScreenDrawIntent } from "./types/native-screen-render.js";
 
 const BASE = "assets/native/screens";
 
-const resolverDirs = new Map(); // resolver-made pack directory pointer -> { idx, sub }
+const resolverDirs = new Map<number, { idx: number; sub: number }>(); // resolver-made pack directory pointer -> { idx, sub }
 
-const state = {
+const state: NativeScreenDriverState = {
     manifest: null,
     resident: null,
     overlays: {}, // module -> Uint8Array
     banks: new Map(), // bank id -> Uint8Array
     current: null,
 };
-
-/** One screen of the natives build: its overlay file, its root constructor, and the banks it uploads. */
-interface NativeScreenEntry { file: string; root_ctor?: number; bank_ids?: number[] }
-/** The natives manifest (tools/build_native_screens.py): one entry per screen module. */
-interface NativeScreenManifest { screens: Record<string, NativeScreenEntry> }
-/** One party record to seed: the roster slot it lands in, and the numbers its status sheet reads. */
-interface SeedRosterRow {
-    slot?: number;
-    starterSlot?: number;
-    exp?: number;
-    level?: number; tp?: number; hp?: number; maxHp?: number; mp?: number; maxMp?: number;
-    name?: string;
-    core?: number[]; elements?: number[];
-    forms?: any;
-    equipment?: { head?: number; body?: number; right?: number; left?: number; acc0?: number; acc1?: number };
-}
-/** The host save-context seed: the party map (roster slot per position, 0xffffffff = empty), and the records. */
-interface NativePartySeed { positions?: number[]; stats?: SeedRosterRow[] }
-/** What a boot may override on top of the manifest: the root constructor, the object lifecycle rule, the SFX hook,
- *  the browser's card, the mixed-mode bridge, real root arguments, and the writes the constructor reads. */
-interface NativeBootOpts {
-    rootCtor?: number;
-    objectLifecycle?: boolean;
-    playPackedSound?: (id: any) => void;
-    memcard?: any;
-    bridge?: boolean;
-    rootArgs?: any[];
-    skipClip?: (name: string, id: any) => boolean;
-    preBoot?: (rt: any) => void;
-}
 
 export async function loadNativeScreens() {
     // Fetch the interpreter bundle first, so bootNativeScreen can stay
@@ -79,7 +51,7 @@ export async function loadNativeScreens() {
             overlays[id] = new Uint8Array(await (await fetch(`${BASE}/${entry.file}`)).arrayBuffer());
         }),
     );
-    const ids = new Set();
+    const ids = new Set<number>();
     for (const entry of Object.values(manifest.screens)) for (const b of entry.bank_ids ?? []) ids.add(b);
     await Promise.all(
         [...ids].map(async (id) => {
@@ -102,7 +74,7 @@ export async function loadNativeScreens() {
  *  (docs/research/ui/pad-input-service-behaviour-2026-08-21.md): Start 0x0008,
  *  Up 0x0010, Right 0x0020, Down 0x0040, Left 0x0080, Triangle 0x1000,
  *  Circle 0x2000 (confirm), Cross 0x4000 (cancel), Square 0x8000. */
-export function setNativeScreenPad(buttons, port = 0) {
+export function setNativeScreenPad(buttons: number, port = 0) {
     if (state.current?.rt) state.current.rt.setPadHeld(port, buttons >>> 0);
 }
 
@@ -118,7 +90,7 @@ export { encodeNativeScreenText };
  *  record+0x3C8 — the live store on the reference route puts an equipped item there
  *  (`sh $s4, 0x3c0($s1)`, ststatus file 0x17990 = RAM 0x8009A640). The documents
  *  that print `+0x3C0..+0x3CB` for these six are using the stat block's base. */
-export const RECORD_EQUIP_OFFSETS: [string, number][] = [
+export const RECORD_EQUIP_OFFSETS: [keyof SeedEquipment, number][] = [
     ["head", 0x3c8], ["body", 0x3ca], ["right", 0x3cc],
     ["left", 0x3ce], ["acc0", 0x3d0], ["acc1", 0x3d2],
 ];
@@ -175,12 +147,12 @@ export function seedNativeScreenParty(seed: NativePartySeed = {}) {
 }
 
 /** Debug: the live objects (addr, callback, alive) the runtime schedules. */
-export function nativeScreenObjects(): { addr: number; cb: number; alive: boolean }[] {
+export function nativeScreenObjects(): NativeScreenObject[] {
     return (state.current?.rt?.world?.objects ?? []).map((o) => ({ addr: o.addr >>> 0, cb: o.cb >>> 0, alive: o.alive }));
 }
 
 /** Debug: the current tick's recorded draw intents (method + args). */
-export function nativeScreenDraws() {
+export function nativeScreenDraws(): NativeScreenDrawIntent[] {
     return (state.current?.rt?.drawCalls ?? []).map((c) => ({ method: c.method, args: [...c.args] }));
 }
 
@@ -197,7 +169,7 @@ export function nativeScreenRawPrims() {
 }
 
 /** Debug read of the running screen's RAM (for focused probes). */
-export function nativeScreenRead(addr, size = 4) {
+export function nativeScreenRead(addr: number, size = 4) {
     const mem = state.current?.rt?.mem;
     if (!mem) return null;
     if (size === 1) return mem.read8(addr);
@@ -220,7 +192,7 @@ export function nativeScreenList() {
  *  lifecycle-3 destroy rule (see engine/native/stubs.ts), which is what lets a
  *  scene return to its parent screen when a sub-screen closes.
  *  opts.playPackedSound — host audio forwarding for the runtime's SFX stub. */
-export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {}) {
+export function bootNativeScreen(moduleId: string, host: Partial<NativeScreenFlags> = {}, opts: NativeBootOpts = {}) {
     state.current = null;
     resolverDirs.clear();
     const entry = state.manifest?.screens?.[moduleId];
@@ -230,7 +202,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
     // retries (the adapters keep a _pending flag for exactly this).
     const ns = nativeRuntime();
     if (!entry || !bytes || !state.resident || !ns) return null;
-    const screenHost = {
+    const screenHost: NativeScreenFlags = {
         setFlag() {},
         getFlag: () => 0,
         rand16: () => 0x777,
@@ -240,7 +212,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
         // save screen's adapter). Absent = the retail no-card path.
         ...(opts.memcard ? { memcard: opts.memcard } : {}),
         ...host,
-    } as NativeScreenFlags;
+    };
     // The manifest stores root_ctor OVERLAY-RELATIVE (tools/build_native_screens.py
     // writes `ctor - load_base`, and the runtime boots overlayBase + root_ctor).
     // An explicit opts.rootCtor is absolute (the decomp's F0x8008xxxx form), so
@@ -259,7 +231,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
         effect_ids: [],
     };
     const residentBase = state.manifest!.resident.base >>> 0;
-    const rt = new ns.NativeStageRuntime(
+    const rt: NativeRuntimeView = new ns.NativeStageRuntime(
         bytes,
         manifestEntry,
         screenHost,
@@ -273,7 +245,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
     // place of the original MIPS bodies for this module. Installed before boot
     // so constructor-time calls are replaced too.
     const bridgeBefore = ns.bridgeInvocations();
-    const bridgeStart = new Map(bridgeBefore);
+    const bridgeStart = new Map<string, number>(bridgeBefore);
     if (opts.bridge) ns.installTranslationBridge(rt.cpu, rt.mem, [moduleId], null, rt.services);
     if (opts.objectLifecycle) rt.objectLifecycle = true;
     // A screen whose manifest root is a sub-object factory needs real arguments
@@ -296,7 +268,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
     // the pause page issued ~22,000 bogus LoadImage uploads (~2.2 GB of copying,
     // the 3-second wait) before the page appeared. A zeroed 16-byte heap block
     // makes the table entry 0 and the walk stops on its first step.
-    const resolverBlocks = new Map();
+    const resolverBlocks = new Map<string, number>();
     rt.cpu.setStub(0x800140d8, (c) => {
         const handle = c.reg(4) >>> 0;
         const idx = (handle >>> 16) & 0xffff;
@@ -319,7 +291,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
         const bank = state.banks.get(id);
         if (!bank) return;
         const n = Math.min(nbytes, bank.length);
-        for (let i = 0; i < n; i++) rt.mem.write8(dest + i, bank[i]);
+        for (let i = 0; i < n; i++) rt.mem.write8(dest + i, bank[i]!);
     };
     // Production state seed: a screen whose CONSTRUCTOR reads seeded state (the
     // save screen reads its save/load mode word out of the resident context as
@@ -329,9 +301,9 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
     if (opts.preBoot) {
         opts.preBoot({
             rt,
-            read: (addr, size = 4) => (size === 1
+            read: (addr: number, size = 4) => (size === 1
                 ? rt.mem.read8(addr) : size === 2 ? rt.mem.read16(addr) : rt.mem.read32(addr) >>> 0),
-            write: (addr, value, size = 4) => {
+            write: (addr: number, value: number, size = 4) => {
                 if (size === 1) rt.mem.write8(addr, value & 0xff);
                 else if (size === 2) rt.mem.write16(addr, value & 0xffff);
                 else rt.mem.write32(addr, value | 0);
@@ -405,7 +377,7 @@ export function tickNativeScreen(padWord: number | undefined, delta = 1) {
 /** Which extracted pack a recorded drawSprite directory pointer belongs to.
  *  The pointer encodes the LBA file index the screen requested; the manifest
  *  maps that index to the extracted pack name for this screen. */
-export function nativeScreenPackNameForDir(dir) {
+export function nativeScreenPackNameForDir(dir: number) {
     const e = resolverDirs.get(dir >>> 0);
     if (!e) return null;
     const packs = state.current?.entry?.packs;
@@ -417,7 +389,7 @@ export function nativeScreenPackNameForDir(dir) {
  *  resolved for. Diagnostic companion to nativeScreenPackNameForDir: when a pack
  *  has no manifest entry this names the handle the screen actually asked for, so
  *  the missing extraction is reported instead of silently skipped. */
-export function nativeScreenDirKey(dir) {
+export function nativeScreenDirKey(dir: number) {
     const e = resolverDirs.get(dir >>> 0);
     return e ? `${e.idx}:${e.sub}` : null;
 }
@@ -428,14 +400,14 @@ export function nativeScreenDirKey(dir) {
  *  +0x4 buffer capacity, +0x6 length, +0x8 draw cursor index, +0xA mode/flag),
  *  +0xB0/+0xB2 pen, +0xC0 colour row, +0xAE palette-row add, +0xC1 visibility,
  *  +0x62 line-0 length, +0xA6 first / +0xA4 end of the reveal window. */
-export function nativeTextWidgets() {
+export function nativeTextWidgets(): NativeTextWidget[] {
     const cur = state.current;
     if (!cur || !cur.booted) return [];
     const mem = cur.rt.mem;
-    const out = [];
+    const out: NativeTextWidget[] = [];
     for (const o of cur.rt.world.objects) {
         if (!o.alive || (o.cb >>> 0) !== 0x8001ac14) continue;
-        const lines = [];
+        const lines: NativeTextLine[] = [];
         for (let i = 0; i < 6; i++) {
             // Line record (decompiled F0x80019370): +0x0 buffer, +0x4 capacity,
             // +0x6 length (u16), +0x8 reveal cursor (set by the drawer), +0xA flag.
@@ -445,7 +417,7 @@ export function nativeTextWidgets() {
             const len = mem.read16(rec + 0x6);
             const index = mem.read16(rec + 0x8);
             const flag = mem.read16(rec + 0xa);
-            let bytes = null;
+            let bytes: number[] | null = null;
             if (ptr >= 0x80000000 && len > 0 && len < 512) {
                 bytes = [];
                 for (let k = 0; k < len; k++) bytes.push(mem.read8(ptr + k));
@@ -475,10 +447,10 @@ export function nativeTextWidgets() {
             // The resident text decoder (F0x8001D264) reads the Shift-JIS pair
             // tables through the font record, so the bridge keeps the widget's
             // memory reader rather than only a byte copy.
-            read8: (a) => mem.read8(a),
-            read16: (a) => mem.read16(a),
-            read16s: (a) => mem.read16s(a),
-            read32: (a) => mem.read32(a),
+            read8: (a: number) => mem.read8(a),
+            read16: (a: number) => mem.read16(a),
+            read16s: (a: number) => mem.read16s(a),
+            read32: (a: number) => mem.read32(a),
             lines,
         });
     }
@@ -499,12 +471,12 @@ export function grantNativeScreenCards(ids: number[]) {
 }
 
 /** The shipped manifest entry for a screen root (load_base, size, pack, ...). */
-export function nativeScreenEntry(moduleId) {
+export function nativeScreenEntry(moduleId: string): NativeScreenEntry | null {
     return state.manifest?.screens?.[moduleId] ?? null;
 }
 
 /** Debug write into the running screen's RAM (production state seeding). */
-export function nativeScreenWrite(addr, value, size = 4) {
+export function nativeScreenWrite(addr: number, value: number, size = 4) {
     const mem = state.current?.rt?.mem;
     if (!mem) return false;
     if (size === 1) mem.write8(addr, value & 0xff);
@@ -551,7 +523,7 @@ export function nativeScreenState() {
         bridgeEnabled: !!cur.bridgeEnabled,
         bridged: cur.bridgeEnabled
             ? [...(nativeRuntime()?.bridgeInvocations() ?? [])]
-                  .map(([key, count]) => [key, count - (cur.bridgeBaseline.get(key) ?? 0)])
+                  .map(([key, count]): [string, number] => [key, count - (cur.bridgeBaseline.get(key) ?? 0)])
                   .filter(([, delta]) => delta > 0)
                   .map(([key, delta]) => ({ key, invocations: delta }))
             : [],

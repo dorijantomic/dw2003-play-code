@@ -5,11 +5,12 @@ import { MB } from "./state.js";
 import { LOG_LINES, MAX_ANIM_MS, MIN_ANIM_MS, TURN_MS } from "./command.js";
 import { render } from "./ui-scene.js";
 import { finish } from "./net.js";
+import type { MpFoeRec, MpSeatFoe, MpSeatPlayer, MpTurnResult } from "../types/mp-match.js";
 
 // ------------------------------------------------------------ the referee: runs the rules, tells everyone
-const later = (ms: number | undefined, fn: { (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; }) => { const id = setTimeout(() => { if (MB.F) fn(); }, ms); (MB.F.timers ??= new Set()).add(id); return id; };
+const later = (ms: number | undefined, fn: () => void) => { const id = setTimeout(() => { if (MB.F) fn(); }, ms); (MB.F.timers ??= new Set()).add(id); return id; };
 
-const say = (lines) => {
+const say = (lines: string | string[]) => {
     const list = [].concat(lines).filter(Boolean).map((l) => String(l).slice(0, 120));
     for (const l of list) MB.F.H.log.push(plainLine(l).slice(0, 72));
     while (MB.F.H.log.length > LOG_LINES) MB.F.H.log.shift();
@@ -17,7 +18,7 @@ const say = (lines) => {
 };
 
 /** Run `fn` once the attack animation on the referee's own screen is over (and at least a moment has passed). */
-function afterAnim(fn: { (): void; (): void; (): void; (): void; (): void; }) {
+function afterAnim(fn: () => void) {
     const t0 = performance.now();
     const poll = () => {
         if (!MB.F) return;
@@ -33,24 +34,24 @@ function snapshot(ph = "play") {
     const pz = H.pause?.view();                                // who is away and for how long, only while someone is
     return {
         r: H.round, w: ar.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null, ft: H.forced ? 1 : 0, ln: H.ln ?? [], lq: H.lq | 0,
-        E: ar.waveFoes().map((e) => ({ i: e.i, n: e.name, lv: e.rec.level | 0, ...ar.plate(e) })),
-        P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0, pt: ar.partyPlate(p), ac: p.act })),
+        E: ar.waveFoes().map((e: MpSeatFoe) => ({ i: e.i, n: e.name, lv: e.rec.level | 0, ...ar.plate(e) })),
+        P: ar.P.map((p: MpSeatPlayer) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0, pt: ar.partyPlate(p), ac: p.act })),
         ...(pz ? { pz } : {}),
     };
 }
 
 /** The other PEOPLE in the fight (not me, not a computer-played practice partner). `fight` defaults to the fight I am in;
  *  `finish` passes the fight it has just ended (the module's own F is already null by then). */
-export const people = (ids, fight = MB.F) => ids.filter((id) => id !== MB.A.myId() && !fight?.bots?.has(id));
+export const people = (ids: number[], fight = MB.F) => ids.filter((id: number) => id !== MB.A.myId() && !fight?.bots?.has(id));
 
 function broadcast(ph = "play") {
     const S = snapshot(ph);
-    const others = people(MB.F.ids).filter((id: string) => !MB.F.H.arena.byKey("p" + id)?.fled);
+    const others = people(MB.F.ids).filter((id: number) => !MB.F.H.arena.byKey("p" + id)?.fled);
     if (others.length) MB.A.send(others, { k: "st", fid: MB.F.fid, S });
     MB.F.S = S; render();
 }
 
-function setEvent(res) {
+function setEvent(res: MpTurnResult) {
     const H = MB.F.H;
     if (!res.rows?.length && res.kind !== "self" && res.kind !== "item" && res.kind !== "dv") return;
     H.ev = { q: (H.evq = (H.evq | 0) + 1), a: res.a, sk: res.sk | 0, kind: res.kind, d: res.rows ?? [], st: res.st ?? null };
@@ -60,11 +61,11 @@ export function hostBegin() {
     const H = MB.F.H;
     clearTimeout(H.readyTimer);
     if (H.started) return; H.started = true;
-    MB.F.ids = MB.F.ids.filter((id) => H.P.has(id));                // never got ready: not in the fight
+    MB.F.ids = MB.F.ids.filter((id: number) => H.P.has(id));                // never got ready: not in the fight
     if (!H.P.size) { finish(false, { fled: true }); return; }
     const players = [...H.P.values()].map((p) => ({ id: p.id, name: p.pn, rec: p.rec, party: p.party }));
     const waveSize = Math.max(2, players.length);
-    H.arena = new Arena({ kit: MB.F.kit, players, foes: MB.F.erec.map((rec, i: string | number) => ({ name: H.names[i], rec })), screenId: MB.F.screenId, waveSize });
+    H.arena = new Arena({ kit: MB.F.kit, players, foes: MB.F.erec.map((rec: MpFoeRec, i: string | number) => ({ name: H.names[i], rec })), screenId: MB.F.screenId, waveSize });
     MB.F.waves = H.arena.waves();
     say("The fight begins!");
     const peers = people(MB.F.ids);
@@ -110,13 +111,13 @@ function nextTurn() {
 /** PRACTICE (F2 -> Extras -> "Practice 2 vs 2"): the computer plays the partner's turn the plainest way: a forced
  *  replacement takes the first reserve still standing, otherwise Fight on the standing enemy with the least HP.
  *  (No technique or item choice: it is a stand-in for a second player, not a rule of the game.) */
-function botTurn(key) {
+function botTurn(key: string) {
     later(1100, () => {
         const H = MB.F.H, ar = H.arena, actor = ar.byKey(key);
         if (!actor || H.turn !== key) return;
         const id = actor.id;
         if (H.forced) {
-            const slot = actor.party.findIndex((r: { hp: number; }, i) => i !== actor.act && r.hp > 0);
+            const slot = actor.party.findIndex((r: { hp: number; }, i: number) => i !== actor.act && r.hp > 0);
             hostCommand(id, { fid: MB.F.fid, c: { k: "tag", slot: Math.max(0, slot) } });
             return;
         }
@@ -125,22 +126,22 @@ function botTurn(key) {
     });
 }
 
-function armTurnTimer(key: string, actor) {
+function armTurnTimer(key: string, actor: MpSeatPlayer) {
     const H = MB.F.H, ar = H.arena;
     clearTimeout(H.turnTimer);
     H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
 }
 
-function armForcedTimer(key, actor) {                          // the forced swap's own timer (it was inline in nextTurn)
+function armForcedTimer(key: string, actor: MpSeatPlayer) {                          // the forced swap's own timer (it was inline in nextTurn)
     const H = MB.F.H;
     clearTimeout(H.turnTimer);
     H.turnTimer = later(TURN_MS, () => {
-        const slot = actor.party.findIndex((r: { hp: number; }, i) => i !== actor.act && r.hp > 0);
+        const slot = actor.party.findIndex((r: { hp: number; }, i: number) => i !== actor.act && r.hp > 0);
         if (H.forced && H.turn === key && slot >= 0) hostCommand(Number(key.slice(1)), { fid: MB.F.fid, c: { k: "tag", slot } });
     });
 }
 
-function foeTurn(key) {
+function foeTurn(key: string) {
     const H = MB.F.H, ar = H.arena;
     if (H.pause.gate("foe", () => foeTurn(key))) return;       // the enemy's action (already due) waits until nobody is away
     const res = ar.foeAction(key);
@@ -227,7 +228,7 @@ function rearmTurn() {                                         // the turn that 
 }
 
 /** Run what the gate held back, once nobody is away. `covered` = calls another path already schedules (hostGone's nextTurn). */
-function releasePause(covered = []) {
+function releasePause(covered: string[] = []) {
     const run = MB.F.H.pause.release({ covered });
     if (!run) return;                                          // someone is still away: stay parked
     for (const f of run) later(0, f);

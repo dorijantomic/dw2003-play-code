@@ -252,7 +252,7 @@ function drawCommandMenu(b: BattleState) {
         // Selected row's +0x80 vsync counter >> 2 cycles CLUT 0..4 (F0x8009add4).
         const k = selected ? ((Math.trunc((b._hudClock || 0) * 50) >> 2) % 5) : 0;
         const rowId = k === 0 ? "34" : `34#${k}`;
-        drawClip(B.ctx, pgfgc00, rowId, C.iconX, y);
+        drawClip(B.ctx!, pgfgc00, rowId, C.iconX, y);
         if (selected) uiCPart(B.ctx, { part: "focus", x: C.iconX + 1, y: y + 1, w: 12, h: 12 });   // look C: the focused row
         B.nativeText(items[i], C.boxX, y, { kind: 1 });
       } else if (B.chromeReady()) {

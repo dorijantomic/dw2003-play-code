@@ -1,49 +1,5 @@
-interface EvolutionReqProgress {
-  id: number;
-  name: string;
-  level: number;
-  have: number;
-  met: boolean;
-  text: string;
-}
-
-
-interface EvolutionGateProgress {
-  kind: number;
-  label?: string | null;
-  threshold: number;
-  have: number | null;
-  met: boolean;
-  text: string;
-}
-
-
-interface EvolutionProgress {
-  reqs: EvolutionReqProgress[];
-  gate: EvolutionGateProgress;
-  unmet: string[];
-  ready: boolean;
-  text: string;
-}
-interface EvolutionRecord {
-  req0?: number;
-  req0Level?: number;
-  req1?: number;
-  req1Level?: number;
-  [key: string]: number | undefined;
-}
-
-interface EvolutionStats {
-  stats: Record<string, number>;
-  bonuses: Record<string, number>;
-  elemBonuses: Record<string, number>;
-}
-
-interface EvolutionLive {
-  formLevels: Record<number, number>;
-  level: number;
-  stats: EvolutionStats;
-}
+import type { BattleSkill } from "./types/battle.js";
+import type { EvoCoreStat, EvoDigimonSource, EvoElement, EvoFetch, EvoFetched, EvoGate, EvoMember, EvoPlannerRow, EvoPlannerState, EvoPlannerTable, EvoProfile, EvoRequirements, EvoSnapshot, EvolutionLive, EvolutionProgress, EvolutionRecord } from "./types/misc-game.js";
 // web/evolution-planner.js — the forms a partner can still learn, and exactly what
 // each one is waiting for.
 //
@@ -82,34 +38,34 @@ interface EvolutionLive {
 // nothing is fetched, no press is read and the frame loop pays one comparison. The module
 // is DOM-free at the top level so node tests import it; drawing takes a canvas context.
 
-const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];   // rule kinds 1..6
-const CORE_LABELS = { str: "STR", def: "DEF", spt: "SPT", wis: "WIS", spd: "SPD", chr: "CHR" };
-const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"]; // rule kinds 8..14
-const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
+const CORE_STATS: EvoCoreStat[] = ["str", "def", "spt", "wis", "spd", "chr"];   // rule kinds 1..6
+const CORE_LABELS: Record<EvoCoreStat, string> = { str: "STR", def: "DEF", spt: "SPT", wis: "WIS", spd: "SPD", chr: "CHR" };
+const ELEMENTS: EvoElement[] = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"]; // rule kinds 8..14
+const ELEMENT_LABELS: Record<EvoElement, string> = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const LIST_ROWS = 12;             // rows the list column shows at once; the cursor scrolls it
 const ROW_H = 14;                 // one list line, in the page's own pixels
 
 /** digimon.json's profile list, from the whole object or just the array. */
-const asProfiles = (digimon) => (Array.isArray(digimon) ? digimon : digimon?.digimon ?? []);
+const asProfiles = (digimon: EvoDigimonSource | null | undefined): EvoProfile[] => (Array.isArray(digimon) ? digimon : digimon?.digimon ?? []);
 
 /** A form's ledger level, from a plain object or a Map. undefined = not learned. */
-function formLevelOf(formLevels, id: number) {
+function formLevelOf(formLevels: EvolutionLive["formLevels"] | undefined, id: number) {
   if (formLevels instanceof Map) return formLevels.get(Number(id));
   return formLevels?.[Number(id)];
 }
 
 /** The record's one extra gate, as plain words. kind 0 = no gate. */
-function extraGate(record) {
+function extraGate(record: EvolutionRecord | undefined): EvoGate {
   const kind = Number(record?.kind ?? 0);
   const threshold = Number(record?.threshold ?? 0);
   if (kind === 0) return { kind: 0, key: null, label: null, threshold, text: "none" };
   if (kind >= 1 && kind <= 6) {
-    const key = CORE_STATS[kind - 1];
+    const key = CORE_STATS[kind - 1]!;   // kind is inside 1..6 (checked above)
     return { kind, key, label: CORE_LABELS[key], threshold, text: `${CORE_LABELS[key]} ${threshold}` };
   }
   if (kind === 7) return { kind, key: "level", label: "partner level", threshold, text: `partner level ${threshold}` };
   if (kind >= 8 && kind <= 14) {
-    const key = ELEMENTS[kind - 8];
+    const key = ELEMENTS[kind - 8]!;   // kind is inside 8..14 (checked above)
     return { kind, key, label: ELEMENT_LABELS[key], threshold, text: `${ELEMENT_LABELS[key]} ${threshold}` };
   }
   // A kind outside the rule's 0..14 is no gate at all (engine/dw3/evo-trees.ts's
@@ -118,25 +74,26 @@ function extraGate(record) {
 }
 
 /** What the unlock's extra gate reads right now. null = the gate is kind 0 (no gate). */
-function gateHave(record, live) {
+function gateHave(record: EvolutionRecord | undefined, live: EvolutionLive | undefined) {
   const gate = extraGate(record);
   if (gate.kind === 0) return null;
   if (gate.kind === 7) return Number(live?.level ?? 1);
-  if (gate.kind >= 8 && gate.kind <= 14) return Number(live?.stats?.elemBonuses?.[gate.key] ?? 0);
+  // every kind but 0 has a key (extraGate gives kind 0 the null key and every other kind its stat or element)
+  if (gate.kind >= 8 && gate.kind <= 14) return Number(live?.stats?.elemBonuses?.[gate.key!] ?? 0);
   // kinds 1..6: the stored core stat plus the permanent stat-chip bonuses — the same
   // two halfwords engine/dw3/evo-trees.ts folds for the gate.
-  return Number(live?.stats?.stats?.[gate.key] ?? 0) + Number(live?.stats?.bonuses?.[gate.key] ?? 0);
+  return Number(live?.stats?.stats?.[gate.key!] ?? 0) + Number(live?.stats?.bonuses?.[gate.key!] ?? 0);
 }
 
 /** id -> display name for a digimon.json-shaped table or its bare profile array. */
-function namesOf(profiles) {
-  return new Map(asProfiles(profiles).map((p) => [Number(p.id), p.name]));
+function namesOf(profiles: EvoDigimonSource | null | undefined) {
+  return new Map(asProfiles(profiles).map((p): [number, string | undefined] => [Number(p.id), p.name]));
 }
 
 /** One record's requirement rows, names resolved through `nameOf`. */
-function requirementsFor(record, nameOf) {
-  const reqs = [];
-  for (const [idKey, levelKey] of [["req0", "req0Level"], ["req1", "req1Level"]]) {
+function requirementsFor(record: EvolutionRecord | undefined, nameOf: Map<number, string | undefined>): EvoRequirements {
+  const reqs: EvoRequirements["reqs"] = [];
+  for (const [idKey, levelKey] of [["req0", "req0Level"], ["req1", "req1Level"]] as const) {
     const id = Number(record?.[idKey] ?? 0);
     if (!id) continue;
     const level = Number(record?.[levelKey] ?? 0);
@@ -156,7 +113,7 @@ function requirementsFor(record, nameOf) {
  *           text } — text reads e.g. "Growlmon L30 + SPD 280", or "none" when the record
  * has no gate at all. A requirement id with no profile row is printed as "#<id>".
  */
-export function requirementText(record, profiles) {
+export function requirementText(record: EvolutionRecord | undefined, profiles: EvoDigimonSource | null | undefined) {
   return requirementsFor(record, namesOf(profiles));
 }
 
@@ -168,7 +125,7 @@ export function requirementText(record, profiles) {
  * stored-stat record the battle reads (stats.stats / stats.bonuses / stats.elemBonuses).
  */
 export function readyNow(record: EvolutionRecord | undefined, live: EvolutionLive | undefined) {
-  for (const [idKey, levelKey] of [["req0", "req0Level"], ["req1", "req1Level"]]) {
+  for (const [idKey, levelKey] of [["req0", "req0Level"], ["req1", "req1Level"]] as const) {
     const id = Number(record?.[idKey] ?? 0);
     if (!id) continue;
     const have = formLevelOf(live?.formLevels, id);
@@ -186,11 +143,11 @@ export function readyNow(record: EvolutionRecord | undefined, live: EvolutionLiv
  * line: { reqs: [{ ..., have, met, text }], gate: { ..., have, met, text }, unmet, ready,
  * text }. A requirement form not in the ledger reads "have 0". Pure.
  */
-export function requirementProgress(record: EvolutionRecord, live: EvolutionLive, profiles: Record<number, { name?: string }>) {
+export function requirementProgress(record: EvolutionRecord, live: EvolutionLive, profiles: EvoDigimonSource) {
   return progressFor(record, live, namesOf(profiles));
 }
 
-function progressFor(record, live, nameOf): EvolutionProgress {
+function progressFor(record: EvolutionRecord | undefined, live: EvolutionLive | undefined, nameOf: Map<number, string | undefined>): EvolutionProgress {
   const base = requirementsFor(record, nameOf);
   const reqs = base.reqs.map((req) => {
     const raw = formLevelOf(live?.formLevels, req.id);
@@ -225,13 +182,13 @@ function progressFor(record, live, nameOf): EvolutionProgress {
  * technique. Records appended to a line (or a whole line at a new slot, as the new
  * partners would add) are read without a code change.
  */
-export function plannerRows(evolutions, slot, profiles, skills, live) {
+export function plannerRows(evolutions: EvoPlannerTable | null | undefined, slot: number | string, profiles: EvoDigimonSource | null | undefined, skills: BattleSkill[] | null | undefined, live: EvolutionLive | undefined) {
   const lines = Array.isArray(evolutions?.lines) ? evolutions.lines : [];
   const wanted = Number(slot);
   const line = lines.find((l) => Number(l?.slot) === wanted) ?? lines[wanted];
   if (!line || !Array.isArray(line.records)) return [];
   const nameOf = namesOf(profiles);
-  const rows = [];
+  const rows: EvoPlannerRow[] = [];
   for (let i = 0; i < line.records.length; i++) {
     const record = line.records[i];
     const to = Number(record?.to ?? 0);
@@ -252,7 +209,7 @@ export function plannerRows(evolutions, slot, profiles, skills, live) {
 
 // ---------------------------------------------------------------- the page
 
-const S = {
+const S: EvoPlannerState = {
   open: false,
   wasOn: false,
   evolutions: null,
@@ -298,14 +255,14 @@ function syncRows() {
   return S.rows;
 }
 
-const asJson = (value) => (typeof value?.json === "function" ? value.json() : value);
+const asJson = (value: EvoFetched) => (typeof value?.json === "function" ? value.json() : value);
 
 /**
  * Fetch the two tables through the page's own fetch, so web/extra-roster.js's wrapped
  * fetch has already merged the extra species and their line records. Cached per load;
  * `fetchJson` is injectable for tests. Never rejects.
  */
-export function plannerLoad(fetchJson = globalThis.fetch) {
+export function plannerLoad(fetchJson: EvoFetch | undefined = globalThis.fetch) {
   if (S.loading) return S.loading;
   if (typeof fetchJson !== "function") return Promise.resolve(false);
   S.loading = (async () => {
@@ -331,7 +288,7 @@ export function plannerLoad(fetchJson = globalThis.fetch) {
  * Install tables and (optionally) the party snapshot. Returns the number of profiles
  * read. Used by plannerLoad and by tests; game.js only supplies the members.
  */
-export function setPlannerData(evolutions, digimon, members = null) {
+export function setPlannerData(evolutions: EvoPlannerTable | null | undefined, digimon: EvoDigimonSource | null | undefined, members: EvoMember[] | null = null) {
   S.evolutions = Array.isArray(evolutions?.lines) ? evolutions : null;
   S.profiles = asProfiles(digimon);
   S.skills = Array.isArray(digimon?.skills) ? digimon.skills : [];
@@ -356,7 +313,7 @@ export function openPlanner() {
  * reader: () => ({ members: [{ slot, name, live }] }). With the switch off nothing is
  * fetched and the snapshot is never called.
  */
-export function tickPlanner(enabled: boolean, snapshot = null) {
+export function tickPlanner(enabled: boolean, snapshot: (() => EvoSnapshot) | null = null) {
   const on = enabled === true;
   if (!on && S.open) S.open = false;
   S.wasOn = on;
@@ -400,7 +357,7 @@ export function plannerError() {
  * close, every other press swallowed. Returns false when the page is closed, so the
  * press falls through exactly as before.
  */
-export function plannerPress(button) {
+export function plannerPress(button: string) {
   if (!S.open) return false;
   if (button === "left" || button === "right") {
     const n = S.members.length;
@@ -418,8 +375,8 @@ export function plannerPress(button) {
 }
 
 /** Break text into lines no longer than `cols` characters, on spaces. */
-function wrapText(text, cols: number) {
-  const out = [];
+function wrapText(text: string, cols: number) {
+  const out: string[] = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
     if (!word) continue;

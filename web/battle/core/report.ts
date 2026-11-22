@@ -27,7 +27,7 @@ export function makeReport(B: BattleContext) {
   //
   // The portrait animates: one frame every 13 vsyncs, from the table read off
   // the running game (claim FIGHT-REPORT-PORTRAIT-FRAMES-001).
-  function drawFightReportGroup(ctx: CanvasRenderingContext2D | undefined, G: FightReportGroupGeom | null | undefined, row: FightReportRow | null | undefined, opts: ReportGroupOptions = {}) {
+  function drawFightReportGroup(ctx: CanvasRenderingContext2D, G: FightReportGroupGeom | null | undefined, row: FightReportRow | null | undefined, opts: ReportGroupOptions = {}) {
     if (!G || !row) return;
     const t = opts.seconds ?? 0;
     // The plate is drawn plain. The screen's own code hands it the arrow's
@@ -111,14 +111,14 @@ function drawFightReport(b: BattleState) {
     // F0x80084c20: ambient background diagonal wipe — draw-position k ramps
     // 0..95 (2 vsyncs/step, ~40ms PAL) then resets, per the decoded cadence.
     const ak = Math.floor(performance.now() / L.ambient_bg.animated.stepMs) % (L.ambient_bg.animated.max + 1);
-    drawClip(B.ctx, stfrptChrome, L.ambient_bg.clip, ak, ak);
+    drawClip(B.ctx!, stfrptChrome, L.ambient_bg.clip, ak, ak);
     // The corner badge carries the battle's EXP total. It is absent from the
     // BIT page in the capture, so picture and text come and go together.
     const badgeOn = (L.corner_badge.pages ?? []).includes(page.kind);
     if (badgeOn) {
-      drawClip(B.ctx, stfrptChrome, L.corner_badge.clip, L.corner_badge.x, L.corner_badge.y);
+      drawClip(B.ctx!, stfrptChrome, L.corner_badge.clip, L.corner_badge.x, L.corner_badge.y);
     }
-    drawClip(B.ctx, stfrptChrome, L.message_bar.clip, L.message_bar.x, L.message_bar.y);
+    drawClip(B.ctx!, stfrptChrome, L.message_bar.clip, L.message_bar.x, L.message_bar.y);
 
     const MSG = G.message;
     const active = page.index ?? 0;
@@ -131,8 +131,8 @@ function drawFightReport(b: BattleState) {
         uiDrawText(B.ctx, CB.label.str, CB.label.x, CB.label.y, { kind: CB.label.kind });
       }
       (b._winReportRows ?? []).slice(0, groups.length).forEach((row, i: number) => {
-        const g = groups[i];
-        drawFightReportGroup(B.ctx, g, row, {
+        const g = groups[i]!;   // i < groups.length (the slice above)
+        drawFightReportGroup(B.ctx!, g, row, {
           seconds: b.timer,
           // The page names one partner, and that partner is marked. A page
           // about the party's money names nobody and marks nobody.
@@ -160,7 +160,7 @@ function drawFightReport(b: BattleState) {
     const cur = loadPack(L.blink_cursor.pack);
     if (packReady(cur)) {
       const k = Math.floor(performance.now() / 120) % 5;
-      drawClipAtPaletteRow(B.ctx, cur, L.blink_cursor.clip, k, L.blink_cursor.x, L.blink_cursor.y);
+      drawClipAtPaletteRow(B.ctx!, cur, L.blink_cursor.clip, k, L.blink_cursor.x, L.blink_cursor.y);
     }
 
   }

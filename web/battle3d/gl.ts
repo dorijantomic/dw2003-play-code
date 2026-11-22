@@ -107,8 +107,9 @@ export function drawSkeletalMesh(gl: WebGLRenderingContext, prog: TexProgram, mv
 
 // ─── GL helpers ───────────────────────────────────────────────────────────────
 
-export function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
-  const s = gl.createShader(type);
+export function compileShader(gl: WebGLRenderingContext, type: number, src: string): WebGLShader {
+  // ETS item 9: createShader only returns null on a lost context, and then the next GL call throws anyway
+  const s = gl.createShader(type) as WebGLShader;
   gl.shaderSource(s, src);
   gl.compileShader(s);
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
@@ -222,7 +223,8 @@ export function makeQuadBuffers(gl: WebGLRenderingContext, verts: number[][], uv
 function drawBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, viewEye: readonly number[], worldPos: [number, number, number],
                        widthUnits: number, heightUnits: number, tex: WebGLTexture, alpha: number, tint: [number, number, number]) {
   // Compute billboard right/up vectors (always face camera)
-  const camRight = normalize([mvp[0], mvp[4], mvp[8]]);
+  // ETS item 9: mvp is a 16-number matrix, so these three entries are there
+  const camRight = normalize([mvp[0]!, mvp[4]!, mvp[8]!]);
   const worldUp = [0, 1, 0];
   const rx = camRight, ry = worldUp;
 
@@ -273,7 +275,7 @@ export function changeStageMat4(keys: Parameters<typeof changeStageMeshMatrix>[0
 }
 
 // Draw one projectile mesh layer (interleaved static pos+uv buffers, non-indexed tris).
-export function drawProjLayer(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: ArenaGroupBuf, tex: WebGLTexture | null, alpha = 1.0, tint: readonly number[] | null = null) {
+export function drawProjLayer(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: Pick<ArenaGroupBuf, "vbo" | "ubo" | "count">, tex: WebGLTexture | null, alpha = 1.0, tint: readonly number[] | null = null) {
   gl.useProgram(prog.program);
   gl.uniformMatrix4fv(prog.uMVP, false, mvp);
   gl.uniform1f(prog.uAlpha, alpha);
@@ -294,28 +296,30 @@ export const arenaCullLog = { kept: 0, total: 0 } as ArenaCullLog;
 
 export function setArenaCullSign(s: number) { S.arenaCullSign = s < 0 ? -1 : 1; return S.arenaCullSign; }
 
-export function arenaCullIndices(mvp, layer: ArenaGroupBuf) {
+export function arenaCullIndices(mvp: Float32List, layer: ArenaGroupBuf) {
   const pos = layer.pos, ref = layer.cullRef;
   if (!pos) return null;
   const nt = (pos.length / 9) | 0;
   const out = [];
   arenaCullLog.total = nt;
   const cache = new Map();
-  const projTri = (t) => {
+  const projTri = (t: number) => {
     const b = t * 9;
     const xy = [];
     for (let k = 0; k < 3; k++) {
-      const x = pos[b + k * 3], y = pos[b + k * 3 + 1], z = pos[b + k * 3 + 2];
-      const cw = mvp[3] * x + mvp[7] * y + mvp[11] * z + mvp[15];
+      // ETS item 9: t < nt = pos.length / 9, so b + k*3 + 2 is inside pos; mvp is a 16-number matrix
+      const x = pos[b + k * 3]!, y = pos[b + k * 3 + 1]!, z = pos[b + k * 3 + 2]!;
+      const cw = mvp[3]! * x + mvp[7]! * y + mvp[11]! * z + mvp[15]!;
       if (!(cw > 1e-6)) return null;             // at/behind the eye: the original clips it away
-      const cx = mvp[0] * x + mvp[4] * y + mvp[8] * z + mvp[12];
-      const cy = mvp[1] * x + mvp[5] * y + mvp[9] * z + mvp[13];
+      const cx = mvp[0]! * x + mvp[4]! * y + mvp[8]! * z + mvp[12]!;
+      const cy = mvp[1]! * x + mvp[5]! * y + mvp[9]! * z + mvp[13]!;
       xy.push(cx / cw, cy / cw);
     }
     return xy;
   };
   for (let t = 0; t < nt; t++) {
-    const rt = ref ? ref[t] : t;
+    // ETS item 9: cullRef holds one entry per triangle ("triangle -> the triangle whose sign governs it")
+    const rt = ref ? ref[t]! : t;
     let s = cache.get(rt);
     if (s === undefined) { s = projTri(rt); cache.set(rt, s); }
     if (!s) continue;
@@ -329,7 +333,7 @@ export function arenaCullIndices(mvp, layer: ArenaGroupBuf) {
 
 // Draw one arena layer through the ported cull: only the front-facing primitives
 // are drawn (the original's own post-cull set). Uses a dynamic index buffer.
-export function drawProjLayerIndexed(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: LayerBuf, tex: WebGLTexture | null, idx: number[] | null, tint = null) {
+export function drawProjLayerIndexed(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: LayerBuf, tex: WebGLTexture | null, idx: number[] | null | undefined, tint: readonly number[] | null = null) {
   if (!idx) { drawProjLayer(gl, prog, mvp, layer, tex, 1, tint); return; }
   if (!layer.ibo) layer.ibo = gl.createBuffer();
   gl.useProgram(prog.program);

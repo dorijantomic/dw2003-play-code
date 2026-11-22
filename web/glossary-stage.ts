@@ -6,16 +6,18 @@
 // second, which is the model turning. `setViewerStudio(false)` (battle3d.js, additive) takes away the viewer's background, grid and
 // axis lines and clears to transparent, so the book's own panel shows behind the model. The renderer's canvas must be created with
 // {alpha: true}; its size for the book is 288 x 144 (the 144 x 72 image rectangle at the 2x game scale).
+import type { StageCamera, StageCanvas, StageFeet, StageLoading, StageOptions, StageRenderer, StageShown, StageView } from "./types/screens.js";
+
 export const TURN_SECONDS = 12;                       // decided: one turn per 12 seconds
 export const TURN_DEG_PER_S = 360 / TURN_SECONDS;     // 30
-export const CANVAS_SIZE = [288, 144];                // the image rectangle 144 x 72 times the 2x game scale
+export const CANVAS_SIZE: [number, number] = [288, 144];                // the image rectangle 144 x 72 times the 2x game scale
 export const FILL = 0.8;                              // the model's height as a share of the window height
 
 const SHADOW = [0, 0, 0, 1];                          // a ???: the model drawn black
 const PITCH_DEG = 8;                                  // the viewer's "front" preset pitch (anim-viewer-camera.js PRESETS)
 
 /** Screen position of a world point for a view {eye, look, up, fovDeg}: x, y in -1..1 (y up), and the depth. */
-export function projectPoint(view, p, aspect: number) {
+export function projectPoint(view: StageView, p: number[], aspect: number) {
     const f = [view.look[0] - view.eye[0], view.look[1] - view.eye[1], view.look[2] - view.eye[2]];
     const fl = Math.hypot(...f) || 1; f[0]! /= fl; f[1]! /= fl; f[2]! /= fl;
     const rx = f[1]! * view.up[2] - f[2]! * view.up[1], ry = f[2]! * view.up[0] - f[0]! * view.up[2], rz = f[0]! * view.up[1] - f[1]! * view.up[0];
@@ -28,11 +30,11 @@ export function projectPoint(view, p, aspect: number) {
     return { x: (v[0]! * r[0]! + v[1]! * r[1]! + v[2]! * r[2]!) / (depth * th * aspect), y: (v[0]! * u[0]! + v[1]! * u[1]! + v[2]! * u[2]!) / (depth * th), depth };
 }
 
-export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, size = CANVAS_SIZE, canvasFactory = null, drawFallback = null }) {
-    let r = null, canvas = null, cam = null;
-    let token = 0, loading = null, folder = null, ready = false, framed = false, closed = false, failed = false;
-    let shown = null;                                   // { name, partnerId } of the species asked for last
-    let feet = null;                                    // { center: [x, y, z], radius } for the floor shadow
+export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, size = CANVAS_SIZE, canvasFactory = null, drawFallback = null }: StageOptions) {
+    let r: StageRenderer | null = null, canvas: StageCanvas | null = null, cam: StageCamera | null = null;
+    let token = 0, loading: StageLoading | null = null, folder: string | null = null, ready = false, framed = false, closed = false, failed = false;
+    let shown: StageShown | null = null;                                   // { name, partnerId } of the species asked for last
+    let feet: StageFeet | null = null;                                    // { center: [x, y, z], radius } for the floor shadow
 
     function ensure() {
         if (r || failed) return !!r;
@@ -49,7 +51,7 @@ export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, 
         r.setIsolated(true, "player");
         r.setViewerStudio?.(false);                     // no grid, no axis lines, no background: the panel shows through
         r.setCameraMode("free");
-        r.setFreeCameraView(() => cam.view());
+        r.setFreeCameraView(() => cam!.view());
         return true;
     }
 
@@ -58,18 +60,18 @@ export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, 
          * Show species `name`. Resolves true when its model is up, false when there is none, it failed, or a newer show() won.
          * While the new model loads the last finished frame keeps being drawn (no flash between species).
          */
-        async show(name, { shadow = false, partnerId = null } = {}) {
+        async show(name: string, { shadow = false, partnerId = null }: { shadow?: boolean; partnerId?: number | null } = {}) {
             const mine = ++token;
             closed = false;
             shown = { name, partnerId };
             if (!ensure()) { ready = false; return false; }
-            let f = null;
+            let f: string | null = null;
             try { f = await resolveFolder(name); } catch { f = null; }
             if (mine !== token) return false;
             if (!f) { ready = false; folder = null; return false; }
             // the same model folder as a load still in flight (Guardromon, then Guardromon2): it is that load, not a second request
             if (!(loading && loading.folder === f)) {
-                const p = Promise.resolve().then(() => r.setPlayerDigimon(f)).catch(() => false);
+                const p = Promise.resolve().then(() => r!.setPlayerDigimon(f)).catch(() => false);
                 loading = { folder: f, promise: p };
                 p.then(() => { if (loading?.promise === p) loading = null; });
             }
@@ -83,7 +85,7 @@ export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, 
             return true;
         },
         /** Render one frame and copy it into (x, y, w, h) of `ctx`. Falls back to the partner picture; false when there is nothing. */
-        draw(ctx, x, y, w, h, dt = 0.02) {
+        draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, dt = 0.02) {
             if (closed) return false;
             if (!ready || !r) return drawFallback && shown ? !!drawFallback(ctx, shown, x, y, w, h) : false;
             cam.update(dt);

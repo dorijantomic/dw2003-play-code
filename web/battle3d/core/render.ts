@@ -47,7 +47,7 @@ import {
 } from "../gl.js";
 import { effectLayer } from "../../fight/effect-player.js";
 import { drawUnderEffects } from "../../fight/effect-under-gl.js";
-import type { BackdropPack, Battle3DContext } from "../../types/battle3d.js";
+import type { Battle3DContext, TexProgram } from "../../types/battle3d.js";
 interface AdvanceClip {
   present?: boolean;
   start_frame: number;
@@ -63,8 +63,9 @@ interface AdvanceModel {
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeRender(B$: Battle3DContext) {
-function render(dt) {
-    B$.animTime += dt;
+// ETS item 9: createBattle3D sets the GL context, the texture program and the tuning constants before any of this runs, so the `!` on those B$ fields below are safe.
+function render(dt: number) {
+    B$.animTime! += dt;
 
     const W = B$.canvas!.width, H = B$.canvas!.height;
     B$.gl!.viewport(0, 0, W, H);
@@ -91,7 +92,7 @@ function render(dt) {
     // swapInNewDigimon) for exactly the span its shot-9 cut carries the -homePos.z offset.
     // ONE frame of the original's order: camera run, view snapshot, then the change's cuts / fades
     // (stepFormChangeFrame, shared with the tests). The frame is drawn with the snapshot.
-    const dvView = B$.dvCam ? stepFormChangeFrame(B$.camRec, B$.dvCam, B$.dvFrame).shot : null;
+    const dvView = B$.dvCam ? stepFormChangeFrame(B$.camRec!, B$.dvCam, B$.dvFrame).shot : null;
     const dvAtOrigin = !!B$.dvCam?.atOrigin();
     const pBob = Math.sin(B$.animTime! * 3) * 2;
     const eBob = Math.sin(B$.animTime! * 3 + Math.PI) * 2;
@@ -124,7 +125,7 @@ function render(dt) {
     // Advance frame counters (60 fps target) — constrained to named clip ranges
     const CLIP_NAMES: Record<string, number> = {idle:0, walk:1, run:2, attack:6, hit:10, win:16, lose:17};
 
-    function advanceInRange(frame, dt, start, end) {
+    function advanceInRange(frame: number, dt: number, start: number, end: number) {
       const range = end - start;
       if (range <= 0) return start;
       let f = frame + dt * 60;
@@ -153,7 +154,7 @@ function render(dt) {
 
     // The coordinator owns per-tick stepping of both actors (it gates on isActive internally),
     // so attacker->defender reaction sequencing stays consistent with the live render tick.
-    function tickSim(speed) {
+    function tickSim(speed: number) {
       // The camera record runs on the RAW per-frame delta, never on `speed`. F0x80091df4's
       // tween multiplies its step by `[0x8004df9c]()` — the same word the op11 wait decrements
       // (F0x8008c220 .L0x8008c26c) and the same one the defeat orbit reads (.L0x8008cad4) — and
@@ -209,7 +210,7 @@ function render(dt) {
         if (B$.screenOverlay.t >= B$.screenOverlay.duration && B$.screenOverlay.type !== 0) B$.screenOverlay = null;
       }
     }
-    B$._acc += dt;
+    B$._acc! += dt;
     const stepDur = 1 / B$.STEP_HZ!;
     // DNA clip 12 plays at the same rate as every other action/tech animation (GLOBAL_SPEED);
     // speeding it up made the models animate comically fast.
@@ -232,9 +233,9 @@ function render(dt) {
         B$.slowMoUnits += step.delta;
       } else {
         B$.slowMoDelta = LOSS_CAM.deltaPerFrame;
-        B$.slowMoTickSpeed = B$.GLOBAL_SPEED;
+        B$.slowMoTickSpeed = B$.GLOBAL_SPEED!;
       }
-      tickSim(B$.slowMoTickSpeed);
+      tickSim(B$.slowMoTickSpeed!);
     }
 
     // Key-off sustained battle voices when the attack finishes (the effect objects
@@ -257,9 +258,9 @@ function render(dt) {
     const eSample = useEnemyA  ? B$.enemyAnim8r!.renderSample(alpha)  : null;
 
     B$.playerFrame = pSample ? pSample.frame
-      : advanceFrame(B$.playerFrame, dt, B$.playerModel, B$.playerAnim);
+      : advanceFrame(B$.playerFrame!, dt, B$.playerModel, B$.playerAnim!);
     B$.enemyFrame = eSample ? eSample.frame
-      : advanceFrame(B$.enemyFrame, dt, B$.enemyModel, B$.enemyAnim);
+      : advanceFrame(B$.enemyFrame!, dt, B$.enemyModel, B$.enemyAnim!);
     // Per-frame pose blend (timeline blend segments) — null when not transitioning.
     const playerBlend = pSample ? pSample.blend : null;
     const enemyBlend  = eSample ? eSample.blend : null;
@@ -269,20 +270,20 @@ function render(dt) {
     B$.pAABB = null;
     let eAABB = null;
     if (B$.playerVisible && B$.playerModel && B$.playerSkelBufs) {
-      const bwm = buildBoneWorldMatrices(B$.playerModel, B$.playerFrame, playerBlend,
+      const bwm = buildBoneWorldMatrices(B$.playerModel, B$.playerFrame!, playerBlend,
         usePlayerA ? B$.playerAnim8r?.currentHiddenParts?.() : null);
       B$.pBwm = bwm;
       const _pt = globalThis.__perfHook3d ? performance.now() : 0;   // dev-only timing hook
-      B$.pAABB = _updateSkeletalVBOGL(B$.gl, B$.playerModel, B$.playerSkelBufs, bwm, playerPos,
+      B$.pAABB = _updateSkeletalVBOGL(B$.gl!, B$.playerModel, B$.playerSkelBufs, bwm, playerPos,
         MODEL_SCALE * B$.fighterScale.fighterScale("player"), false, playerYaw);
       if (_pt) globalThis.__perfHook3d?.("fighterVBO", performance.now() - _pt, B$.playerSkelBufs.totalVerts);
     }
     if (B$.enemyModel && B$.enemySkelBufs) {
-      const bwm = buildBoneWorldMatrices(B$.enemyModel, B$.enemyFrame, enemyBlend,
+      const bwm = buildBoneWorldMatrices(B$.enemyModel, B$.enemyFrame!, enemyBlend,
         useEnemyA ? B$.enemyAnim8r?.currentHiddenParts?.() : null);
       B$.eBwm = bwm;
       const _pt = globalThis.__perfHook3d ? performance.now() : 0;   // dev-only timing hook
-      eAABB = _updateSkeletalVBOGL(B$.gl, B$.enemyModel, B$.enemySkelBufs, bwm, enemyPos,
+      eAABB = _updateSkeletalVBOGL(B$.gl!, B$.enemyModel, B$.enemySkelBufs, bwm, enemyPos,
         MODEL_SCALE * B$.fighterScale.fighterScale("enemy"), false, enemyYaw);
       if (_pt) globalThis.__perfHook3d?.("fighterVBO", performance.now() - _pt, B$.enemySkelBufs.totalVerts);
       B$.eAABBLast = eAABB;
@@ -298,7 +299,7 @@ function render(dt) {
     let fwd = [enemyPos[0]!-playerPos[0]!, 0, enemyPos[2]!-playerPos[2]!];
     const fl = Math.hypot(fwd[0]!, fwd[2]!) || 1; fwd = [fwd[0]!/fl, 0, fwd[2]!/fl];
 
-    B$.orbitClock += dt;
+    B$.orbitClock! += dt;
     const azTarget = B$.camMode === "orbit" ? Math.sin(B$.orbitClock! * 0.5) * 1.15 : 0; // ±66° sweep
     B$.camAz! += (azTarget - B$.camAz!) * Math.min(1, dt * 2.5);  // smooth toward target
     const behindDir = B$._rotY([-fwd[0]!, 0, -fwd[2]!], B$.camAz!);
@@ -380,7 +381,7 @@ function render(dt) {
       // zeroed is the arena origin, so both the eye and the look-at swing around it.
       // One delta per 60 Hz frame, from the real elapsed time, so a faster display
       // does not turn the camera faster.
-      B$.defeatClock += dt;
+      B$.defeatClock! += dt;
       B$.defeatDelta = Math.floor(B$.defeatClock! * 60) * LOSS_CAM.deltaPerFrame;
       const p = B$.lossShot() || OP5_PRESETS[4];
       const turned = rotateShotYaw(p.eye, p.target, lossCamYawUnits(B$.defeatDelta));
@@ -575,7 +576,7 @@ function render(dt) {
     // stage's pack is still loading (or when the battle has no disc arena).
     const stageId = B$.blastState ? (B$.blastState.stage | 0) : 0;
     const stageLevel = B$.blastState && B$.blastState.stageLevel != null ? B$.blastState.stageLevel : CHANGE_STAGE_FULL;
-    const stageName = (id) => `meft10${String(id).padStart(2, "0")}`;
+    const stageName = (id: number | string) => `meft10${String(id).padStart(2, "0")}`;
     if (B$.blastState && B$.blastState.stageChange) {          // load the change stage's pack and textures ahead of its frame
       const ahead = B$.loadArenaPack(stageName(B$.blastState.stageChange));
       if (ahead!.groups) for (const g of ahead!.groups) if (g.count) B$.arenaTextureFor(ahead!, g);
@@ -604,11 +605,11 @@ function render(dt) {
     const bgTint = B$.arenaTint;
     if (B$.isolatedMode) {
       // Viewer: a neutral studio background, no sky texture / arena / backdrop.
-      if (B$.viewerStudio) drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, [0.085, 0.095, 0.115, 1]);
+      if (B$.viewerStudio) drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, 1, [0.085, 0.095, 0.115, 1]);
     } else if (dnaVoidActive) {
-      drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, bgTint || [0, 0, 0, 1]);
+      drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, 1, bgTint || [0, 0, 0, 1]);
     } else if (dfActive) {
-      drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, bgTint || [0, 0, 0, 1]);   // black void (full screen)
+      drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, 1, bgTint || [0, 0, 0, 1]);   // black void (full screen)
       // Backdrop shares the live battle camera, but with a FAR clip plane pushed way out: the mesh
       // spans ±20479×MODEL_SCALE (≈±7168 world) and its far edge exceeds the scene's 8000 far plane
       // at wide shots → far triangles clipped to black holes. A 60000 far plane keeps it all in.
@@ -625,7 +626,7 @@ function render(dt) {
         const mvp = g.spinDeg
           ? mat4Mul(mat4Mul(bdPV, world), mat4RotateY(g.spinDeg * spinT * Math.PI / 180))
           : mat4Mul(bdPV, world);
-        drawProjLayer(B$.gl, B$.texP, mvp, g, g.page === "floor" ? B$.activeBackdrop!.floorTex : B$.activeBackdrop!.wallTex, 1);
+        drawProjLayer(B$.gl!, B$.texP!, mvp, g, g.page === "floor" ? B$.activeBackdrop!.floorTex : B$.activeBackdrop!.wallTex, 1);
       }
       B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);           // restore normal alpha blend
     } else if (arenaActive) {
@@ -658,7 +659,7 @@ function render(dt) {
         const k = stageLevel / CHANGE_STAGE_FULL;
         stageTint = [k, k, k, 1];
       }
-      if (!B$.builtArena) drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, skyColor);   // the arena view's sky colour
+      if (!B$.builtArena) drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, 1, skyColor);   // the arena view's sky colour
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
       const world = ps1ToRenderMatrix(MODEL_SCALE * (B$.multiCam ? B$.arenaScale : 1)!);   // larger for many fighters (_layoutExtras)
       const mvp = mat4Mul(bdPV, world);
@@ -698,8 +699,8 @@ function render(dt) {
         const idx = B$.arenaDebug!.cull ? arenaCullIndices(gm, g) : null;
         if (idx) arenaCullLog.groups.push({ page: g.page, clut: g.clut, kept: idx.length / 3, total: (g.count / 3) | 0 });
         if (_pf3) _ptri += (g.count / 3) | 0;
-        if (B$.arenaDebug!.cull) drawProjLayerIndexed(B$.gl, B$.texP, gm, g, tex, idx, stageTint!);
-        else drawProjLayer(B$.gl, B$.texP, gm, g, tex, 1, stageTint!);
+        if (B$.arenaDebug!.cull) drawProjLayerIndexed(B$.gl!, B$.texP!, gm, g, tex, idx, stageTint!);
+        else drawProjLayer(B$.gl!, B$.texP!, gm, g, tex, 1, stageTint!);
       }
       if (_pf3) _pf3("arenaGroups", performance.now() - _pt3, _ptri);
       B$.gl!.enable(B$.gl!.BLEND);
@@ -726,7 +727,7 @@ function render(dt) {
       // flat-patch fix, which lives in the colour buffer now, not the depth buffer.
       if (B$.arenaDebug!.depthWrite && B$.arenaDebug!.depthClear) B$.gl!.clear(B$.gl!.DEPTH_BUFFER_BIT);
     } else {
-      drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.skyTexture, 1, bgTint || [1,1,1,1]);
+      drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.skyTexture, 1, bgTint || [1,1,1,1]);
     }
     B$.gl!.depthMask(true);
 
@@ -734,7 +735,7 @@ function render(dt) {
     // when the disc's own per-area arena is loaded, which supplies its own ground — and skipped in
     // the viewer's isolated mode, where the neutral grid below is the ground).
     if (!dfActive && !dnaVoidActive && !arenaActive && !B$.isolatedMode)
-      drawQuad(B$.gl, B$.texP, pv, B$.floorBufs, B$.arenaTexture || B$.whiteTex, 1, [0.8,0.8,0.85,1]);
+      drawQuad(B$.gl!, B$.texP!, pv, B$.floorBufs!, B$.arenaTexture || B$.whiteTex!, 1, [0.8,0.8,0.85,1]);
     if (B$.isolatedMode && B$.viewerStudio) B$.drawViewerGrid(pv);
 
     // The change stage's fades (stage.c, engine digivolveStageBrightness): the battle stage dims to black
@@ -747,7 +748,7 @@ function render(dt) {
       B$.gl!.depthMask(false);
       B$.gl!.enable(B$.gl!.BLEND);
       B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
-      drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, B$.blastState.voidAlpha, [0, 0, 0, 1]);
+      drawQuad(B$.gl!, B$.texP!, B$.IDENT_MVP!, B$.skyBufs!, B$.whiteTex!, B$.blastState.voidAlpha, [0, 0, 0, 1]);
       B$.gl!.depthMask(true);
       if (depthOn) B$.gl!.enable(B$.gl!.DEPTH_TEST);
     }
@@ -757,7 +758,7 @@ function render(dt) {
     // after the backdrop/arena/floor and before the fighters; getEffectDraw() leaves them out of the 2D pass.
     if (B$.effectPlayer && B$.effectAssets) {
       const underFx = [...B$.effectPlayer.renderList(), ...B$._dnaSampleSprites()].filter(s => effectLayer(s) === "under");
-      if (underFx.length) drawUnderEffects(B$.gl, underFx, B$.effectAssets.manifest, B$.effectAssets.images, { centerX: W / 2, centerY: H / 2, pxScale: H / 240, worldToScreen: () => null }, W, H);   // screen-space sprites only: same view maths as getEffectDraw
+      if (underFx.length) drawUnderEffects(B$.gl!, underFx, B$.effectAssets.manifest, B$.effectAssets.images, { centerX: W / 2, centerY: H / 2, pxScale: H / 240, worldToScreen: () => null }, W, H);   // screen-space sprites only: same view maths as getEffectDraw
     }
 
     // ── Digimon rendering (skeletal if loaded, billboard fallback) ──
@@ -785,13 +786,13 @@ function render(dt) {
       B$.gl!.enable(B$.gl!.SCISSOR_TEST);
       if (rowPx > 0) {
         B$.gl!.scissor(0, H - rowPx, W, rowPx);
-        drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs, B$.playerTex || B$.whiteTex, fighterTint("player"));
+        drawSkeletalMesh(B$.gl!, B$.texP!, pv, B$.playerSkelBufs, B$.playerTex || B$.whiteTex!, fighterTint("player"));
       }
       if (B$.blastState.wireOn && rowPx < H) {
         B$.gl!.scissor(0, 0, W, H - rowPx);
         B$.gl!.enable(B$.gl!.BLEND);
         B$.gl!.blendFunc(B$.gl!.ONE, B$.gl!.ONE);                    // additive: it glows
-        drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs, B$.whiteTex,
+        drawSkeletalMesh(B$.gl!, B$.texP!, pv, B$.playerSkelBufs, B$.whiteTex!,
           [0.18, 1.0, 0.28, 1], 1, true);
         B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
       }
@@ -800,19 +801,19 @@ function render(dt) {
       // Also the entrance (entrance.c): no wipe, no wireframe, the ordinary model. The entering fighter's OLD model
       // stays until the cut (models->setId, f114), the new one is drawn from there; the other side's model is
       // hidden through playerVisible / enemyVisible.
-      drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs, B$.playerTex || B$.whiteTex, fighterTint("player"));
+      drawSkeletalMesh(B$.gl!, B$.texP!, pv, B$.playerSkelBufs, B$.playerTex || B$.whiteTex!, fighterTint("player"));
     } else if (B$.playerVisible) {
       // The billboard quad's normal is render +Z, which under the one mapping is the PS1
       // screen's own toward-the-viewer, so the page reads the same way the console draws it.
       // The player's old flipX=true was a compensation for the mirrored world and goes with it.
-      drawDigimonBillboard(B$.gl, B$.texP, pv, playerPos, B$.DIGI_W, B$.DIGI_H,
-        B$.playerTex || B$.whiteTex, 1, fighterTint("player"), false);
+      drawDigimonBillboard(B$.gl!, B$.texP!, pv, playerPos, B$.DIGI_W!, B$.DIGI_H!,
+        B$.playerTex || B$.whiteTex!, 1, fighterTint("player"), false);
     }
     if (B$.enemyVisible && B$.enemyModel && B$.enemySkelBufs) {
-      drawSkeletalMesh(B$.gl, B$.texP, pv, B$.enemySkelBufs, B$.enemyTex || B$.whiteTex, fighterTint("enemy"));
+      drawSkeletalMesh(B$.gl!, B$.texP!, pv, B$.enemySkelBufs, B$.enemyTex || B$.whiteTex!, fighterTint("enemy"));
     } else if (B$.enemyVisible) {
-      drawDigimonBillboard(B$.gl, B$.texP, pv, enemyPos, B$.DIGI_W, B$.DIGI_H,
-        B$.enemyTex || B$.whiteTex, 1, fighterTint("enemy"), false);
+      drawDigimonBillboard(B$.gl!, B$.texP!, pv, enemyPos, B$.DIGI_W!, B$.DIGI_H!,
+        B$.enemyTex || B$.whiteTex!, 1, fighterTint("enemy"), false);
     }
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
     if (B$.sceneLight) B$._sceneLightDraw(false);
@@ -829,8 +830,8 @@ function render(dt) {
     // Floor shadow ellipses. The Blast vortex has no floor to cast onto — the
     // capture is a black void from f180 — so both shadows drop with it.
     const studioOff = B$.isolatedMode && !B$.viewerStudio;
-    if (B$.playerVisible && !blastDark && !studioOff) drawShadow(B$.gl, B$.texP, pv, playerPos, 20, 8);
-    if (B$.enemyVisible && !blastDark && !studioOff)  drawShadow(B$.gl, B$.texP, pv, enemyPos,  20, 8);
+    if (B$.playerVisible && !blastDark && !studioOff) drawShadow(B$.gl!, B$.texP!, pv, playerPos, 20, 8);
+    if (B$.enemyVisible && !blastDark && !studioOff)  drawShadow(B$.gl!, B$.texP!, pv, enemyPos,  20, 8);
     if (atm) { B$._drawWeather(pv, atm, camEye, camLook); B$._atmosUniforms(null); }   // effects keep the game's own colours
 
     // ── op6 flight meshes: root at the muzzle, per-layer ctrl-track TRS animation ──
@@ -899,7 +900,7 @@ function render(dt) {
             } else {
               B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE);
             }
-            drawProjLayer(B$.gl, B$.texP, layerWorld[li + 1], g, g.tex, 1.0);
+            drawProjLayer(B$.gl!, B$.texP!, layerWorld[li + 1], g, g.tex, 1.0);
             B$.gl!.blendEquation(B$.gl!.FUNC_ADD);
           }
         }
@@ -1015,8 +1016,8 @@ function render(dt) {
 
         const boxBufs = B$._faceBoxBuffers(B$.gl!);
         const s = MODEL_SCALE;
-        const boxWorld = (v) => ps1ToRender(v, s);
-        _updateSkeletalVBOGL(B$.gl, B$.playerModel, boxBufs, B$.pBwm, boxPos, MODEL_SCALE,
+        const boxWorld = (v: number[]) => ps1ToRender(v, s);
+        _updateSkeletalVBOGL(B$.gl!, B$.playerModel, boxBufs, B$.pBwm, boxPos, MODEL_SCALE,
                              false, playerYaw);
         // The picture inside the box is the 320x240 projection taken about the box's OWN
         // centre (258,106) and clipped to the 100x60 window, at the record's own projection
@@ -1028,19 +1029,19 @@ function render(dt) {
         const fLook = boxWorld(faceShot.target);
         const fProj = mat4Perspective(faceBoxFovY(faceShot.H) * Math.PI / 180,
                                       FACE_BOX_ASPECT, 1, 8000);
-        const boxPV = mat4Mul(fProj, mat4LookAt(fEye, fLook, B$.UP));
+        const boxPV = mat4Mul(fProj, mat4LookAt(fEye, fLook, B$.UP!));
         for (const item of scene) {
-          const mvp = item.mvp === "identity" ? B$.IDENT_MVP : boxPV;
+          const mvp = item.mvp === "identity" ? B$.IDENT_MVP! : boxPV;
           if (item.what === "sky") {
             // No depth write: the sky is behind everything and must not occlude the head.
             B$.gl!.depthMask(false);
-            drawQuad(B$.gl, B$.texP, mvp, B$.skyBufs,
-                     item.tex === "void" ? B$.whiteTex : B$.skyTexture, 1, item.tint);
+            drawQuad(B$.gl!, B$.texP!, mvp, B$.skyBufs!,
+                     item.tex === "void" ? B$.whiteTex! : B$.skyTexture, 1, item.tint);
             B$.gl!.depthMask(true);
           } else if (item.what === "floor") {
-            drawQuad(B$.gl, B$.texP, mvp, B$.floorBufs, B$.arenaTexture || B$.whiteTex, 1, [0.8,0.8,0.85,1]);
+            drawQuad(B$.gl!, B$.texP!, mvp, B$.floorBufs!, B$.arenaTexture || B$.whiteTex!, 1, [0.8,0.8,0.85,1]);
           } else {
-            drawSkeletalMesh(B$.gl, B$.texP, mvp, boxBufs, B$.playerTex || B$.whiteTex, fighterTint("player"));
+            drawSkeletalMesh(B$.gl!, B$.texP!, mvp, boxBufs, B$.playerTex || B$.whiteTex!, fighterTint("player"));
           }
         }
         B$.gl!.disable(B$.gl!.SCISSOR_TEST);
@@ -1049,13 +1050,14 @@ function render(dt) {
       B$.faceCamRect = { x: fx, y: fyTop, w: fw, h: fh };
     }
   }
-function drawDigimonBillboard(gl, prog, mvp, worldPos, w, h, tex, alpha, tint, flipX) {
+// ETS item 9: a world position is always an [x, y, z] triple.
+function drawDigimonBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, worldPos: number[], w: number, h: number, tex: WebGLTexture | null, alpha: number, tint: number[] | null, flipX: boolean) {
     const hw = w * 0.5;
     // billboard always faces camera — use camera right from view matrix
     // For simplicity use fixed right/up since camera is fixed
-    const cx = worldPos[0], cy = worldPos[1], cz = worldPos[2];
+    const cx = worldPos[0]!, cy = worldPos[1]!, cz = worldPos[2]!;
     // slight angle toward center of arena
-    const lean = worldPos[0] < 0 ? -0.05 : 0.05;
+    const lean = worldPos[0]! < 0 ? -0.05 : 0.05;
 
     const tl = [cx - hw, cy + h, cz + lean * h];
     const tr = [cx + hw, cy + h, cz - lean * h];
@@ -1068,26 +1070,26 @@ function drawDigimonBillboard(gl, prog, mvp, worldPos, w, h, tex, alpha, tint, f
     drawQuad(gl, prog, mvp, bufs, tex, alpha, tint);
     gl.deleteBuffer(bufs.vbo); gl.deleteBuffer(bufs.ubo); gl.deleteBuffer(bufs.ibo);
   }
-function drawShadow(gl, prog, mvp, pos, rx, ry) {
+function drawShadow(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, pos: number[], rx: number, ry: number) {
     // Flat ellipse on floor (y=0) as a dark transparent quad
-    const cx = pos[0], cz = pos[2];
+    const cx = pos[0]!, cz = pos[2]!;
     const verts = [
       [cx-rx, 0.2, cz-ry], [cx+rx, 0.2, cz-ry],
       [cx+rx, 0.2, cz+ry], [cx-rx, 0.2, cz+ry],
     ];
     const bufs = makeQuadBuffers(gl, verts, [[0,0],[1,0],[1,1],[0,1]]);
-    drawQuad(gl, prog, mvp, bufs, B$.whiteTex, 0.35, [0,0,0,1]);
+    drawQuad(gl, prog, mvp, bufs, B$.whiteTex!, 0.35, [0,0,0,1]);
     gl.deleteBuffer(bufs.vbo); gl.deleteBuffer(bufs.ubo); gl.deleteBuffer(bufs.ibo);
   }
 function destroy() {
     B$.clearFighters();
-    for (const pk of Object.values(B$.backdropPacks) as BackdropPack[]) {
+    for (const pk of Object.values(B$.backdropPacks!)) {
       if (pk.floorTex) B$.gl!.deleteTexture(pk.floorTex);
       if (pk.wallTex) B$.gl!.deleteTexture(pk.wallTex);
       for (const g of pk.groups || [])
         if (g && g.vbo) { B$.gl!.deleteBuffer(g.vbo); B$.gl!.deleteBuffer(g.ubo); }
     }
-    [B$.arenaTexture, B$.skyTexture, B$.playerTex, B$.enemyTex, B$.whiteTex].forEach(t => {
+    [B$.arenaTexture, B$.skyTexture, B$.playerTex, B$.enemyTex, B$.whiteTex!].forEach(t => {
       if (t) B$.gl!.deleteTexture(t);
     });
     B$.gl!.deleteBuffer(B$.floorBufs!.vbo); B$.gl!.deleteBuffer(B$.floorBufs!.ubo);

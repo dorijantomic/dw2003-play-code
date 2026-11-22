@@ -9,6 +9,8 @@
 // collection unchanged. The collection the player has ever obtained seeds the
 // album's own flags before the first tick.
 import { ui } from "./vendor/engine.js";
+import type { PackedSfx, ResidentGlyphs } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import { composeWindow } from "./ui-c/screens.js";
@@ -67,7 +69,7 @@ function loadData(language: number): Promise<CardAlbumData> {
   return dataPromise;
 }
 
-export function createCardAlbumTranslated(sfx = null) {
+export function createCardAlbumTranslated(sfx: PackedSfx | null = null) {
   const album = {
     _open: false, _session: null, _state: null, _onClose: null,
     _clock: null, _error: null, _request: 0,
@@ -75,10 +77,10 @@ export function createCardAlbumTranslated(sfx = null) {
   const renderer = createNativeScreenRenderer({ pack: "stalbm", packs: PACKS },
     (directory) => PACKS[directory >>> 16] ?? null);
 
-  function seed(state) {
+  function seed(state: unknown) {
     const collection = cards();
-    const seen = new Set();
-    const owned = new Map();
+    const seen = new Set<number>();
+    const owned = new Map<number, number>();
     for (const id of collection?.seen ?? []) seen.add(Number(id));
     for (const [id, count] of collection?.owned ?? []) { seen.add(Number(id)); owned.set(Number(id), count); }
     void state;
@@ -96,14 +98,16 @@ export function createCardAlbumTranslated(sfx = null) {
     }
     album._error = null;
     album._session = null;
-    album._clock = new ui.MenuDisplayClock();
+    album._clock = new (ui as EngineUi).MenuDisplayClock();
     const request = ++album._request;
     const language = Number.isInteger(album._state?.languageByte) ? album._state.languageByte : 2;
     loadData(language).then((data) => {
       if (!album._open || request !== album._request) return;
-      const session = new ui.AlbumSession(language,
+      const session = new (ui as EngineUi).AlbumSession(language,
         { banks: data.banks, cards: data.cards, font: data.resident.font,
-          ranges: data.resident.ranges, cursorGlyphs: data.resident.cursorGlyphs },
+          ranges: data.resident.ranges,
+          // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+          cursorGlyphs: data.resident.cursorGlyphs as ResidentGlyphs },
         { playSound: (id) => sfx?.playPacked(id) });
       const { seen, owned } = seed(album._state);
       session.seedCollection(seen, owned);

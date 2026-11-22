@@ -6,7 +6,7 @@
 // like the battle/menu/shop code paths do.
 import { heldCount, ITEMS, storeAddItem } from "./vendor/engine.js";
 import { scaledStat } from "./battle.js";
-import type { DebugPanelState } from "./types/debugPanel.js";
+import type { DebugField, DebugPanelState } from "./types/debugPanel.js";
 
 import type { GameState } from "./game/types.js";
 const FISHING_POLE_ID = 5;
@@ -27,7 +27,7 @@ export function grantTreeBoots(state: GameState) {
 }
 
 export function createDebugPanel() {
-  const d = { enabled: false, sel: 0, itemIdx: 0, evoIdx: 0, msg: null } as DebugPanelState;
+  const d: DebugPanelState = { enabled: false, sel: 0, itemIdx: 0, evoIdx: 0, msg: null };
 
   // Evolution targets the partner currently qualifies for (level/form/stat-gated). Recomputed
   // live so editing Level/stats above immediately changes what's offered here.
@@ -54,15 +54,15 @@ export function createDebugPanel() {
   }
 
   // bonus(stat) accessors live under ps.bonuses[stat] (added on top of the scaled base).
-  const bonus = (stat: string) => ({
+  const bonus = (stat: string): DebugField => ({
     label: `+${stat.toUpperCase()}`, step: 1, min: 0,
     get: (ps) => ps.bonuses?.[stat] ?? 0,
     set: (ps, v) => { ps.bonuses = ps.bonuses ?? {}; ps.bonuses[stat] = Math.max(0, v); },
   });
 
-  const FIELDS = [
+  const FIELDS: DebugField[] = [
     { label: "Level", step: 1, min: 1, get: (ps) => ps.level ?? 1,
-      set: (ps, v, state: GameState) => { ps.level = Math.max(1, v); recomputeMax(state); } },
+      set: (ps, v, state) => { ps.level = Math.max(1, v); recomputeMax(state); } },
     { label: "EXP", step: 10, min: 0, get: (ps) => ps.xp ?? 0, set: (ps, v) => { ps.xp = Math.max(0, v); } },
     { label: "TP", step: 1, min: 0, get: (ps) => ps.tp ?? 0, set: (ps, v) => { ps.tp = Math.max(0, Math.min(99, v)); } },
     { label: "HP", step: 10, min: 0, get: (ps) => ps.hp, set: (ps, v) => { ps.hp = Math.max(0, Math.min(v, ps.maxHp)); } },
@@ -211,7 +211,7 @@ export function createDebugPanel() {
 
     if (!ps) { ctx.fillStyle = "#f88"; ctx.fillText("No partner yet.", x + 8, y + 8 + lh * 2); ctx.restore(); return; }
     let row = 0;
-    const line = (label: string, val, idx: number) => {
+    const line = (label: string, val: string | number, idx: number) => {
       const yy = y + 14 + lh * (2 + row++);
       ctx.fillStyle = idx === d.sel ? "#ffe000" : "#cde";
       ctx.fillText(`${idx === d.sel ? "▶ " : "  "}${label}`, x + 8, yy);

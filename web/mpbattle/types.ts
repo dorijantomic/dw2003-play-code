@@ -1,6 +1,9 @@
 // Types only: one interface per object the converted code creates empty and fills in later
 // (see tools/rewrite/add-types.mjs). Nothing here is emitted — node's strip mode erases the
 // declarations — so this file must never hold runtime code.
+import type { Arena } from "../mpbattle-rules.js";
+import type { createPause } from "../mpbattle-pause.js";
+import type { MpFoeRec, MpKit, MpPartyMember, MpPlayerRec, MpSnapshot } from "../types/mp-match.js";
 
 /** The command menu under one fighter: which stage it is in, and the rows to pick from. */
 export interface MpFighterCommand {
@@ -59,8 +62,8 @@ export interface MpNetPlayer {
   /** the digimon's name */
   n: string;
   lv: number;
-  rec: any;
-  party: any[];
+  rec: MpPlayerRec;
+  party: MpPlayerRec[];
 }
 
 export interface MpNetFighter {
@@ -75,7 +78,7 @@ export interface MpNetFighter {
   /** the fight's finish hook, run once when it is over */
   done: (result: MpFightResult) => void;
   /** the enemies' digimon records, one per foe */
-  erec: any[];
+  erec: MpFoeRec[];
   /** this fight's net id */
   fid: number;
   /** true when both sides are fought (a wave fight), false for a single side */
@@ -88,7 +91,7 @@ export interface MpNetFighter {
   isHost: boolean;
   items: any[];
   /** the battle kit this fight runs on (MB.F.kit) */
-  kit: any;
+  kit: MpKit;
   label: string;
   /** the net question id of the last event the fighter saw */
   lastEv: number | null;
@@ -97,18 +100,18 @@ export interface MpNetFighter {
   link: any;
   mapId: number | null;
   /** my player record */
-  me: any;
+  me: MpPlayerRec;
   mineKey?: string;
   /** fighter id -> model name */
   modelName: Map<number, string>;
   names: Record<number, string>;
   nat: any;
-  party: any[];
+  party: MpPartyMember[];
   placed: Set<number>;
   /** the BGM track that was playing before the battle, restored on the way out */
   prevTrack?: string | null;
   r3d: any;
-  S: any;
+  S: MpSnapshot | null;
   screenId: number | null;
   snap: any;
   techs: any[];
@@ -120,14 +123,14 @@ export interface MpNetFighter {
 }
 
 export interface MpNetHost {
-  arena: any;
+  arena: Arena | null;
   ln?: string[];
   log: string[];
   lq?: number;
   /** id -> name, or the per-foe name list the local host builds */
   names: Record<number, string> | string[];
   P: Map<number, MpNetPlayer>;
-  pause: any;
+  pause: ReturnType<typeof createPause>;
   readyTimer?: ReturnType<typeof setTimeout>;
   res: Map<number, any>;
   round: number;

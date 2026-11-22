@@ -4,6 +4,8 @@
 // hands the confirmed names back to the walker's state. It never executes
 // original instructions.
 import { ui, rosterSlotOfCharId } from "./vendor/engine.js";
+import type { WalkerState, PackedSfx } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import { composeName } from "./ui-c/screens.js";
@@ -40,7 +42,7 @@ export function encodeGameName(text: string, limit: number) {
     return new Uint8Array(out);
 }
 
-export function decodeGameName(bytes) {
+export function decodeGameName(bytes: Iterable<number>) {
     let out = "";
     for (const b of bytes) {
         if (b === 0) break;
@@ -54,9 +56,9 @@ export function decodeGameName(bytes) {
 
 /** Roster slot of a manifest char id, or null when it is not a roster species
  *  (the engine helper's own miss value; the call site filters null out). */
-const rosterSlotFor = (charId) => rosterSlotOfCharId(String(charId));
+const rosterSlotFor = (charId: string | null) => rosterSlotOfCharId(String(charId));
 
-export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () => Record<string, any> } = {}) {
+export function createNameEntryTranslated(sfx: PackedSfx | null = null, options: { digimonDB?: () => Record<string, any> } = {}) {
     const n = {
         _open: false, _session: null, _state: null, _clock: null, _error: null,
         _request: 0, _members: [], _initial: "", _results: [], _lastValue: "",
@@ -65,7 +67,7 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
         (directory) => PACKS[directory >>> 16] ?? null);
 
     /** The party the screen can name: the live party, else the opening's granted pack. */
-    function members(state) {
+    function members(state: WalkerState) {
         const live = Array.isArray(state?.party) ? state.party : [];
         const pending = Array.isArray(state?.pendingParty) ? state.pendingParty : [];
         const ids = (live.length ? live : pending).slice(0, MAX_PARTNERS);
@@ -74,11 +76,11 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
             view = partyRosterView(ids, state.partnerStats, state.partyStats,
                 options.digimonDB?.() ?? {}, state.digimonNames);
         } catch { view = []; }
-        return ids.map((charId, i) => ({
+        return ids.map((charId: string | null, i: number) => ({
             charId,
             rosterSlot: rosterSlotFor(charId),
             name: state.digimonNames?.[charId] ?? view[i]?.name ?? "",
-        })).filter((member) => member.rosterSlot !== null);
+        })).filter((member: { rosterSlot: number | null }) => member.rosterSlot !== null);
     }
 
     n.open = (opts: { state?: any; initial?: string } = {}) => {
@@ -89,7 +91,7 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
         n._lastValue = n._initial;
         n._error = null;
         n._session = null;
-        n._clock = new ui.MenuDisplayClock();
+        n._clock = new (ui as EngineUi).MenuDisplayClock();
         n._members = members(n._state ?? {});
         const request = ++n._request;
         if (!n._members.length) {
@@ -104,7 +106,7 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
                 [offset + language, await fetchBytes(`name/${offset + language}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
             if (!n._open || request !== n._request) return;
             const limit = language === 0 ? 5 : 8;
-            n._session = new ui.NameRootSession(language,
+            n._session = new (ui as EngineUi).NameRootSession(language,
                 n._members.map((member) => ({
                     rosterSlot: member.rosterSlot,
                     nameBytes: encodeGameName(member.name, limit),

@@ -29,12 +29,14 @@
 // black the old hand-written card always painted, records the colour the card asked for in diagnostics()
 // (viewColour), and asserts nothing about what it should look like.
 import { ui } from "./vendor/engine.js";
+import type { ThrownError } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { composeEnd } from "./ui-c/screens.js";
 import { paletteClipId } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
-import type { EndscreenScreen } from "./types/endscreen-translated.js";
+import type { EndCardData, EndscreenScreen } from "./types/endscreen-translated.js";
 
 /** The framebuffer the card's coordinates are authored in. */
 const NATIVE_W = 320;
@@ -43,8 +45,8 @@ const NATIVE_H = 240;
 const DEFAULT_LANGUAGE = 2;
 const DATA_LABEL = "END card data";
 
-let data = null;
-let loading = null;
+let data: EndCardData | null = null;
+let loading: Promise<EndCardData> | null = null;
 
 /**
  * Load the card's layout table. Safe to call repeatedly. The session checks the table against the
@@ -98,7 +100,7 @@ export function createEndCardTranslated(options: EndCardOptions = {} as EndCardO
         _onDone: options.onDone ?? null,
     } as EndscreenScreen;
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         card._error = error;
         card._failed = true;
         card._open = false;
@@ -107,12 +109,12 @@ export function createEndCardTranslated(options: EndCardOptions = {} as EndCardO
 
     /** Build the session and raise the card. The original's only entry is title launch mode 13. */
     function startSession() {
-        card._session ??= new ui.EndCardSession(card._data, {
+        card._session ??= new (ui as EngineUi).EndCardSession(card._data, {
             onStopAllSound: () => card._stopSound?.(),
             onLaunch: (code) => card._launches.push(code >>> 0),
         });
         card._renderer ??= createNativeScreenRenderer({ pack: card._data!.pack }, () => card._data!.pack);
-        card._clock = new ui.MenuDisplayClock();
+        card._clock = new (ui as EngineUi).MenuDisplayClock();
         card._session.begin({ language: card._language });
         card._lastState = null;
         card._launches.length = 0;

@@ -14,6 +14,7 @@
 // (docs/research/audio/sound-system.md, "The exclusive-track register"). Neither is the SEQ music, so
 // both go through sfx.playPacked and the bgm track is left playing.
 import { innForStage, quoteInnStay, restAtInn, ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import * as uiC from "./ui-c/index.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
@@ -22,33 +23,36 @@ import { applyInnRest } from "./inn.js";
 import { fetchBytes, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import type { InnScreen } from "./types/inn-translated.js";
+import type { ResidentTextResources } from "../engine/dw3/ui/resident-text-host.js";
+import type { InnSession } from "../engine/dw3/ui/inn-session.js";
+import type { PackedSfx, ResidentGlyphs, ThrownError, WalkerState } from "./types/translated-screens.js";
 
 const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 
 const DATA_LABEL = "Inn data";
 
-const bankCache = new Map();
-const loadBank = (language) => {
-    const id = ui.innBankId(language);
+const bankCache = new Map<number, Promise<Uint8Array>>();
+const loadBank = (language: number) => {
+    const id = (ui as EngineUi).innBankId(language);
     if (!bankCache.has(id)) bankCache.set(id, fetchBytes(`inn-banks/${id}.bin`, DATA_LABEL).catch((e) => { bankCache.delete(id); throw e; }));
-    return bankCache.get(id);
+    return bankCache.get(id)!;
 };
 
 // The deployed partner blocks, as web/inn.js prices them: index 0 is partnerStats, the rest partyStats.
-function partyOf(state) {
+function partyOf(state: WalkerState) {
     const chars = state?.party;
     if (!Array.isArray(chars) || !chars.length) return [];
     const stats = Array.isArray(state.partyStats) ? state.partyStats : [];
     return chars.map((_, i) => (i === 0 ? state.partnerStats : stats[i]) ?? {});
 }
 
-export function createInnTranslated(sfx = null, bgm = null) {
-    const inn = {
+export function createInnTranslated(sfx: PackedSfx | null = null, bgm = null) {
+    const inn: InnScreen = {
         _open: false, _failed: false, _error: null, _session: null, _clock: null, _state: null, _record: null,
         _party: [], _onClose: null, _queued: 0, _ticks: 0, _closes: 0, _sounds: [], _music: [], _request: 0,
         _bgm: bgm, time: 0,
-    } as InnScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Taken away by the caller, the session is disposed before onClose runs, as this screen always
@@ -59,14 +63,14 @@ export function createInnTranslated(sfx = null, bgm = null) {
         tracksPending: false, countsCloses: true, clearSession: false,
     });
 
-    const playSound = (id) => {
+    const playSound = (id: number) => {
         const key = id >>> 0;
         inn._sounds.push(key);
         if (inn._sounds.length > 256) inn._sounds.splice(0, inn._sounds.length - 256);
         sfx?.playPacked?.(key);
     };
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         inn._error = error;
         inn._failed = true;
         console.error("Translated inn failed", error);
@@ -82,13 +86,13 @@ export function createInnTranslated(sfx = null, bgm = null) {
         return shared;
     };
 
-    function language(state) {
+    function language(state: WalkerState) {
         const selected = state?.languageByte;
         return Number.isInteger(selected) && selected >= 0 && selected <= 6 ? selected : 2;
     }
 
     /** The rest effect: BIT already charged by the screen; heal slots 0..2 and persist. */
-    function rest(session) {
+    function rest(session: InnSession) {
         const state = inn._state;
         if (!state) return;
         const before = Number(state.bits ?? 0);
@@ -132,7 +136,8 @@ interface InnOpenArgs {
             const [shared, bank] = await Promise.all([loadResidentResources(), loadBank(lang)]);
             if (!host.current(request)) return quote;
             inn._session?.dispose();
-            const session = new ui.InnSession(shared);
+            // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
+            const session = new (ui as EngineUi).InnSession(shared as ResidentTextResources);
             inn._state = state;
             inn._record = record;
             inn._party = party;
@@ -152,7 +157,7 @@ interface InnOpenArgs {
                 onClose: () => host.finish(),
             });
             inn._session = session;
-            inn._clock = new ui.MenuDisplayClock();
+            inn._clock = new (ui as EngineUi).MenuDisplayClock();
         } catch (error) {
             if (host.current(request)) { inn._open = false; fail(error); }
             return null;
@@ -167,17 +172,17 @@ interface InnOpenArgs {
 
     // Button calls become the pressed word of the next display tick (logical bits: Up 4, Down 6,
     // Confirm 13, Cancel 14). The screen reads Up/Down from the pressed or repeat word.
-    inn.moveUp = () => { inn._queued |= ui.INN_PAD_UP; };
-    inn.moveDown = () => { inn._queued |= ui.INN_PAD_DOWN; };
-    inn.confirm = () => { inn._queued |= ui.INN_PAD_CONFIRM; };
-    inn.cancel = () => { inn._queued |= ui.INN_PAD_CANCEL; };
+    inn.moveUp = () => { inn._queued |= (ui as EngineUi).INN_PAD_UP; };
+    inn.moveDown = () => { inn._queued |= (ui as EngineUi).INN_PAD_DOWN; };
+    inn.confirm = () => { inn._queued |= (ui as EngineUi).INN_PAD_CONFIRM; };
+    inn.cancel = () => { inn._queued |= (ui as EngineUi).INN_PAD_CANCEL; };
 
     inn.tick = (dt) => {
         if (!inn._open || inn._failed || !inn._session) return;
         inn.time += dt;
         try {
-            for (const frame of inn._clock.advance(dt)) {
-                const session = inn._session;
+            for (const frame of inn._clock!.advance(dt)) {
+                const session: InnSession = inn._session;
                 const pressed = inn._queued;
                 inn._queued = 0;
                 session.tick({ pressed, repeat: 0 }, frame.tick);
@@ -209,7 +214,7 @@ interface InnOpenArgs {
     // foreground: every channel loses L, clamped at 0. Canvas has no subtract mode, so it is built
     // exactly from difference and add: 255 - min(255, (255 - dst) + L) = max(0, dst - L).
     // GUESS: the quad sits over the inn windows (it is in the same layer at depth 0, the windows at 1).
-    function drawFade(ctx: CanvasRenderingContext2D, fade, viewW: number, viewH: number) {
+    function drawFade(ctx: CanvasRenderingContext2D, fade: ReturnType<InnSession["fadeIntent"]>, viewW: number, viewH: number) {
         if (!fade || fade.level <= 0) return;
         const L = fade.level & 0xff;
         ctx.save();

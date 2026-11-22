@@ -12,6 +12,7 @@
 import * as THREE from "./lib3d/three.module.js";
 import { classSource } from "./mapclass.js";
 import { getSharedRenderer, sharedLost } from "./gl-shared.js";
+import type { WaterStage, WaterUniforms } from "./types/misc-game2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
@@ -20,11 +21,11 @@ const PX = 2;
 const PITCH = (50 * Math.PI) / 180; // must match grass3d.js
 const SIN = Math.sin(PITCH);
 
-let renderer = null;
+let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.OrthographicCamera | null = null;
 let quad = null;
-const uniforms = {
+const uniforms: WaterUniforms = {
     uMap: { value: null },
     uMask: { value: null },
     uCam: { value: new THREE.Vector2() },
@@ -33,7 +34,7 @@ const uniforms = {
     uRefl: { value: null },
     uReflOn: { value: 1 },
 };
-const stages = new Map(); // stageId -> { mapTex, maskTex } | null
+const stages = new Map<string, WaterStage | null>(); // stageId -> { mapTex, maskTex } | null
 
 function ensureRenderer() {
     if (renderer && sharedLost()) return false;
@@ -147,7 +148,7 @@ const WATER_STAGES = new Set([
 // on forest shadows elsewhere (e.g. Wind Prairie), so it is opt-in per stage.
 const GREEN_WATER_STAGES = new Set(["s380", "s381"]); // Divermon's Lake
 
-function isWater(r, g, b, greenMode: boolean) {
+function isWater(r: number, g: number, b: number, greenMode: boolean) {
     if (b >= 62 && b > r + 28 && b > g + 6 && r < 150) return true;
     return greenMode && g >= 45 && g <= 150 && g > r + 18
         && b >= g * 0.4 && b <= g * 0.97 && g - b <= 60 && b >= 20;
@@ -155,10 +156,10 @@ function isWater(r, g, b, greenMode: boolean) {
 
 // The water test for one stage, so grass3d.js can keep blades out of water
 // with exactly the rule that decides where water is drawn.
-export function waterPixelTest(stageId) {
+export function waterPixelTest(stageId: string) {
     if (!WATER_STAGES.has(stageId)) return () => false;
     const greenMode = GREEN_WATER_STAGES.has(stageId);
-    return (r, g, b) => isWater(r, g, b, greenMode);
+    return (r: number, g: number, b: number) => isWater(r, g, b, greenMode);
 }
 
 function boxBlur(src: Uint8Array<ArrayBuffer>, W: number, H: number, rad: number) {
@@ -232,7 +233,7 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
 }
 
 // Returns the hidden canvas (VIEW_W*PX by VIEW_H*PX, camera-relative) or null.
-export function renderWater(stageId, mapImg, camX: number, camY: number, timeSec: number) {
+export function renderWater(stageId: string, mapImg: HTMLImageElement | null | undefined, camX: number, camY: number, timeSec: number) {
     if (!WATER_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
@@ -259,7 +260,7 @@ export function renderWater(stageId, mapImg, camX: number, camY: number, timeSec
 export const WATER_VIEW = { get w() { return VIEW_W; }, h: VIEW_H, px: PX };
 
 // Is this map pixel water (so wading can ripple)? False until the stage has been drawn once.
-export function isWaterAt(stageId, x, y) {
+export function isWaterAt(stageId: string, x: number, y: number) {
     const st = stages.get(stageId);
     if (!st) return false;
     const xi = x | 0, yi = y | 0;
@@ -268,4 +269,4 @@ export function isWaterAt(stageId, x, y) {
 }
 
 // Is this one of the maps that gets the water shader (so real water, not blue paving)?
-export function isWaterStage(stageId) { return WATER_STAGES.has(stageId); }
+export function isWaterStage(stageId: string) { return WATER_STAGES.has(stageId); }

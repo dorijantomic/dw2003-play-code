@@ -5,21 +5,23 @@
 // hands the account name and chosen pack back to the walker's opening. It never
 // executes original instructions.
 import { ui } from "./vendor/engine.js";
+import type { PackedSfx } from "./types/translated-screens.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import { composeWizard } from "./ui-c/screens.js";
 import { decodeGameName, encodeGameName } from "./nameentry-translated.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import type { PackSelectScreen } from "./types/packselect-translated.js";
-type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type WizardResources = import("../engine/dw3/ui/wizard-root-session.js").WizardResources;
 
 
 interface PackSelectShared {
   tables: Awaited<ReturnType<typeof fetchBytes>>;
   font: Awaited<ReturnType<typeof loadResidentResources>>["font"];
   members: number[];
-  cursorGlyphs: JsonValue;
-  textButtons: JsonValue;
+  cursorGlyphs: WizardResources["cursorGlyphs"];
+  textButtons: WizardResources["textButtons"];
 }
 
 
@@ -42,7 +44,7 @@ const loadShared = (): Promise<PackSelectShared> => {
     return sharedPromise;
 };
 
-export function createPackSelectTranslated(sfx = null) {
+export function createPackSelectTranslated(sfx: PackedSfx | null = null) {
     const p = {
         _open: false, _done: false, _session: null, _state: null, _clock: null, _error: null,
         _request: 0, _sel: 0, _partners: [], _accountName: "",
@@ -76,7 +78,7 @@ export function createPackSelectTranslated(sfx = null) {
         p._press = null;
         p._error = null;
         p._session = null;
-        p._clock = new ui.MenuDisplayClock();
+        p._clock = new (ui as EngineUi).MenuDisplayClock();
         const request = ++p._request;
         loadShared().then(async (shared) => {
             const selected = p._state?.languageByte;
@@ -85,8 +87,9 @@ export function createPackSelectTranslated(sfx = null) {
             const banks = new Map(await Promise.all(BANKS.map(async (offset) =>
                 [offset + language!, await fetchBytes(`wizard/${offset + language!}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
             if (!p._open || request !== p._request) return;
-            p._session = new ui.WizardRootSession(language,
+            p._session = new (ui as EngineUi).WizardRootSession(language,
                 encodeGameName(p._accountName, language === 0 ? 5 : 8),
+                // ETS item 9: web/resident-data.ts types the glyph table as {}; it is the engine's CursorGlyphTable
                 { ...shared, banks },
                 { playSound(id) { sfx?.playPacked(id); } });
         }).catch((error) => {

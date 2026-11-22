@@ -1,3 +1,5 @@
+import type { SpeciesCounts, SpeciesLogField, SpeciesLogState, SpeciesLogStorage } from "./types/misc-game2.js";
+
 interface SpeciesLogEvent {
     enemies?: string[];
     name?: string;
@@ -21,9 +23,9 @@ export const SPECIES_LOG_KEY = "dw.glossary.v1";
 const MAX_NAME = 64;
 const BAD_NAMES = new Set(["__proto__", "constructor", "prototype"]);
 
-const validName = (n) => typeof n === "string" && n.length > 0 && n.length <= MAX_NAME && !BAD_NAMES.has(n);
+const validName = (n: unknown): n is string => typeof n === "string" && n.length > 0 && n.length <= MAX_NAME && !BAD_NAMES.has(n);
 const cleanCounts = (o) => {
-    const out = {};
+    const out: SpeciesCounts = {};
     if (!o || typeof o !== "object" || Array.isArray(o)) return out;
     for (const k of Object.keys(o)) {
         if (!validName(k)) continue;
@@ -33,12 +35,12 @@ const cleanCounts = (o) => {
     return out;
 };
 
-function defaultStorage() {
+function defaultStorage(): SpeciesLogStorage {
     return typeof localStorage !== "undefined" ? localStorage : { getItem: () => null, setItem: () => {} };
 }
 
 export function createSpeciesLog(storage = defaultStorage()) {
-    const read = () => {
+    const read = (): SpeciesLogState => {
         try {
             const j = JSON.parse(storage.getItem(SPECIES_LOG_KEY) || "null");
             if (j && typeof j === "object" && j.v === 1) return { v: 1, met: cleanCounts(j.met), beaten: cleanCounts(j.beaten), owned: cleanCounts(j.owned) };
@@ -47,8 +49,8 @@ export function createSpeciesLog(storage = defaultStorage()) {
     };
     // the `items` part belongs to web/item-log.js: read() leaves it out, write() carries it through untouched
     const keptItems = () => { try { const j = JSON.parse(storage.getItem(SPECIES_LOG_KEY) || "null"); return j && j.v === 1 && j.items && typeof j.items === "object" ? j.items : null; } catch { return null; } };
-    const write = (s) => { try { const items = keptItems(); storage.setItem(SPECIES_LOG_KEY, JSON.stringify(items ? { ...s, items } : s)); } catch { /* blocked or full: the count is lost, the game goes on */ } };
-    const note = (names, field: string) => {
+    const write = (s: SpeciesLogState) => { try { const items = keptItems(); storage.setItem(SPECIES_LOG_KEY, JSON.stringify(items ? { ...s, items } : s)); } catch { /* blocked or full: the count is lost, the game goes on */ } };
+    const note = (names: string[] | undefined, field: SpeciesLogField) => {
         const list = (Array.isArray(names) ? names : []).filter(validName);
         if (!list.length) return false;
         const s = read();
@@ -60,7 +62,7 @@ export function createSpeciesLog(storage = defaultStorage()) {
         return true;
     };
     // owned = species the player has had (party now, each form worn since): a set, so a name is 1 once it is in
-    const noteOwned = (names) => {
+    const noteOwned = (names: (string | undefined)[] | undefined) => {
         const list = (Array.isArray(names) ? names : []).filter(validName);
         const s = read();
         let added = false;
@@ -71,11 +73,11 @@ export function createSpeciesLog(storage = defaultStorage()) {
     return {
         read,
         noteOwned,
-        ownedCount: (name) => read().owned[name] || 0,
+        ownedCount: (name: string) => read().owned[name] || 0,
         noteMet: (names: string[] | undefined) => note(names, "met"),
         noteBeaten: (names: string[] | undefined) => note(names, "beaten"),
-        metCount: (name) => read().met[name] || 0,
-        beatenCount: (name) => read().beaten[name] || 0,
+        metCount: (name: string) => read().met[name] || 0,
+        beatenCount: (name: string) => read().beaten[name] || 0,
         totals() { const s = read(); return { met: Object.keys(s.met).length, beaten: Object.keys(s.beaten).length }; },
     };
 }

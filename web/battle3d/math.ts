@@ -2,7 +2,15 @@ import { mat4Identity, mat4Scale } from "../fight/proj-layers.js";
 import { patchCopyRect } from "../vendor/engine.js";
 type Pt3 = [number, number, number];
 
-type Vec3Like = number[] | Float32Array;
+type Vec3Like = readonly number[] | Float32Array;
+
+/** A PS1 battle point, spelled as an [x,y,z] triple or as an {x,y,z} slot (both are in the data). */
+interface Ps1Slot {
+  [index: number]: number | undefined;
+  x?: number;
+  y?: number;
+  z?: number;
+}
 
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
@@ -21,7 +29,7 @@ export function mat4Perspective(fovY: number, aspect: number, near: number, far:
   return m;
 }
 
-export function mat4LookAt(eye: Vec3Like, center: Vec3Like, up: Vec3Like | undefined) {
+export function mat4LookAt(eye: Vec3Like, center: Vec3Like, up: Vec3Like) {
   const z = normalize(sub3(eye, center));
   const x = normalize(cross3(up, z));
   const y = cross3(z, x);
@@ -48,13 +56,14 @@ export function centroid3(pts: Pt3[]) {
   return [x/n, y/n, z/n];
 }
 
-export function sub3(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+// ETS item 9: a vec3 always holds three numbers, so the element reads below are never undefined.
+export function sub3(a: Vec3Like, b: Vec3Like): Pt3 { return [a[0]!-b[0]!, a[1]!-b[1]!, a[2]!-b[2]!]; }
 
-export function cross3(a, b: number[]) { return [a[1]*b[2]!-a[2]*b[1]!, a[2]*b[0]!-a[0]*b[2]!, a[0]*b[1]!-a[1]*b[0]!]; }
+export function cross3(a: Vec3Like, b: Vec3Like): Pt3 { return [a[1]!*b[2]!-a[2]!*b[1]!, a[2]!*b[0]!-a[0]!*b[2]!, a[0]!*b[1]!-a[1]!*b[0]!]; }
 
-export function dot3(a, b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+export function dot3(a: Vec3Like, b: Vec3Like) { return a[0]!*b[0]!+a[1]!*b[1]!+a[2]!*b[2]!; }
 
-export function normalize(v) { const l = Math.sqrt(dot3(v,v)); return l<1e-6?[0,0,0]:[v[0]/l,v[1]/l,v[2]/l]; }
+export function normalize(v: Vec3Like): Pt3 { const l = Math.sqrt(dot3(v,v)); return l<1e-6?[0,0,0]:[v[0]!/l,v[1]!/l,v[2]!/l]; }
 
 // mat3 multiply (column-major 9-element Float32Array)
 function mat3Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
@@ -84,11 +93,12 @@ export function ps1AnglesToMat3(ax: number, ay: number, az: number) {
 }
 
 // Embed mat3 into upper-left of mat4 (column-major)
-function mat3ToMat4(m3) {
+function mat3ToMat4(m3: Float32Array) {
   const m4 = mat4Identity();
-  m4[0]=m3[0]; m4[1]=m3[1]; m4[2]=m3[2];
-  m4[4]=m3[3]; m4[5]=m3[4]; m4[6]=m3[5];
-  m4[8]=m3[6]; m4[9]=m3[7]; m4[10]=m3[8];
+  // ETS item 9: a mat3 always holds nine numbers.
+  m4[0]=m3[0]!; m4[1]=m3[1]!; m4[2]=m3[2]!;
+  m4[4]=m3[3]!; m4[5]=m3[4]!; m4[6]=m3[5]!;
+  m4[8]=m3[6]!; m4[9]=m3[7]!; m4[10]=m3[8]!;
   return m4;
 }
 
@@ -111,7 +121,7 @@ export const PS1_RENDER_SIGN = [1, -1, -1];
 
 /** One PS1 battle coordinate → render world, scaled by `s`. The one mapping, in one place.
  *  Accepts an [x,y,z] triple or an {x,y,z} slot, because both spellings are in the data. */
-export function ps1ToRender(p, s = 1) {
+export function ps1ToRender(p: Ps1Slot, s = 1) {
   const x = p[0] !== undefined ? p[0] : p.x;
   const y = p[1] !== undefined ? p[1] : p.y;
   const z = p[2] !== undefined ? p[2] : p.z;
@@ -124,7 +134,7 @@ export function ps1ToRenderMatrix(s = 1) {
 }
 
 /** The inverse: render world back to the PS1 battle world, for a camera record. */
-export function renderToPs1(p, s = 1) {
+export function renderToPs1(p: Ps1Slot, s = 1) {
   const x = p[0] !== undefined ? p[0] : p.x;
   const y = p[1] !== undefined ? p[1] : p.y;
   const z = p[2] !== undefined ? p[2] : p.z;

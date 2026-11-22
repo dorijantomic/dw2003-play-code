@@ -13,95 +13,46 @@ import { plannerRows, requirementText } from "./evolution-planner.js";
 import { scaledHp, scaledMp, scaledStat } from "./battle.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import { elementValue } from "./vendor/engine.js";
-import type { GlossaryDigimonOut } from "./types/glossary-digimon.js";
-import type { DigimonRecord } from './types/battle.js';
-interface GlossarySpecies {
-    index?: number;
-    number?: number;
-    name: string;
-    id?: string | number;
-}
-
-
-interface GlossaryPartner {
-    id?: string | number;
-    species?: string | number;
-    name?: string;
-}
-
-
-interface GlossaryRow {
-    index?: number;
-    number?: number;
-    label: string;
-    state: string;
-}
-
-interface EvolutionLine {
-    digimonId?: string | number;
-    records?: EvolutionRecord[];
-}
-
-interface EvolutionLinesFile extends Array<EvolutionLine> {
-    lines?: EvolutionLine[] | null;
-}
+import type { BaseNumbers, CoreKey, DigimonLog, EvolutionPlannerRow, GlossaryDigimonOut, GlossaryDrop, GlossaryMaxima, GlossaryPageOne, GlossaryPartner, GlossaryRow, GlossarySpecies, GlossarySpeciesData, GlossaryWorld, HeaderCounts, PageTwoLine, SpeciesNames, SpeciesTables, StatKey, WildKey } from "./types/glossary-digimon.js";
+import type { CodexPartnerRow, CodexRow, EncounterRow, EvolutionLine, EvolutionLinesFile, EvolutionRecord } from "./types/codex-data.js";
+import type { BattleSkill, DigimonRecord } from './types/battle.js';
 
 interface LineIndex {
     lines: EvolutionLine[];
-    reach: Map<string | number, Set<number>>;
+    reach: Map<string | number | null | undefined, Set<number>>;
     rootSlot: Map<string | number, number>;
 }
 
-interface EvolutionPlannerRow {
-    to: number;
-    name: { id?: string | number; name?: string };
-    index: number;
-    ready: boolean;
-    unmet: string[];
-    text: string;
-}
-
-interface HeaderCounts { met: number; beaten: number; total: number; text: string; }
-
-interface EvolutionRecord { from?: string | number; to?: string | number; level?: number; stats?: Record<string, number>; dna?: (string | number)[]; item?: string | number | null; time?: string | null; happiness?: number; mistakes?: number; }
-
-interface DigimonLogState {
-    met: Record<string, number>;
-    beaten: Record<string, number>;
-    owned?: Record<string, number> | null;
-}
-
-interface DigimonLog {
-    read?: () => DigimonLogState | null;
-    metCount: (id: string | number) => number;
-    beatenCount: (id: string | number) => number;
-    ownedCount: (id: string | number) => number;
-    totals: () => { met: number; beaten: number };
+/** One record name's entry while the list is built: its partner profiles and its wild records. */
+interface SpeciesEntry {
+    names: string[];
+    partners: CodexPartnerRow[];
+    wilds: CodexRow[];
 }
 
 
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
-const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
-const BARS = [["HP", "hp", null], ["MP", "mp", null], ["STR", "str", "str"], ["DEF", "def", "def"], ["SPT", "spt", "spt"], ["WIS", "wis", "wis"], ["SPD", "spd", "spd"], ["CHR", "chr", "chr"]];
+const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
+const BARS: [string, StatKey, CoreKey | null][] = [["HP", "hp", null], ["MP", "mp", null], ["STR", "str", "str"], ["DEF", "def", "def"], ["SPT", "spt", "spt"], ["WIS", "wis", "wis"], ["SPD", "spd", "spd"], ["CHR", "chr", "chr"]];
 
 /** Smallest bar scale (a value of 1 is then 1% of a bar, never full). */
 export const SCALE_FLOOR = 100;
 
-const WILD_KEYS = ["str", "def", "spt", "wis", "spd"];
-const CORE_KEYS = ["str", "def", "spt", "wis", "spd", "chr"];
-const FORM_KEYS = ["str", "def", "spt", "wis", "spd"];      // the five stats a worn form adds (engine/dw3/battle-form-change.ts formChangeCoreStats)
+const WILD_KEYS: WildKey[] = ["str", "def", "spt", "wis", "spd"];
+const CORE_KEYS: CoreKey[] = ["str", "def", "spt", "wis", "spd", "chr"];
+const FORM_KEYS: StatKey[] = ["str", "def", "spt", "wis", "spd"];      // the five stats a worn form adds (engine/dw3/battle-form-change.ts formChangeCoreStats)
 
 /** A digivolution form: a partner profile that is not a starter. Its table numbers are ADD-ONS on the partner's own row, not totals. */
-const isForm = (sp) => !!(sp.partner && sp.profile && !sp.profile.is_starter);
+const isForm = (sp: GlossarySpecies) => !!(sp.partner && sp.profile && !sp.profile.is_starter);
 
 /**
  * A partner form's BASE numbers at a level (no table holds a starting level per form, so callers use 1): the game's own rule,
  * web/battle.js scaledHp / scaledMp / scaledStat (what an evolution seeds). A non-starter profile's HP is a placeholder (1);
  * scaledHp answers for it exactly as the game does. A core stat the profile does not hold is null.
  */
-export function baseNumbers(profile, level = 1) {
+export function baseNumbers(profile: DigimonRecord | null | undefined, level = 1): BaseNumbers | null {
     if (!profile) return null;
-    const out = { hp: scaledHp(profile, level), mp: scaledMp(profile, level) };
+    const out: BaseNumbers = { hp: scaledHp(profile, level), mp: scaledMp(profile, level) };
     for (const k of CORE_KEYS) out[k] = Number.isFinite(Number(profile[k])) ? scaledStat(profile, k, level) : null;
     return out;
 }
@@ -113,15 +64,16 @@ export function baseNumbers(profile, level = 1) {
  * STR..SPD on top (engine/dw3/battle-form-change.ts formChangeCoreStats), so the bars do too. `profiles` (digimon.json rows) lets
  * a record with no stored numbers fall back to its starter's baseline, as the fight's seed does.
  */
-export function ownNumbers(sp, partner, profiles = null) {
+export function ownNumbers(sp: GlossarySpecies, partner: GlossaryPartner | null | undefined, profiles: DigimonRecord[] | null = null) {
     const rec = partner?.live?.stats;
     if (!rec || !sp.profile) return null;
-    const id = Number(partner.formId ?? rec.digimonId);
-    if (id > 0 ? id !== sp.profileId : !(sp.names ?? [sp.name]).includes(partner.form)) return null;
-    const level = Number(partner.level ?? rec.level ?? 1);
-    const onStarter = partner.rookie ? (sp.names ?? [sp.name]).includes(partner.rookie) : !isForm(sp);
+    // ETS item 9: rec came from partner?.live?.stats, so a partner is there from here on
+    const id = Number(partner!.formId ?? rec.digimonId);
+    if (id > 0 ? id !== sp.profileId : !(sp.names ?? [sp.name]).includes(partner!.form)) return null;
+    const level = Number(partner!.level ?? rec.level ?? 1);
+    const onStarter = partner!.rookie ? (sp.names ?? [sp.name]).includes(partner!.rookie) : !isForm(sp);
     const add = onStarter ? null : sp.profile;
-    const root = add ? (profiles ?? []).find((p) => p.name === partner.rookie) : null;
+    const root = add ? (profiles ?? []).find((p) => p.name === partner!.rookie) : null;
     const base = baseNumbers(root ?? sp.profile, level);
     const out: Record<string, number> = { hp: Number(rec.maxHp ?? base!.hp), mp: Number(rec.maxMp ?? base!.mp), level };
     for (const k of CORE_KEYS) {
@@ -143,14 +95,15 @@ function needText(record: EvolutionRecord, profiles: DigimonRecord[]) {
 }
 
 /** "48-96", or "48" when both ends are equal (the font has no long dash). */
-export const rangeText = (lo, hi) => (lo === hi ? String(lo) : `${lo}-${hi}`);
+export const rangeText = (lo: number, hi: number) => (lo === hi ? String(lo) : `${lo}-${hi}`);
 
 /**
  * A wild record's stats as they are fought: for each encounter row the record's five table stats through the battle's own rule
  * (web/enemy-stats.js, row stat_scale / 16), and that row's HP; then low and high over the rows. null when the record has no row.
  */
-export function wildAsFought(rawStats, rows) {
+export function wildAsFought(rawStats: Record<string, number> | null | undefined, rows: EncounterRow[] | null | undefined): GlossaryDigimonOut | null {
     if (!rows?.length || !rawStats) return null;
+    // ETS item 9: the loop below sets all five stat ranges before out is returned
     const out = {} as GlossaryDigimonOut;
     for (const k of WILD_KEYS) {
         const v = rows.map((r) => scaleEnemyStat(rawStats[k], r.statScale > 0 ? r.statScale : 16));
@@ -162,14 +115,14 @@ export function wildAsFought(rawStats, rows) {
 }
 
 /** The name the player sees: the tables number variants ("Guardromon2"); the number is an internal id. */
-export const displayName = (name) => String(name ?? "").replace(/\d+$/, "");
+export const displayName = (name: string | null | undefined) => String(name ?? "").replace(/\d+$/, "");
 
 /** Map name as the quest log shows it: the part after the dash. */
-export const mapLabel = (stageName) => String(stageName ?? "").replace(/^.*— /, "").trim();
+export const mapLabel = (stageName: string | null | undefined) => String(stageName ?? "").replace(/^.*— /, "").trim();
 
-function techniqueNames(partner, wild, skillById) {
+function techniqueNames(partner: CodexPartnerRow | null, wild: CodexRow | null, skillById: Map<number, BattleSkill>) {
     const ids = partner ? partner.techSlots : [wild?.attack?.id, wild?.move1?.id, wild?.move2?.id];
-    const names = [];
+    const names: string[] = [];
     for (const id of ids ?? []) {
         const n = skillById.get(Number(id) || 0)?.name;
         if (n && !names.includes(n)) names.push(n);
@@ -180,32 +133,22 @@ function techniqueNames(partner, wild, skillById) {
 /** Lines of evolutions.json that can reach each profile id, and the root (starter) id of each line. */
 function lineIndex(evolutions: EvolutionLinesFile | null): LineIndex {
     const lines = Array.isArray(evolutions?.lines) ? evolutions.lines : [];
-    const reach = new Map(), rootSlot = new Map();
+    const reach: LineIndex["reach"] = new Map(), rootSlot: LineIndex["rootSlot"] = new Map();
     lines.forEach((line, slot) => {
         if (line?.digimonId != null) rootSlot.set(line.digimonId, slot);
         for (const r of line?.records ?? []) {
             if (!reach.has(r.to)) reach.set(r.to, new Set());
-            reach.get(r.to).add(slot);
+            reach.get(r.to)!.add(slot);
         }
     });
     return { lines, reach, rootSlot };
 }
 
-/** The game's own tables the species page is built from: the digimon tables, the evolution lines, the wild
- *  rows, the model map, and where each species is met. */
-interface SpeciesTables {
-    digimon?: { digimon?: any[]; skills?: any[] } | null;
-    evolutions?: any[] | null;
-    enemies?: { enemies?: any[] } | null;
-    modelMap?: any;
-    encounters?: { stages?: any; screens?: any; maps?: any } | null;
-}
-
-export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = null, encounters = {} }: SpeciesTables = {}) {
+export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = null, encounters = {} }: SpeciesTables = {}): GlossarySpeciesData {
     const profiles = Array.isArray(digimon?.digimon) ? digimon.digimon : [];
     const skills = Array.isArray(digimon?.skills) ? digimon.skills : [];
-    const skillById = new Map(skills.map((s) => [s.id, s]));
-    const nameOf = new Map(profiles.map((p) => [p.id, p.name]));
+    const skillById = new Map<number, BattleSkill>(skills.map((s) => [s.id, s]));
+    const nameOf = new Map<string | number | undefined, string>(profiles.map((p) => [p.id, p.name]));
     const partners = partnerRows({ digimon: profiles, skills }, skills);
     const wilds = wildRows(enemies ?? { enemies: [] }, skills, modelMap);
     const enc = encounterIndex(encounters?.stages ?? null, encounters?.screens ?? null, encounters?.maps ?? null);
@@ -215,17 +158,18 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
     // encounters and counts; the species log keys by the raw enemy id). A partner profile and the wild record of the same raw name
     // are one entry. The shown name is still the plain one (displayName). A numbered entry is listed right after its base entry
     // (the one with the plain name), after any numbered sibling already placed there.
-    const byName = new Map(), first = [];
-    const entry = (name: string) => { if (!byName.has(name)) { byName.set(name, { names: [name], partners: [], wilds: [] }); first.push(name); } return byName.get(name); };
+    const byName = new Map<string, SpeciesEntry>(), first: string[] = [];
+    const entry = (name: string) => { if (!byName.has(name)) { byName.set(name, { names: [name], partners: [], wilds: [] }); first.push(name); } return byName.get(name)!; };
     for (const p of partners) entry(p.name).partners.push(p);
     for (const w of wilds) entry(w.name).wilds.push(w);
-    const groups = new Map();
-    for (const k of first) { const g = displayName(k); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(k); }
-    const order = [];
+    const groups = new Map<string, string[]>();
+    for (const k of first) { const g = displayName(k); if (!groups.has(g)) groups.set(g, []); groups.get(g)!.push(k); }
+    const order: string[] = [];
     for (const [g, keys] of groups) { if (keys.includes(g)) order.push(g); for (const k of keys) if (k !== g) order.push(k); }
 
-    const species = order.map((key, index) => {
-        const { names, partners: ps, wilds: ws } = byName.get(key);
+    const species = order.map((key, index): GlossarySpecies => {
+        // ETS item 9: order only holds names that entry() put into byName
+        const { names, partners: ps, wilds: ws } = byName.get(key)!;
         const partner = ps[0] ?? null;
         const wild = ws[0] ?? null;
         const name = partner ? partner.name : wild.name;
@@ -238,17 +182,17 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
         }
         const encHp = rows.map((r) => r.hp).filter((n) => n > 0);
         const profileId = partner ? partner.id : null;
-        const dropBy = new Map();      // item -> best odds over every wild variant of this Digimon
+        const dropBy = new Map<string, number>();      // item -> best odds over every wild variant of this Digimon
         for (const w of ws) {
             if (!w.drop || w.drop === "Null") continue;
             const k = dropOdds(w.dropRate).n;
-            if (!dropBy.has(w.drop) || k > dropBy.get(w.drop)) dropBy.set(w.drop, k);
+            if (!dropBy.has(w.drop) || k > dropBy.get(w.drop)!) dropBy.set(w.drop, k);
         }
         const drops = [...dropBy].map(([item, k]) => ({ item, n: k, of: 1024, percent: Math.round((k / 1024) * 1000) / 10 })).sort((a, b) => b.n - a.n);
-        let from: string | null | null = null, into = [];
+        let from: string | null = null, into: string[] = [];
         if (profileId != null) {
             if (idx.rootSlot.has(profileId)) {
-                into = lineTargets(evolutions, idx.rootSlot.get(profileId), profiles);   // a starter: its line's forms
+                into = lineTargets(evolutions, idx.rootSlot.get(profileId)!, profiles);   // a starter: its line's forms
             } else {
                 const slots = idx.reach.get(profileId);
                 if (slots?.size) {
@@ -259,14 +203,14 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
             }
         }
         // How to get it: each record of each line that reaches this form, in short words; one text shared by every reaching line is one line
-        const need = new Map();
+        const need = new Map<string, Set<number>>();
         if (profileId != null && !idx.rootSlot.has(profileId)) {
             idx.lines.forEach((line, slot) => {
                 for (const r of line?.records ?? []) {
                     if (r.to !== profileId) continue;
                     const t = needText(r, profiles);
                     if (!need.has(t)) need.set(t, new Set());
-                    need.get(t).add(slot);
+                    need.get(t)!.add(slot);
                 }
             });
         }
@@ -278,7 +222,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
         const profile = profileId != null ? profiles.find((p) => p.id === profileId) ?? null : null;
         const base = partner ? baseNumbers(profile, 1) : null;     // the stats page shows these unless the player wears this form
         const fought = partner ? null : wildAsFought(wild?.stats, rows);
-        const stats = partner ? (base ? Object.fromEntries(CORE_KEYS.map((k) => [k, base[k]])) : partner.stats) : { ...(wild?.stats ?? {}), chr: null };
+        const stats: GlossarySpecies["stats"] = partner ? (base ? Object.fromEntries(CORE_KEYS.map((k) => [k, base[k]])) : partner.stats) : { ...(wild?.stats ?? {}), chr: null };
         if (fought) for (const k of WILD_KEYS) stats[k] = fought[k].hi;      // the bars use the high value
         return {
             index, number: index + 1, name, names, partner, wild, profileId,
@@ -300,12 +244,12 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
     // Each bar is scaled by that stat's real maximum over all species. The scale is never below SCALE_FLOOR: a stat whose real
     // maximum is tiny (CHR is 1 for every partner) would otherwise show a value of 1 as a full bar.
     // Two scales, so a bar compares like with like: `maxima` over the partner profiles, `wildMaxima` over the wild-only records.
-    const floor = () => ({ hp: SCALE_FLOOR, mp: SCALE_FLOOR, str: SCALE_FLOOR, def: SCALE_FLOOR, spt: SCALE_FLOOR, wis: SCALE_FLOOR, spd: SCALE_FLOOR, chr: SCALE_FLOOR });
+    const floor = (): GlossaryMaxima => ({ hp: SCALE_FLOOR, mp: SCALE_FLOOR, str: SCALE_FLOOR, def: SCALE_FLOOR, spt: SCALE_FLOOR, wis: SCALE_FLOOR, spd: SCALE_FLOOR, chr: SCALE_FLOOR });
     const maxima = floor(), wildMaxima = floor();
     for (const sp of species) {
         const into = sp.partner ? maxima : wildMaxima;
         for (const [, key] of BARS) {
-            if (isForm(sp) && !FORM_KEYS.includes(key!)) continue;      // a form's HP, MP and CHR are not shown, and are not like the starters' totals
+            if (isForm(sp) && !FORM_KEYS.includes(key)) continue;      // a form's HP, MP and CHR are not shown, and are not like the starters' totals
             const v = key === "hp" ? sp.hp : key === "mp" ? sp.mp : sp.stats?.[key];
             if (Number.isFinite(v) && v > into[key]) into[key] = v;
         }
@@ -315,7 +259,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
 
 // ---------------------------------------------------------------- what the player knows
 
-export function partnerOf(sp, partners) {
+export function partnerOf(sp: SpeciesNames, partners: (GlossaryPartner | null)[] | null | undefined): GlossaryPartner | null {
     const names = sp.names ?? [sp.name];
     // a member wearing this form now comes first (its numbers are the ones to show), else the member whose starter it is
     for (const p of partners ?? []) if (p && names.includes(p.form)) return p;
@@ -323,16 +267,16 @@ export function partnerOf(sp, partners) {
     return null;
 }
 
-const namesOf = (sp): string[] => sp.names ?? [sp.name];
-const sumOf = (sp, fn) => namesOf(sp).reduce((t, n) => t + (fn(n) || 0), 0);
+const namesOf = (sp: SpeciesNames): string[] => sp.names ?? [sp.name];
+const sumOf = (sp: SpeciesNames, fn: (name: string) => number | undefined) => namesOf(sp).reduce((t, n) => t + (fn(n) || 0), 0);
 /** Owned = a form you have worn (the log's `owned` set). */
-export const ownedOf = (sp, log) => namesOf(sp).some((n) => log.ownedCount?.(n) > 0);
+export const ownedOf = (sp: SpeciesNames, log: DigimonLog) => namesOf(sp).some((n) => log.ownedCount?.(n) > 0);
 /** Times met / defeated, added over every name of the row; an owned species counts as met at least once. */
-export const metOf = (sp, log) => Math.max(sumOf(sp, (n) => log.metCount(n)), ownedOf(sp, log) ? 1 : 0);
-export const beatenOf = (sp, log) => sumOf(sp, (n) => log.beatenCount(n));
+export const metOf = (sp: SpeciesNames, log: DigimonLog) => Math.max(sumOf(sp, (n) => log.metCount(n)), ownedOf(sp, log) ? 1 : 0);
+export const beatenOf = (sp: SpeciesNames, log: DigimonLog) => sumOf(sp, (n) => log.beatenCount(n));
 
 /** "unknown" = never met (a ??? shadow), "met" = name and picture only, "known" = defeated once, or your partner. */
-export function speciesState(sp, log, partner) {
+export function speciesState(sp: SpeciesNames, log: DigimonLog, partner: GlossaryPartner | null) {
     if (partner) return "known";
     if (beatenOf(sp, log) > 0 || ownedOf(sp, log)) return "known";
     if (metOf(sp, log) > 0) return "met";
@@ -350,7 +294,7 @@ export function logSnapshot(log: DigimonLog): DigimonLog {
     return { metCount: (n) => s.met[n] || 0, beatenCount: (n) => s.beaten[n] || 0, ownedCount: (n) => owned[n] || 0, totals: () => ({ met: Object.keys(s.met).length, beaten: Object.keys(s.beaten).length }) };
 }
 
-export function headerCounts(species, log: DigimonLog): HeaderCounts {
+export function headerCounts(species: SpeciesNames[], log: DigimonLog): HeaderCounts {
     let met = 0, beaten = 0;
     for (const sp of species) {
         if (metOf(sp, log) > 0) met++;
@@ -359,7 +303,7 @@ export function headerCounts(species, log: DigimonLog): HeaderCounts {
     return { met, beaten, total: species.length, text: `Met ${met}/${species.length}  Beaten ${beaten}` };
 }
 
-export function listRows(species: GlossarySpecies[], log: DigimonLog, partners: GlossaryPartner[]): GlossaryRow[] {
+export function listRows(species: GlossarySpecies[], log: DigimonLog, partners: (GlossaryPartner | null)[]): GlossaryRow[] {
     return species.map((sp) => {
         const state = speciesState(sp, log, partnerOf(sp, partners));
         return { index: sp.index, number: sp.number, label: state === "unknown" ? "???" : displayName(sp.name), state };
@@ -368,7 +312,7 @@ export function listRows(species: GlossarySpecies[], log: DigimonLog, partners: 
 
 // ---------------------------------------------------------------- page 1
 
-export function pageOne(sp, state, log, partner) {
+export function pageOne(sp: GlossarySpecies, state: string, log: DigimonLog, partner: GlossaryPartner | null): GlossaryPageOne {
     if (state === "unknown") return { title: "???", row1: "", record: "", lives: "", drops: "", shadow: true };
     const defeated = beatenOf(sp, log);
     const who = partner ? "Your partner" : ownedOf(sp, log) ? "Your Digimon" : "Met";
@@ -390,7 +334,7 @@ export function pageOne(sp, state, log, partner) {
 /** The partner's next form: the one READY now, else the one with the fewest unmet gates (table order breaks ties). */
 export function nextForm(rows: EvolutionPlannerRow[] | undefined): EvolutionPlannerRow | null {
     if (!rows?.length) return null;
-    return rows.find((r) => r.ready) ?? rows.reduce((best, r) => (r.unmet.length < best.unmet.length ? r : best), rows[0]);
+    return rows.find((r) => r.ready) ?? rows.reduce((best, r) => (r.unmet.length < best.unmet.length ? r : best), rows[0]!);
 }
 
 /**
@@ -399,20 +343,21 @@ export function nextForm(rows: EvolutionPlannerRow[] | undefined): EvolutionPlan
  * only the live partner adds its trained points (the game's own elementValue, engine/dw3/effective-stats.ts).
  * -> { name, elements: { fire: n, ... } } the partner's own seven element numbers.
  */
-export function formPartner(sp, lead, world) {
+export function formPartner(sp: GlossarySpecies, lead: GlossaryPartner | null, world: GlossaryWorld) {
     const lines = Array.isArray(world?.evolutions?.lines) ? world.evolutions.lines : [];
-    const reaches = (line) => (line?.records ?? []).some((r) => r.to === sp.profileId);
+    const reaches = (line: EvolutionLine | undefined) => (line?.records ?? []).some((r) => r.to === sp.profileId);
     const live = lead && reaches(lines[lead.slot]) ? lines[lead.slot] : null;
     const line = live ?? lines.find(reaches);
     const profile = line ? (world.profiles ?? []).find((p) => p.id === line.digimonId) : null;
     if (!profile) return null;
-    const points = live ? lead.live?.stats?.elemBonuses : null;
+    // ETS item 9: live is only set when lead is there (the test above)
+    const points = live ? lead!.live?.stats?.elemBonuses : null;
     return { name: displayName(profile.name), elements: Object.fromEntries(ELEMENTS.map((e) => [e, elementValue(profile, points, e)])) };
 }
 
-export function pageTwoLines(sp, state: string, partner, world, maxima, wildMaxima = maxima, lead = null) {
+export function pageTwoLines(sp: GlossarySpecies, state: string, partner: GlossaryPartner | null, world: GlossaryWorld, maxima: GlossaryMaxima, wildMaxima = maxima, lead: GlossaryPartner | null = null): PageTwoLine[] {
     if (state !== "known") return [{ kind: "text", label: "Locked", text: state === "met" ? "Defeat it once to see its strength." : "Meet it first." }];
-    const out = [];
+    const out: PageTwoLine[] = [];
     const scale = sp.partner ? maxima : wildMaxima;
     // a wild-only record: the numbers as the battle uses them (each encounter's stat_scale), low-high over its encounters;
     // a record with no encounter row keeps its table values, and says so
@@ -459,7 +404,7 @@ export function pageTwoLines(sp, state: string, partner, world, maxima, wildMaxi
 
 // ---------------------------------------------------------------- loading
 
-const asJson = (v) => (typeof v?.json === "function" ? v.json() : v);
+const asJson = (v: { json?: unknown } | null | undefined) => (typeof v?.json === "function" ? v.json() : v);
 
 /** Fetch the tables through the page's own fetch (so web/extra-roster.js's merge has run) and build the species. Never rejects. */
 export async function loadGlossaryData(fetchJson = globalThis.fetch) {

@@ -34,7 +34,7 @@ import {
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { NativeVblankClock, maskFromButtons } from "./vendor/engine.js";
-import type { NativeScreenHost } from "./types/native-screen-host.js";
+import type { NativeAdapterInstalled, NativeAdapterOptions, NativeAdapterOwner, NativeScreenHost, NativeScreenOpenOpts } from "./types/native-screen-host.js";
 
 /** Screen packs are extracted at the console's 320x240; the game canvas is
  *  640x480 and the field draws through the same 2x factor (ZOOM). */
@@ -46,7 +46,7 @@ export const NATIVE_SCREEN_H = 240;
 const MAX_PACK_WAIT = 300;
 
 
-let preload = null;
+let preload: ReturnType<typeof loadNativeScreens> | null = null;
 
 /** Fetch and decode every shipped screen overlay + bank once. Idempotent. */
 export function preloadNativeScreens() {
@@ -90,18 +90,7 @@ export function nativeScreensReady() {
  * and retry (a native screen is a test failure, never a silent fallback to a
  * hand-authored module).
  */
-/** What opening a screen takes: the root ctor override, the audio hook, the RAM seed, and the pre-boot writes. */
-interface NativeScreenOpenOpts {
-    rootCtor?: number;
-    playPackedSound?: (id: any) => void;
-    seed?: (io: { read: typeof nativeScreenRead; write: typeof nativeScreenWrite; rt: any }) => void;
-    preBoot?: (io: { read: typeof nativeScreenRead; write: typeof nativeScreenWrite; rt: any }) => void;
-    memcard?: any;
-    rootArgs?: any[];
-    skipClip?: (name: string, id: any) => boolean;
-}
-
-export function openNativeScreen(moduleId, opts: NativeScreenOpenOpts = {}) {
+export function openNativeScreen(moduleId: string, opts: NativeScreenOpenOpts = {}) {
     if (!nativeScreensReady()) return null;
     const entry = nativeScreenEntry(moduleId);
     if (!entry) return null;
@@ -135,7 +124,7 @@ export function openNativeScreen(moduleId, opts: NativeScreenOpenOpts = {}) {
     renderer.ready();
     let packWait = 0;
     const blanks = new NativeVblankClock();
-    const host = {
+    const host: NativeScreenHost = {
         module: moduleId,
         rt,
         renderer,
@@ -205,7 +194,7 @@ export function openNativeScreen(moduleId, opts: NativeScreenOpenOpts = {}) {
             host.rt = null;
             host.renderer = null;
         },
-    } as NativeScreenHost;
+    };
     opts.seed?.({ read: nativeScreenRead, write: nativeScreenWrite, rt });
     return host;
 }
@@ -239,6 +228,7 @@ export function openNativeScreen(moduleId, opts: NativeScreenOpenOpts = {}) {
  *   label         the diagnostic for a boot that returns null.
  *   draw          a screen-specific paint; the default is the host's own frame.
  */
+export function createNativeAdapter<T extends NativeAdapterOwner>(options: NativeAdapterOptions<T>): T & NativeAdapterInstalled;
 export function createNativeAdapter({
     owner,
     moduleId,
@@ -252,7 +242,7 @@ export function createNativeAdapter({
     closed = null,
     label = `native ${moduleId} boot failed (manifest/overlay missing)`,
     draw = null,
-}) {
+}: NativeAdapterOptions): NativeAdapterOwner {
     owner._boot = () => {
         const opts = typeof hostOptions === "function" ? hostOptions() : hostOptions;
         const host = openNativeScreen(moduleId, opts);
@@ -269,7 +259,8 @@ export function createNativeAdapter({
         preload().catch((e) => {
             owner._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
         });
-        if (!owner._boot()) owner._pending = true;
+        // ETS item 9: _boot, _begin and _finish are installed on the owner by this function, above and below
+        if (!owner._boot!()) owner._pending = true;
     };
 
     owner.update = (dt, state) => {
@@ -280,7 +271,7 @@ export function createNativeAdapter({
                 preload().catch(() => {});
                 return;
             }
-            if (!owner._boot()) {
+            if (!owner._boot!()) {
                 owner._lastDiagnostic = label;
                 return;
             }
@@ -289,7 +280,7 @@ export function createNativeAdapter({
         const host = owner._host;
         if (!host) return;
         host.setPad(pad(host, owner._state) >>> 0);
-        if (frame(host, dt)) owner._finish();
+        if (frame(host, dt)) owner._finish!();
     };
 
     owner.draw = draw ?? ((ctx, viewW = NATIVE_SCREEN_W, viewH = NATIVE_SCREEN_H) => {
@@ -299,7 +290,7 @@ export function createNativeAdapter({
     });
 
     owner.close = () => {
-        if (owner._open) owner._finish();
+        if (owner._open) owner._finish!();
     };
 
     owner._finish = (allowCommit = true) => {

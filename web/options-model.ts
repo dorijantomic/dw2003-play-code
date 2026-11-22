@@ -9,42 +9,7 @@ import { SPEEDS } from "./battle-speed.js";
 import { DETAIL_OFF_LOW, DETAIL_OFF_MEDIUM } from "./detail-presets.js";
 import { shipClass } from "./ship-list.js";
 import type { AmbienceSettings } from "./types/ambience.js";
-import type { OptionsHome } from "./types/options-model.js";
-interface DetailStore {
-    setMany(values: { [key: string]: boolean | string }): void;
-}
-
-interface OptionsViewSource extends OptionsRow {
-    numeric?: boolean;
-    customLabel?: () => string;
-}
-
-
-interface OptionsViewEntry {
-    id: string;
-    label: string;
-    numeric: boolean;
-    help: string;
-    menu: boolean;
-    locked: boolean;
-    value: string;
-    custom: boolean;
-    canLeft: boolean;
-    canRight: boolean;
-}
-
-interface OptionsRow {
-  id: string;
-  label: string;
-  help: string;
-  choices: string[];
-  read: (store: OptionsHome) => number;
-  write: (store: OptionsHome, value: number) => void;
-  keys?: string[];
-  back?: boolean;
-  menu?: string;
-}
-
+import type { EffectCategory, OptionsHome, OptionsOpenCategory, OptionsRow, OptionsStore, OptionsValue, OptionsViewEntry } from "./types/options-model.js";
 
 // ---------------------------------------------------------------- key homes
 /** The 35 effect keys the one Detail choice sets (web/ambience.js groups Terrain, Weather, Atmosphere, Life, Ground, Screen). */
@@ -57,9 +22,9 @@ export const DETAIL_KEYS = Object.freeze([
 export const DETAIL_LEVELS = Object.freeze(["original", "low", "medium", "high"]);
 export const DETAIL_LABELS = Object.freeze(["Original", "Low", "Medium", "High"]);
 /** Keys each level switches OFF. Original = all 35 (the PS1 look); High = none. Low and Medium come from the measurement (tools/measure_fx_cost.mjs). */
-export const DETAIL_OFF = Object.freeze({ original: DETAIL_KEYS, low: DETAIL_OFF_LOW, medium: DETAIL_OFF_MEDIUM, high: Object.freeze([]) });
+export const DETAIL_OFF: Readonly<Record<string, readonly string[]>> = Object.freeze({ original: DETAIL_KEYS, low: DETAIL_OFF_LOW, medium: DETAIL_OFF_MEDIUM, high: Object.freeze([]) });
 /** fx.quality (weather-particle density, web/ambience.js QUALITY) that goes with each level. */
-export const DETAIL_QUALITY = Object.freeze({ original: "low", low: "low", medium: "medium", high: "high" });
+export const DETAIL_QUALITY: Readonly<Record<string, string>> = Object.freeze({ original: "low", low: "low", medium: "medium", high: "high" });
 
 /** The groups of invented features. A row is ON when any of its keys is on; moving it sets all of them. Only SHOWN_EXTRAS get an OPTIONS row; the rest are "out" or "auto" for players and live on F2. */
 export const EXTRA_GROUPS = Object.freeze([
@@ -147,7 +112,7 @@ export const LIST_ROWS = 9;
 
 /** Where each of the 98 keys lives: "detail", an OPTIONS row id, "effects:<category>", or "f2". (The two new dev switches `glossary` and `options` are F2 only too.) */
 export const OPTIONS_HOME = (() => {
-    const home = {} as OptionsHome;
+    const home: OptionsHome = {};
     for (const k of DETAIL_KEYS) home[k] = "detail";
     home.battlespeed = "battleSpeed"; home.encounterdial = "randomFights";
     for (const k of [...WIDE_KEYS, "hd2d", ...TOON_KEYS]) home[k] = "f2";       // "auto" or "out" for players: no OPTIONS row
@@ -159,70 +124,70 @@ export const OPTIONS_HOME = (() => {
 })();
 
 // ---------------------------------------------------------------- reading and writing the store
-const on = (store: { get: (arg0: string) => boolean; }, keys: string[]) => keys.some((k) => store.get(k) === true);
-const setAll = (store, keys: string[], value: boolean) => store.setMany(Object.fromEntries(keys.map((k) => [k, value])));
+const on = (store: OptionsStore, keys: string[]) => keys.some((k) => store.get(k) === true);
+const setAll = (store: OptionsStore, keys: string[], value: boolean) => store.setMany(Object.fromEntries(keys.map((k) => [k, value])));
 
 /** The Detail keys a player can change. The "auto" and "out" ones (uisharp, devils) have no switch in the installed copy, so they never decide what Detail reads. */
 const DETAIL_PLAYER_KEYS = Object.freeze(DETAIL_KEYS.filter((k) => shipClass(k) === "in"));
 /** "original" | "low" | "medium" | "high", or "custom" when F2 or the EFFECTS page has put the player's Detail keys somewhere between. */
-export function detailOf(store: { get: (arg0: string) => boolean; }) {
+export function detailOf(store: OptionsStore) {
     for (const level of [...DETAIL_LEVELS].reverse()) {
         const off = new Set(DETAIL_OFF[level]);
         if (DETAIL_PLAYER_KEYS.every((k) => (store.get(k) === true) === !off.has(k)) && store.get("quality") === DETAIL_QUALITY[level]) return level;
     }
     return "custom";
 }
-export function applyDetail(store: DetailStore, level: string | undefined) {
+export function applyDetail(store: Pick<OptionsStore, "setMany">, level: string | undefined) {
     const off = new Set(DETAIL_OFF[level]);
     store.setMany({ ...Object.fromEntries(DETAIL_KEYS.map((k) => [k, !off.has(k)])), quality: DETAIL_QUALITY[level] });
 }
 
-const DIAL = Object.freeze(["rare", "normal", "lure"]);        // fewer / normal / more (web/encounter-dial.js DIAL_MODES)
+const DIAL: readonly OptionsValue[] = Object.freeze(["rare", "normal", "lure"]);        // fewer / normal / more (web/encounter-dial.js DIAL_MODES)
 const TODS = Object.freeze(["auto", "day", "golden", "dusk", "night"]);
 const WEATHERS = Object.freeze(["auto", "always", "storm", "clear"]);   // web/ambience.js: the F2 select's values
 const MAP_SCREENS = Object.freeze(["classic", "new"]);   // web/map-screen-book.js; classic = the game's own MAP page
 const VOLUMES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);   // tenths; 10 = today's gain
 
-const toggleRow = (id: string, label: string, help: string, keys: string[]) => ({
+const toggleRow = (id: string, label: string, help: string, keys: string[]): OptionsRow => ({
     id, label, help, keys, choices: ["Off", "On"],
-    read: (s: { get: (arg0: string) => boolean; }) => (on(s, keys) ? 1 : 0), write: (s, i: number) => setAll(s, keys, i === 1),
+    read: (s: OptionsStore) => (on(s, keys) ? 1 : 0), write: (s: OptionsStore, i: number) => setAll(s, keys, i === 1),
 });
-const valueRow = (id: string, label: string, help: string, key: string, values: readonly string[] | (string | undefined)[], labels: string[] | (string | undefined)[]) => ({
+const valueRow = (id: string, label: string, help: string, key: string, values: readonly OptionsValue[], labels: string[] | (string | undefined)[]): OptionsRow => ({
     id, label, help, choices: labels,
-    read: (s: { get: (arg0: string) => string; }) => Math.max(0, values.indexOf(s.get(key))), write: (s, i: string | number) => s.setMany({ [key]: values[i] }),
+    read: (s: OptionsStore) => Math.max(0, values.indexOf(s.get(key))), write: (s: OptionsStore, i: number) => s.setMany({ [key]: values[i] }),
 });
-const volumeRow = (id: string, label: string, help: string, key: string) => ({
+const volumeRow = (id: string, label: string, help: string, key: string): OptionsRow => ({
     id, label, help, numeric: true, choices: VOLUMES.map((v) => String(v * 10)),
-    read: (s) => { const v = Number(s.get(key)); return Number.isFinite(v) ? Math.min(10, Math.max(0, Math.round(v * 10))) : 10; },
-    write: (s, i: string | number) => s.setMany({ [key]: VOLUMES[i] / 10 }),
+    read: (s: OptionsStore) => { const v = Number(s.get(key)); return Number.isFinite(v) ? Math.min(10, Math.max(0, Math.round(v * 10))) : 10; },
+    write: (s: OptionsStore, i: number) => s.setMany({ [key]: VOLUMES[i] / 10 }),
 });
 
 /** Every row, by id. `pixelFilters` = [[id, label], ...] (web/sprite-filters.js SPRITE_FILTERS limited to the GPU ones). */
-export function buildRows(pixelFilters = [["off", "Off"]]) {
-    const rows = {
+export function buildRows(pixelFilters: string[][] = [["off", "Off"]]) {
+    const rows: Record<string, OptionsRow> = {
         battleSpeed: {
             id: "battleSpeed", label: "Battle speed", keys: ["battlespeed", "battleSpeed"], numeric: true, choices: SPEEDS.map((v) => `x${v}`),
             help: "How fast battles play. x1 is the speed of the original game.",
-            read: (s: { get: (arg0: string) => boolean; }) => {
+            read: (s: OptionsStore) => {
                 if (s.get("battlespeed") !== true) return 0;                       // the switch is off: the game really runs x1
                 const v = Number(s.get("battleSpeed"));
                 const want = Number.isFinite(v) ? v : 2;
                 return SPEEDS.reduce((best, sp, k) => (Math.abs(sp - want) < Math.abs(SPEEDS[best]! - want) ? k : best), 0);
             },
-            write: (s, i: string | number) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
+            write: (s: OptionsStore, i: number) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
         },
         randomFights: {
             id: "randomFights", label: "Random fights", keys: ["encounterdial", "encounterDialMode"], choices: ["Fewer", "Normal", "More"],
             help: "How often wild Digimon attack you while you walk.",
-            read: (s) => (s.get("encounterdial") === true ? DIAL.indexOf(s.get("encounterDialMode")) : 1),   // -1 = "none" set in F2
+            read: (s: OptionsStore) => (s.get("encounterdial") === true ? DIAL.indexOf(s.get("encounterDialMode")) : 1),   // -1 = "none" set in F2
             customLabel: () => "Never",
-            write: (s, i: string | number) => (DIAL[i] === "normal" ? s.setMany({ encounterdial: false, encounterDialMode: "normal" }) : s.setMany({ encounterdial: true, encounterDialMode: DIAL[i] })),
+            write: (s: OptionsStore, i: number) => (DIAL[i] === "normal" ? s.setMany({ encounterdial: false, encounterDialMode: "normal" }) : s.setMany({ encounterdial: true, encounterDialMode: DIAL[i] })),
         },
         detail: {
             id: "detail", label: "Detail", choices: DETAIL_LABELS,
             help: "Small map effects. Original = exactly like the PlayStation game.",
-            read: (s: { get: (arg0: string) => boolean; }) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
-            write: (s: { setMany: (values: { encounterdial: boolean; encounterDialMode: string }) => void }, i: string | number) => applyDetail(s, DETAIL_LEVELS[i]),
+            read: (s: OptionsStore) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
+            write: (s: OptionsStore, i: number) => applyDetail(s, DETAIL_LEVELS[i]),
         },
         timeOfDay: valueRow("timeOfDay", "Time of day", "Keep the map at one time of day, or let it change by itself.", "todMode", TODS, ["Auto", "Day", "Golden", "Dusk", "Night"]),
         weather: valueRow("weather", "Weather", "Random weather, weather all the time, storms only, or clear skies.", "weatherMode", WEATHERS, ["Random", "Always", "Storms", "Clear"]),
@@ -235,7 +200,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
         const keys = c.items.map((i) => i.key);
         rows[`cat:${c.id}`] = {
             id: `cat:${c.id}`, label: c.label, help: c.help, menu: true, choices: ["All", "Some", "None"],
-            read: (s: { get: (arg0: string) => boolean; }) => (keys.every((k) => s.get(k) === true) ? 0 : on(s, keys) ? 1 : 2), write: () => { },
+            read: (s: OptionsStore) => (keys.every((k) => s.get(k) === true) ? 0 : on(s, keys) ? 1 : 2), write: () => { },
         };
     }
     for (const g of EXTRA_GROUPS.filter((x) => SHOWN_EXTRAS.includes(x.id))) rows[`extra:${g.id}`] = toggleRow(`extra:${g.id}`, g.label, g.help, g.keys);
@@ -258,12 +223,12 @@ export const PAGES = Object.freeze([
  * Pages, cursor and value changes. No wrap anywhere (the pause list does not wrap: pause-menu-screen-tree-2026-08-14.md).
  * Every method returns what the screen should do: "move" (play the cursor sound), "change" (a value moved), or null.
  */
-export function createOptionsModel(store, pixelFilters) {
+export function createOptionsModel(store: OptionsStore, pixelFilters: string[][]) {
     const rows = buildRows(pixelFilters);
     const lockedRow = (r: OptionsRow) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
-    const backRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
-    let page = 0, row = 0, top = 0, open: null | { index: number; cat: number; } | null = null;          // open = the EFFECTS category that is showing its switches, or null
-    const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
+    const backRow: OptionsRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
+    let page = 0, row = 0, top = 0, open: OptionsOpenCategory | null = null;          // open = the EFFECTS category that is showing its switches, or null
+    const switchRows = (c: EffectCategory | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
     const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page]!.rows.map((id) => rows[id]));
     const here = (): OptionsRow => pageRows()[row];
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };

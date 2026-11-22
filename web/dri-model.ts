@@ -6,55 +6,10 @@ import {
   ROSTER_SLOT_CHARIDS, reserveRosterSlots, rosterSlotDigimonId, rosterSlotOfCharId,
   DEPLOYED_PARTY_CAP, syncWornFromEquipment, isFormDigimonId,
 } from "./vendor/engine.js";
-import type { BattleState, DigimonRecord } from './types/battle.js';
-interface DriFormLedgerEntry {
-  id: number | string;
-  formLevel: number;
-  dvexp: number;
-  techSlots: number[];
-}
+import type { DigimonRecord } from './types/battle.js';
+import type { DriChartEntry, DriChartPage, DriChartRecord, DriDigimonById, DriFormLedgerEntry, DriFormRecord, DriModelState, DriRosterRow, DriStats, DriSwitchSlot, StandingChoice } from "./types/misc-game.js";
 
-interface DriEquippedFormStats { equippedForms?: number[]; }
-
-interface DriFormationStats {
-  digimonId?: number | string;
-}
-
-interface DriFormationCharacter {
-  id: string | number;
-  digimonId?: number | string;
-}
-
-interface DriFormationManifest {
-  characters?: DriFormationCharacter[];
-}
-
-interface DriFormationState {
-  party: (string | number)[];
-  partyStats?: (DriFormationStats | null)[];
-  equipment?: (string | number | null)[];
-  partnerStats: DriFormationStats | null;
-  charId?: string | number;
-  charIdx?: number;
-  manifest?: DriFormationManifest;
-}
-
-interface DriSwitchSlot {
-  index: number;
-  charId: string | number | null;
-  profile: DigimonRecord | null;
-  stats: Record<string, number> | null;
-  empty?: boolean;
-}
-
-interface DriFormRecord { id: number | string; }
-
-interface DriState { party: { [x: string]: string | number }; }
-
-interface StandingChoice { profile: DigimonRecord; formId: number; doNothing?: boolean; }
-
-
-export function ensureDriPartyStats(state, digimonById) {
+export function ensureDriPartyStats(state: DriModelState, digimonById: DriDigimonById) {
   const party = state.party ?? [];
   if (!Array.isArray(state.partyStats) || state.partyStats.length !== party.length)
     state.partyStats = party.map(() => null);
@@ -64,18 +19,18 @@ export function ensureDriPartyStats(state, digimonById) {
   return state.partyStats;
 }
 
-export function driStatsAt(state, index, digimonById) {
+export function driStatsAt(state: DriModelState, index: number, digimonById: DriDigimonById): DriStats | null {
   ensureDriPartyStats(state, digimonById);
   if (index === 0) return state.partnerStats;
   return state.partyStats[index] ?? baseStatsFor(digimonById[CHARID_TO_DIGID[state.party[index]]]);
 }
 
-export function driDigimonAt(state, index, digimonById) {
+export function driDigimonAt(state: DriModelState, index: number, digimonById: DriDigimonById) {
   const stats = driStatsAt(state, index, digimonById);
   return digimonById[stats?.digimonId ?? CHARID_TO_DIGID[state.party[index]]];
 }
 
-export function driStarterAt(state: { party: { [x: string]: string | number; }; }, index: string | number, digimonById) {
+export function driStarterAt(state: DriModelState, index: number, digimonById: DriDigimonById) {
   return digimonById[CHARID_TO_DIGID[state.party[index]]];
 }
 
@@ -83,14 +38,14 @@ export function driStarterAt(state: { party: { [x: string]: string | number; }; 
 // { id, formLevel, dvexp, techSlots[6] }.  Older walker saves only had a
 // dvexpByForm map; migrate those banks lazily and derive the already-learned
 // slots from the profile's decoded learn thresholds.
-export function ensureFormLedger(stats, digimonById) {
+export function ensureFormLedger(stats: DriStats | null | undefined, digimonById: DriDigimonById): DriFormLedgerEntry[] {
   if (!stats) return [];
   if (!Array.isArray(stats.formLedger)) stats.formLedger = [];
-  const byId = new Map(stats.formLedger.map((r) => [Number(r.id), r]));
+  const byId = new Map(stats.formLedger.map((r): [number, DriFormLedgerEntry] => [Number(r.id), r]));
   for (const [rawId, rawExp] of Object.entries(stats.dvexpByForm ?? {})) {
     const id = Number(rawId);
     if (byId.has(id) || !digimonById[id]) continue;
-    const profile = digimonById[id];
+    const profile = digimonById[id]!;   // the line above skipped every id the table lacks
     const exp = Number(rawExp) || 0;
     const cap = profile.dv_cap ?? 100;
     let level = 1;
@@ -115,19 +70,19 @@ export function ensureFormLedger(stats, digimonById) {
   return stats.formLedger;
 }
 
-export function formLedgerRecord(stats: { digimonId?: number | string; formLedger?: DriFormLedgerEntry[] }, formId: string | number | undefined, digimonById: Record<string, DigimonRecord>): DriFormLedgerEntry | null {
+export function formLedgerRecord(stats: DriStats | null | undefined, formId: string | number | undefined, digimonById: DriDigimonById): DriFormLedgerEntry | null {
   return ensureFormLedger(stats, digimonById).find((r) => Number(r.id) === Number(formId)) ?? null;
 }
 
-function ensureEquippedForms(stats: DriEquippedFormStats, digimonById: Record<string, DigimonRecord>): number[] {
+function ensureEquippedForms(stats: DriStats, digimonById: DriDigimonById): number[] {
   ensureFormLedger(stats, digimonById);
   if (!Array.isArray(stats.equippedForms)) stats.equippedForms = [];
   return stats.equippedForms;
 }
 
-export function driRoster(state, digimonById) {
+export function driRoster(state: DriModelState, digimonById: DriDigimonById): DriRosterRow[] {
   return (state.party ?? []).map((charId: string | number, index) => {
-    const stats = driStatsAt(state, index, digimonById) ?? {};
+    const stats: DriStats = driStatsAt(state, index, digimonById) ?? {};
     const profile = driDigimonAt(state, index, digimonById);
     return {
       index, charId, profile, stats,
@@ -149,19 +104,19 @@ export function driRoster(state, digimonById) {
 // that count). The packed party puts the standing partners at the front
 // (claim party-lab-count-and-pack-2026-09-14), so the walker's dense party plus
 // one empty entry per free pedestal is that list.
-export function driSwitchSlots(state: DriState, digimonById: { [digId: number]: DigimonRecord }): DriSwitchSlot[] {
-  const slots = driRoster(state, digimonById).slice(0, DEPLOYED_PARTY_CAP);
+export function driSwitchSlots(state: DriModelState, digimonById: DriDigimonById): DriSwitchSlot[] {
+  const slots: DriSwitchSlot[] = driRoster(state, digimonById).slice(0, DEPLOYED_PARTY_CAP);
   for (let i = slots.length; i < DEPLOYED_PARTY_CAP; i++) {
     slots.push({ index: i, charId: null, profile: null, stats: null, empty: true });
   }
   return slots;
 }
 
-export function swapDriFormation(state: DriFormationState, a: string | number, b: string | number) {
+export function swapDriFormation(state: DriModelState, a: number, b: number) {
   if (a === b) return false;
   if (!state.partyStats) state.partyStats = (state.party ?? []).map(() => null);
   state.partyStats[0] = state.partnerStats;
-  const swap = (array: (string | number)[] | (string | number | null)[] | (DriFormationStats | null)[] | undefined) => {
+  const swap = <T>(array: T[] | undefined) => {
     if (!Array.isArray(array)) return;
     [array[a], array[b]] = [array[b], array[a]];
   };
@@ -182,7 +137,7 @@ export function swapDriFormation(state: DriFormationState, a: string | number, b
 // and drops any that is one of the three deployed party members; the survivors, in slot
 // order, are the candidate list (claim PARTY-C004, stgdglab.s L9505-L9542). A reserve
 // member that has never been deployed has no stat block yet, so it gets the level-1 one.
-export function driReserve(state, digimonById) {
+export function driReserve(state: DriModelState, digimonById: DriDigimonById) {
   return reserveRosterSlots(state?.rosterOwned ?? 0, state?.party ?? []).map((slot) => {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const stats = state.reserveStats?.[charId]
@@ -206,7 +161,7 @@ export function driReserve(state, digimonById) {
 // places: the outgoing member keeps its stats and gear in the reserve store, so
 // switching it back in later returns the Digimon you had, not a fresh one. Deploying
 // does not change ownership — both partners stay in `rosterOwned`.
-export function switchInReservePartner(state, index: number | null, charId: string | number | undefined, digimonById) {
+export function switchInReservePartner(state: DriModelState, index: number | null, charId: string | number | undefined, digimonById: DriDigimonById) {
   const party = state.party ?? [];
   // The original's Switch confirm writes party[chosen pedestal] = candidate and
   // then re-packs (F0x8008b798 case 8 -> lab_count_and_pack_party), and the
@@ -258,7 +213,7 @@ export function switchInReservePartner(state, index: number | null, charId: stri
 // The lab's "{name} digivolve" list writes current form only — equipped[cursor]
 // or 0 (rookie / "Do nothing."). It does not unlock a form and does not reroll
 // HP/MP; those happen on the fight report (DIGI decoded §7, PLAIN §8).
-export function setStandingForm(state, index: number, formId, digimonById) {
+export function setStandingForm(state: DriModelState, index: number, formId: number | null | undefined, digimonById: DriDigimonById) {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return false;
@@ -278,7 +233,7 @@ export function setStandingForm(state, index: number, formId, digimonById) {
   return true;
 }
 
-export function acquiredDriForms(state: DriState, index: number, digimonById: { [id: number]: DigimonRecord | undefined }): Array<{ record: DriFormRecord; profile: DigimonRecord }> {
+export function acquiredDriForms(state: DriModelState, index: number, digimonById: DriDigimonById): Array<{ record: DriFormRecord; profile: DigimonRecord }> {
   const stats = driStatsAt(state, index, digimonById);
   if (!stats) return [];
   const seen = new Set();
@@ -296,11 +251,11 @@ export function acquiredDriForms(state: DriState, index: number, digimonById: { 
 // F0x8008d7cc/F0x8008d9bc draw this list in the shared panel (F0x8008e4cc); the
 // F0x8008e8d0 object that the Switch Circle opens builds it from get_equipped
 // (0x8004B46C) and enumerate_acquired (0x8004B474).
-export function standingChoicesFromStats(stats, starter, digimonById) {
+export function standingChoicesFromStats(stats: DriStats | null | undefined, starter: DigimonRecord | undefined, digimonById: DriDigimonById) {
   if (!stats) return [];
   const equipped = ensureEquippedForms(stats, digimonById);
-  const rows = [];
-  const seen = new Set();
+  const rows: StandingChoice[] = [];
+  const seen = new Set<number>();
   for (const id of equipped) {
     const profile = digimonById[Number(id)];
     if (!profile || seen.has(profile.id)) continue;
@@ -311,7 +266,7 @@ export function standingChoicesFromStats(stats, starter, digimonById) {
   return rows;
 }
 
-export function standingChoices(state: DriState, index: number, digimonById: Map<number, DigimonRecord>): StandingChoice[] {
+export function standingChoices(state: DriModelState, index: number, digimonById: DriDigimonById): StandingChoice[] {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return [];
@@ -320,7 +275,7 @@ export function standingChoices(state: DriState, index: number, digimonById: Map
 
 // Change-type: write one of the three equipped slots. Duplicate ids are
 // refused. A form that is the one they are standing as is refused ("can't").
-export function setEquippedForm(stats: Record<string, number> | null, slot: number, formId: number | string, currentFormId: number | string | null) {
+export function setEquippedForm(stats: DriStats | null, slot: number, formId: number | string, currentFormId: number | string | null) {
   if (!stats || slot < 0 || slot > 2) return "invalid";
   const equipped = ensureEquippedForms(stats, {});
   while (equipped.length < 3) equipped.push(0);
@@ -332,7 +287,7 @@ export function setEquippedForm(stats: Record<string, number> | null, slot: numb
   return "ok";
 }
 
-export function firstOpenEquipSlot(stats) {
+export function firstOpenEquipSlot(stats: DriStats) {
   const equipped = ensureEquippedForms(stats, {});
   while (equipped.length < 3) equipped.push(0);
   const empty = equipped.findIndex((id) => !Number(id));
@@ -341,14 +296,14 @@ export function firstOpenEquipSlot(stats) {
 
 // Kept for callers that still pass a species name. The lab no longer restats
 // or unlocks here — it only changes who they are standing as.
-export function applyDriEvolution(state: DriState, index: number, target: string, digimonById: Record<number, DigimonRecord>) {
-  const profile = (Object.values(digimonById) as { id: any; name: string }[]).find((d) => d.name === target);
+export function applyDriEvolution(state: DriModelState, index: number, target: string, digimonById: DriDigimonById) {
+  const profile = Object.values(digimonById).find((d) => d.name === target);
   if (!profile) return false;
   return setStandingForm(state, index, profile.id, digimonById);
 }
 
 // The DRI chooser is the selected form's six ledger slots, including flags.
-export function loadableDriTechs(state: DriState, index: number, digimonById: Record<string, DigimonRecord>): number[] {
+export function loadableDriTechs(state: DriModelState, index: number, digimonById: DriDigimonById): number[] {
   const stats = driStatsAt(state, index, digimonById);
   const current = driDigimonAt(state, index, digimonById);
   const record = formLedgerRecord(stats, current?.id, digimonById);
@@ -356,7 +311,7 @@ export function loadableDriTechs(state: DriState, index: number, digimonById: Re
 }
 
 // Toggle a loaded-tech slot (3 max — esdglabo "Load up to 3.").
-export function toggleDriLoadedTech(stats, techId) {
+export function toggleDriLoadedTech(stats: DriStats | null | undefined, techId: number) {
   if (!stats) return "invalid";
   if (!Array.isArray(stats.loadedTechs)) stats.loadedTechs = [];
   const at = stats.loadedTechs.indexOf(techId);
@@ -369,7 +324,7 @@ export function toggleDriLoadedTech(stats, techId) {
   return "loaded";
 }
 
-export function toggleLedgerTech(record: { techSlots: number[]; }, slot: number, load) {
+export function toggleLedgerTech(record: { techSlots: number[]; }, slot: number, load: boolean) {
   if (!record || slot < 0 || slot >= 6) return "invalid";
   const word = Number(record.techSlots?.[slot] ?? 0);
   if (!word) return "unavailable";
@@ -392,8 +347,8 @@ export function toggleLedgerTech(record: { techSlots: number[]; }, slot: number,
 
 // The Lab chart's four pages for one line: the forms that line's own tree names,
 // grouped by the species id the original bands them into (F0x800842f4:117-134).
-export function chartPages(starter, records, digimonById) {
-  const tiers = [[], [], [], []];
+export function chartPages(starter: DigimonRecord | undefined, records: DriChartRecord[] | null | undefined, digimonById: DriDigimonById): DriChartPage[] {
+  const tiers: DriChartEntry[][] = [[], [], [], []];
   const seen = new Set();
   for (const record of records ?? []) {
     if (seen.has(record.to)) continue;

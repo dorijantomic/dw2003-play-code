@@ -6,9 +6,16 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintScreenDim } from "./screendim.js";
 import * as uiC from "./ui-c/index.js";
 import { composeLanguage } from "./ui-c/screens.js";
-interface CountryScreenData { schema: number; dataBase: number; bytes: number[]; }
+import type { CountryDisplaySetup, CountryStartupHost } from "../engine/dw3/ui/country-startup.js";
+import type { CountryScreenHost } from "../engine/dw3/ui/country-screen.js";
+import type { SfxPlayerContext } from "./types/audio.js";
+import type { AudioPlayer } from "./audio/types.js";
+import type { EngineUi } from "./types/battle.js";
+import type { CntyselDraw, CntyselNative, CntyselPick } from "./types/screens.js";
+interface CountryScreenData { schema: number; dataBase: number; bytes: number[]; initialLanguage: number; }
 
-const { CountryScreen, MenuPadWords, MenuDisplayClock, createTaskState, setState0, countryScreenStartupTick } = ui;
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+const { CountryScreen, MenuPadWords, MenuDisplayClock, createTaskState, setState0, countryScreenStartupTick } = ui as EngineUi;
 
 export const CNTYSEL_ROOT_CB = 0x80083d18;
 export const LANGUAGE_GLOBAL = 0x8005cca8;
@@ -25,19 +32,19 @@ function screenData(): Promise<CountryScreenData> {
         }).catch(error => { dataPromise = null; throw error; });
 }
 
-export function createCntyselNative(sfx = null, music = null) {
-    let open = false, pending = false, screen = null, onPick = null;
+export function createCntyselNative(sfx: SfxPlayerContext | null = null, music: AudioPlayer | null = null) {
+    let open = false, pending = false, screen: InstanceType<typeof CountryScreen> | null = null, onPick: CntyselPick | null = null;
     let row = 0, language = 0, frames = 0, generation = 0, diagnostic: null | string | null = null;
     let pad = new MenuPadWords(), release = false;
-    const queue: number[] = [], draws = [], contexts: number[] = [];
+    const queue: number[] = [], draws: CntyselDraw[] = [], contexts: number[] = [];
     let fade = 0;
     let clock = new MenuDisplayClock();
-    let data = null, setup = null, startup = createTaskState();
+    let data: CountryScreenData | null = null, setup: CountryDisplaySetup | null = null, startup = createTaskState();
     const previousMusic = () => music?.current ?? null;
-    let restoreMusic = null;
+    let restoreMusic: string | null = null;
     const renderer = createNativeScreenRenderer({ pack: "cntselwn" }, () => "cntselwn");
-    const record = (method, ...args) => draws.push({ method, args });
-    const host = {
+    const record = (method: string, ...args: number[]) => draws.push({ method, args });
+    const host: CountryScreenHost = {
         initDrawContext: () => contexts.push(draws.length),
         setLayer: (...a) => record("setLayer", ...a),
         setOrigin: (...a) => record("setOrigin", ...a),
@@ -50,7 +57,7 @@ export function createCntyselNative(sfx = null, music = null) {
         emitFadePrim: level => { fade = level & 0xff; },
         playSound: id => { sfx?.playPacked(id); },
     };
-    const startupHost = {
+    const startupHost: CountryStartupHost = {
         // The browser's pre-rendered audio is ready without a console archive
         // transfer. Gesture-gated playback is handled by the existing player.
         audioPending: () => 0,
@@ -83,8 +90,8 @@ export function createCntyselNative(sfx = null, music = null) {
         onPick = null;
         if (confirmed) callback?.(row, language, launchCode);
     };
-    const api = {
-        open(callback = null) {
+    const api: CntyselNative = {
+        open(callback: CntyselPick | null = null) {
             if (open) finish(false);
             generation++;
             const token = generation;
@@ -113,7 +120,7 @@ export function createCntyselNative(sfx = null, music = null) {
         isOpen: () => open,
         isPending: () => pending || (open && !renderer.ready()),
         active: () => open && !!screen && renderer.ready(),
-        press(button) {
+        press(button: string) {
             const mask = maskFromButtons([button]);
             if (mask && open) queue.push(mask);
             if (queue.length > 16) queue.shift();
@@ -126,7 +133,7 @@ export function createCntyselNative(sfx = null, music = null) {
                 if (!open) break;
                 let held = keys ? maskFromButtons(keys) : 0;
                 if (release) release = false;
-                else if (queue.length) { held |= queue.shift(); release = true; }
+                else if (queue.length) { held |= queue.shift()!; release = true; }
                 const words = pad.update(held, tick);
                 draws.length = contexts.length = 0;
                 fade = 0;

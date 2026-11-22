@@ -21,6 +21,13 @@ import { battleMsgPaint, battleMsgText } from "./battlemsg-translated.js";
 import { loadPack } from "./screenpack.js";
 import { drawText as uiDrawText, fontReady } from "./uifont.js";
 
+
+/** One page of the message window: the game's own call (spec) or plain lines. */
+interface MpMenuPage {
+    spec?: { kind: number; payload: (number | undefined)[]; name: string | null; slots?: string[]; };
+    lines?: string[];
+}
+
 const NATIVE_W = 320, NATIVE_H = 240;
 const PAGE_MS = 1250;          // how long one line of the log stays in the window
 const PAGE_FAST_MS = 800;      // when a lot happened at once
@@ -39,12 +46,12 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
     const msg = new BattleMessageSession({ textOf: battleMsgText, paint: () => {} });
     const clock = new ui.MenuDisplayClock();
     let mode: string | null = null;
-    let pages = [], page = null, pageLeft = 0, hold = false, ms = PAGE_MS;
+    let pages: MpMenuPage[] = [], page: MpMenuPage | null = null, pageLeft = 0, hold = false, ms = PAGE_MS;
 
     const TAG = /([^]*)/g;
     // a log line -> a page: the game's own call (kind 4 "{1} damage!", kind 2 "Evade!" ...) when the line is one of its bank strings,
     // else the whole sentence on a single line
-    const pageOf = (raw) => {
+    const pageOf = (raw: string | null | undefined): MpMenuPage => {
         const tags = [...String(raw ?? "").matchAll(TAG)];
         const text = String(raw ?? "").replace(TAG, "");
         const i = text.indexOf(": ");
@@ -56,7 +63,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         }
         return { lines: [text] };
     };
-    const showPage = (p) => { page = p; if (p.spec) msg.openOriginal(p.spec); else msg.open(p.lines); };
+    const showPage = (p: MpMenuPage) => { page = p; if (p.spec) msg.openOriginal(p.spec); else msg.open(p.lines); };
 
     return {
         get mode() { return mode; },
@@ -70,9 +77,9 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
             return true;
         },
         close() { if (mode) { widgets[mode].close(); mode = null; } },
-        press(button) { if (mode) widgets[mode].press(button); },
+        press(button: string) { if (mode) widgets[mode].press(button); },
         /** Show log lines in the window, a page each. opts.hold keeps the last page up. */
-        say(lines, opts: { hold?: boolean; ms?: number } = {}) {
+        say(lines: string | string[], opts: { hold?: boolean; ms?: number } = {}) {
             pages = [].concat(lines).filter((l) => l != null && l !== "").map(pageOf);
             hold = !!opts.hold;
             page = null; pageLeft = 0;
@@ -102,7 +109,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
             w.close(); mode = null;
             return { mode: m, value: v };
         },
-        draw(ctx, cw: number, ch: number) {
+        draw(ctx: CanvasRenderingContext2D, cw: number, ch: number) {
             ctx.save();
             // one even scale, the 320 x 240 box centred: the one-on-one battle's own rule (battle.js), so a wide window
             // does not stretch the menus sideways
@@ -115,7 +122,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
                     if (mode === "tag") w.draw(ctx, NATIVE_W); else w.draw(ctx, NATIVE_W, NATIVE_H);
                 }
             } else if (page && msg.active && !msg.finished) {
-                const nativeText = (text, x, y, opts = {}) => {
+                const nativeText = (text: string | number, x: number, y: number, opts = {}) => {
                     if (fontReady()) return uiDrawText(ctx, String(text), x, y, opts);
                     ctx.fillStyle = "#f2f2f2"; ctx.font = "10px monospace"; ctx.textBaseline = "top"; ctx.fillText(String(text), x, y);
                 };

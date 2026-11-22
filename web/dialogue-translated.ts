@@ -6,6 +6,7 @@
 //
 // Drives the UI Lab and the game's ordinary NPC talk route (web/game.js; a line that cannot load falls back to web/textbox.js).
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import * as uiC from "./ui-c/index.js";
@@ -13,10 +14,11 @@ import { composeTalk } from "./ui-c/message.js";
 import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { DialogueSession } from "../engine/dw3/ui/dialogue-session.js";
+import type { PackedSfx, ThrownError } from "./types/translated-screens.js";
 import type { DialogueScreen } from "./types/dialogue-translated.js";
-interface RawPaintPack {
-    img: CanvasImageSource;
-}
+import type { NativePack } from "./types/native-screen-render.js";
+type RawPaintPack = NativePack;
 
 
 interface RawPaintIntent {
@@ -36,7 +38,7 @@ interface RawPaintCommand {
 
 
 const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
-const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
+const packName = (handle: number) => PACK_NAMES[handle >>> 0] ?? null;
 const CONFIRM_BIT = 1 << 13;
 /** The game key that drives the confirm bit (Circle). */
 const CONFIRM_KEY = "circle";
@@ -89,11 +91,11 @@ function paintRaw(ctx: CanvasRenderingContext2D, raw: RawPaintCommand, getPack: 
 const DATA_LABEL = "Dialogue data";
 let boxCount = 0;
 
-export function createDialogueTranslated(sfx = null) {
-    const g = {
+export function createDialogueTranslated(sfx: PackedSfx | null = null) {
+    const g: DialogueScreen = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null,
         _key: `dialogue${++boxCount}`, _ticks: 0, _request: 0, _onClose: null, _latched: false, _primed: false, _onFail: null, _packed: {}, _prevHeld: false, _closes: 0, _sounds: [],
-    } as DialogueScreen;
+    };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName, { paintRaw, opaqueClips: true });
 
     // Closed by the caller, the box disposes its session and still runs onClose, as web/dialogue.js
@@ -102,7 +104,7 @@ export function createDialogueTranslated(sfx = null) {
         closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
     });
 
-    const playSound = (id) => {
+    const playSound = (id: number) => {
         const key = id >>> 0;
         g._packed[key] = (g._packed[key] ?? 0) + 1;
         g._sounds.push(key);
@@ -110,7 +112,7 @@ export function createDialogueTranslated(sfx = null) {
         sfx?.playPacked(key);
     };
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         g._error = error;
         g._failed = true;
         console.error("Translated dialogue failed", error);
@@ -143,7 +145,7 @@ interface DialogueOpenArgs {
         try {
             const [shared, pack] = await Promise.all([loadResidentResources(), source.pack ?? (source.esdmg ? loadEsdmgEntry(source.esdmg, source.entry, DATA_LABEL) : loadDialogueFile(source.file, DATA_LABEL))]);
             if (!host.current(request)) return;
-            const session = new ui.DialogueSession({ font: shared.font, ranges: shared.ranges }, () => host.finish());
+            const session = new (ui as EngineUi).DialogueSession({ font: shared.font, ranges: shared.ranges }, () => host.finish());
             if (mode.kind === "talk") session.openTalk(pack, source.index, mode.npc, project);
             else session.openSay(pack, source.index, mode.actor ?? null, mode.balloonMode ?? 0, !!mode.plain, project);
             // Player-name control (operand 8): the original reads the NUL-terminated name at 0x80048d88.
@@ -153,7 +155,7 @@ interface DialogueOpenArgs {
                 session.mem.write8(0x80048d88 + Math.min(name.length, 0x1f), 0);
             }
             g._session = session;
-            g._clock = new ui.MenuDisplayClock();
+            g._clock = new (ui as EngineUi).MenuDisplayClock();
             g._pending = false;
         } catch (error) {
             if (host.current(request)) fail(error);
@@ -171,13 +173,13 @@ interface DialogueOpenArgs {
         // The press that opened the box is still down: it is not a confirm.
         if (!g._primed) { g._primed = true; g._prevHeld = held; g._latched = false; }
         try {
-            for (const _frame of g._clock.advance(dt)) {
+            for (const _frame of g._clock!.advance(dt)) {
                 const pressed = (held && !g._prevHeld) || g._latched;
                 g._latched = false;
                 g._prevHeld = held;
                 // Hold this frame's session: its close callback can open the next line at once,
                 // which replaces g._session before this frame's sounds are collected.
-                const session = g._session;
+                const session: DialogueSession = g._session;
                 session.tick({ pressed: pressed ? CONFIRM_BIT : 0, held: held ? CONFIRM_BIT : 0 });
                 g._ticks++;
                 for (const id of session.takeSounds()) playSound(id);
@@ -195,12 +197,12 @@ interface DialogueOpenArgs {
         // look C (web/ui-c, task T6): the game's own draw runs inside the capture scope; the balloon pieces, tail, band halves and more
         // marker become the C6 balloon / C9 band, the opening animation's outline lines C edge lines, the text the game's typed runs.
         // When the overlay cannot draw (fonts not loaded, no stage) the scope runs the same draw as pixels.
-        const lines = (raw ?? []).filter((r) => r.kind === "tailLine").map((r) => r.intent);
+        const lines = (raw ?? []).filter((r: RawPaintCommand) => r.kind === "tailLine").map((r: RawPaintCommand) => r.intent);
         ctx.save();
         ctx.scale(s, s);
         uiC.scope(g._key, ctx, { enable: true, compose: (sc: Parameters<typeof composeTalk>[0]) => composeTalk(sc, { lines }) }, () => {
             renderer.draw(ctx, calls, null, [], contextMarkers, raw);
-            g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets(), { revealWindow: true }).texts;
+            g._painted = drawNativeTextWidgets(ctx, g._session!.textWidgets(), { revealWindow: true }).texts;
         });
         ctx.restore();
     };

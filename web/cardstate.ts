@@ -36,25 +36,81 @@ import {
 } from "./vendor/engine.js";
 import type { GameState } from "./game/types.js";
 interface CardCatalogRecord {
-  id: string;
+  id: number;
   name: string;
   rarity?: string;
+  colour?: string;
+  kind?: string;
+  ap?: number;
+  hp?: number;
+  programCost?: number;
+  summonCost?: number;
+  level?: number;
+  strengthRank?: number;
+  unk8?: number;
+  unkA?: number;
+  comboInto?: number;
+  programCategory?: number;
+  cost?: number;
+  effect?: string;
+  stage?: string;
+  summonTier?: number;
+}
+
+/** assets/data/card_catalog.json: the cards, and the atlas their icons come from. */
+interface CardCatalogFile {
+  icons: { atlas: string; cols: number; cellW: number; cellH: number; };
+  cards: CardCatalogRecord[];
+}
+
+/** assets/data/card_starter.json */
+interface CardStarterFile {
+  cardIds?: number[];
+  folders?: number;
+}
+
+/** assets/data/card_boosters.json */
+interface CardBoostersFile {
+  sets: { setId: number; pools: { cards: number[]; }[]; }[];
 }
 
 interface OpponentDeckSlot {
-  cardId: string;
-  aiClass: string;
-  setGroup: string;
+  cardId: number;
+  aiClass: number;
+  setGroup: number;
 }
 
 
 interface CardOpponentRecord {
+  id?: number;
+  packSetId?: number;
   deck?: OpponentDeckSlot[];
 }
 
+/** assets/data/card_opponents.json */
+interface CardOpponentsFile {
+  opponents: CardOpponentRecord[];
+}
 
-let CATALOG = null;
-let catalogPromise = null;
+/** assets/data/card_prices.json */
+interface CardPricesFile {
+  prices: { id: number; price: number; }[];
+  defaultPrice?: number;
+}
+
+interface CardShopRecord {
+  shopId: number;
+  cardIds: number[];
+}
+
+/** assets/data/card_shops.json */
+interface CardShopsFile {
+  shops: CardShopRecord[];
+}
+
+
+let CATALOG: CardCatalogFile | null = null;
+let catalogPromise: Promise<CardCatalogFile | null> | null = null;
 
 export function loadCatalog() {
   if (catalogPromise) return catalogPromise;
@@ -81,7 +137,7 @@ export function loadCardIcons() {
 }
 
 /** Draw a card's icon at its native 32x32, or scaled to `size` if given. */
-export function drawCardIcon(ctx, id, x, y, size = null) {
+export function drawCardIcon(ctx: CanvasRenderingContext2D, id: number, x: number, y: number, size: number | null = null) {
   if (!iconsReady || !CATALOG?.icons || !id) return false;
   const ic = CATALOG.icons;
   const idx = id - 1;
@@ -94,7 +150,7 @@ export function drawCardIcon(ctx, id, x, y, size = null) {
   return true;
 }
 
-export function cardById(id) {
+export function cardById(id: number) {
   return CATALOG?.cards?.find((c) => c.id === id) ?? null;
 }
 
@@ -161,8 +217,8 @@ export function bindCardInventory(state: GameState) {
 // card_starter.json by tools/extract_card_starter.py.
 // — cardgame-starter-deck-grant-and-the-collection-api,
 //   cardgame-starter-folder-forty-ids-extracted
-let STARTER = null;
-let starterPromise = null;
+let STARTER: CardStarterFile | null = null;
+let starterPromise: Promise<CardStarterFile | null> | null = null;
 
 export function loadStarter() {
   if (starterPromise) return starterPromise;
@@ -194,8 +250,8 @@ export function ensureStarterFolder() {
 // 0x8008C708 table — 35 sets of six ordered per-slot pools of sixteen ids.
 // — cardgame-booster-pack-exists-in-the-shop-and-0x7c-is-the-pack-stock,
 //   cardgame-booster-pools-are-35-sets-of-six-per-slot-pools-of-sixteen
-let BOOSTERS = null;
-let boostersPromise = null;
+let BOOSTERS: CardBoostersFile | null = null;
+let boostersPromise: Promise<CardBoostersFile | null> | null = null;
 
 export function loadBoosters() {
   if (boostersPromise) return boostersPromise;
@@ -211,7 +267,7 @@ export function boosters() { return BOOSTERS; }
 /** Cards per pack: six, one drawn from each of the set's six ordered pools. */
 export const BOOSTER_SIZE = CARDS_PER_PACK;
 
-function poolsOf(setId: string) {
+function poolsOf(setId: number) {
   const set = BOOSTERS?.sets?.find((s) => s.setId === setId);
   return set ? set.pools.map((p) => p.cards) : null;
 }
@@ -226,7 +282,7 @@ export function heldPackSets() {
 
 /** The opponent table selects an item id, read and incremented in the bag.
  * cardgame.s:33088-33096; stcrdshp.s:2129 reads that same byte. */
-export function grantPackForOpponent(opponent) {
+export function grantPackForOpponent(opponent: CardOpponentRecord | null | undefined) {
   const setId = opponent?.packSetId;
   if (typeof setId !== "number") return false;
   grantPack(collection, setId, 1);
@@ -237,7 +293,7 @@ export function grantPackForOpponent(opponent) {
 
 /** Open one held pack. Returns the six catalog records drawn, or null when the
  *  set has no stock. */
-export function openBooster(setId: string, rng = Math.random): CardCatalogRecord[] | null {
+export function openBooster(setId: number, rng = Math.random): CardCatalogRecord[] | null {
   const pools = poolsOf(setId);
   if (!CATALOG || !pools) return null;
   const ids = openPack(collection, setId, pools, rng);
@@ -251,8 +307,8 @@ export function openBooster(setId: string, rng = Math.random): CardCatalogRecord
 // response list, with a per-entry availability group and AI play class.
 // — cardgame-opponent-table-is-card-npc-bin-170-records,
 //   cardnpc-record-layout-40-entries-plus-response-list
-let OPPONENTS = null;
-let opponentsPromise = null;
+let OPPONENTS: CardOpponentsFile | null = null;
+let opponentsPromise: Promise<CardOpponentsFile | null> | null = null;
 
 export function loadOpponents() {
   if (opponentsPromise) return opponentsPromise;
@@ -265,14 +321,14 @@ export function loadOpponents() {
 
 export function opponents() { return OPPONENTS; }
 
-export function opponentById(id) {
+export function opponentById(id: number) {
   return OPPONENTS?.opponents?.find((o) => o.id === id) ?? null;
 }
 
 /** An opponent record's deck as the duel wants it: the 40 card ids in authored
  *  slot order, and the AI play class of each slot alongside. The class is
  *  authored PER SLOT, so the two arrays must stay parallel. */
-export function opponentDeck(record: CardOpponentRecord | null): { cards: string[]; aiClass: string[]; setGroup: string[] } {
+export function opponentDeck(record: CardOpponentRecord | null): { cards: number[]; aiClass: number[]; setGroup: number[] } {
   const deck = record?.deck ?? [];
   return {
     cards: deck.map((e) => e.cardId),
@@ -297,8 +353,8 @@ export function opponentDeck(record: CardOpponentRecord | null): { cards: string
 // (Soulmon, a champion, costs 500 while the champion Devidramon costs 1000) nor
 // in stats (Puppetmon 36/30 costs 9000, KingEtemon 38/35 costs 8000).
 // — tools/extract_card_prices.py
-let PRICES = null;
-let pricesPromise = null;
+let PRICES: Map<number, number> | null = null;
+let pricesPromise: Promise<Map<number, number> | null> | null = null;
 /** the original's not-listed price, overwritten by the loaded table */
 let DEFAULT_PRICE = 1;
 
@@ -307,7 +363,7 @@ export function loadCardPrices() {
   pricesPromise = fetch("assets/data/card_prices.json")
     .then((r) => r.json())
     .then((j) => {
-      PRICES = new Map(j.prices.map((p) => [p.id, p.price]));
+      PRICES = new Map(j.prices.map((p: { id: number; price: number; }) => [p.id, p.price]));
       if (typeof j.defaultPrice === "number") DEFAULT_PRICE = j.defaultPrice;
       return PRICES;
     })
@@ -316,7 +372,7 @@ export function loadCardPrices() {
 }
 
 /** What the shop charges for a card. Accepts a card record or a bare id. */
-export function cardPrice(card) {
+export function cardPrice(card: number | { id?: number; } | null | undefined) {
   if (card == null) return 0;
   const id = typeof card === "number" ? card : card.id;
   if (id == null) return DEFAULT_PRICE;
@@ -344,8 +400,8 @@ export function cardDefaultPrice() {
 // The 44 distinct cards these records sell are exactly the 44 the price list
 // prices — the two tables agree with no leftovers on either side.
 // — tools/extract_card_shops.py
-let SHOPS = null;
-let shopsPromise = null;
+let SHOPS: CardShopsFile | null = null;
+let shopsPromise: Promise<CardShopsFile | null> | null = null;
 
 export function loadCardShops() {
   if (shopsPromise) return shopsPromise;
@@ -358,7 +414,7 @@ export function loadCardShops() {
 
 /** Card ids a shop stocks. Unknown id falls back to record 0, as the disc does.
  *  Returns [] before the table has loaded. */
-export function shopStock(shopId) {
+export function shopStock(shopId: number) {
   const list = SHOPS?.shops;
   if (!list?.length) return [];
   const rec = list.find((s) => s.shopId === shopId) ?? list[0];
@@ -372,7 +428,7 @@ export function cardShopIds() {
 
 /** Has the player ever obtained this card? The Card Album keys on this, not on
  *  the copy count — see `hasSeenCard` in the engine. */
-export function seenCard(id) { return hasSeenCard(collection, id); }
+export function seenCard(id: number) { return hasSeenCard(collection, id); }
 
 export {
   grantCard, ownedCount, spareCount, addToFolder, removeFromFolder, folderIsLegal,

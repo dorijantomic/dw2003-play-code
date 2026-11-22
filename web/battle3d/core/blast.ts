@@ -15,6 +15,7 @@ interface BlastState {
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeBlast(B$: Battle3DContext) {
+// ETS item 9: createBattle3D sets the camera record and the tuning constants before any of this runs, and `schedule` is only set when `state` is.
 function dnaPresentationStart() { B$.dnaPresentation = { tick: 0, fusionTick: null }; }
 function dnaFusionStart() {
     if (!B$.dnaPresentation) dnaPresentationStart();
@@ -33,21 +34,21 @@ function dvHome() {
   }
 // `entrance` = { folder }: the model folder of the fighter that enters (entrance.c key1), for the programs
   // BLAST_REVERT (player side, key2 0) and ENTRANCE_ENEMY (enemy side, key2 0x10).
-  function blastPresentationSet(state: BlastState | null, program: string | null, skipped: boolean = false, weak: boolean | (() => boolean) = false, entrance = null) {
+  function blastPresentationSet(state: BlastState | null, program: string | null, skipped: boolean = false, weak: boolean | (() => boolean) = false, entrance: { folder: string } | null = null) {
     B$.blastState = state || null;
     B$.entranceMotionTry();
     // "Digivolve Demo: OFF": the end state of the original presentation in one step.
-    if (skipped) { skipFormChange(B$.camRec, B$.dvCam, () => B$.introShot(), B$.setEnemyVisible); B$.dvCam = null; return; }
+    if (skipped) { skipFormChange(B$.camRec!, B$.dvCam, () => B$.introShot(), B$.setEnemyVisible); B$.dvCam = null; return; }
     const isRevert = program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY;
     const eSide = program === FormChangeProgram.ENTRANCE_ENEMY ? 1 : 0;
     const schedule: { swapFrame: number; returnFrame: number; shotIndex?: number } | null = state && !state.done && program != null
       ? (isRevert ? entranceCameraSchedule(eSide) : formChangeCameraSchedule(program)) : null;
     if (!schedule) { B$.dvCam?.stop(); B$.dvCam = null; return; }
-    B$.dvFrame = state.frame;
+    B$.dvFrame = state!.frame;
     if (!B$.dvCam && isRevert) {
       // The OTHER side's model is hidden f19..f298: the enemy on the player entrance, the partner on the enemy one.
       B$.dvCam = createRevertCamera({
-        camRec: B$.camRec, schedule,
+        camRec: B$.camRec!, schedule,
         shotTen: () => B$.entranceShot(eSide, entrance?.folder, schedule.shotIndex),
         arena: () => B$.introShot(),
         setEnemyVisible: eSide ? B$.setPlayerVisible : B$.setEnemyVisible,
@@ -55,7 +56,7 @@ function dvHome() {
       });
     } else if (!B$.dvCam) {
       B$.dvCam = createDigivolveCamera({
-        camRec: B$.camRec, schedule,
+        camRec: B$.camRec!, schedule,
         shotNine: () => B$.cannedShotSlot("player", DV_SHOT_INDEX),
         arena: () => B$.introShot(),
         homeZ: () => dvHome().z,
@@ -91,19 +92,19 @@ function blastPresentationStop() { B$.dvCam?.stop(); B$.dvCam = null; B$.blastSt
 function dnaOrbIgnite(key: string | number) {
     // Register a parent orb (1005/1006 ignitions during the parent phase). The converging
     // orbit itself starts when dnaOrbsPath() is called at the fusion segment.
-    if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
+    if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS!, orbiting: false };
     B$.dnaOrbs!.orbs[key] = { tick: 0 };
   }
 // Begin the clockwise inward spiral that ends in the central collision. (Kept named
   // dnaOrbsPath for the battle.js call site; the old captured screen-path was replaced by
   // this procedural orbit — the capture never engaged and did not match the real motion.)
-  function dnaOrbsPath(_path, _durTicks: number) {
-    if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
+  function dnaOrbsPath(_path: unknown, _durTicks: number) {
+    if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS!, orbiting: false };
     B$.dnaOrbs!.orbs.A ||= { tick: 0 };   // ensure both cores exist even if an ignite was missed
     B$.dnaOrbs!.orbs.B ||= { tick: 0 };
     B$.dnaOrbs!.orbiting = true;
     B$.dnaOrbs!.u = 0;
-    B$.dnaOrbs!.dur = B$.DNA_ORB_TICKS;
+    B$.dnaOrbs!.dur = B$.DNA_ORB_TICKS!;
   }
 function dnaOrbsClear() { B$.dnaOrbs = null; }
 // Sample an authored program record without creating an op3 object. The DNA

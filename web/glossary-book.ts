@@ -19,46 +19,20 @@ import { VISIBLE, createGlossaryModel } from "./glossary-model.js";
 import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glossary-items.js";
 import { drawItemIcon } from "./itemicons.js";
 import { artHook } from "./ui-c/capture.js";
-interface PageTwoLine {
-    kind: string;
-    label: string | null | undefined;
-    text?: string;
-    icon?: string;
-}
+import type { DigimonLog, GlossaryPartner, GlossarySpecies, GlossarySpeciesData, PageTwoLine } from "./types/glossary-digimon.js";
+import type { GlossaryArtStage, GlossaryBookArgs, GlossaryBookView, GlossaryItemsSource, Page2Row, TextWidthFn } from "./types/screens.js";
 
-interface GlossaryItemEntry { ids(): number[]; }
-
+/** One species with the party member it belongs to and the state the book shows it in. */
 interface GlossaryCard {
     sp: GlossarySpecies;
     state: string;
-    partner: GlossarySpecies | null;
-    lead: GlossarySpecies | null;
+    partner: GlossaryPartner | null;
+    lead: GlossaryPartner | null;
 }
 
 interface GlossaryBookModel {
     reveal(count: number): number;
 }
-
-interface GlossaryArtStage {
-    draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, dt?: number): boolean;
-}
-
-interface GlossaryBookView {
-    progress(name: "list" | "model" | "title" | "footer"): number;
-    ticks: number;
-    dt?: number;
-}
-
-interface GlossarySpecies {
-  name: string;
-}
-interface GlossarySpeciesData {
-  species: GlossarySpecies[];
-  world?: Record<string, number>;
-  maxima?: Record<string, number>;
-  wildMaxima?: Record<string, number>;
-}
-
 
 const rect = (x: number, y: number, cols: number, bands: number) => ({ x, y, w: cols * 40, h: panelPixelHeight(bands), cols, bands });
 export const GLOSSARY_LAYOUT = Object.freeze({
@@ -89,8 +63,8 @@ const iconsWidth = (n: number) => n * PAGE2.iconPitch - (PAGE2.iconPitch - PAGE2
  * the text follows wrapped over as many rows as it needs (the pane scrolls; nothing is cut). Resists / Weak to show element icons when they fit beside the label.
  * VisualRow = { kind: "bar" | "head" | "text" | "note", label, icon, value, max, text, textX, icons? }.
  */
-export function page2Rows(lines, widthOf) {
-    const rows = [];
+export function page2Rows(lines: PageTwoLine[], widthOf: TextWidthFn) {
+    const rows: Page2Row[] = [];
     const full = PAGE2.right - PAGE2.labelX;
     for (const l of lines) {
         const label = l.label ?? "";
@@ -122,7 +96,7 @@ export function page2Rows(lines, widthOf) {
 }
 
 /** Bar length for one page: the usual width, shortened (the same for every bar) so the widest range text (orange digits, font kind 3) still fits beside it. */
-export function pageBarWidth(rows, widthOf) {
+export function pageBarWidth(rows: Page2Row[], widthOf: TextWidthFn) {
     let widest = 0;
     for (const r of rows) if (r.kind === "bar" && r.text) widest = Math.max(widest, widthOf(r.text, 3));
     return widest ? Math.max(24, Math.min(PAGE2.barW, PAGE2.numberRight - widest - 6 - PAGE2.barX)) : PAGE2.barW;
@@ -159,16 +133,16 @@ const SECTION_DIGIMON = 0, SECTION_ITEMS = 1;
  * getItems (optional): () => null while the tables load, else { data, info(id) -> {name, desc}, ids() -> known item ids, held(id) }.
  * Without it the book has no ITEMS section and R1 on page 2 does nothing, as before.
  */
-export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners = () => [], stage = null, getItems = null }) {
-    let model = null, loadedFor = null, first = true;
+export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners = () => [], stage = null, getItems = null }: GlossaryBookArgs) {
+    let model: ReturnType<typeof createGlossaryModel> | null = null, loadedFor: GlossarySpeciesData | null = null, first = true;
     let section = SECTION_DIGIMON;
     const itemsModel = createItemsModel();
-    const data = (): GlossarySpeciesData | null => {
+    const data = (): GlossarySpeciesData | null | undefined => {
         const d = getSpecies();
         if (d && loadedFor !== d) { loadedFor = d; model = createGlossaryModel({ count: d.species.length }); first = true; }
         return d;
     };
-    const current = (d, log = getLog()) => {
+    const current = (d: GlossarySpeciesData, log = getLog()) => {
         const sp = d.species[model.index()];
         const partner = partnerOf(sp, getPartners());
         return { sp, partner, lead: getPartners()[0] ?? null, state: speciesState(sp, log, partner) };
@@ -179,12 +153,12 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
         const rows = page2Rows(pageTwoLines(c.sp, c.state, c.partner, d.world, d.maxima, d.wildMaxima, c.lead), (s) => textWidth(s)).length;
         return Math.max(1, rows - PAGE2.visible + 1);
     };
-    const cue = (ok) => { if (ok) sfx?.play?.("system02"); return ok; };
+    const cue = (ok: boolean) => { if (ok) sfx?.play?.("system02"); return ok; };
     // ---- ITEMS section
     const plain = (s: string) => textWidth(s);
     const descOf = (text: string) => (text ? wrapToLines(text, plain, ITEMS_LAYOUT.textRight - ITEMS_LAYOUT.textX, MAX_DESC_LINES) : []);
-    const itemIds = (it: GlossaryItemEntry): number[] => { try { return it.ids(); } catch { return []; } };
-    function actItems(buttons) {
+    const itemIds = (it: GlossaryItemsSource): number[] => { try { return it.ids(); } catch { return []; } };
+    function actItems(buttons: ReadonlySet<string>) {
         if (buttons.has(WORD.prev)) { section = SECTION_DIGIMON; sfx?.playPacked?.(SFX_CLOSE); const d = data(); if (d && model) show(d); return; }
         const it = getItems?.();
         if (!it || !it.data) return;
@@ -266,11 +240,11 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
             model?.tickReveal();
         },
         close() { stage?.close?.(); },
-        draw(ctx: CanvasRenderingContext2D, view: { progress(name: "title" | "list" | "model" | "footer"): number; ticks: number }) {
+        draw(ctx: CanvasRenderingContext2D, view: GlossaryBookView) {
             const d = data();
             const L = GLOSSARY_LAYOUT;
             const pt = view.progress("title"), pl = view.progress("list"), pm = view.progress("model"), pf = view.progress("footer");
-            const w = (s, k = 1) => textWidth(s, k);
+            const w = (s: string, k = 1) => textWidth(s, k);
             drawHeader(ctx, pt, "GLOSSARY", TABS, section);   // PLACES (the third tab) is not built: always dim
             if (section === SECTION_ITEMS) { drawItems(ctx, pl, pf, view.ticks); return; }
             withFold(ctx, pl, L.list.x, L.list.y + L.list.h / 2, "x", () => drawPanel(ctx, L.list.x, L.list.y, L.list.cols, L.list.bands));
@@ -287,7 +261,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
                     if (!r) break;
                     const y = listRowY(i + 1);
                     drawText(ctx, String(r.number), L.numberRight, y, { kind: 3, alignRight: true });
-                    drawText(ctx, fitByWidth(r.label, (s) => w(s), L.nameRight - L.nameX), L.nameX, y, r.state === "unknown" ? { clut: 7 } : undefined);
+                    drawText(ctx, fitByWidth(r.label, (s: string) => w(s), L.nameRight - L.nameX), L.nameX, y, r.state === "unknown" ? { clut: 7 } : undefined);
                 }
                 drawCursor(ctx, view.ticks * 2, L.cursorX, listRowY(model.index() - model.top() + 1));
                 if (model.top() > 0 && (view.ticks % 18) < 9) drawText(ctx, "▲", L.arrowX, listRowY(1));
@@ -300,7 +274,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     };
 }
 
-function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: GlossaryCard, log: Parameters<typeof pageOne>[2], model: GlossaryBookModel, stage: GlossaryArtStage | null, view: GlossaryBookView, w: (s: string, k?: number) => number) {
+function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: GlossaryCard, log: DigimonLog, model: GlossaryBookModel, stage: GlossaryArtStage | null, view: GlossaryBookView, w: (s: string, k?: number) => number) {
     const L = GLOSSARY_LAYOUT;
     const p1 = pageOne(c.sp, c.state, log, c.partner);
     withFold(ctx, pm, L.model.x, L.model.y + L.model.h / 2, "x", () => {
@@ -312,7 +286,7 @@ function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: G
     if (pm >= 1) {
         // look C (web/ui-c): the model picture goes on the scope's art canvas, over the C panel; outside a scope it is painted here
         let drawn = false;
-        const paint = (c) => { drawn = stage?.draw(c, L.image.x, L.image.y, L.image.w, L.image.h, view.dt) ?? false; };
+        const paint = (c: CanvasRenderingContext2D) => { drawn = stage?.draw(c, L.image.x, L.image.y, L.image.w, L.image.h, view.dt) ?? false; };
         if (!artHook(ctx, paint)) paint(ctx);
         if (!drawn) {
             const label = "No picture";
@@ -323,7 +297,7 @@ function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: G
     const hint = c.state === "known";
     const footerShown = shown >= lines.length;
     const dropsRoom = hint ? BAND_TEXT_W - w(HINT, 3) - 8 : BAND_TEXT_W;
-    drawFooter(ctx, pf, footerShown ? fitByWidth(p1.lives, (s) => w(s), BAND_TEXT_W) : "", footerShown ? fitByWidth(p1.drops, (s) => w(s), dropsRoom) : "");
+    drawFooter(ctx, pf, footerShown ? fitByWidth(p1.lives, (s: string) => w(s), BAND_TEXT_W) : "", footerShown ? fitByWidth(p1.drops, (s: string) => w(s), dropsRoom) : "");
     if (pf >= 1 && hint) drawText(ctx, HINT, L.hintRight, 212, { kind: 3, clut: 2, alignRight: true });
 }
 

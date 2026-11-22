@@ -25,7 +25,7 @@
 // A league object is plain JSON (it travels in one relay message, so it stays small): short keys on a match
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
-import type { MpLeagueState } from "./types/mp-league.js";
+import type { MpLeagueState, MpLeagueWire, MpNight } from "./types/mp-league.js";
 interface MatchScoreMatch { a: number; b: number; w?: number | null; g?: number[]; }
 
 interface MpLeaguePackExtra {
@@ -44,7 +44,7 @@ interface MpLeaguePacked {
     r: number;
     f: string;
     k: 0 | 1;
-    c: boolean | undefined;
+    c: number | null | undefined;
     R: (number | null)[][][];
 }
 
@@ -94,11 +94,11 @@ export const MIN_TAMERS = 2;
 export const MAX_TAMERS = 8;
 export const DEFAULT_BEST_OF = 3;
 
-const isTamer = (id) => Number.isInteger(id) && id > 0;
-const has = (list, id: number) => Array.isArray(list) && list.includes(id);
+const isTamer = (id: number) => Number.isInteger(id) && id > 0;
+const has = (list: number[], id: number) => Array.isArray(list) && list.includes(id);
 
 /** A new night: the first round drawn (with the byes the bracket needs) and the folder closed until its first fight. */
-export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; bestOf?: number } = {}) {
+export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; bestOf?: number } = {}): MpNight {
     const list = Array.isArray(ids) ? ids.slice() : [];
     if (list.length < MIN_TAMERS || list.length > MAX_TAMERS) throw new Error(`a night needs ${MIN_TAMERS}..${MAX_TAMERS} tamers`);
     if (!list.every(isTamer) || new Set(list).size !== list.length) throw new Error("tamers are distinct positive ids");
@@ -106,7 +106,7 @@ export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; b
 
     const size = 2 ** Math.ceil(Math.log2(list.length));      // the bracket the next power of two gives
     const byes = size - list.length;                          // slots with nobody opposite: first round only
-    const first = [];
+    const first: MpLeagueState[] = [];
     let i = 0;
     for (let m = 0; m < size / 2; m++) {
         if (m < byes) first.push({ a: list[i++], b: null, w: list[i - 1], g: [], bye: true });
@@ -128,10 +128,10 @@ export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; b
     };
 }
 
-const out = (lg: MpForfeitLeague, id: number | null) => id == null || has(lg.dropped, id);
+const out = (lg: MpNight, id: number | null) => id == null || has(lg.dropped, id);
 
 /** Mark the round complete, or the whole night when it was the last one. Called after every decided fight. */
-function settle(lg) {
+function settle(lg: MpNight) {
     const round = lg.rounds[lg.r] ?? [];
     if (!round.length || round.some((m) => m.w == null && !m.dead)) return;
     if (lg.r >= lg.roundsPlanned - 1) {
@@ -141,9 +141,9 @@ function settle(lg) {
 }
 
 /** Pair the winners of the round just played; a tamer who left hands the fight over (a walkover). */
-function drawNextRound(lg) {
+function drawNextRound(lg: MpNight) {
     const winners = (lg.rounds[lg.r] ?? []).map((m) => m.w ?? null);
-    const next = [];
+    const next: MpLeagueState[] = [];
     for (let i = 0; i < winners.length; i += 2) {
         const a = winners[i] ?? null, b = winners[i + 1] ?? null;
         if (a == null && b == null) next.push({ a, b, w: null, g: [], dead: true });
@@ -161,7 +161,7 @@ function drawNextRound(lg) {
  * The fight to call now, or null. Null means "no fight on the table": either the round is over (the next call
  * draws the next round) or the whole night is won.
  */
-export function nextPairing(lg) {
+export function nextPairing(lg): { r: number; m: number; a: number | null; b: number | null; game: number; bestOf: number; } | null {
     if (!lg || lg.phase === "done") return null;
     if (lg.phase === "break") {
         if (!lg.asked) { lg.asked = true; return null; }      // between rounds: null once ...
@@ -193,10 +193,10 @@ export function nextPairing(lg) {
  * (e.g. [a, b, a] = a lost, won, won: 2-1). A best-of-three fight ends when a side has two games. Reports are
  * refused when they cannot be true (a fourth game, a game after the fight was over, a winner who did not win).
  */
-export function report(lg, winner, games): MpReportResult {
+export function report(lg, winner: number, games: number[] | null | undefined): MpReportResult {
     if (!lg || lg.phase !== "play") return { refused: lg?.phase === "done" ? "done" : "no_fight" };
     const round = lg.rounds[lg.r] ?? [];
-    const index = round.findIndex((m) => m.w == null && !m.dead && !out(lg, m.a) && !out(lg, m.b));
+    const index = round.findIndex((m: MpLeagueState) => m.w == null && !m.dead && !out(lg, m.a) && !out(lg, m.b));
     if (index < 0) return { refused: "no_fight" };
     const m = round[index];
     if (winner !== m.a && winner !== m.b) return { refused: "not_in_match" };
@@ -233,7 +233,7 @@ export function matchScore(m: MatchScoreMatch | null | undefined) {
 }
 
 /** A tamer leaves the night: their open fight goes to the opponent, and no later pairing calls them again. */
-export function forfeit(lg: MpForfeitLeague, id: number): { refused: string } | { ok: true; id: number; to: number | null } {
+export function forfeit(lg: MpNight, id: number): { refused: string } | { ok: true; id: number; to: number | null } {
     if (!lg || !has(lg.ids, id)) return { refused: "unknown" };
     if (has(lg.dropped, id)) return { refused: "dropped" };
     lg.dropped.push(id);
@@ -251,13 +251,13 @@ export function forfeit(lg: MpForfeitLeague, id: number): { refused: string } | 
 /** Everyone in the night, best first: the champion, then those still standing, then by the round they left in. */
 export function standings(lg): MpStandingRow[] {
     if (!lg) return [];
-    const rows = lg.ids.map((id) => {
+    const rows = lg.ids.map((id: number) => {
         let wins = 0, losses = 0, games = 0, round = -1;
-        lg.rounds.forEach((matches, r: number) => {
+        lg.rounds.forEach((matches: MpLeagueState[], r: number) => {
             for (const m of matches) {
                 if (m.bye || (m.a !== id && m.b !== id)) continue;
                 round = Math.max(round, r);
-                games += m.g.filter((g) => g === id).length;
+                games += m.g.filter((g: number) => g === id).length;
                 if (m.w === id) wins++;
                 else if (m.w != null || m.dead) losses++;
             }
@@ -271,7 +271,7 @@ export function standings(lg): MpStandingRow[] {
 }
 
 /** The Server Champ, or null until the final is won. */
-export function champ(lg) {
+export function champ(lg: MpNight | null | undefined) {
     return lg?.champ ?? null;
 }
 
@@ -280,7 +280,7 @@ export function champ(lg) {
 // cap even with three- or four-digit tamer ids. A night travels packed: short keys on the league, and each match
 // as [a, b, winner, ...gameWinners] (a null b is a bye or an empty slot; a match with no tamer left is
 // [null, null]). The flags come back on unpack, so the dock and the room work with the same readable object.
-export function packLeague(lg: MpLeaguePackable): MpLeaguePacked | null {
+export function packLeague(lg: MpNight | null): MpLeaguePacked | null {
     if (!lg) return null;
     return {
         b: lg.bestOf,
@@ -294,11 +294,11 @@ export function packLeague(lg: MpLeaguePackable): MpLeaguePacked | null {
     };
 }
 
-export function unpackLeague(wire) {
+export function unpackLeague(wire: MpLeagueWire | null | undefined): MpNight | null {
     if (!wire || !Array.isArray(wire.i)) return null;
     const n = wire.i.length;
     const size = 2 ** Math.ceil(Math.log2(n));
-    const lg = {
+    const lg: MpNight = {
         bestOf: wire.b ?? DEFAULT_BEST_OF,
         ids: wire.i.slice(),
         size,
@@ -313,9 +313,9 @@ export function unpackLeague(wire) {
         rounds: [],
     };
     for (const round of Array.isArray(wire.R) ? wire.R : []) {
-        lg.rounds.push(round.map((row: [(null | undefined)?, (null | undefined)?, (null | undefined)?, ...any[]]) => {
+        lg.rounds.push(round.map((row) => {
             const [a = null, b = null, w = null, ...g] = Array.isArray(row) ? row : [];
-            const m = { a, b, w, g } as MpLeagueState;
+            const m: MpLeagueState = { a, b, w, g };
             if (b == null && a != null) m.bye = true;                       // a first-round bye
             else if (a == null && b == null) m.dead = true;                 // nobody left to play it
             else if (w != null && g.length === 0) m.wo = true;              // the opponent left: a walkover

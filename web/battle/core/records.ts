@@ -22,6 +22,7 @@ import { canonicalProfileName } from "../messages.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { BattlePartyEntry } from "./types.js";
+import type { EquipmentBonuses } from "../../../engine/dw3/equipment.js";
 
 import type { GameState, FormLedgerEntry } from "../../game/types.js";
 import type { RosterMember, BattleState, EnemyBattleRecord } from "../../types/battle.js";
@@ -51,7 +52,7 @@ export function makeRecords(B: BattleContext) {
 
     // FIGHTSTG_F0x8009ec94 scales the resolved species primary stats by the
     // encounter enemy-struct +0x0a halfword / 16. A value of 16 is identity.
-    const scaledEnemyStat = (name: string) => eStats
+    const scaledEnemyStat = (name: "str" | "def" | "spt" | "wis" | "spd") => eStats
       ? scaleEnemyStat(eStats[name], enemyStatScale)
       : scaledStat(enemyProf, name, enemyLevel);
     return {
@@ -141,7 +142,7 @@ export function makeRecords(B: BattleContext) {
     // `member.slot` is the ROSTER slot, which is what the original's signature-set
     // table is keyed by (F0x80017174 indexes 0x8004B53C by the slot the save context
     // handed it), not the party position.
-    const eb = equipmentBonuses(equipment, member.slot);
+    const eb: EquipmentBonuses = equipmentBonuses(equipment, member.slot);
     // The stored body is the roster row's own (the starter's), so a record with none
     // is seeded from the starter, never from the worn form that is added on top.
     const st = ensureStoredStats(ps, starterProfile);
@@ -158,7 +159,7 @@ export function makeRecords(B: BattleContext) {
     // the one shared helper (web/party.js) — the same sum the status sheet and the
     // gym HUD print, so the battle divisor cannot drift from them.
     const pElem = elementPointsWithGear(ps.elemBonuses, eb.elemResists);
-    const pStatusRes = {};
+    const pStatusRes: Record<string, number> = {};
     for (const [stName, v] of Object.entries(eb.statusResists ?? {}))
       pStatusRes[stName === "paralyze" ? "frozen" : stName] = v;
     const elemAttack = (eb.effects ?? []).find(f => f.kind === "elem_attack");

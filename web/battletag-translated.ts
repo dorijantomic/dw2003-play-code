@@ -10,11 +10,15 @@
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/
 // preload/diagnostics.
 import { ui, rosterSlotOfCharId } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { encodeNativeScreenText } from "./native-screen.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleTagOptions, BattleTagSeed } from "./types/battletag-translated.js";
+import type { FightTagSeed, FightTagSession } from "../engine/dw3/ui/fight-tag-session.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+import type { BattleMenuData, BattleMenuMove, PackedSfx } from "./types/translated-screens.js";
 
 // The chrome is 0x00455000 (PGFGTC00, disc 1109) and the blinking hand is
 // 0x00286000 (CMFONT, the resident UI glyphs). The original builds both handles
@@ -46,7 +50,7 @@ function loadData() {
 }
 
 /** The name string the species service hands a row's plate. */
-export function createBattleTagTranslated(sfx = null, options: BattleTagOptions = {}) {
+export function createBattleTagTranslated(sfx: PackedSfx | null = null, options: BattleTagOptions = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -60,7 +64,7 @@ export function createBattleTagTranslated(sfx = null, options: BattleTagOptions 
         state: { _row: null },
 
         /** Open on the two partners that are not the acting member. */
-        seed: (r, seed: BattleTagSeed = {}) => {
+        seed: (r: BattleMenuAdapterState, seed: BattleTagSeed = {}) => {
             const state = options.getState?.() ?? {};
             const party = Array.isArray(state.party) ? state.party : [];
             return {
@@ -88,7 +92,7 @@ export function createBattleTagTranslated(sfx = null, options: BattleTagOptions 
         /** The list resets its chosen row with the rest of the screen. */
         onOpen: (r: { _row: null; }) => { r._row = null; },
 
-        start: (r, data, language, playSound) => new ui.FightTagSession(language, {
+        start: (r: BattleMenuAdapterState & { _seed: FightTagSeed }, data: BattleMenuData, language: number, playSound: (soundId: number) => void) => new (ui as EngineUi).FightTagSession(language, {
             activeIndex: r._seed.activeIndex,
             interactive: r._seed.interactive,
             cursorRow: r._seed.cursorRow,
@@ -97,18 +101,18 @@ export function createBattleTagTranslated(sfx = null, options: BattleTagOptions 
              ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}) },
            { playSound }),
 
-        answer: (r, session) => {
+        answer: (r: BattleMenuAdapterState & { _row: number | null }, session: FightTagSession) => {
             if (!session.finished()) return null;
             r._chosen = session.chosen();
             r._row = session.chosenRow();
             return { value: r._chosen };
         },
 
-        extraApi: (r) => {
+        extraApi: (r: BattleMenuAdapterState & { _row: number | null; chosenRow?: () => number | null }) => {
             r.chosenRow = () => r._row;
         },
 
-        diagnostics: (r) => ({
+        diagnostics: (r: BattleMenuAdapterState & { _row: number | null }) => ({
             row: r._row,
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
@@ -119,7 +123,7 @@ export function createBattleTagTranslated(sfx = null, options: BattleTagOptions 
             ready: r._session?.ready() ?? false,
             tasks: r._session?.tree.tasks.size ?? 0,
             vsync: r._session?.vsyncInstalled() ?? false,
-            moves: r._session?.moves.map((m) => ({ ...m })) ?? [],
+            moves: r._session?.moves.map((m: BattleMenuMove) => ({ ...m })) ?? [],
             sounds: r._session?.sounds ?? [],
         }),
     });

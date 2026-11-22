@@ -1,30 +1,33 @@
 import { MODEL_SCALE } from "../math.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
 
-import type { Battle3dFighter } from "./types.js";
+import type { Battle3dAABB, Battle3dFighter } from "./types.js";
+import type { ArenaGroupBuf } from "../../types/battle3d.js";
+import type { CamShot, SmartJob, SmartScore, Vec3 } from "../../types/fx3d.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeSmartcam(B$: Battle3DContext) {
-function _smartApply(base, p) {
+function _smartApply(base: CamShot, p): CamShot {
     const v = [base.eye[0] - base.look[0], base.eye[1] - base.look[1], base.eye[2] - base.look[2]];
     const a = p.yaw * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
     return { eye: [base.look[0] + (v[0]! * c - v[2]! * s) * p.d, base.look[1] + v[1]! * p.h * p.d, base.look[2] + (v[0]! * s + v[2]! * c) * p.d], look: base.look, fov: base.fov };
   }
 // one camera spot's numbers (all 0..1)
-  function _smartScore(groups, scale, cam, fs, aspect) {
-    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+  function _smartScore(groups: ArenaGroupBuf[], scale: number, cam: CamShot, fs: { aabb: Battle3dAABB }[], aspect: number): SmartScore {
+    // ETS item 9: a vec3 holds three numbers, and the box corners and the triangle buffers are read inside their own bounds.
+    const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
     const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0]!, a[1]!, a[2]!) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2]!, 0, fwd[0]]);
     const up = [right[1]! * fwd[2]! - right[2]! * fwd[1]!, right[2]! * fwd[0]! - right[0]! * fwd[2]!, right[0]! * fwd[1]! - right[1]! * fwd[0]!];
     const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * scale;
-    const scr = (p: number[]) => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
+    const scr = (p: Vec3): Vec3 | null => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
     let near = Infinity, feet = Infinity, off = 0, corners = 0;
     const boxes = new Uint8Array(GW * GH);
     for (const f of fs) {
       const b = f.aabb;
-      near = Math.min(near, dot(sub([(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2], cam.eye), fwd));
-      feet = Math.min(feet, b.min[1]);
+      near = Math.min(near, dot(sub([(b.min[0]! + b.max[0]!) / 2, (b.min[1]! + b.max[1]!) / 2, (b.min[2]! + b.max[2]!) / 2], cam.eye), fwd));
+      feet = Math.min(feet, b.min[1]!);
       let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-      for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) {
+      for (const x of [b.min[0]!, b.max[0]!]) for (const y of [b.min[1]!, b.max[1]!]) for (const z of [b.min[2]!, b.max[2]!]) {
         const q = scr([x, y, z]); corners++;
         if (!q) { off++; continue; }
         if (q[0]! < 0.025 * GW || q[0]! > 0.975 * GW || q[1]! < 0.025 * GH || q[1]! > 0.975 * GH) off++;
@@ -36,10 +39,10 @@ function _smartApply(base, p) {
     const hit = new Uint8Array(GW * GH), xs = [0, 0, 0], ys = [0, 0, 0];
     for (const g of groups) {
       const pos = g.pos, ref = g.cullRef; if (!pos) continue;
-      const front = new Map();
-      const proj3 = (tri) => { const out = []; for (let v = 0; v < 3; v++) { const q = scr([pos[tri * 9 + v * 3] * k, -pos[tri * 9 + v * 3 + 1] * k, -pos[tri * 9 + v * 3 + 2] * k]); if (!q) return null; out.push(q); } return out; };
+      const front = new Map<number, boolean>();
+      const proj3 = (tri: number) => { const out: Vec3[] = []; for (let v = 0; v < 3; v++) { const q = scr([pos[tri * 9 + v * 3]! * k, -pos[tri * 9 + v * 3 + 1]! * k, -pos[tri * 9 + v * 3 + 2]! * k]); if (!q) return null; out.push(q); } return out; };
       tri: for (let ti = 0, nt = (pos.length / 9) | 0; ti < nt; ti++) {
-        const rt = ref ? ref[ti] : ti;
+        const rt = ref ? ref[ti]! : ti;
         let fr = front.get(rt);
         if (fr === undefined) {
           const q = proj3(rt);       // NCLIP in screen space, Y down: drawn when > 0 (arenaCullIndices)
@@ -49,7 +52,7 @@ function _smartApply(base, p) {
         if (!fr) continue;
         let top = -Infinity, anyNear = false;
         for (let v = 0; v < 3; v++) {
-          const p = [pos[ti * 9 + v * 3] * k, -pos[ti * 9 + v * 3 + 1] * k, -pos[ti * 9 + v * 3 + 2] * k];
+          const p: Vec3 = [pos[ti * 9 + v * 3]! * k, -pos[ti * 9 + v * 3 + 1]! * k, -pos[ti * 9 + v * 3 + 2]! * k];
           top = Math.max(top, p[1]!);
           const q = scr(p); if (!q) continue tri;
           if (q[2]! < near * 0.9) anyNear = true;
@@ -72,7 +75,7 @@ function _smartApply(base, p) {
     for (let i = 0; i < hit.length; i++) { n += hit[i]!; if (boxes[i]) { nb++; nbh += hit[i]!; } }
     return { cover: n / hit.length, onFighters: nb ? nbh / nb : 0, offscreen: off / Math.max(1, corners) };
   }
-function _smartTotal(m: { cover: number; onFighters: number; offscreen: number; }, p) {
+function _smartTotal(m: SmartScore, p) {
     return 8 * m.onFighters + 4 * m.cover + 6 * m.offscreen
       + 0.004 * Math.abs(p.yaw) + 0.5 * Math.abs(Math.log(p.h)) + 0.6 * Math.abs(Math.log(p.d));
   }
@@ -87,7 +90,7 @@ function _smartTotal(m: { cover: number; onFighters: number; offscreen: number; 
     job.ms += performance.now() - t0;
     return job.i >= B$.SMART_CANDS!.length;
   }
-function _smartJob(base: { eye: number[]; look: number[]; fov: number; }, fs: Battle3dFighter[], pk = B$.activeArena, scale = B$.arenaScale) {
+function _smartJob(base: CamShot, fs: Battle3dFighter[], pk = B$.activeArena, scale = B$.arenaScale): SmartJob | null {
     const groups = pk?.groups; if (!groups?.length) return null;
     return { base, fs, groups, scale, aspect: B$.canvas!.width / Math.max(1, B$.canvas!.height), name: pk!.name, i: 0, ms: 0, def: null, best: null };
   }
@@ -109,7 +112,7 @@ function _smartCameraShot() {
   }
 /** (checks) the smart camera's numbers: the last pick in the live fight, or a fresh pick for arena pack `name`
    *  at `scale` (default: the scale that pack would get) with the current fighters; null while the pack loads. */
-  function probeSmartCam(name, want = B$.arenaScale, scale = null) {
+  function probeSmartCam(name: string, want = B$.arenaScale, scale: number | null = null) {
     if (!name) return B$.smartInfo;
     const pk = B$.loadArenaPack(name); if (!pk?.groups) return null;
     const base = _multiCameraShot(), fs = [...B$.extras!.values()].filter((f) => f.model && f.visible && f.aabb);
@@ -131,7 +134,7 @@ function _smartCameraShot() {
     // wobbled 16 units in 10 s). A fighter not measured yet uses its live box.
     for (const f of fs) {
       const hw = f.restW ? f.restW * MODEL_SCALE / 2 : null;   // restW is stored / ARENA (= MODEL_SCALE)
-      minX = Math.min(minX, hw != null ? f.pos[0]! - hw : f.aabb!.min[0]); maxX = Math.max(maxX, hw != null ? f.pos[0]! + hw : f.aabb!.max[0]);
+      minX = Math.min(minX, hw != null ? f.pos[0]! - hw : f.aabb!.min[0]!); maxX = Math.max(maxX, hw != null ? f.pos[0]! + hw : f.aabb!.max[0]!);
       tall = Math.max(tall, f.restH || f.aabb!.max[1]! - f.aabb!.min[1]!);
     }
     let dir = [fc![0]! - nc![0]!, fc![1]! - nc![1]!];
@@ -143,13 +146,14 @@ function _smartCameraShot() {
     const sway = Math.sin(B$.orbitClock! * 0.4) * W * 0.06;
     const back = Math.max(520, W * 0.55 + depth * 0.30) + tall * 0.9;
     const lateral = W * 0.55 + tall * 0.5 + sway;
-    const eye = [nc![0]! - dir[0]! * back + side[0]! * lateral, tall * 1.5 + W * 0.14, nc![1]! - dir[1]! * back + side[1]! * lateral];
-    const look = [(nc![0]! + fc![0]!) / 2, tall * 0.3, (nc![1]! + fc![1]!) / 2];
+    const eye: Vec3 = [nc![0]! - dir[0]! * back + side[0]! * lateral, tall * 1.5 + W * 0.14, nc![1]! - dir[1]! * back + side[1]! * lateral];
+    const look: Vec3 = [(nc![0]! + fc![0]!) / 2, tall * 0.3, (nc![1]! + fc![1]!) / 2];
     return { eye, look, fov: Math.PI / 3.6 };
   }
-function _projectExtras(pv, W, H) {
+function _projectExtras(pv: Float32Array, W: number, H: number) {
+    // ETS item 9: pv is a 4x4 matrix, sixteen numbers.
     const proj = (x: number, y: number | undefined, z: number) => {
-      const cx = pv[0] * x + pv[4] * y! + pv[8] * z + pv[12], cy = pv[1] * x + pv[5] * y! + pv[9] * z + pv[13], cw = pv[3] * x + pv[7] * y! + pv[11] * z + pv[15];
+      const cx = pv[0]! * x + pv[4]! * y! + pv[8]! * z + pv[12]!, cy = pv[1]! * x + pv[5]! * y! + pv[9]! * z + pv[13]!, cw = pv[3]! * x + pv[7]! * y! + pv[11]! * z + pv[15]!;
       return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null;
     };
     for (const f of B$.extras!.values()) {
