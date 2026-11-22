@@ -35,7 +35,7 @@ import type { ContactDamageSpec } from "./types.js";
  * `hp` is the victim's HP at the start of the action (only used to keep it above 0 on the
  * intermediates); omit it and the split is the plain per-hit one.
  */
-export function contactPlan(total: number, perHit: number | undefined, hits: number | undefined, hp = null) {
+export function contactPlan(total: number, perHit: number | undefined, hits: number | undefined, hp: number | null = null) {
   const t = Math.max(0, total | 0);
   const per = Math.max(0, perHit! | 0);
   const n = Math.max(1, hits! | 0);
@@ -64,7 +64,7 @@ export function contactPlan(total: number, perHit: number | undefined, hits: num
  */
 export function contactDamager({ total, perHit, hits, hp = null, pay = null }: ContactDamageSpec = {}) {
   const t = Math.max(0, total! | 0);
-  const shares = contactPlan(t, perHit, hits, hp!);
+  const shares = contactPlan(t, perHit, hits, hp);
   let taken = 0;
   let paid = 0;
   const apply = typeof pay === "function" ? pay : () => {};

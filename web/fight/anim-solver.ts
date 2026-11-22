@@ -218,7 +218,7 @@ interface HeadGate {
 
 interface CastLaunchPoint {
   id: string;
-  bone: string;
+  bone: number;
   frame: number;
   x: number;
   y: number;
@@ -487,9 +487,9 @@ export function solverGroup(model: SolverModel | null | undefined, { tech = null
   }
   // the class of the shot: a group of arm sites is one arm class; anything else is the centre class
   const armSites = sites.filter((s) => s.chain && s.chain.length);
-  const classes = [...new Set(sites.map((s) => motionClassOf(s.cls)))].filter(Boolean);
+  const classes = [...new Set(sites.map((s) => motionClassOf(s.cls)))].filter(Boolean) as MotionClass[];
   if (!classes.length) return { ok: false, reason: "no motion class for these emitters", rule, sites };
-  let cls = classes[0];
+  let cls = classes[0]!;
   if (armSites.length && classes.includes("prop")) cls = "prop";
   else if (armSites.length && classes.includes("hand")) cls = "hand";
   else if (classes.length > 1 && classes.includes("mouth")) cls = "mouth";
@@ -610,11 +610,11 @@ export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null
   const M = motionFor(cls, size) ? motionFor(cls, size) : motionFor(cls, null);
   if (!M) return { ok: false, reason: `no measured motion for class ${cls}` };
   const rel = releasePoint({ emitterClass: cls, sizeClass: size, bodyHeight: H, quantile }) ?? releasePoint({ emitterClass: cls, bodyHeight: H, quantile });
-  const hand = handPoint({ emitterClass: cls, sizeClass: size, bodyHeight: H, quantile }) ?? rel;
+  const hand = handPoint({ emitterClass: cls, sizeClass: size, bodyHeight: H, quantile }) ?? rel!;
   const wu = windupFor({ emitterClass: cls, sizeClass: size, bodyHeight: H, quantile }) ?? windupFor({ emitterClass: cls, bodyHeight: H, quantile });
   if (!rel || !wu) return { ok: false, reason: `no constants for class ${cls}` };
   const low = lowestVertex(model, neutral);
-  const floorY = Number.isFinite(low.y) ? low.y : rig.box.mx[1];   // +Y DOWN: the lowest mesh point
+  const floorY = Number.isFinite(low.y) ? low.y : rig.box.mx[1]!;   // +Y DOWN: the lowest mesh point
   const torsoZ = rig.torso != null ? neutral.pos[rig.torso][2] : 0;
   const torsoX = rig.torso != null ? neutral.pos[rig.torso][0] : 0;
 
@@ -759,7 +759,7 @@ export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null
         let p: number[];
         if (t <= windup * 0.6) {
           const a = smooth(t / Math.max(1, windup * 0.6));
-          p = restTip[i] ? lerp3(restTip[i], plan.apex[i], a) : plan.apex[i].slice();
+          p = restTip[i] ? lerp3(restTip[i]!, plan.apex[i], a) : plan.apex[i].slice();
         } else if (t <= windup) {
           p = plan.apex[i].slice();
         } else if (t <= release) {
@@ -775,7 +775,7 @@ export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null
           const k = (t - release - follow) / Math.max(1, ticks - release - follow);
           p = restTip[i]
             ? (k < 0.5 ? lerp3(plan.overshoot[i], plan.apex[i], smooth(k * 2))
-                       : lerp3(plan.apex[i], restTip[i], smooth((k - 0.5) * 2)))
+                       : lerp3(plan.apex[i], restTip[i]!, smooth((k - 0.5) * 2)))
             : plan.overshoot[i].slice();
         }
         if (s.side === "left" || s.side === "right") f.arms[s.side] = p;
@@ -877,7 +877,7 @@ function toCh2(M: Mat3, prev: Vec3 | null = null): Vec3 {
     const alt = [t[0]! + 2048, 2048 - t[1]!, t[2]! + 2048];
     const cost = (v: Vec3) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
     // ETS item 9: mapping a three-component vector gives three components; TS types the result number[].
-    const a = t.map((x, i) => wrap(x, prev[i])) as Vec3, b = alt.map((x, i) => wrap(x, prev[i])) as Vec3;
+    const a = t.map((x, i) => wrap(x, prev[i]!)) as Vec3, b = alt.map((x, i) => wrap(x, prev[i]!)) as Vec3;
     t = cost(a) <= cost(b) ? a : b;
   }
   const norm = (x: number | undefined) => { let r = Math.round(x!) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
@@ -924,7 +924,7 @@ function withHold(own: ChanRow[] | undefined, added: ChanRow[], holdAt: number):
     const v = out[out.length - 1]!;
     out.push([v[0]!, v[1]!, v[2]!, holdAt]);
   }
-  const last = added[added.length - 1];
+  const last = added[added.length - 1]!;
   // ETS item 40: every row is four numbers, but slice() widens the tuples to number[] on the way through.
   return [...out, ...added, [last[0], last[1], last[2], 30000]] as ChanRow[];
 }
@@ -1014,16 +1014,16 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
     }
     return out;
   })();
-  const carriesGrounded = (bone: number) => [...subs[bone]].some((b) => groundedSet.has(b));
+  const carriesGrounded = (bone: number) => [...subs[bone]!].some((b) => groundedSet.has(b));
   const baseLowY = lowestVertex(target, rest).y;
   /** The joints a head cast may pitch: the head's own joint, then its ancestors while they carry no feet. */
   const headJointsOf = (bone: number) => {
     const out = [bone];
-    let p = parent[bone], guard = 0;
+    let p = parent[bone]!, guard = 0;
     while (p! >= 0 && p! < n && guard++ < n) {
       if (carriesGrounded(p)) break;
       out.push(p);
-      p = parent[p];
+      p = parent[p]!;
     }
     return out;
   };
@@ -1034,7 +1034,7 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
   for (let t = 0; t < ticks; t++) {
     const frame = plan.frames[Math.min(plan.frames.length - 1, t)];
     const idleIdx = idleList.length ? (t % idleList.length) : 0;
-    W0 = idleW[idleIdx];
+    W0 = idleW[idleIdx]!;
     curFrame = idleList[idleIdx] ?? base;
     const LrTick = idleL[idleIdx] ?? null;
     for (let i = 0; i < n; i++) W[i] = W0[i];
@@ -1125,8 +1125,8 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
     const tipPrev = new Map<number, number | null>(plan.sites.map((s: SolverSite) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
     const driveChainOf = (bone: number) => {
       const chain: (number | undefined)[] = [];
-      let p = parent[bone], guard = 0;
-      while (p! >= 0 && p! < n && guard++ < n) { chain.push(p); p = parent[p]; }
+      let p = parent[bone]!, guard = 0;
+      while (p! >= 0 && p! < n && guard++ < n) { chain.push(p); p = parent[p]!; }
       chain.reverse();
       // the root itself is the last resort (a bird's head is attached straight to the body): it may be
       // turned, because the ground gate then judges the feet the turn lifts.
@@ -1442,7 +1442,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
     const wantM = plan.isArm ? plan.hand : plan.rel;      // what the class's own casts say: wrist for an arm
     return {
       id: s.id, ...body(o), bone: body(p),
-      want: wantM ? { height: +(wantM.height / plan.H).toFixed(3), forward: +(wantM.forward / plan.H).toFixed(3) } : null,
+      want: wantM ? { height: +(wantM.height! / plan.H).toFixed(3), forward: +(wantM.forward! / plan.H).toFixed(3) } : null,
     };
   });
   // ── clearance: per pair, against the body's own NEUTRAL clearance (not a blanket slack) ────────────
@@ -1455,7 +1455,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
     const list = idlePlaylist(bake.model, plan.baseFrame ?? 0);
     const step = Math.max(1, Math.floor(list.length / 24));
     const out = [neutral];
-    for (let i = 0; i < list.length; i += step) out.push(poseFromChannels(bake.model, list[i]));
+    for (let i = 0; i < list.length; i += step) out.push(poseFromChannels(bake.model, list[i]!));
     return out;
   })();
   const restClear = new Map<string, number | null>();
@@ -1483,7 +1483,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
     // are measured and reported, never gated; the gate is for a HAND or a HEAD driven through a body.
     if (roleOf(i) === "extra" || roleOf(j) === "extra") return null;
     const rest = restClear.get(`${i}:${j}`);
-    const auth = authorTol.pairFloor(i, j);
+    const auth = authorTol.pairFloor!(i, j);
     // A PROP's capsule is a long thin fit around a blade: turning a wrist sweeps it a body height, and the
     // disc's own animation of the same arm wanders 0.13 h inside the body's capsules (Piedmon's arm/back
     // box: 0.14 h at rest, 0.01 h in its own cast). For a pair with a prop on either side the disc's own
@@ -1509,7 +1509,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
   // the floor the model itself stands on at each tick (its own idle's floor): a cast that plays OVER the
   // idle may not be judged against a floor the idle itself has already left (K20b item 3)
   const idleFramesB = idlePlaylist(bake.model, plan.baseFrame ?? 0);
-  const idleFloorAt = (t: number) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
+  const idleFloorAt = (t: number) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length]!)).y;
   const orig = (pose: SolverPose, s: SolverSite): Vec3 | null => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
   const t0 = plan.sites.map((s: SolverSite) => orig(neutral, s));
   let travel = 0, groundWorst = 0, groundTick: number | null = null, penTicks = 0, worstPen = null, gapMin = Infinity;
@@ -1549,7 +1549,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
     for (let t = 0; t < plan.ticks; t++) {
       const c = rNow(off + t);
       // the transport is measured against the IDLE's own ch1 at that tick: the idle's sway is the idle's
-      const ic = chan(bake.model.bones[rigB.root]?.anim?.ch1, idleFramesB[t % idleFramesB.length]);
+      const ic = chan(bake.model.bones[rigB.root]?.anim?.ch1, idleFramesB[t % idleFramesB.length]!);
       const d = Math.hypot(c[0] - ic[0], c[1] - ic[1], c[2] - ic[2]) / plan.H;
       rootTravel = Math.max(rootTravel, d);
       if (t === plan.release) releaseTravel = d;
@@ -1625,13 +1625,13 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
   // R1/R4's reach: at RELEASE the arm must put its wrist where the plan effectively asks (the median point,
   // pulled in to this body's own arm length) without stretching past that length. A centre emitter is
   // rotated, not translated, so it has no reach question.
-  const tr = bake.trace[plan.release];
+  const tr = bake.trace[plan.release]!;
   const reach = plan.sites.map((s: SolverSite, i: number) => {
     if (!s.chain?.length) return { id: s.id, centre: true, ok: true };
     let L = 0;
-    for (let k = 1; k < s.chain.length; k++) L += len3(sub3(tr.pos[s.chain[k]!], tr.pos[s.chain[k - 1]!]));
-    const S0 = tr.pos[s.chain[0]!], wrist = tr.pos[s.chain[s.chain.length - 1]!];
-    const wantD = len3(sub3(plan.targets[i], S0));
+    for (let k = 1; k < s.chain.length; k++) L += len3(sub3(tr.pos[s.chain[k]!]!, tr.pos[s.chain[k - 1]!]!));
+    const S0 = tr.pos[s.chain[0]!]!, wrist = tr.pos[s.chain[s.chain.length - 1]!]!;
+    const wantD = len3(sub3(plan.targets[i]!, S0));
     const maxD = L * K16.reachSlack;
     const eff = Math.min(wantD, maxD);
     const d = len3(sub3(wrist, S0));
@@ -1688,7 +1688,7 @@ export function solveCast(model: CastSolverModel, { tech = null, apply = true, o
   const key = techKey(tech ?? "");
   const cached = model.solverCasts?.[key];
   if (cached?.table != null && model.timeline?.[cached.table]?.table) {
-    return { ok: true, reused: true, ...cached };
+    return { ok: true, reused: true, ...(cached as Omit<typeof cached, "ok">) };
   }
   const start = offset ?? (SOLVER.offset + SOLVER.offsetStep * (model.__solverBakes ?? 0));
   // The plan is tried at a small ladder of plans, all built from measured data (SOLVER.attemptLadder):
@@ -1767,7 +1767,7 @@ export function solveCast(model: CastSolverModel, { tech = null, apply = true, o
         if (v2.pass) {
           // the report carries BOTH numbers: what the disc measured for this size class and the share this
           // body could actually take (verified by re-running the same gate on the re-baked pose)
-          v = { ...v2, report: { ...v2.report, head: { ...v2.report.head, liftFull: v2.report.head!.lift, lift: +(v2.report.head!.lift * k).toFixed(2), scale: k } } };
+          v = { ...v2, report: { ...v2.report, head: { ...v2.report.head!, liftFull: v2.report.head!.lift, lift: +(v2.report.head!.lift * k).toFixed(2), scale: k } } };
           bk = b2; p.headScale = k; break;
         }
       }
@@ -1785,7 +1785,7 @@ export function solveCast(model: CastSolverModel, { tech = null, apply = true, o
       gapNeed = Math.max(gapNeed, (SHARED_SHOT.minSeparation * p.H - v.report.gap.min! * p.H) + 0.01 * p.H);
     }
   }
-  const { bake, v } = best;
+  const { bake, v } = best!;
   plan = best!.plan;
   const pass = v.pass;
   const forced = !!force && !pass;
@@ -1801,9 +1801,9 @@ export function solveCast(model: CastSolverModel, { tech = null, apply = true, o
     cls: plan.cls, mode: plan.mode, report, group, plan, bake, launch,
   };
   if (apply) {
-    for (let i = 0; i < model.bones.length; i++) if (bake.model.bones[i] !== model.bones[i]) model.bones[i] = bake.model.bones[i];
+    for (let i = 0; i < model.bones.length; i++) if (bake.model.bones[i] !== model.bones[i]) model.bones[i] = bake.model.bones[i]!;
     if (!model.timeline) model.timeline = [];
-    model.timeline[bake.table] = bake.model.timeline[bake.table];
+    model.timeline[bake.table] = bake.model.timeline![bake.table]!;
     if (!model.solverCasts) model.solverCasts = {};
     const { plan: _p, group: _g, bake: _b, ...keep } = out;
     model.solverCasts[key] = keep;

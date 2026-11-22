@@ -34,10 +34,9 @@
 //     launch / world spawn fires inside the hide window.
 import { skillRowsForName } from "./fight-tables.js";
 import { shotsFor } from "./digimon-anatomy.js";
-interface OwnClipModel {
-  actions?: OwnClipRec[];
-  folder?: string | number;
-}
+type OwnClipModel = FightModel;
+/** The part of a model the clip classifier reads: its bones and playlists. */
+type OwnClipBody = Pick<FightModel, "bones" | "timeline">;
 
 
 // The disc's clip families (clips.md §5): 9/13 the casts, 15/16 the field/throw casts; 5,6,7,8,14 the
@@ -56,9 +55,9 @@ const FLY_SHARE = 0.5;                          // a thrown copy's pivot travel 
 // the same for the Node tools; setOwnClipsEnabled(v) pins it for a test or a lab.
 import { battleSetting } from "./battle-settings.js";
 import { isInstalledBuild } from "../ship-list.js";
-import type { OwnClipInventory, OwnClipRec } from "./types.js";
+import type { FightChanRow, FightModel, FightVec3, OwnClipInventory, OwnClipRec } from "./types.js";
 let override: boolean | null = null;          // null = follow the player's setting
-export function setOwnClipsEnabled(v) { override = v == null ? null : !!v; }
+export function setOwnClipsEnabled(v: boolean | null | undefined) { override = v == null ? null : !!v; }
 export function ownClipsEnabled() { if (isInstalledBuild()) return false; return override == null ? battleSetting("ownclips") : override; }   // installed copy: out, no flag or setter turns it on
 /** Read the developer override out of a query string: `?ownclips=1` turns the rule on for the session. */
 export function ownClipsFlagFromUrl(search = "") {
@@ -73,10 +72,10 @@ if (typeof window !== "undefined" && window?.location?.search) {
 }
 if (typeof process !== "undefined" && process?.env?.OWNCLIPS === "1") override = true;
 
-const hasOps = (s) => !!s && Array.isArray(s.ops) && s.ops.length > 0;
+const hasOps = (s: { ops?: unknown } | null | undefined) => !!s && Array.isArray(s.ops) && s.ops.length > 0;
 
 // ── the model's own clips, by the numbers ───────────────────────────────────────────────────────
-function ch1At(model, bone: number, frame: number | undefined) {
+function ch1At(model: OwnClipBody | null | undefined, bone: number, frame: number | undefined): FightVec3 | null {
   const ch = model?.bones?.[bone]?.anim?.ch1;
   if (!Array.isArray(ch) || !ch.length) return null;
   let prev = null;
@@ -92,7 +91,7 @@ function ch1At(model, bone: number, frame: number | undefined) {
   return prev ? [prev[0], prev[1], prev[2]] : null;
 }
 /** ch3 scale of one bone at a frame (4096 = 1.0); 1.0 when the bone has no ch3 channel. */
-export function boneScale(model, bone: number, frame: number) {
+export function boneScale(model: OwnClipBody | null | undefined, bone: number, frame: number) {
   const ch = model?.bones?.[bone]?.anim?.ch3;
   if (!Array.isArray(ch) || !ch.length) return 4096;
   let prev = null;
@@ -103,13 +102,13 @@ export function boneScale(model, bone: number, frame: number) {
   }
   return prev ? Math.max(Math.abs(prev[0]), Math.abs(prev[1]), Math.abs(prev[2])) : 4096;
 }
-function tableFrames(model, t: number) {
+function tableFrames(model: OwnClipBody | null | undefined, t: number) {
   const tab = model?.timeline?.[t]?.table;
   if (!Array.isArray(tab) || !tab.length) return [];
   return tab.map((e) => e.value | 0).filter((v) => v >= 0 && v < 0x8000);
 }
 /** The mesh's own height in model units (the y extent of every vertex). */
-export function bodyHeight(model) {
+export function bodyHeight(model: OwnClipBody | null | undefined) {
   let lo = Infinity, hi = -Infinity;
   for (const b of model?.bones ?? []) for (const v of b.verts ?? []) { if (v[1] < lo) lo = v[1]; if (v[1] > hi) hi = v[1]; }
   return Number.isFinite(lo) && hi > lo ? hi - lo : 0;
@@ -124,16 +123,16 @@ export function bodyHeight(model) {
  *   travel        which of the disc's travel arms it uses, and how far the root's ch1 keys walk
  *   returnsHome   op2 mode 5 kind 5 / mode 7 - it comes back on its own
  */
-export function classifyOwnScript(model, script) {
+export function classifyOwnScript(model: OwnClipBody, script: { ops?: { op: number; words?: number[]; }[]; } | null | undefined) {
   const ops = script?.ops ?? [];
-  const rec = { slot: null, launches: [], contacts: [], markers: [], tables: [], ramp4: 0, ramp5: 0, leap3: 0, dash8: 0, home7: 0, waits: 0, rootTravel: 0, returnsHome: false };
+  const rec: Required<OwnClipRec> = { slot: null, launches: [], contacts: [], markers: [], tables: [], ramp4: 0, ramp5: 0, leap3: 0, dash8: 0, home7: 0, waits: 0, rootTravel: 0, returnsHome: false };
   ops.forEach((o, i) => {
     const w = o.words || [];
-    if (o.op === 6 && (w[0] | 0) === 0) rec.launches.push(i);
-    else if (o.op === 10) { rec.markers.push({ at: i, type: w[0] | 0 }); if (CONTACT_TYPES.has(w[0] | 0)) rec.contacts.push(i); }
-    else if (o.op === 11) rec.waits += (w[0] | 0);
+    if (o.op === 6 && (w[0]! | 0) === 0) rec.launches.push(i);
+    else if (o.op === 10) { rec.markers.push({ at: i, type: w[0]! | 0 }); if (CONTACT_TYPES.has(w[0]! | 0)) rec.contacts.push(i); }
+    else if (o.op === 11) rec.waits += (w[0]! | 0);
     else if (o.op === 2) {
-      const mode = w[0] | 0, sub = w[2] | 0;
+      const mode = w[0]! | 0, sub = w[2]! | 0;
       if (mode === 0 && sub > 1) rec.tables.push(sub);
       else if (mode === 3) rec.leap3++;
       else if (mode === 5 && sub === 4) rec.ramp4++;
@@ -152,22 +151,22 @@ export function classifyOwnScript(model, script) {
   return rec;
 }
 
-const INV = new WeakMap();     // model -> inventory (rebuilt only when the model object is new)
+const INV = new WeakMap<object, OwnClipInventory>();     // model -> inventory (rebuilt only when the model object is new)
 
 /** Every own action script of a model, classified, plus the flag this rule needs. */
 export function ownClipInventory(model: OwnClipModel): OwnClipInventory {
   if (!model) return { slots: {}, height: 0, throws: false, throwsWhy: [] };
-  if (INV.has(model)) return INV.get(model);
+  if (INV.has(model)) return INV.get(model)!;
   const slots: Record<string, OwnClipRec> = {};
   for (const k of Object.keys(model.actions || {}) as any[]) {
-    const s = model.actions[k];
+    const s = model.actions![k];
     if (!hasOps(s)) continue;
     const rec = classifyOwnScript(model, s);
     rec.slot = k | 0;
     slots[k | 0] = rec;
   }
-  const inv = { slots, height: bodyHeight(model), throws: false, throwsWhy: [] };
-  const t = detectThrow(model, slots, inv.height);
+  const inv: OwnClipInventory = { slots, height: bodyHeight(model), throws: false, throwsWhy: [] };
+  const t = detectThrow(model, slots, inv.height!);
   inv.throws = t.throws;
   inv.throwsWhy = t.why;
   INV.set(model, inv);
@@ -184,14 +183,14 @@ export function ownClipInventory(model: OwnClipModel): OwnClipInventory {
  *                   ticks 36..224, the lid's op6 launch is at tick 55).
  * A whole-body vanish (a bone whose sub-tree holds >= half the model) is NOT a throw and is skipped.
  */
-function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
+function detectThrow(model: FightModel, slots: Record<string, OwnClipRec>, H: number) {
   const why: string[] = [];
   if (!(H > 0) || !model?.bones?.length) return { throws: false, why };
   const idleFrames = tableFrames(model, 0);
   const idle = idleFrames.length ? idleFrames : [0];
   const mesh = [];
-  const parentOf = (i: number) => (model.bones[i]?.parent_slot | 0) - 1;
-  for (let i = 0; i < model.bones.length; i++) if ((model.bones[i].faces ?? []).length) mesh.push(i);
+  const parentOf = (i: number) => (model.bones[i]?.parent_slot! | 0) - 1;
+  for (let i = 0; i < model.bones.length; i++) if ((model.bones[i]!.faces ?? []).length) mesh.push(i);
   if (!mesh.length) return { throws: false, why };
   const sub = new Map();
   for (const i of mesh) {
@@ -209,7 +208,7 @@ function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
   for (const rec of Object.values(slots)) {
     const frames = rec.tables!.flatMap((t) => tableFrames(model, t));
     if (frames.length < 10) continue;
-    const script = model.actions?.[rec.slot];
+    const script = model.actions?.[rec.slot!];
     const hasWorldSpawn = (script?.ops ?? []).some((o: { op: number; words: number[]; }) => o.op === 3 && (o.words?.[0]! | 0) === 0
       && (o.words?.[4]! | 0) !== 32767 && Math.abs(o.words?.[4]! | 0) <= 20000);
     const hasLaunch = rec.launches!.length > 0;
@@ -249,7 +248,7 @@ function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
  * `tech` is the technique's NAME, the key the animator has (techName) and the anatomy's tables use; the
  * skills row is found by that name and narrowed by the clip when one name covers several rows.
  */
-export function moveKind(model: OwnClipModel, clip: number, tech) {
+export function moveKind(model: OwnClipModel, clip: number, tech: string | null | undefined) {
   const rows = (tech ? skillRowsForName(tech) : []).filter((r: { clip: number; }) => clip == null || (r.clip | 0) === (clip | 0));
   const cats = new Set(rows.map((r) => String(r.attack_category || "")));
   const cat = cats.size === 1 ? [...cats][0] : null;
@@ -257,7 +256,7 @@ export function moveKind(model: OwnClipModel, clip: number, tech) {
   if (types.has("heal") || types.has("support") || cat === "support") return { kind: "self", why: "heal/support row" };
   if (cat === "magical") return { kind: "shoot", why: "skills row: magical" };
   if (CAST_CLIPS.has(clip | 0)) return { kind: "shoot", why: `cast clip ${clip}` };
-  const anat = shotsFor(model?.folder, tech ?? "", { volley: (clip | 0) === 13 });
+  const anat = shotsFor(model?.folder!, tech ?? "", { volley: (clip | 0) === 13 });
   const rule = anat.basis === "anatomy" ? anat.mode : null;
   if (rule === "single" || rule === "per-emitter") return { kind: "shoot", why: `anatomy rule ${rule}` };
   if (rule === "per-limb-contact") return { kind: "close", why: "anatomy rule per-limb-contact" };
@@ -268,9 +267,9 @@ export function moveKind(model: OwnClipModel, clip: number, tech) {
 /** The model's own clip of `kind`: its own casting clip first for a shot, its own attack for a blow. */
 export function pickOwnClip(model: OwnClipModel, kind: string) {
   const inv = ownClipInventory(model);
-  const list = Object.values(inv.slots).filter((r) => (kind === "shoot" ? r.launches!.length > 0 : r.contacts!.length > 0));
+  const list = Object.values(inv.slots!).filter((r) => (kind === "shoot" ? r.launches!.length > 0 : r.contacts!.length > 0));
   if (!list.length) return null;
-  const travels = (r) => r.ramp4 > 0 || r.leap3 > 0 || r.dash8 > 0 || Math.abs(r.rootTravel) > TRAVEL_SHARE * inv.height!;
+  const travels = (r: OwnClipRec) => r.ramp4! > 0 || r.leap3! > 0 || r.dash8! > 0 || Math.abs(r.rootTravel!) > TRAVEL_SHARE * inv.height!;
   const rank = (r: OwnClipRec) => {
     const fit = kind === "shoot" ? (CAST_CLIPS.has(r.slot!) ? 0 : r.slot === 5 ? 1 : 2) : (r.slot === 5 ? 0 : 1);
     return fit * 1000 + (travels(r) ? 0 : 100) + r.slot!;
@@ -285,7 +284,7 @@ export function pickOwnClip(model: OwnClipModel, kind: string) {
  * heal/support move is never planned (its calm self cast is the right shape), an item is not a
  * technique (the animator passes no tech for it) and an unknown move kind is not guessed.
  */
-export function ownClipPlan(model: OwnClipModel, clip: number, { tech = null, target = "enemy" } = {}) {
+export function ownClipPlan(model: OwnClipModel, clip: number, { tech = null, target = "enemy" }: { tech?: string | null | undefined; target?: string | undefined; } = {}) {
   if (!ownClipsEnabled() || !model || clip == null || !tech) return null;
   if (target === "self") return null;
   if (hasOps(model.actions?.[clip])) return null;
@@ -308,8 +307,8 @@ export function ownClipPlan(model: OwnClipModel, clip: number, { tech = null, ta
  * it has no script for — the DW2 body cannot carry the thrown mesh, and the operator's rule is that
  * such a body plays its own attack for every technique.
  */
-export function ownClipsBlockDw2(model: OwnClipModel, clip: string | number | null, { tech = null, target = "enemy" } = {}) {
+export function ownClipsBlockDw2(model: OwnClipModel, clip: string | number | null, { tech = null, target = "enemy" }: { tech?: string | null | undefined; target?: string | undefined; } = {}) {
   if (!ownClipsEnabled() || !model || clip == null || !tech || target === "self") return false;
-  if (hasOps(model.actions?.[clip])) return false;
+  if (hasOps(model.actions?.[clip as number])) return false;
   return ownClipInventory(model).throws;
 }

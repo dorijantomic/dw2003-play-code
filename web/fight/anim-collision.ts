@@ -30,7 +30,7 @@
 import { roleOfBone, armChains } from "./digimon-bonemap.js";
 import { armEquip } from "./digimon-anatomy.js";
 import { restPose } from "./anim-retarget.js";
-import type { FightCollisionOut } from "./types.js";
+import type { FightCollisionOut, FightModel, FightVec3 } from "./types.js";
 interface ClearanceCapsule { a: number[]; b: number[]; r: number; }
 
 interface PairClearance { clearance: number; a: number[]; b: number[]; distance: number; }
@@ -47,8 +47,8 @@ interface SharedShotOpts {
 interface RigPoint { x: number; y: number; z: number; }
 interface RigBone { parent_slot?: number | null; verts?: [number, number, number][]; }
 interface RigModel { folder?: string; num_bones?: number | null; bones: RigBone[]; }
-interface RigCollider { bone: number; role: string; prop: boolean; hand: boolean; compact: number; c: RigPoint; a: RigPoint; b: RigPoint; radius: number; halfLen: number; }
-interface Rig { folder: string | undefined; model: RigModel; colliders: RigCollider[]; parent: number[]; depth: number[]; n: number; }
+interface RigCollider { bone: number; role: string; prop: boolean; hand: boolean; compact: boolean; c: number[]; a: number[]; b: number[]; radius: number; halfLen: number; }
+interface Rig { folder: string | number | undefined; model: RigModel; colliders: RigCollider[]; parent: number[]; depth: number[]; n: number; }
 
 type SharedShotMode = "combined" | "spread";
 
@@ -101,11 +101,11 @@ const P95 = 0.95;
 function percentile(sorted: number[], q: number) {
   if (!sorted.length) return 0;
   const i = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * q)));
-  return sorted[i];
+  return sorted[i]!;
 }
 
 /** The bone-local frame of one mesh: centroid, principal axis, extent along it, radial spread. */
-export function meshFrame(verts) {
+export function meshFrame(verts: FightVec3[]) {
   const n = verts.length;
   if (!n) return null;
   let cx = 0, cy = 0, cz = 0;
@@ -119,7 +119,7 @@ export function meshFrame(verts) {
   }
   const C = [xx / n, xy / n, xz / n, xy / n, yy / n, yz / n, xz / n, yz / n, zz / n];
   // start from the column with the largest diagonal
-  const diag = [C[0], C[4], C[8]];
+  const diag = [C[0]!, C[4]!, C[8]!];
   let u = [0, 0, 0];
   u[diag.indexOf(Math.max(...diag))] = 1;
   if (Math.hypot(...u) === 0) u = [0, 1, 0];
@@ -160,17 +160,17 @@ export function meshFrame(verts) {
 }
 
 /** The model's rest-pose height (world AABB of every vertex), the unit of the published fractions. */
-const HEIGHTS = new WeakMap();
-export function bodyHeight(model, frame = 0) {
-  if (HEIGHTS.has(model)) return HEIGHTS.get(model);
+const HEIGHTS = new WeakMap<object, number>();
+export function bodyHeight(model: FightModel, frame = 0) {
+  if (HEIGHTS.has(model)) return HEIGHTS.get(model)!;
   const rp = restPose(model, frame);
   let lo = Infinity, hi = -Infinity;
   for (let i = 0; i < model.bones.length; i++) {
-    const verts = model.bones[i].verts || [];
+    const verts = model.bones[i]!.verts || [];
     if (!verts.length) continue;
-    const R = rp.rot[i], t = rp.pos[i];
+    const R = rp.rot[i]!, t = rp.pos[i]!;
     for (const v of verts) {
-      const wy = (R[1] * v[0] + R[4] * v[1] + R[7] * v[2]) + t[1];
+      const wy = (R[1]! * v[0] + R[4]! * v[1] + R[7]! * v[2]) + t[1];
       if (wy < lo) lo = wy;
       if (wy > hi) hi = wy;
     }
@@ -182,7 +182,7 @@ export function bodyHeight(model, frame = 0) {
 
 // ---------------------------------------------------------------- colliders
 
-const RIGS = new WeakMap();
+const RIGS = new WeakMap<object, Rig>();
 
 /**
  * The collider set of one model: a capsule (or sphere) per bone that carries a mesh, in the bone's own
@@ -193,7 +193,7 @@ const RIGS = new WeakMap();
  * segment, a hand block or a weapon, so the mesh's principal axis and its radial spread are the honest
  * shape. Bones with no vertices (joints) get no collider: they cannot be seen passing through anything.
  */
-export function rigColliders(model: RigModel | null, folder = model?.folder): Rig | null {
+export function rigColliders(model: RigModel | null, folder: string | number = model?.folder!): Rig | null {
   if (!model) return null;
   const cached = RIGS.get(model);
   if (cached) return cached;
@@ -221,7 +221,7 @@ export function rigColliders(model: RigModel | null, folder = model?.folder): Ri
     let x = i, guard = 0;
     while (x >= 0 && depth[x] === 0 && parent[x] >= 0 && guard++ < n) { chain.push(x); x = parent[x]; }
     let d = x >= 0 ? depth[x] : 0;
-    for (let k = chain.length - 1; k >= 0; k--) { depth[chain[k]] = ++d; }
+    for (let k = chain.length - 1; k >= 0; k--) { depth[chain[k]!] = ++d; }
   }
 
   const colliders = [];
@@ -244,12 +244,12 @@ export function rigColliders(model: RigModel | null, folder = model?.folder): Ri
 }
 
 /** Tree distance between two bones (infinity when the rig has no path, which cannot happen). */
-function boneDistance(rig, a, b) {
+function boneDistance(rig: Rig, a: number, b: number) {
   let x = a, y = b, steps = 0;
-  while (rig.depth[x] > rig.depth[y]) { x = rig.parent[x]; steps++; if (x < 0) return Infinity; }
-  while (rig.depth[y] > rig.depth[x]) { y = rig.parent[y]; steps++; if (y < 0) return Infinity; }
+  while (rig.depth[x]! > rig.depth[y]!) { x = rig.parent[x]!; steps++; if (x < 0) return Infinity; }
+  while (rig.depth[y]! > rig.depth[x]!) { y = rig.parent[y]!; steps++; if (y < 0) return Infinity; }
   while (x !== y) {
-    x = rig.parent[x]; y = rig.parent[y]; steps += 2;
+    x = rig.parent[x]!; y = rig.parent[y]!; steps += 2;
     if (x < 0 || y < 0) return Infinity;
   }
   return steps;
@@ -263,16 +263,21 @@ export const MIN_BONE_DISTANCE = 3;
 /** The world-space capsule (or sphere) of one collider under a pose: {a, b, r} with a === b for a
  *  sphere. A pose is the shape restPose() returns ({rot: [...], pos: [...]}) - or the same thing as
  *  an array of {rot, pos} per bone, which is what a solver building one bone at a time naturally has. */
-export function poseCollider(col, pose) {
-  let R = null, t = null;
+/** One bone of a pose given bone by bone: its rotation under rot or R, its position under pos or t. */
+interface PoseBone { rot?: number[]; R?: number[]; pos?: number[]; t?: number[]; }
+/** A pose the colliders can be placed under: restPose()'s per-bone arrays, or one record per bone. */
+export type ColliderPose = { rot: (number[] | undefined)[]; pos?: (number[] | undefined)[]; } | ((PoseBone | undefined)[] & { rot?: undefined; pos?: undefined });
+
+export function poseCollider(col: RigCollider, pose: ColliderPose | null | undefined) {
+  let R: number[] | null | undefined = null, t: number[] | null | undefined = null;
   if (pose && Array.isArray(pose.rot)) { R = pose.rot[col.bone]; t = pose.pos?.[col.bone]; }
   else if (pose && Array.isArray(pose)) { const b = pose[col.bone]; if (b) { R = b.rot ?? b.R; t = b.pos ?? b.t; } }
   else if (pose && pose.rot && pose.pos && !Array.isArray(pose.rot)) { R = pose.rot[col.bone]; t = pose.pos[col.bone]; }
   if (!R || !t) return null;
-  const map = (p) => [
-    -(R[0] * p[0] + R[3] * p[1] + R[6] * p[2]) + t[0],
-    (R[1] * p[0] + R[4] * p[1] + R[7] * p[2]) + t[1],
-    -(R[2] * p[0] + R[5] * p[1] + R[8] * p[2]) + t[2],
+  const map = (p: number[]) => [
+    -(R![0]! * p[0]! + R![3]! * p[1]! + R![6]! * p[2]!) + t![0]!,
+    (R![1]! * p[0]! + R![4]! * p[1]! + R![7]! * p[2]!) + t![1]!,
+    -(R![2]! * p[0]! + R![5]! * p[1]! + R![8]! * p[2]!) + t![2]!,
   ];
   if (col.compact) {
     const c = map(col.c);
@@ -283,21 +288,21 @@ export function poseCollider(col, pose) {
 
 // ---------------------------------------------------------------- distances
 
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a, b: number[]) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+const sub = (a: number[], b: number[]) => [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!];
+const add = (a: number[], b: number[]) => [a[0]! + b[0]!, a[1]! + b[1]!, a[2]! + b[2]!];
+const mul = (a: number[], s: number) => [a[0]! * s, a[1]! * s, a[2]! * s];
 const len = (a: number[]) => Math.hypot(a[0]!, a[1]!, a[2]!);
 
 /**
  * Closest points between two segments (Ericson, Real-Time Collision Detection 5.1.9) plus the
  * distance. Degenerate segments (a sphere is a zero-length segment) fall out of the same arithmetic.
  */
-export function segmentDistance(p1, q1, p2, q2) {
+export function segmentDistance(p1: number[], q1: number[], p2: number[], q2: number[]) {
   const d1 = sub(q1, p1), d2 = sub(q2, p2), r = sub(p1, p2);
   const a = dot(d1, d1), e = dot(d2, d2), f = dot(d2, r);
   const EPS = 1e-12;
-  let s, t;
+  let s: number, t: number;
   if (a <= EPS && e <= EPS) { s = 0; t = 0; }
   else if (a <= EPS) { s = 0; t = Math.min(1, Math.max(0, f / e)); }
   else {
@@ -351,7 +356,7 @@ interface PenetrationOpts {
   clasp?: boolean | undefined;
 }
 
-export function penetration(model, pose, { folder = model?.folder, rig = null, tolerance = null, pairs = null, clasp = false }: PenetrationOpts = {}) {
+export function penetration(model: FightModel, pose: ColliderPose, { folder = model?.folder, rig = null, tolerance = null, pairs = null, clasp = false }: PenetrationOpts = {}) {
   const R = rig || rigColliders(model, folder);
   if (!R) return { ok: true, clearance: Infinity, depth: 0, tested: 0, worst: null, tolerance: 0, over: 0, violations: [], clasp: null };
   const tol = tolerance === 0 || typeof tolerance === "number"
@@ -366,7 +371,7 @@ export function penetration(model, pose, { folder = model?.folder, rig = null, t
     if (!a || !b) continue;
     tested++;
     const p = pairClearance(a, b);
-    const isClasp = clasp && R.colliders[i].hand && R.colliders[j].hand;
+    const isClasp = clasp && R.colliders[i]!.hand && R.colliders[j]!.hand;
     if (isClasp && (!clasped || p.clearance < clasped.clearance)) {
       clasped = { clearance: p.clearance, distance: p.distance, a: p.a, b: p.b, roleA: a.role, roleB: b.role };
     }
@@ -406,15 +411,15 @@ export function penetration(model, pose, { folder = model?.folder, rig = null, t
 }
 
 /** The collider index pairs the rule tests: same-bone/direct-family pairs are not questions. */
-const PAIRS = new WeakMap();
-export function allowedPairs(rig) {
+const PAIRS = new WeakMap<object, [number, number][]>();
+export function allowedPairs(rig: Rig) {
   const cached = PAIRS.get(rig);
   if (cached) return cached;
-  const out = [];
+  const out: [number, number][] = [];
   const cols = rig.colliders;
   for (let i = 0; i < cols.length; i++) {
     for (let j = i + 1; j < cols.length; j++) {
-      if (boneDistance(rig, cols[i].bone, cols[j].bone) < MIN_BONE_DISTANCE) continue;
+      if (boneDistance(rig, cols[i]!.bone, cols[j]!.bone) < MIN_BONE_DISTANCE) continue;
       out.push([i, j]);
     }
   }
@@ -424,13 +429,13 @@ export function allowedPairs(rig) {
 
 // ---------------------------------------------------------------- the tolerance, from the disc's own animation
 
-const TOLERANCE = new WeakMap();
+const TOLERANCE = new WeakMap<object, FightCollisionOut>();
 
 /** The frames that define this body's own range of motion: its whole authored keyframe sequence,
  *  sampled evenly (`samples` poses). A cast is part of it; the idle, its attacks and its hurt poses
  *  are the rest, and the minimum over them is "how close this body itself brings these parts". */
-function authoredWindows(model, samples) {
-  const total = model.total_frames | 0;
+function authoredWindows(model: FightModel, samples: number) {
+  const total = model.total_frames! | 0;
   if (total > 0) return [{ source: "own-animation", lo: 0, hi: total - 1 }];
   // a pack without a stated length: the windows its tables name
   let lo = Infinity, hi = -1;
@@ -453,8 +458,8 @@ function authoredWindows(model, samples) {
  * gets floor `null`: it is fused geometry, not a motion question, and testing it would only produce
  * noise. A pair with room in at least one pose gets that pose's own clearance as its bar.
  */
-export function clearanceTolerance(model, folder = model?.folder, { samples = null } = {}) {
-  const total = model?.total_frames | 0;
+export function clearanceTolerance(model: FightModel, folder = model?.folder, { samples = null }: { samples?: number | null; } = {}) {
+  const total = model?.total_frames! | 0;
   const want = samples ?? Math.max(1, Math.min(2000, total || 96));
   const cached = TOLERANCE.get(model);
   if (cached && cached.samples >= want) return cached;
@@ -472,7 +477,7 @@ export function clearanceTolerance(model, folder = model?.folder, { samples = nu
         const pose = restPose(model, f);
         const posed = rig.colliders.map((c) => poseCollider(c, pose));
         for (let q = 0; q < list.length; q++) {
-          const [i, j] = list[q];
+          const [i, j] = list[q]!;
           const a = posed[i], b = posed[j];
           if (!a || !b) continue;
           const c = pairClearance(a, b).clearance;
@@ -487,7 +492,7 @@ export function clearanceTolerance(model, folder = model?.folder, { samples = nu
       if (!Number.isFinite(min[n])) continue;
       // fused: no sampled pose ever separated this pair
       const bar = max[n] > 0 ? min[n] : null;
-      out.byPair.set(`${list[n][0]}:${list[n][1]}`, bar);
+      out.byPair.set(`${list[n]![0]}:${list[n]![1]}`, bar);
       if (bar != null && bar < floor) floor = bar;
     }
     out.floor = floor;
@@ -504,11 +509,11 @@ export function clearanceTolerance(model, folder = model?.folder, { samples = nu
 // ---------------------------------------------------------------- R3: shared shots
 
 /** The longest distance between any two of the points (the group's span). */
-export function emitterSpan(points) {
+export function emitterSpan(points: ShotPoint[]) {
   let span = 0;
   for (let i = 0; i < points.length; i++) {
     for (let j = i + 1; j < points.length; j++) {
-      const a = points[i], b = points[j];
+      const a = points[i]!, b = points[j]!;
       span = Math.max(span, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
     }
   }
@@ -516,7 +521,7 @@ export function emitterSpan(points) {
 }
 
 /** The R3 mode a technique's own shots rule implies (K14): one combined shot, or one per emitter. */
-export function sharedShotMode(rule, emitterCount = 0) {
+export function sharedShotMode(rule: { mode?: string; emitters?: unknown[]; } | null | undefined, emitterCount = 0) {
   if (!rule) return null;
   const n = Math.max(emitterCount, Array.isArray(rule.emitters) ? rule.emitters.length : 0);
   if (n < 2) return null;
@@ -525,7 +530,7 @@ export function sharedShotMode(rule, emitterCount = 0) {
   return null;
 }
 
-const isArmSite = (p) => /arm|hand|claw|fist/.test(String(p?.site ?? p?.role ?? p?.id ?? ""));
+const isArmSite = (p: ShotPoint & { site?: string; role?: string; id?: string; }) => /arm|hand|claw|fist/.test(String(p?.site ?? p?.role ?? p?.id ?? ""));
 
 /**
  * R3 in one function. `points` are the emitters' positions at the RELEASE pose (model space; the solver
@@ -548,10 +553,10 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
   const gap = (rule.combinedGap ?? SHARED_SHOT.combinedGap) * H;
   const sep = (rule.minSeparation ?? SHARED_SHOT.minSeparation) * H;
   const span = emitterSpan(pts);
-  const centred = (list) => {
+  const centred = (list: ShotPoint[]) => {
     if (!list.length) return { x: 0, y: 0, z: 0 };
-    const s = list.reduce((a, p) => [a[0] + p.x, a[1] + p.y, a[2] + p.z], [0, 0, 0]);
-    return { x: s[0] / list.length, y: s[1] / list.length, z: s[2] / list.length };
+    const s = list.reduce((a: number[], p) => [a[0]! + p.x, a[1]! + p.y, a[2]! + p.z], [0, 0, 0]);
+    return { x: s[0]! / list.length, y: s[1]! / list.length, z: s[2]! / list.length };
   };
   if (pts.length < 2 || !mode) {
     return {
@@ -577,7 +582,7 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
       const along = pts.map((p) => (p.x - c.x) * ax[0]! + (p.y - c.y) * ax[1]! + (p.z - c.z) * ax[2]!);
       const lead = Math.max(...along);
       out = pts.map((p, i) => {
-        const back = lead - along[i];
+        const back = lead - along[i]!;
         const slide = back > gap ? back - gap : 0;
         return { ...p, x: p.x + ax[0]! * slide, y: p.y + ax[1]! * slide, z: p.z + ax[2]! * slide };
       });
@@ -600,9 +605,9 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
   const used = new Array(pts.length).fill(false);
   const target = off.slice();
   // the middle of an odd group stays on the line; the rest pair most-positive with most-negative
-  let order = pts.map((_, i) => i).sort((i, j) => off[j] - off[i]);
+  let order = pts.map((_, i) => i).sort((i, j) => off[j]! - off[i]!);
   if (pts.length % 2 === 1) {
-    const mid = order.reduce((best, i) => (Math.abs(off[i]) < Math.abs(off[best]) ? i : best), order[0]);
+    const mid = order.reduce((best, i) => (Math.abs(off[i]!) < Math.abs(off[best]!) ? i : best), order[0]!);
     used[mid] = true;
     target[mid] = 0;
   }
@@ -612,19 +617,19 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
     let j = -1, bestScore = Infinity;
     for (const q of order) {
       if (used[q]) continue;
-      const score = off[i] + off[q];          // most opposite first
+      const score = off[i]! + off[q]!;          // most opposite first
       if (score < bestScore) { bestScore = score; j = q; }
     }
     if (j < 0) { target[i] = 0; continue; }
     used[j] = true;
-    let half = Math.abs(off[i] - off[j]) / 2;
+    let half = Math.abs(off[i]! - off[j]!) / 2;
     if (half < sep / 2) half = sep / 2;      // two shots closer than a hand block draw as one
-    const sign = off[i] >= off[j] ? 1 : -1;
+    const sign = off[i]! >= off[j]! ? 1 : -1;
     target[i] = sign * half;
     target[j] = -sign * half;
   }
   const out = pts.map((p, i) => {
-    const slide = target[i] - off[i];
+    const slide = target[i]! - off[i]!;
     return { ...p, x: p.x + sideways[0]! * slide, y: p.y + sideways[1]! * slide, z: p.z + sideways[2]! * slide };
   });
   return {
@@ -635,9 +640,9 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
 }
 
 /** The horizontal axis square to the aim: cross(aim, up), with the model frame's up = -Y. */
-function lateralAxis(aim) {
+function lateralAxis(aim: number[]) {
   const up = [0, -1, 0];
-  let v = [aim[1] * up[2]! - aim[2] * up[1]!, aim[2] * up[0]! - aim[0] * up[2]!, aim[0] * up[1]! - aim[1] * up[0]!];
+  let v = [aim[1]! * up[2]! - aim[2]! * up[1]!, aim[2]! * up[0]! - aim[0]! * up[2]!, aim[0]! * up[1]! - aim[1]! * up[0]!];
   let l = Math.hypot(...v);
   if (l < 1e-6) { v = [1, 0, 0]; l = 1; }
   return [v[0]! / l, v[1]! / l, v[2]! / l];

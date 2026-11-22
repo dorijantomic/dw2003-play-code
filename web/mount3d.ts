@@ -294,7 +294,7 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
     for (const p of mesh.prims) {
       if (!p.pos.length) continue;
       for (let i = 0; i < p.pos.length; i += 3) for (let c = 0; c < 3; c++) {
-        const v: number = p.pos[i + c];
+        const v: number = p.pos[i + c]!;
         if (v < min[c]!) min[c] = v;
         if (v > max[c]!) max[c] = v;
       }
@@ -376,7 +376,7 @@ export function composeTRS(t: Vec3F, r: QuatF, s: Vec3F, out: Float32Array = new
 export function mat4Mul(a: Float32Array, b: Float32Array, out: Float32Array = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
-    for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]!;
+    for (let k = 0; k < 4; k++) s += a[k * 4 + r]! * b[c * 4 + k]!;
     out[c * 4 + r] = s;
   }
   return out;
@@ -389,7 +389,7 @@ export function updateWorld(pose: MountPose): Float32Array {
     composeTRS(pose.t.subarray(i * 3, i * 3 + 3) as Vec3F, pose.r.subarray(i * 4, i * 4 + 4) as QuatF, pose.s.subarray(i * 3, i * 3 + 3) as Vec3F, local);
     const out = pose.world.subarray(i * 16, i * 16 + 16);
     if (parent) mat4Mul(parent, local, out); else out.set(local);
-    for (const c of pose.model.nodes[i].children || []) walk(c, out);
+    for (const c of pose.model.nodes[i]!.children || []) walk(c, out);
   };
   for (const r of pose.model.roots) walk(r, null);
   return pose.world;
@@ -412,7 +412,7 @@ function applyChannel(pose: MountPose, ch: DwChannel, time: number) {
   if (!n) return;
   const dst = ch.path === "rotation" ? pose.r : ch.path === "translation" ? pose.t : pose.s;
   const off = ch.node * comps;
-  const put = (i: number) => { for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c]; };
+  const put = (i: number) => { for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c]!; };
   // ETS item 9: n = times.length is above 0 here, and lo, mid and hi stay inside 0..n-1
   if (n === 1 || time <= times[0]!) return put(0);
   if (time >= times[n - 1]!) return put(n - 1);
@@ -420,15 +420,15 @@ function applyChannel(pose: MountPose, ch: DwChannel, time: number) {
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= time) lo = mid; else hi = mid; }
   if (ch.interp === "STEP") return put(lo);
   const a = times[hi]! > times[lo]! ? (time - times[lo]!) / (times[hi]! - times[lo]!) : 0;
-  for (let c = 0; c < comps; c++) dst[off + c] = values[lo * comps + c] + (values[hi * comps + c] - values[lo * comps + c]) * a;
+  for (let c = 0; c < comps; c++) dst[off + c] = values[lo * comps + c]! + (values[hi * comps + c]! - values[lo * comps + c]!) * a;
   if (ch.path === "rotation") {                                  // shortest-arc nlerp, then normalise
     let d = 0;
-    for (let c = 0; c < 4; c++) d += values[lo * 4 + c] * values[hi * 4 + c];
-    if (d < 0) for (let c = 0; c < 4; c++) dst[off + c] = values[lo * 4 + c] - (values[lo * 4 + c] + values[hi * 4 + c]) * a;
+    for (let c = 0; c < 4; c++) d += values[lo * 4 + c]! * values[hi * 4 + c]!;
+    if (d < 0) for (let c = 0; c < 4; c++) dst[off + c] = values[lo * 4 + c]! - (values[lo * 4 + c]! + values[hi * 4 + c]!) * a;
     let len = 0;
-    for (let c = 0; c < 4; c++) len += dst[off + c] * dst[off + c];
+    for (let c = 0; c < 4; c++) len += dst[off + c]! * dst[off + c]!;
     len = Math.sqrt(len) || 1;
-    for (let c = 0; c < 4; c++) dst[off + c] /= len;
+    for (let c = 0; c < 4; c++) dst[off + c]! /= len;
   }
 }
 
@@ -451,7 +451,7 @@ export function poseBounds(model: PoseBoundsModel, pose: MountPose, out: PoseBou
     // ETS item 9: the box loop at the end of parseDw2Gltf gave every mesh its min and max
     for (let c = 0; c < 8; c++) {
       const p = point(m, c & 1 ? mesh.max![0] : mesh.min![0], c & 2 ? mesh.max![1] : mesh.min![1], c & 4 ? mesh.max![2] : mesh.min![2]);
-      for (let k = 0; k < 3; k++) { if (p[k] < min[k]!) min[k] = p[k]; if (p[k] > max[k]!) max[k] = p[k]; }
+      for (let k = 0; k < 3; k++) { if (p[k]! < min[k]!) min[k] = p[k]!; if (p[k]! > max[k]!) max[k] = p[k]!; }
     }
   });
   if (!min.every(Number.isFinite)) { min.fill(0); max.fill(0); }
@@ -483,8 +483,8 @@ export function measureRig(model: Dw2Model): MeasuredRig {
   const joints = (model.json.skins?.[0]?.joints || nodes.map((_, i) => i)).filter((i) => nodes[i]?.mesh == null);
   const jointSet = new Set(joints);
   // the body root: the joint with the most descendants
-  const countChildren = (i: number): number => (nodes[i].children || []).reduce((s, c) => s + 1 + countChildren(c), 0);
-  let body: number = joints[0], best = -1;
+  const countChildren = (i: number): number => (nodes[i]!.children || []).reduce((s, c) => s + 1 + countChildren(c), 0);
+  let body: number = joints[0]!, best = -1;
   for (const j of joints) { const d = countChildren(j); if (d > best) { best = d; body = j; } }
   // leg chains: from every root's children, walk to the chain end. A LEG is a chain of >= 3 joints whose
   // end hangs in the lower half of the model (the DW2 rigs also hang a 1-2 joint tail and armour pieces off
@@ -492,15 +492,15 @@ export function measureRig(model: Dw2Model): MeasuredRig {
   const legs: LegChain[] = [];
   const walk = (i: number, chain: number[]): void => {
     chain.push(i);
-    const kids = (nodes[i].children || []).filter((c) => jointSet.has(c));
+    const kids = (nodes[i]!.children || []).filter((c) => jointSet.has(c));
     if (!kids.length) return;
     for (const k of kids) walk(k, chain);
   };
   for (const root of model.roots) {
-    for (const c of (nodes[root].children || []).filter((x) => jointSet.has(x))) {
+    for (const c of (nodes[root]!.children || []).filter((x) => jointSet.has(x))) {
       const chain: number[] = [];
       walk(c, chain);
-      legs.push({ chain, end: chain[chain.length - 1], top: chain[0], root });
+      legs.push({ chain, end: chain[chain.length - 1]!, top: chain[0]!, root });
     }
   }
   const legsBelow = legs.filter((L) => L.chain.length >= 3
@@ -512,8 +512,8 @@ export function measureRig(model: Dw2Model): MeasuredRig {
   let head = -1, headY = -Infinity;
   for (const j of joints) {
     if (legNodes.has(j) || j === body) continue;
-    const y = bind.world[j * 16 + 13];
-    if (y! > headY) { headY = y; head = j; }
+    const y = bind.world[j * 16 + 13]!;
+    if (y > headY) { headY = y; head = j; }
   }
   // forward: from the body's centroid toward the head, on the horizontal plane, as the dominant axis
   let fwd: Vec3 = [0, 0, 0];
@@ -548,7 +548,7 @@ export function calibrateGait(model: Dw2Model, rig: MeasuredRig, swingDeg = 14):
   const bind = rig.bind;
   const legs = rig.legs.map((L) => {
     const hip = L.hip;
-    const parent: number = model.parents[hip];
+    const parent: number = model.parents[hip]!;
     // world rotation of the hip's parent, inverted, so a model-space axis can be expressed in parent space
     // ETS item 9: subarray(parent * 16, parent * 16 + 16) of the world array holds exactly the 16 elements of one matrix
     const pw = parent >= 0 ? bind.world.subarray(parent * 16, parent * 16 + 16) as Mat4F : null;
@@ -559,8 +559,8 @@ export function calibrateGait(model: Dw2Model, rig: MeasuredRig, swingDeg = 14):
       rotateJoint(probe, hip, local, (swingDeg * Math.PI) / 180);
       updateWorld(probe);
       const d = [
-        probe.world[L.end * 16 + 12]! - bind.world[L.end * 16 + 12],
-        probe.world[L.end * 16 + 14]! - bind.world[L.end * 16 + 14],
+        probe.world[L.end * 16 + 12]! - bind.world[L.end * 16 + 12]!,
+        probe.world[L.end * 16 + 14]! - bind.world[L.end * 16 + 14]!,
       ];
       const along = rig.forwardAxis === "x" ? d[0]! * rig.forward[0] : d[1]! * rig.forward[2];
       axes.push({ axis: local, along });
@@ -617,14 +617,14 @@ export function applyGait(pose: MountPose, rig: GaitRig, legs: GaitLeg[], phase:
     const angle = Math.sin(p * Math.PI * 2) * swing * L.sign;
     rotateJoint(pose, L.hip, L.axis, angle);
     if (L.chain && L.chain.length >= 2) {
-      const knee = L.chain[L.chain.length - 2];
+      const knee = L.chain[L.chain.length - 2]!;
       // the knee bends while the foot is off the ground (the second half of the leg's cycle)
       const bend = Math.max(0, Math.sin(p * Math.PI * 2 + Math.PI)) * lift;
       rotateJoint(pose, knee, L.axis, bend * L.sign * 0.5);
     }
   });
   const bodyBob = Math.sin(phase * Math.PI * 4) * bob * rig.height;
-  pose.t[rig.body * 3 + 1] += bodyBob;
+  pose.t[rig.body * 3 + 1]! += bodyBob;
   updateWorld(pose);
   return pose;
 }
@@ -636,7 +636,7 @@ export function gaitFootfalls(model: Dw2Model, rig: GaitRig, legs: (GaitLeg & Ri
     const pose = bindPose(model);
     applyGait(pose, rig, legs, i / steps);
     out.push(legs.map((L) => [
-      pose.world[L.end * 16 + 12], pose.world[L.end * 16 + 13], pose.world[L.end * 16 + 14],
+      pose.world[L.end * 16 + 12]!, pose.world[L.end * 16 + 13]!, pose.world[L.end * 16 + 14]!,
     ]));
   }
   return out;
@@ -656,7 +656,7 @@ export function clipWalkStats(model: Dw2Model, clipIndex: number, rig: MeasuredR
   const P: Vec3[][] = [];
   for (let t = 0; t <= nticks; t++) {
     const pose = sampleClipPose(model, clipIndex, t / fps);
-    P.push(rig!.legs.map((L) => [pose.world[L.end * 16 + 12], pose.world[L.end * 16 + 13], pose.world[L.end * 16 + 14]]));
+    P.push(rig!.legs.map((L) => [pose.world[L.end * 16 + 12]!, pose.world[L.end * 16 + 13]!, pose.world[L.end * 16 + 14]!]));
   }
   const H = rig!.height || 1;
   if (rig!.legs.length < 2) {
@@ -664,18 +664,18 @@ export function clipWalkStats(model: Dw2Model, clipIndex: number, rig: MeasuredR
       bodyTravel: 0, feet: rig!.legs.length, usableFeet: 0, alternation: 0, walk: false,
       why: "no measured leg chains" };
   }
-  const bodyTravel = Math.max(...P.map((f, t) => Math.abs(f[0][0] - P[0][0][0])
-    + Math.abs(f[0][2] - P[0][0][2])));
+  const bodyTravel = Math.max(...P.map((f, t) => Math.abs(f[0]![0]! - P[0]![0]![0]!)
+    + Math.abs(f[0]![2]! - P[0]![0]![2]!)));
   let loopErr = 0;
   for (let i = 0; i < rig!.legs.length; i++) {
     loopErr = Math.max(loopErr, Math.hypot(
-      P[P.length - 1][i][0] - P[0][i][0], P[P.length - 1][i][1] - P[0][i][1], P[P.length - 1][i][2] - P[0][i][2]));
+      P[P.length - 1]![i]![0]! - P[0]![i]![0]!, P[P.length - 1]![i]![1]! - P[0]![i]![1]!, P[P.length - 1]![i]![2]! - P[0]![i]![2]!));
   }
   const feet = rig!.legs.map((L, fi) => {
-    const ys = P.map((f) => f[fi][1]);
+    const ys = P.map((f) => f[fi]![1]!);
     const yMin = Math.min(...ys), lift = Math.max(...ys) - yMin;
-    const zs = P.map((f) => f[fi][rig!.forwardAxis === "x" ? 0 : 2]);
-    const vs = zs.map((z, t) => (t ? z - zs[t - 1] : 0));
+    const zs = P.map((f) => f[fi]![rig!.forwardAxis === "x" ? 0 : 2]!);
+    const vs = zs.map((z, t) => (t ? z - zs[t - 1]! : 0));
     const vMax = Math.max(...vs.map(Math.abs), 1e-9);
     const low = ys.map((y) => y <= yMin + Math.max(0.06 * lift, 1e-6));
     const planted = low.map((l, t) => l && Math.abs(vs[t]!) <= 0.3 * vMax);
@@ -690,7 +690,7 @@ export function clipWalkStats(model: Dw2Model, clipIndex: number, rig: MeasuredR
   if (usable.length >= 2) {
     const [A, B] = usable.sort((a, c) => c.runs - a.runs || c.duty - a.duty);
     let only = 0;
-    for (let t = 0; t < P.length; t++) if (A.planted[t] !== B.planted[t]) only++;
+    for (let t = 0; t < P.length; t++) if (A!.planted[t] !== B!.planted[t]) only++;
     alternation = only / P.length;
   }
   const inPlace = bodyTravel <= 0.06 * H;
@@ -833,7 +833,7 @@ async function loadMountAssetOnce(key: string, url: string): Promise<MountAsset 
       obj.matrixAutoUpdate = false;
       obj.__node = node;
       boneGroups.set(node, obj);
-      const parent: number = model.parents[node];
+      const parent: number = model.parents[node]!;
       (parent >= 0 ? groupOf(parent) : group).add(obj);
       return obj;
     };
@@ -878,7 +878,7 @@ function standFloor(asset: MountAsset, walk: Walk | null) {
   asset._floor ??= {};
   if (!(walk.idle in asset._floor)) {
     const i = asset.model.anims.findIndex((a) => a.name === walk.idle);
-    asset._floor[walk.idle] = i >= 0 ? poseBounds(asset.model, sampleClipPose(asset.model, i, 0)).min![1] : null;
+    asset._floor[walk.idle] = i >= 0 ? poseBounds(asset.model, sampleClipPose(asset.model, i, 0)).min![1]! : null;
   }
   return asset._floor[walk.idle];
 }
@@ -894,13 +894,13 @@ export function renderMount(asset: MountAsset | null, { x, y, dir = "down", phas
   let pose: MountPose;
   const stillIndex = still ? model.anims.findIndex((a) => a.name === still.clip) : -1;
   // a held frame of one of the model's own clips (`still.at` 0..1, 1 = the clip's last frame): a pose, not a motion
-  if (stillIndex >= 0) pose = sampleClipPose(model, stillIndex, (still!.at ?? 1) * model.anims[stillIndex].dur);
+  if (stillIndex >= 0) pose = sampleClipPose(model, stillIndex, (still!.at ?? 1) * model.anims[stillIndex]!.dur);
   else if (moving && clip) pose = sampleClipPose(model, clipIndex, (phase % 1) * clip.dur);
   else if (moving) pose = applyGait(bindPose(model), rig, legs, phase % 1);
   else if (walk?.idle && model.anims.some((a) => a.name === walk.idle)) {
     // standing: the model's own idle clip, looped
     const ii = model.anims.findIndex((a) => a.name === walk.idle);
-    pose = sampleClipPose(model, ii, timeSec % model.anims[ii].dur);
+    pose = sampleClipPose(model, ii, timeSec % model.anims[ii]!.dur);
   } else {
     // standing: the bind pose, with a slow breath in the body root
     pose = bindPose(model);
@@ -910,9 +910,9 @@ export function renderMount(asset: MountAsset | null, { x, y, dir = "down", phas
   // push the pose into the three hierarchy: each bone group takes its LOCAL TRS, three composes the tree
   for (const [node, obj] of boneObjects(asset)) {
     const o = node * 3, q = node * 4;
-    _t.set(pose.t[o], pose.t[o + 1], pose.t[o + 2]);
-    _q.set(pose.r[q], pose.r[q + 1], pose.r[q + 2], pose.r[q + 3]);
-    _s.set(pose.s[o], pose.s[o + 1], pose.s[o + 2]);
+    _t.set(pose.t[o]!, pose.t[o + 1]!, pose.t[o + 2]!);
+    _q.set(pose.r[q]!, pose.r[q + 1]!, pose.r[q + 2]!, pose.r[q + 3]!);
+    _s.set(pose.s[o]!, pose.s[o + 1]!, pose.s[o + 2]!);
     obj.matrix.compose(_t, _q, _s);
     obj.matrixWorldNeedsUpdate = true;
   }
@@ -930,7 +930,7 @@ export function renderMount(asset: MountAsset | null, { x, y, dir = "down", phas
   // a held frame (lying down) is grounded on its OWN lowest point; the scale stays the standing body's
   // a model with its own stand clip keeps that clip's floor (DW2 field models: hooves at y 0 in anim_E0, while the
   // bind pose reaches -369, which floated the mount ~12 px); one value per asset, so a gallop's leap still leaves it
-  const ground = stillIndex >= 0 ? poseBounds(model, pose).min![1] : standFloor(asset, walk) ?? b.min[1];
+  const ground = stillIndex >= 0 ? poseBounds(model, pose).min![1]! : standFloor(asset, walk) ?? b.min[1]!;
   group.position.set(x, -ground * scale, y / SIN);
   // the camera window: `x` centred, the ground row `y` near the bottom of the cell
   camera!.left = x - MOUNT_VIEW.w / 2;
@@ -967,8 +967,8 @@ function splitAtSeat(asset: MountAsset, pix: HTMLCanvasElement, seat: Seat) {
   asset.group.updateMatrixWorld(true);
   _seat.set(seat.at[0], seat.at[1], seat.at[2]);
   obj.localToWorld(_seat);
-  camera.updateMatrixWorld(true);
-  camera.getWorldDirection(_view);                  // unit, from the camera into the scene
+  camera!.updateMatrixWorld(true);
+  camera!.getWorldDirection(_view);                  // unit, from the camera into the scene
   // The rider is an UPRIGHT figure, so his plane is vertical: only the view's ground direction counts. A plane
   // facing the 50 deg camera leans back instead, and every high part (Unimon's head, facing up) came out "nearer"
   // than the rider's head: sin50 * height above the saddle beat cos50 * distance behind him.
@@ -977,15 +977,15 @@ function splitAtSeat(asset: MountAsset, pix: HTMLCanvasElement, seat: Seat) {
   // keep dot(p - R, view) < 0 (nearer than R): the cut keeps dot(-view, p) + dot(view, R) >= 0
   const cut = asset.material.uniforms.uCut.value;
   cut.set(-_view.x, -_view.y, -_view.z, _view.dot(_seat));
-  renderer.render(scene, camera);
+  renderer!.render(scene!, camera!);
   cut.set(0, 0, 0, 1);
   const rd = splitCanvases.read;
   if (rd.width !== w || rd.height !== h) { rd.width = w; rd.height = h; }
   const rc = rd.getContext("2d", { willReadFrequently: true });
   rc!.clearRect(0, 0, w, h);
-  rc!.drawImage(renderer.domElement, 0, 0);
+  rc!.drawImage(renderer!.domElement, 0, 0);
   const near = rc!.getImageData(0, 0, w, h).data;
-  const src = pix.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h);
+  const src = pix.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, w, h);
   const s = src.data;
   const isNear = (p: number) => near[p * 4 + 3]! >= 40;     // the same solid test as pixelate()
   const front = new ImageData(w, h), back = new ImageData(w, h);
@@ -996,14 +996,14 @@ function splitAtSeat(asset: MountAsset, pix: HTMLCanvasElement, seat: Seat) {
     const f = lastSolid?.[p] ? isNear(p)
       : (x > 0 && isNear(p - 1)) || (x < w - 1 && isNear(p + 1)) || (y > 0 && isNear(p - w)) || (y < h - 1 && isNear(p + w));
     const d = f ? front.data : back.data;
-    d[i] = s[i]; d[i + 1] = s[i + 1]; d[i + 2] = s[i + 2]; d[i + 3] = s[i + 3];
+    d[i] = s[i]!; d[i + 1] = s[i + 1]!; d[i + 2] = s[i + 2]!; d[i + 3] = s[i + 3]!;
   }
   for (const [k, img] of [["front", front], ["back", back]] satisfies ["front" | "back", ImageData][]) {
     const c = splitCanvases[k];
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    c.getContext("2d", { willReadFrequently: true }).putImageData(img, 0, 0);
+    c.getContext("2d", { willReadFrequently: true })!.putImageData(img, 0, 0);
   }
-  const ndc = _seat.clone().project(camera);
+  const ndc = _seat.clone().project(camera!);
   return { back: splitCanvases.back, front: splitCanvases.front, seatX: ((ndc.x + 1) / 2) * w, seatY: ((1 - ndc.y) / 2) * h };
 }
 
@@ -1130,7 +1130,7 @@ export function pixelate(srcCanvas: HTMLCanvasElement) {
   for (let i = 0, p = 0; p < w * h; p++, i += 4) {
     if (d[i + 3]! < 40) { d[i + 3] = 0; continue; }
     solid[p] = 1;
-    const [r, g, b] = nearestPalette(d[i], d[i + 1], d[i + 2]);
+    const [r, g, b] = nearestPalette(d[i]!, d[i + 1]!, d[i + 2]!);
     d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
   }
   // outline: any empty pixel that touches a solid one becomes the outline colour
@@ -1150,23 +1150,23 @@ export function pixelate(srcCanvas: HTMLCanvasElement) {
 }
 
 /** The palette index nearest to an RGB triple (Euclidean in RGB; the palette is small and spread out). */
-export function nearestPalette(r: number | undefined, g: number | undefined, b: number | undefined) {
+export function nearestPalette(r: number, g: number, b: number) {
   let best = 0, bestD = Infinity;
   for (let i = 0; i < PALETTE.length; i++) {
     const p = PALETTE[i];
-    const dr = r! - p![0]!, dg = g! - p![1]!, db = b! - p![2]!;
+    const dr = r - p![0]!, dg = g - p![1]!, db = b - p![2]!;
     const dd = dr * dr + dg * dg + db * db;
     if (dd < bestD) { bestD = dd; best = i; }
   }
-  return PALETTE[best];
+  return PALETTE[best]!;
 }
 
 /** How many model pixels are on screen (tests/verify use the number, never a picture). */
 export function solidPixelCount(canvas: HTMLCanvasElement | null) {
   if (!canvas || !canvas.getContext) return 0;
   const c2 = canvas.getContext("2d", { willReadFrequently: true });
-  const d = c2.getImageData(0, 0, canvas.width, canvas.height).data;
+  const d = c2!.getImageData(0, 0, canvas.width, canvas.height).data;
   let n = 0;
-  for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+  for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
   return n;
 }

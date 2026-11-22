@@ -10,55 +10,7 @@
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
-import type { AmbienceSettings } from "./types/ambience.js";
-interface SceneryDimensions { DW: number; DH: number; DWB: number; DHB: number; }
-
-interface SceneryFx { indoor?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; sparkle?: boolean; lightning?: boolean; rain?: boolean; }
-
-interface SceneryPrefs { indoorLit?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; fogK?: number; seed: number; night?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; snowy?: boolean; }
-
-interface SceneryLevels { rain: number; blizzard: number; sand: number; }
-
-interface SceneryState { map: { id: number | string }; fx: SceneryFx; p: SceneryPrefs; L: SceneryLevels; t: number; dt: number; fade: number; camX: number; camY: number; Q: number; now: number; wrapX: (v: number, cam: number) => number; wrapY: (v: number, cam: number) => number; wrapXB: (v: number, cam: number) => number; wrapYB: (v: number, cam: number) => number; wrapRange: (x: number, span: number, margin: number) => number; onThunder: (delayMs: number) => void; }
-
-interface GroundGrid {
-    cell: number;
-    cols: number;
-    rows: number;
-    cells: number[];
-}
-
-interface GroundFoot {
-    id: string;
-    x: number;
-    y: number;
-    moving?: boolean;
-    leader?: boolean;
-}
-
-interface GroundSceneryState {
-    map: { id: number | string };
-    fx: { puddles?: boolean; steps?: boolean };
-    p: { rainy?: boolean; snowy?: boolean; sandy?: boolean };
-    L: { rain: number };
-    t: number;
-    dt?: number;
-    camX: number;
-    camY: number;
-    now: number;
-    feet?: GroundFoot[];
-    grid: () => GroundGrid | null | undefined;
-    isWater: (x: number, y: number) => boolean;
-    onStep: (type: string, volume: number) => void;
-    DW?: number;
-    DH?: number;
-    DWB?: number;
-    DHB?: number;
-    wrapX?: (x: number, cam: number) => number;
-    wrapY?: (y: number, cam: number) => number;
-    wrapXB?: (x: number, cam: number) => number;
-    wrapYB?: (y: number, cam: number) => number;
-}
+import type { SceneryBolt, SceneryDimensions, SceneryDrop, SceneryEnt, SceneryFlock, SceneryFx, SceneryGrid, SceneryMapState, SceneryProfile, SceneryPuddle, SceneryPuff, SceneryReveal, SceneryRgb, SceneryRipple, SceneryScene, SceneryStep, SceneryTodKey } from "./types/scenery.js";
 
 const VIEW_H = 240;
 
@@ -74,17 +26,18 @@ const isWaterPx = (r: number, g: number, b: number) => b >= 62 && b > r + 28 && 
 
 // ------------------------------------------------------------- time of day
 // Keyframes over one cycle: [phase, rgb]. Drawn as a multiply layer, so white = no change.
-const TOD: [number, number[]][] = [
+const TOD: SceneryTodKey[] = [
     [0.00, [255, 255, 255]], [0.38, [255, 255, 255]], [0.52, [255, 196, 128]],
     [0.64, [255, 150, 86]], [0.77, [150, 132, 196]], [0.89, [255, 196, 148]], [1.00, [255, 255, 255]],
 ];
 const TOD_SECONDS = 240;
-export function todColor(phase: number) {
+export function todColor(phase: number): SceneryRgb {
     for (let i = 1; i < TOD.length; i++) {
         if (phase <= TOD[i]![0]) {
-            const [p0, c0] = TOD[i - 1], [p1, c1] = TOD[i];
+            const [p0, c0] = TOD[i - 1]!, [p1, c1] = TOD[i]!;
             const k = smooth((phase - p0) / (p1 - p0));
-            return c0.map((v: number, j: string | number) => Math.round(v + (c1[j] - v) * k));
+            // ETS item 40: Array.map loses the three-number tuple; both keys always hold exactly three numbers.
+            return c0.map((v: number, j: number) => Math.round(v + (c1[j]! - v) * k)) as SceneryRgb;
         }
     }
     return [255, 255, 255];
@@ -95,13 +48,14 @@ export const todPhaseNow = () => (typeof window.__todForce === "number" ? window
 export function cueBolt(now = performance.now()) { bolt = { t0: now }; }
 
 // --------------------------------------------------------------- per-map state
-let sc = null;               // state of the map being shown
+// ETS item 9: sc is empty until resetScenery() runs; drawScenery() and groundScenery() return on `!sc` first, and the helpers they call only run after that.
+let sc: SceneryMapState = null!;               // state of the map being shown
 let tmp: HTMLCanvasElement | null = null;              // scratch canvas for the heat shimmer
-let flock = null, nextFlock = 0;
-let nextBolt = 0, bolt = null;
+let flock: SceneryFlock | null = null, nextFlock = 0;
+let nextBolt = 0, bolt: SceneryBolt | null = null;
 let wet = 0;                 // how soaked the ground is, 0..1
 let todLight = 1;            // 1 in daylight, lower toward dusk
-let steps = [], puffs = [], ripples = [];
+let steps: SceneryStep[] = [], puffs: SceneryPuff[] = [], ripples: SceneryRipple[] = [];
 let lastStep = null, nextPuff = 0, stepSide = 1;
 
 export function resetScenery(map: { id: number | string }, p: { seed: number; }, S: SceneryDimensions) {
@@ -124,35 +78,35 @@ export function resetScenery(map: { id: number | string }, p: { seed: number; },
 
 // positions that need a pixel look-up (butterflies, sparkles, puddles) are built
 // the first frame the map's pixels are readable
-function scatter(S, count: number, test: (R: number, G: number, B: number, x: number, y: number) => boolean, tries = 80) {
+function scatter(S: SceneryScene, count: number, test: (R: number, G: number, B: number, x: number, y: number) => boolean, tries = 80) {
     const px = S.pix();
     if (!px) return [];
-    const out = [];
-    const r = sc.rand;
+    const out: [number, number][] = [];
+    const r = sc.rand!;
     for (let n = 0; out.length < count && n < count * tries; n++) {
         const x = r() * px.w, y = r() * px.h, o = ((y | 0) * px.w + (x | 0)) * 4;
-        if (px.data[o + 3] < 128) continue;
-        if (test(px.data[o], px.data[o + 1], px.data[o + 2], x, y)) out.push([x, y]);
+        if (px.data[o + 3]! < 128) continue;
+        if (test(px.data[o]!, px.data[o + 1]!, px.data[o + 2]!, x, y)) out.push([x, y]);
     }
     return out;
 }
-function build(S) {
+function build(S: SceneryScene) {
     const { p, fx } = S;
     if (!S.pix()) return;
     sc.built = true;
-    const r = sc.rand;
+    const r = sc.rand!;
     sc.flies = p.butterflies
         ? scatter(S, 26, (R: number, G: number, B: number) => isGrassPx(R, G, B)).map(([x, y]) => ({
             x, y, ax: 25 + r() * 45, ay: 14 + r() * 26, fx: 0.25 + r() * 0.35, fy: 0.3 + r() * 0.4, ph: r() * 6.28,
-            col: ["#ff9a3c", "#fff2c2", "#6fb7ff", "#ffd23f", "#f78fb3"][(r() * 5) | 0],
+            col: ["#ff9a3c", "#fff2c2", "#6fb7ff", "#ffd23f", "#f78fb3"][(r() * 5) | 0]!,
         })) : [];
     sc.sparkles = p.snowy
         ? scatter(S, 340, (R: number, G: number, B: number) => R > 170 && G > 195 && B > 210).map(([x, y]) => ({ x, y, ph: r(), sp: 0.25 + r() * 0.5 })) : [];
     sc.puddlesDone = false; sc.iceDone = false;
 }
-function buildPuddles(S: GroundSceneryState, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
+function buildPuddles(S: SceneryScene, grid: SceneryGrid) {
     sc.puddlesDone = true;
-    const r = sc.rand;
+    const r = sc.rand!;
     const walk = (x: number, y: number) => {
         const c = (x / grid.cell) | 0, rr = (y / grid.cell) | 0;
         return c >= 0 && rr >= 0 && c < grid.cols && rr < grid.rows && grid.cells[rr * grid.cols + c] === 0;
@@ -165,34 +119,34 @@ function buildPuddles(S: GroundSceneryState, grid: { cell: number; cols: number;
 // Called with the game's 2D context (view units, clipped to the view).
 // Lights register here: they get the untinted frame so they can put the real colours back around
 // themselves (a lamp lights the wall, instead of adding white on top of the night tint).
-let revealer = null;
-export const setReveal = (r) => { revealer = r; };
+let revealer: SceneryReveal | null = null;
+export const setReveal = (r: SceneryReveal) => { revealer = r; };
 let snapC: HTMLCanvasElement | null = null;
 function takeSnap(ctx: CanvasRenderingContext2D): HTMLCanvasElement {
     const cv = ctx.canvas;
     if (!snapC || snapC.width !== cv.width || snapC.height !== cv.height) { snapC = document.createElement("canvas"); snapC.width = cv.width; snapC.height = cv.height; }
-    const g: CanvasRenderingContext2D = snapC.getContext("2d");
+    const g = snapC.getContext("2d")!;
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "copy"; g.drawImage(cv, 0, 0);
     return snapC;
 }
 
 // Indoors and underground there is no sky to dim, but the stage has its own lights: a gentle cool
 // dim stands in for the night so they can show, with the same reveal that restores true colours.
-function drawIndoorMood(ctx: CanvasRenderingContext2D, S) {
+function drawIndoorMood(ctx: CanvasRenderingContext2D, S: SceneryScene) {
     const { fade } = S;
     const snap = revealer && revealer.wants(S) ? takeSnap(ctx) : null;
     ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = fade;
     // full mood in a dark room, fading to nothing as the room gets brighter (see indoorK in ambience.js)
-    const d = 1 - 0.33 * S.p.indoorK, c = (v: number) => Math.round(255 * Math.max(0, Math.min(1, v)));
+    const d = 1 - 0.33 * S.p.indoorK!, c = (v: number) => Math.round(255 * Math.max(0, Math.min(1, v)));
     ctx.fillStyle = `rgb(${c(d + 0.005)},${c(d - 0.011)},${c(d + 0.09)})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     const vg = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.7);
-    vg.addColorStop(0, "rgba(14,10,36,0)"); vg.addColorStop(1, `rgba(14,10,36,${(0.35 * S.p.indoorK).toFixed(3)})`);
+    vg.addColorStop(0, "rgba(14,10,36,0)"); vg.addColorStop(1, `rgba(14,10,36,${(0.35 * S.p.indoorK!).toFixed(3)})`);
     ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = vg; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.globalAlpha = 1;
-    if (snap) revealer.draw(ctx, snap, S);
+    if (snap) revealer!.draw(ctx, snap, S);
 }
 
-export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
+export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryScene) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, fade, camX, camY, Q, now } = S;
     if (!sc.built) build(S);
@@ -216,7 +170,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
                 ctx.fillRect(0, 0, VIEW_W, VIEW_H);
             }
             ctx.globalCompositeOperation = "source-over";
-            if (snap) revealer.draw(ctx, snap, S);
+            if (snap) revealer!.draw(ctx, snap, S);
         }
     }
 
@@ -239,7 +193,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     if (fx.shafts && p.shafts && L.rain < 0.5) {
         const k = 0.42, vis = (1 - L.rain * 1.6) * fade * clamp01((todLight - 0.5) * 3);
         ctx.globalCompositeOperation = "lighter";
-        for (const s of sc.shafts) {
+        for (const s of sc.shafts!) {
             const base = S.wrapRange(s.u + k * camY - camX, VIEW_W + 160, 80);
             const a = s.a * (0.65 + 0.35 * Math.sin(t * 0.5 + s.ph)) * vis;
             const g = ctx.createLinearGradient(base - s.w / 2, 0, base + s.w / 2, 0);
@@ -266,7 +220,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     if (fx.fog && p.fog) {
         const dens = (0.55 + 0.45 * Math.sin(t / 31 + (p.seed % 7))) * fade * (0.5 + 0.5 * Q) * (p.fogK ?? 1);
         const col = p.night ? "150,172,218" : "208,224,214";
-        for (const b of sc.fog) {
+        for (const b of sc.fog!) {
             b.x += b.vx * dt; b.y += b.vy * dt;
             const bx = S.wrapXB(b.x, camX), by = S.wrapYB(b.y, camY);
             if (bx < -b.rad || bx > VIEW_W + b.rad || by < -b.rad || by > VIEW_H + b.rad) continue;
@@ -279,9 +233,9 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     // pollen and drifting seeds
     if (fx.pollen && p.pollen && L.rain < 0.3) {
         ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = "#fff6c8";
-        const n = Math.round(sc.pollen.length * Q);
-        for (let i = 0; i < sc.pollen.length; i++) {
-            const o = sc.pollen[i];
+        const n = Math.round(sc.pollen!.length * Q);
+        for (let i = 0; i < sc.pollen!.length; i++) {
+            const o = sc.pollen![i]!;
             o.x += (o.vx + Math.sin(t * 0.7 + o.ph) * 4) * dt; o.y += (o.vy + Math.cos(t * 0.5 + o.ph) * 3) * dt;
             if (i >= n) continue;
             const sx = S.wrapX(o.x, camX), sy = S.wrapY(o.y, camY);
@@ -296,7 +250,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     if (fx.butterflies && p.butterflies && sc.flies && L.rain < 0.25) {
         const n = Math.round(sc.flies.length * Q), vis = fade * (1 - L.rain * 3);
         for (let i = 0; i < n; i++) {
-            const f = sc.flies[i];
+            const f = sc.flies[i]!;
             const x = f.x + Math.sin(t * f.fx + f.ph) * f.ax + Math.sin(t * f.fx * 0.37 + f.ph * 2) * f.ax * 0.6 - camX;
             const y = f.y + Math.sin(t * f.fy + f.ph * 1.7) * f.ay + Math.cos(t * f.fy * 0.41) * f.ay * 0.5 - camY;
             if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
@@ -313,7 +267,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     // birds: an occasional small flock crosses the map high above, throwing shadows
     if (fx.birds && p.birds) {
         if (!flock && now >= nextFlock && L.rain < 0.2 && L.blizzard < 0.2 && L.sand < 0.2) {
-            const r = sc.rand, dir = r() < 0.5 ? 1 : -1, n = 3 + ((r() * 3) | 0), sp = 48 + r() * 30;
+            const r = sc.rand!, dir = r() < 0.5 ? 1 : -1, n = 3 + ((r() * 3) | 0), sp = 48 + r() * 30;
             const x0 = camX + (dir > 0 ? -50 : VIEW_W + 50), y0 = camY + 40 + r() * 150;
             flock = { dir, birds: Array.from({ length: n }, (_, i) => ({ x: x0 - dir * i * 15 - r() * 8, y: y0 + (i % 2 ? 1 : -1) * i * 7 + r() * 6, ph: r() * 6.28 })), sp, vy: (r() - 0.5) * 10, age: 0 };
         }
@@ -331,7 +285,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
                 ctx.globalAlpha = 0.85 * fade; ctx.strokeStyle = "#1c1b26"; ctx.lineWidth = 1.2; ctx.lineCap = "round";
                 ctx.beginPath(); ctx.moveTo(sx - 5, sy - flap); ctx.quadraticCurveTo(sx - 2, sy + 1, sx, sy); ctx.quadraticCurveTo(sx + 2, sy + 1, sx + 5, sy - flap); ctx.stroke();
             }
-            if (!any && flock.age > 3) { flock = null; nextFlock = now + 14000 + sc.rand() * 24000; }
+            if (!any && flock.age > 3) { flock = null; nextFlock = now + 14000 + sc.rand!() * 24000; }
         }
     }
 
@@ -356,8 +310,8 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
         if (window.__forceBolt) { window.__forceBolt = false; nextBolt = 0; }   // filming: strike on cue
         if (!bolt && now >= nextBolt) {
             bolt = { t0: now };
-            nextBolt = now + 7000 + sc.rand() * 14000;
-            S.onThunder(350 + sc.rand() * 1900);
+            nextBolt = now + 7000 + sc.rand!() * 14000;
+            S.onThunder(350 + sc.rand!() * 1900);
         }
     }
     if (bolt) {
@@ -375,10 +329,10 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
 // Drawn after the map and before every sprite: puddles, ice, footprints, dust,
 // splashes and ripples. Works for every body in view (leader, partners and NPCs):
 // S.feet is [{ id, x, y, moving, dir, leader }] gathered by game.js each frame.
-const ents = new Map();          // body id -> { last, side, nextPuff, nextFoot }
-let splashDrops = [];
+const ents = new Map<string, SceneryEnt>();          // body id -> { last, side, nextPuff, nextFoot }
+let splashDrops: SceneryDrop[] = [];
 
-function groundType(S, f: { y: number; x: number; }, puddle, inWater) {
+function groundType(S: SceneryScene, f: { y: number; x: number; }, puddle: SceneryPuddle | null, inWater: boolean) {
     if (inWater) return "water";
     if (puddle) return "puddle";
     const { p } = S;
@@ -386,7 +340,7 @@ function groundType(S, f: { y: number; x: number; }, puddle, inWater) {
     let r = 0, g = 0, b = 0;
     if (px) {
         const o = ((f.y | 0) * px.w + (f.x | 0)) * 4;
-        if (o >= 0 && o < px.data.length) { r = px.data[o]; g = px.data[o + 1]; b = px.data[o + 2]; }
+        if (o >= 0 && o < px.data.length) { r = px.data[o]!; g = px.data[o + 1]!; b = px.data[o + 2]!; }
     }
     if (p.snowy && r > 165 && g > 185 && b > 200) return "snow";
     if (p.sandy) return "sand";
@@ -397,9 +351,9 @@ function groundType(S, f: { y: number; x: number; }, puddle, inWater) {
     return "stone";
 }
 
-function buildIce(S: GroundSceneryState, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
+function buildIce(S: SceneryScene, grid: SceneryGrid) {
     sc.iceDone = true;
-    const r = sc.rand;
+    const r = sc.rand!;
     const walk = (x: number, y: number) => {
         const c = (x / grid.cell) | 0, rr = (y / grid.cell) | 0;
         return c >= 0 && rr >= 0 && c < grid.cols && rr < grid.rows && grid.cells[rr * grid.cols + c] === 0;
@@ -408,7 +362,7 @@ function buildIce(S: GroundSceneryState, grid: { cell: number; cols: number; row
         .map(([x, y]) => ({ x, y, rx: 8 + r() * 14, ph: r() * 6.28, rot: (r() - 0.5) * 0.4 }));
 }
 
-export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundSceneryState) {
+export function groundScenery(ctx: CanvasRenderingContext2D, S: SceneryScene) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, camX, camY, now } = S;
     if (!sc.built) build(S);
@@ -444,7 +398,7 @@ export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundScenerySta
         }
         if (f.moving && now >= e.nextFoot) {
             e.nextFoot = now + 300;
-            let hit = null;
+            let hit: SceneryPuddle | null = null;
             if (fx.puddles && wet > 0.3 && sc.puddles) for (const d of sc.puddles) if (Math.abs(d.x - f.x) < d.rx * 0.9 && Math.abs(d.y - f.y) < d.rx * 0.5) { hit = d; break; }
             if (hit) {
                 ripples.push({ x: f.x, y: f.y + 1, born: now, life: 800 });
@@ -499,7 +453,7 @@ export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundScenerySta
     }
     // footprints
     for (let i = steps.length - 1; i >= 0; i--) {
-        const s = steps[i], age = now - s.born;
+        const s = steps[i]!, age = now - s.born;
         if (age > s.life) { steps.splice(i, 1); continue; }
         const sx = s.x - camX, sy = s.y - camY;
         if (sx < -4 || sx > VIEW_W + 4 || sy < -4 || sy > VIEW_H + 4) continue;
@@ -510,14 +464,14 @@ export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundScenerySta
     // wading ripples and puddle splashes
     ctx.strokeStyle = "#e6f2ff"; ctx.lineWidth = 0.6;
     for (let i = ripples.length - 1; i >= 0; i--) {
-        const r = ripples[i], k = (now - r.born) / r.life;
+        const r = ripples[i]!, k = (now - r.born) / r.life;
         if (k >= 1) { ripples.splice(i, 1); continue; }
         ctx.globalAlpha = (1 - k) * 0.7;
         ctx.beginPath(); ctx.ellipse(r.x - camX, r.y - camY, 2 + k * 11, 0.9 + k * 4.6, 0, 0, 6.2832); ctx.stroke();
     }
     ctx.fillStyle = "#eaf4ff";
     for (let i = splashDrops.length - 1; i >= 0; i--) {
-        const d = splashDrops[i], age = (now - d.born) / 1000, k = age / (d.life / 1000);
+        const d = splashDrops[i]!, age = (now - d.born) / 1000, k = age / (d.life / 1000);
         if (k >= 1) { splashDrops.splice(i, 1); continue; }
         const x = d.x + d.vx * age - camX, y = d.y + d.vy * age + 90 * age * age - camY;
         ctx.globalAlpha = (1 - k) * 0.85;
@@ -525,7 +479,7 @@ export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundScenerySta
     }
     // dust and snow puffs
     for (let i = puffs.length - 1; i >= 0; i--) {
-        const q = puffs[i], k = (now - q.born) / q.life;
+        const q = puffs[i]!, k = (now - q.born) / q.life;
         if (k >= 1) { puffs.splice(i, 1); continue; }
         const sx = q.x + q.vx * k - camX, sy = q.y + q.vy * k - camY;
         ctx.globalAlpha = (1 - k) * 0.42; ctx.fillStyle = `rgb(${q.c})`;
@@ -535,9 +489,9 @@ export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundScenerySta
 }
 
 // How dark it is, 0 (full daylight) .. 1 (night): drives lamp and window glow.
-export function darkness(p, fx, now) {
+export function darkness(p: Partial<SceneryProfile>, fx: SceneryFx, now: number) {
     if (p.night) return 1;
-    if (fx.indoor && p.indoorLit) return 0.7 * p.indoorK;   // indoor mood: the lights count as lit in the dim
+    if (fx.indoor && p.indoorLit) return 0.7 * p.indoorK!;   // indoor mood: the lights count as lit in the dim
     if (fx.tod && p.tod) {
         const phase = todPhaseNow();
         const [r, g, b] = todColor(phase);

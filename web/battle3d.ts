@@ -132,6 +132,7 @@ import { makeAtmos } from "./battle3d/core/atmos.js";
 import { makePano } from "./battle3d/core/pano.js";
 import { makeRender } from "./battle3d/core/render.js";
 import type { Battle3DContext, Battle3DInitOptions, CaptureCanvas, SkelBufs } from "./types/battle3d.js";
+import type { BattleSide } from "./types/audio.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export {
   LOSS_CAM,
@@ -200,7 +201,7 @@ export {
 const { createBattleFaceBox, battleFaceBoxVisible } = ui;
 export { battleFaceBoxVisible };
 
-export function setSlerpRotation(v) { S._slerpRot = !!v; }
+export function setSlerpRotation(v: boolean) { S._slerpRot = !!v; }
 export function slerpRotationEnabled() { return S._slerpRot; }
 /** Read the scope out of a query string: `?slerp=1` turns it on. */
 export function slerpFlagFromUrl(search = "") {
@@ -1066,7 +1067,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     get enemyAnimator()  { return B$.enemyAnim8r; },
     get playerVictoryComplete() { return !!B$.playerAnim8r?.timelineCycleComplete; },
     // Debug (motion browser): play raw timeline table `idx` on the player; list non-empty tables.
-    debugPlayPlayerTable(idx) {
+    debugPlayPlayerTable(idx: number) {
       const t = B$.playerModel?.timeline?.[idx]?.table;
       if (!B$.playerAnim8r || !t || !t.length) return false;
       B$.playerAnim8r.debugPlayTable(t);
@@ -1088,13 +1089,13 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       return true;
     },
     // Debug (fight-action-lab): set the global per-tick table step (GLOBAL_SPEED) to judge timing.
-    debugSetSpeed(n) { B$.GLOBAL_SPEED = Math.max(1, n | 0); return B$.GLOBAL_SPEED; },
+    debugSetSpeed(n: number) { B$.GLOBAL_SPEED = Math.max(1, n | 0); return B$.GLOBAL_SPEED; },
     // Debug (tools/verify_texture_patches.mjs): hold a fighter's eyes at one state and
     // blit immediately. The blink itself is six ticks long at GLOBAL_SPEED 2, so a
     // wall-clock screenshot can never be relied on to catch it; F0x8008b118's state
     // override is the deterministic way in. State 1 = the blink runs (open), 2 = half,
     // 4..11 = shut. Returns how many patches were re-blitted.
-    debugHoldPatchState(side, state) {
+    debugHoldPatchState(side: BattleSide, state: number | null) {
       const patches = side === "enemy" ? B$.enemyPatches : B$.playerPatches;
       const tex = side === "enemy" ? B$.enemyTex : B$.playerTex;
       const page = side === "enemy" ? B$.enemyPage : B$.playerPage;
@@ -1114,7 +1115,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     // variant should have put there. This is the end-to-end proof that the blit happened:
     // a screenshot cannot show it, because the eye is a handful of pixels on screen and
     // the idle animation moves every frame regardless.
-    debugReadPatchPixels(side, index = 0) {
+    debugReadPatchPixels(side: BattleSide, index = 0) {
       const patches = side === "enemy" ? B$.enemyPatches : B$.playerPatches;
       const tex = side === "enemy" ? B$.enemyTex : B$.playerTex;
       const page = side === "enemy" ? B$.enemyPage : B$.playerPage;
@@ -1154,13 +1155,13 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       };
     },
     // Debug: is a fighter's patch animation actually up (table row + page pixels)?
-    debugPatchState(side) {
+    debugPatchState(side: BattleSide) {
       const patches = side === "enemy" ? B$.enemyPatches : B$.playerPatches;
       const page = side === "enemy" ? B$.enemyPage : B$.playerPage;
       const a = side === "enemy" ? B$.enemyAnim8r : B$.playerAnim8r;
       return {
         entries: patches ? patches.entries.length : 0,
-        variants: patches ? patches.entries.map((e) => e.variant) : [],
+        variants: patches ? patches.entries.map((e: { variant: number; }) => e.variant) : [],
         page: page ? { width: page.width, height: page.height, scale: page.scale } : null,
         timelineTable: a ? a.timelineTable : null,
         animationId: patchState(side),
@@ -1201,7 +1202,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     },
     // Debug: is the pack's geometry loaded and ready to draw? The mesh cache is lazy and
     // async, so a capture taken before it resolves is a blank frame, not a result.
-    debugProjectileReady(id) {
+    debugProjectileReady(id: number) {
       loadProjMesh(id);
       const e = B$.projCache!.get(id);
       return !!(e && e !== "loading" && e.layers.length &&
@@ -1209,7 +1210,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     },
     // Debug: set the move-back sync-ramp rate (MOVE_SPEED). Lower = longer move-back. Takes effect on
     // the NEXT attack (the VM reads it at construction). Tune to match the real game, then we lock it.
-    debugSetMoveSpeed(n) { return setMoveSpeed(n); },
+    debugSetMoveSpeed(n: number) { return setMoveSpeed(n); },
     // Debug (headless verification): each fighter's live arena offset from its home slot, in PS1
     // units. The op2 mode-5 motion object writes z here as an attacker steps toward its target, so
     // a capture script can measure the approach instead of eyeballing a screenshot.
@@ -1247,9 +1248,9 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     // ── the animation viewer's own camera / staging (web/anim-viewer.html) ──────────────────────
     // `fn` returns {eye, look, up?, fovDeg, ortho?} in RENDER space, or null. Pass null to hand the
     // camera back to the battle record (the viewer's "use the battle's camera" toggle).
-    setFreeCameraView(fn) { B$.freeCamView = typeof fn === "function" ? fn : null; return !!B$.freeCamView; },
+    setFreeCameraView(fn: typeof B$.freeCamView) { B$.freeCamView = typeof fn === "function" ? fn : null; return !!B$.freeCamView; },
     /** The fighter's last rendered bounding box in render space: {min,max,center,size} or null. */
-    getFighterBounds(side) {
+    getFighterBounds(side: string) {
       const b = side === "enemy" ? B$.eAABBLast : B$.pAABB;
       if (!b) return null;
       const center = [(b.min[0]! + b.max[0]!) / 2, (b.min[1]! + b.max[1]!) / 2, (b.min[2]! + b.max[2]!) / 2];
@@ -1259,17 +1260,17 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       };
     },
     /** Arena Viewer "built" look: no disc arena or sky, see-through clear (needs createBattle3D(.., {alpha: true})). */
-    setBuiltArena(on) { B$.builtArena = !!on; return B$.builtArena; },
+    setBuiltArena(on: boolean) { B$.builtArena = !!on; return B$.builtArena; },
 // TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
     /** Arena Viewer: { outline, shade } booleans (the game uses F2 window.__fx.toonoutline / .toonshade instead). */
-    setToon(o) { B$.toonSet!.outline = !!o?.outline; B$.toonSet!.shade = !!o?.shade; return { ...B$.toonSet }; },
+    setToon(o: { outline?: boolean; shade?: boolean; } | null | undefined) { B$.toonSet!.outline = !!o?.outline; B$.toonSet!.shade = !!o?.shade; return { ...B$.toonSet }; },
     /** For checks: what is on now, and counters (frames drawn with toon, hull draws, weld builds, last error). */
     getToon() { return { set: { ...B$.toonSet }, on: _toonState(), ...B$.toonLog }; },
 // TOON-END
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
     /** Arena Viewer built look only: light the Digimon like the built world ({dir, colour, ambient}, see
      *  _sceneLightDraw); null turns it off again. Never called by the game or the model viewer. */
-    setSceneLight(L) {
+    setSceneLight(L: { dir: ArrayLike<number>; colour: ArrayLike<number>; ambient: ArrayLike<number>; } | null | undefined) {
       B$.sceneLight = L && L.dir && L.colour && L.ambient
         ? { dir: Array.from(L.dir).slice(0, 3), colour: Array.from(L.colour).slice(0, 3), ambient: Array.from(L.ambient).slice(0, 3) } : null;
       return B$.sceneLight;
@@ -1308,15 +1309,15 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     getViewProjection() { return B$._fxView ? Array.from(B$._fxView.pv) : null; },
     /** Isolated mode only: false = no neutral background, no grid or axis lines, no floor quad shadow, see-through clear
      *  (needs createBattle3D(.., {alpha: true})). Default true = the animation viewer as before. Used by the glossary. */
-    setViewerStudio(on) { B$.viewerStudio = !!on; return B$.viewerStudio; },
+    setViewerStudio(on: boolean) { B$.viewerStudio = !!on; return B$.viewerStudio; },
     /** Isolated studio mode: neutral background + ground grid, no arena/sky/backdrop. */
-    setIsolated(on, side = null) {
+    setIsolated(on: boolean, side: BattleSide | null = null) {
       B$.isolatedMode = !!on;
       if (side) B$.isolatedSide = side;
       return B$.isolatedMode;
     },
     /** The scene's ground height (feet of the focused fighter), render space. */
-    getGroundY(side) {
+    getGroundY(side: string) {
       const b = side === "enemy" ? B$.eAABBLast : B$.pAABB;
       return b ? b.min[1] : 0;
     },
@@ -1336,7 +1337,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
      *  0.1..16; k = 1 draws exactly as shipped. Returns the stored scale. */
     setFighterScale: (side: string, k: number) => B$.fighterScale.setFighterScale(side, k),
     /** The scale that side is drawn at now (1 = MODEL_SCALE). */
-    getFighterScale: (side) => B$.fighterScale.fighterScale(side),
+    getFighterScale: (side: string) => B$.fighterScale.fighterScale(side),
     setSlowMotion,
     getAnimationReadout,
     setGameCamParam,
@@ -1347,7 +1348,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     /** Whether the close-up box object is on screen right now (the rule's own answer). */
     getFaceBoxOnScreen() { return B$.faceBoxOnScreen && !B$.faceBoxSuppressed; },
     getFaceCamSpeaker() { return B$.faceCamSpeaker; },
-    setFaceCamSpeaker(speaker) { B$.faceCamSpeaker = faceCamSideFor(speaker); },
+    setFaceCamSpeaker(speaker: string | number) { B$.faceCamSpeaker = faceCamSideFor(speaker); },
     /** Which model record the box drew this frame, and both fighters' own keys. */
     getFaceBoxSubject() { return B$.faceBoxSubject ? { ...B$.faceBoxSubject } : null; },
     __dnaDebug() {
@@ -1446,7 +1447,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       const view = {
         centerX: w / 2, centerY: h / 2,
         pxScale: h / 240,                       // PSX 240-line screen -> canvas px
-        worldToScreen(pos: BattleVec3, side: number) {
+        worldToScreen(pos: BattleVec3, side: string | undefined) {
           // op3 world coords are ABSOLUTE PS1 arena coordinates (Y down), and they are NOT
           // mirrored for the far-side fighter: claim
           // fight-world-effect-coordinates-are-not-mirrored-per-side-2026-08-18 reads the
@@ -1476,8 +1477,8 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
 
 // ─── Name → folder resolution ─────────────────────────────────────────────────
 
-let _modelMap = null;
-export function canonicalModelName(name) {
+let _modelMap: Record<string, string> | null = null;
+export function canonicalModelName(name: string) {
   return ({
     "BK WarGreymon": "BKWarGreymon",
     "Imperialdramon-F": "ImperialdramonFM",
@@ -1495,7 +1496,7 @@ export {
   VERT_SRC, FRAG_SRC,
 };
 
-export async function resolveModelFolder(digimonName) {
+export async function resolveModelFolder(digimonName: string) {
   if (!_modelMap) {
     try {
       const r = await fetch("assets/battle/model_map.json");

@@ -3,5 +3,5 @@
 export interface BattleMsgBankFile {
   file: string;
   what: string;
-  promise?: Promise<unknown> | null;
+  promise?: Promise<Readonly<Record<number, string>>> | null;
 }

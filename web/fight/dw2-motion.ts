@@ -25,11 +25,17 @@ import { DW2_CLIP_MAP, dw2LetterForSlot, DW2_MOTION_LETTERS } from "./dw2-clip-m
 import { battleSetting } from "./battle-settings.js";
 import { ensureDw2Picks } from "./dw2-picks.js";
 import { isInstalledBuild } from "../ship-list.js";
-import type { Dw2FightCh1, Dw2FightCh2, Dw2Motion } from "./types.js";
+import type { Dw2FightCh1, Dw2FightCh2, Dw2Motion, FightBoneAnim, FightModel } from "./types.js";
+
+/** The technique -> DW2 cast type table as cast-types.json writes it. */
+type CastTypes = { bySkill?: Record<string, number>; } | null;
+/** The generated per-model motion file: its motions by DW2 letter. */
+type Dw2File = { motions: Record<string, Dw2Motion>; };
+type Dw2Loader = (folder: string) => Promise<Dw2File | null>;
 
 let override: boolean | null = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
-let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
-let castTypesPromise = null;
+let castTypes: CastTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
+let castTypesPromise: Promise<CastTypes> | null = null;
 
 export function setDw2MotionEnabled(v: boolean | null) { override = v == null ? null : !!v; }
 export function dw2MotionEnabled() { if (isInstalledBuild()) return true; return override == null ? battleSetting("dw2motion") : override; }   // installed copy: auto = always on (no DW2 data = the disc motion, see prepareDw2Motion)
@@ -50,7 +56,7 @@ if (typeof process !== "undefined" && process?.env?.DW2MOTION === "1") override 
 
 // ── loading (browser fetch; Node tools read the same file from disk; tests register JSON directly) ─
 const dataCache = new Map();          // folder -> generated file | null
-let loader = async (folder) => {
+let loader: Dw2Loader | null = async (folder: string) => {
   const rel = `assets/battle/dw2motion/${folder}.json`;
   if (typeof fetch === "function" && typeof window !== "undefined") {
     return fetch(rel).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -64,10 +70,10 @@ let loader = async (folder) => {
   } catch { return null; }
 };
 
-export function setDw2MotionLoader(fn) { loader = typeof fn === "function" ? fn : null; }
+export function setDw2MotionLoader(fn: Dw2Loader | null | undefined) { loader = typeof fn === "function" ? fn : null; }
 /** Prime a species' generated file synchronously (the tests and the Node harnesses do this). */
 export function registerDw2Motion(folder: string, data: Dw2Motion | null) { if (folder) dataCache.set(folder, data || null); }
-export function dw2MotionData(folder) { return dataCache.get(folder) ?? null; }
+export function dw2MotionData(folder: string) { return dataCache.get(folder) ?? null; }
 
 /** The technique -> DW2 cast type table (generated next to the motion files). Loaded once. */
 export async function ensureCastTypes() {
@@ -93,7 +99,7 @@ export async function ensureCastTypes() {
   }
   return castTypesPromise;
 }
-export function setCastTypes(json) { castTypes = json?.bySkill ? json : null; }
+export function setCastTypes(json: CastTypes | undefined) { castTypes = json?.bySkill ? json : null; }
 /** The DW2 cast type (0/1/2) of a DW3 technique, or null when the table is not loaded. */
 export function castTypeFor(techId: number | null) {
   if (!castTypes || techId == null) return null;
@@ -109,7 +115,7 @@ const TERM = 30000;
  * Returns { table, letter, kind } on success, null when the motion is unusable for this model
  * (no keys, or the table index is already taken by the model's own data).
  */
-export function applyMotion(model, letter: string, motion: Dw2Motion) {
+export function applyMotion(model: FightModel, letter: string, motion: Dw2Motion) {
   if (!model || !motion || !motion.keys || !Object.keys(motion.keys).length) return null;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return null;
   if (!model.timeline) model.timeline = [];
@@ -122,7 +128,7 @@ export function applyMotion(model, letter: string, motion: Dw2Motion) {
     const anim = { ...(bone.anim || {}) } as Dw2FightCh2;
     const own = (anim.ch2 ?? []).filter((r) => r[3] !== TERM).map((r) => r.slice());
     anim.ch2 = [...own, ...rows.map((r) => r.slice()), [rows[rows.length - 1][0], rows[rows.length - 1][1], rows[rows.length - 1][2], TERM]];
-    model.bones[i] = { ...bone, anim };
+    model.bones[i] = { ...bone, anim: anim as FightBoneAnim };
   }
   if (motion.ch1 && (Array.isArray(motion.ch1) ? motion.ch1.length : Object.keys(motion.ch1).length)) {
     // the root's translation keys belong to the bone the bake appended them to. v2 files carry ch1 per
@@ -138,26 +144,26 @@ export function applyMotion(model, letter: string, motion: Dw2Motion) {
       const anim = { ...(bone.anim || {}) } as Dw2FightCh1;
       const own = (anim.ch1 ?? []).filter((r) => r[3] !== TERM).map((r) => r.slice());
       anim.ch1 = [...own, ...rows.map((r) => r.slice()), [rows[rows.length - 1][0], rows[rows.length - 1][1], rows[rows.length - 1][2], TERM]];
-      model.bones[i] = { ...bone, anim };
+      model.bones[i] = { ...bone, anim: anim as FightBoneAnim };
     }
   }
   model.timeline[table] = { table: motion.playlist.map((e) => ({ ...e })) };
   if (!model.dw2Motion) model.dw2Motion = {};
-  model.dw2Motion[letter] = { table, kind: motion.kind, lo: motion.lo, hi: motion.hi, letter, hit: Number.isInteger(motion.hit) ? motion.hit : null };   // hit: playlist entry of the strike pose (v2 files from export_game.mjs)
+  model.dw2Motion[letter] = { table, kind: motion.kind, lo: motion.lo, hi: motion.hi, letter, hit: Number.isInteger(motion.hit) ? motion.hit! : null };   // hit: playlist entry of the strike pose (v2 files from export_game.mjs)
   return { table, letter, kind: motion.kind };
 }
 
 /** The bone the ch1 keys belong to: the one whose appended ch2 keys span the same frames (the bake
  *  writes both for the root only), else bone 0. */
-function rootIndexOf(model, motion: Dw2Motion) {
-  for (const [idx, rows] of Object.entries(motion.keys) as [any, any[]][]) {
+function rootIndexOf(model: FightModel, motion: Dw2Motion) {
+  for (const [idx, rows] of Object.entries(motion.keys!) as [any, any[]][]) {
     if (rows.length && motion.ch1?.length && rows[0][3] === motion.ch1[0]![3]) return idx | 0;
   }
   return 0;
 }
 
 /** Merge every motion the generated file marks `used` into the model. Idempotent per model. */
-export function applyDw2Motion(model, data: { motions: {}; }) {
+export function applyDw2Motion(model: FightModel, data: Dw2File) {
   if (!model || !data || model.__dw2Applied) return model?.dw2Motion ?? null;
   const motions = data.motions || {};
   for (const letter of DW2_MOTION_LETTERS) {
@@ -174,7 +180,7 @@ export function applyDw2Motion(model, data: { motions: {}; }) {
  * loadSkeletalModel, through clip-fallback's prepareModelDonors). Never throws; a missing file just
  * leaves the model exactly as it was.
  */
-export async function prepareDw2Motion(model) {
+export async function prepareDw2Motion(model: FightModel) {
   if (!dw2MotionEnabled() || !model?.folder || model.__dw2Applied) return model;
   await ensureCastTypes();
   await ensureDw2Picks();             // the hand-picked clips (dw2-picks.js), read by resolveClipScript
@@ -192,33 +198,33 @@ export async function prepareDw2Motion(model) {
  * and the signature slot need it: they pick F/G/H by the technique's DW2 cast type, and the
  * signature slot takes the melee clip for a physical technique).
  */
-export function dw2MotionFor(model, clip: number | null, { tech = null, magical = false } = {}) {
+export function dw2MotionFor(model: FightModel | null | undefined, clip: number | null, { tech = null, magical = false }: { tech?: number | string | null; magical?: boolean; } = {}) {
   if (!dw2MotionEnabled() || !model?.dw2Motion || clip == null) return null;
   const row = DW2_CLIP_MAP[clip];
   if (!row) return null;
-  const castType = castTypeFor(tech) ?? 0;
+  const castType = castTypeFor(tech as number | null) ?? 0;
   const letter = dw2LetterForSlot(clip, { castType, magical });
   const hit = letter ? model.dw2Motion[letter] : null;
   return hit ? { ...hit, slot: clip | 0, castType } : null;
 }
 
 /** How many clip slots this model can play from DW2 motion (a report/test helper). */
-export function dw2SlotCount(model) {
+export function dw2SlotCount(model: FightModel | null | undefined) {
   if (!model?.dw2Motion) return 0;
   let n = 0;
   for (const slot of Object.keys(DW2_CLIP_MAP)) {
     const row = DW2_CLIP_MAP[slot];
-    if (row.letters.some((L: string | number) => model.dw2Motion[L])) n++;
+    if (row!.letters.some((L: string | number) => model.dw2Motion![L])) n++;
   }
   return n;
 }
 
 /** Drop everything a model gained (a re-load or a test needs a pristine object). */
-export function clearDw2Motion(model) {
+export function clearDw2Motion(model: FightModel | null | undefined) {
   if (!model) return;
   if (model.dw2Motion) {
     for (const m of Object.values(model.dw2Motion) as Dw2Motion[]) {
-      if (model.timeline?.[m.table]) delete model.timeline[m.table];
+      if (model.timeline?.[m.table!]) delete model.timeline[m.table!];
     }
   }
   delete model.dw2Motion;

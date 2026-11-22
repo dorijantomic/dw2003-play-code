@@ -8,14 +8,16 @@
 // scripts, so its shots flew back at itself. The arena is symmetric about the origin (home z is +-(0x1400+standoff)),
 // so turning a script around is x -> -x, z -> -z, plus half a turn on a projectile's yaw.
 
+import type { FightActionHooks, FightLungeRec, FightMoveRec, FightScript, FightScriptOp } from "./types.js";
+
 const SCREEN_Z = (z: number) => z === 32767 || z === -1 || Math.abs(z) > 20000;   // screen-space effects, not arena positions
 const HALF_TURN = 2048;                                                    // PS1 angle units, 4096 = 360 degrees
 const wrap = (a: number) => (((a + HALF_TURN) % 4096) + 4096) % 4096;
 
 const cache = new WeakMap();
 /** "player" when the model's scripts aim down +z, "enemy" when down -z. */
-export function authoredSide(model) {
-  const actions = model?.actions;
+export function authoredSide(model: { actions?: unknown } | null | undefined) {
+  const actions = model?.actions as (FightScript | undefined)[] | undefined;
   // A model with NO action scripts of its own — the new partner species, whose anim.json carries only timeline
   // tables — plays nothing but donor scripts and clip-fallback builds, and clip-fallback lays those out in the
   // player convention (+z toward the far side, see its victimAnchor()). Saying "player" here is what lets the
@@ -31,8 +33,8 @@ export function authoredSide(model) {
   for (const a of actions) {
     for (const o of a?.ops ?? []) {
       const w = o.words;
-      if (o.op === 6 && w?.[0] === 0 && w.length >= 8) yaw += (w[6] | 0) % 4096 ? 1 : -1;
-      else if (o.op === 3 && w?.[0] === 0 && w.length >= 5 && !SCREEN_Z(w[4] | 0)) spark += w[4] | 0;
+      if (o.op === 6 && w?.[0] === 0 && w.length >= 8) yaw += (w[6]! | 0) % 4096 ? 1 : -1;
+      else if (o.op === 3 && w?.[0] === 0 && w.length >= 5 && !SCREEN_Z(w[4]! | 0)) spark += w[4]! | 0;
     }
   }
   const full = actions.filter((a) => a?.ops?.length).length >= 12;
@@ -42,13 +44,13 @@ export function authoredSide(model) {
 }
 
 /** A copy of an op list turned around (the donor clips of clip-fallback.js, which are player-authored). */
-export function mirrorOps(ops) {
+export function mirrorOps(ops: FightScriptOp[]) {
   return ops.map((o) => {
     const w = o.words ? o.words.slice() : o.words;
     if (!w) return o;
-    if (o.op === 3 && w[0] === 0 && w.length >= 5 && !SCREEN_Z(w[4] | 0)) { w[2] = -(w[2] | 0); w[4] = -(w[4] | 0); }
-    else if (o.op === 6 && w[0] === 0 && w.length >= 8) { w[2] = -(w[2] | 0); w[4] = -(w[4] | 0); w[6] = (w[6] | 0) - HALF_TURN; }
-    else if (o.op === 2 && w[0] === 3) { w[2] = -(w[2] | 0); w[4] = -(w[4] | 0); }
+    if (o.op === 3 && w[0] === 0 && w.length >= 5 && !SCREEN_Z(w[4]! | 0)) { w[2] = -(w[2]! | 0); w[4] = -(w[4]! | 0); }
+    else if (o.op === 6 && w[0] === 0 && w.length >= 8) { w[2] = -(w[2]! | 0); w[4] = -(w[4]! | 0); w[6] = (w[6]! | 0) - HALF_TURN; }
+    else if (o.op === 2 && w[0] === 3) { w[2] = -(w[2]! | 0); w[4] = -(w[4]! | 0); }
     return { ...o, words: w };
   });
 }
@@ -60,10 +62,10 @@ export function mirrorOps(ops) {
  * victim from the far side's point of view now frames the far victim from ours). A preset (sub 0) names a slot,
  * not a position, so it is mirrored by mirrorPresetShot instead and is returned unchanged here.
  */
-export function mirrorCameraWords(words) {
+export function mirrorCameraWords(words: number[]) {
   if (!Array.isArray(words) || words[1] !== 1) return words;
   const w = words.slice();
-  for (const i of [2, 4, 5, 7, 8, 10]) w[i] = -(w[i] | 0);
+  for (const i of [2, 4, 5, 7, 8, 10]) w[i] = -(w[i]! | 0);
   return w;
 }
 
@@ -83,13 +85,13 @@ export function mirrorPresetShot(preset: number) {
 }
 
 /** The hooks an action VM reports to, with every arena position turned around. */
-export function mirrorHooks(h) {
+export function mirrorHooks(h: FightActionHooks) {
   return {
     ...h,
-    onMove: (rec: { kind: string; x: number; z: number; }) => h.onMove?.(rec?.kind === "to" ? { ...rec, x: -rec.x, z: -rec.z } : rec),
-    onEffect: (rec: { z: number; x: number; }) => h.onEffect?.(SCREEN_Z(rec.z | 0) ? rec : { ...rec, x: -rec.x, z: -rec.z }),
-    setLunge: (l) => h.setLunge?.(l?.sub === 0 && l.from
-      ? { ...l, from: [-l.from[0], l.from[1], -l.from[2]], to: [l.to[0], wrap(l.to[1]), l.to[2]] }
+    onMove: (rec: FightMoveRec) => h.onMove?.(rec?.kind === "to" ? { ...rec, x: -rec.x, z: -rec.z } : rec),
+    onEffect: (rec: { type: number; x: number; y: number; z: number; }) => h.onEffect?.(SCREEN_Z(rec.z | 0) ? rec : { ...rec, x: -rec.x, z: -rec.z }),
+    setLunge: (l: FightLungeRec) => h.setLunge?.(l?.sub === 0 && l.from
+      ? { ...l, from: [-l.from[0], l.from[1], -l.from[2]], to: [l.to![0], wrap(l.to![1]), l.to![2]] }
       : l),
   };
 }

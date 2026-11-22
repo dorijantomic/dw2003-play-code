@@ -310,7 +310,7 @@ function elementNameForElem1(elem1: number) {
    * technique record: the browser's own port (`magicalBase` + `resolveDamage`) on the
    * disc's record for `slotTechId`.
    */
-  function slotDamage(slotTechId: number, atk, def, rng: () => number | undefined, field: number) {
+  function slotDamage(slotTechId: number, atk: ReturnType<typeof effStats>, def: ReturnType<typeof effStats>, rng: () => number | undefined, field: number) {
     const rec = B.fightTechDB?.[String(slotTechId | 0)];
     if (!rec) return 0;
     const sk = {
@@ -357,7 +357,7 @@ function elementNameForElem1(elem1: number) {
       // unconditionally by F0x8009ddd8 (:28224 `lw $v0, 0xa0($s3)`) — not the
       // physical +0x9c entry.
       predicate: () => (rollMagicHit(atk, def, skill, RAND_U16) ? 1 : 0),
-      produce: (_side, slotTechId: number) => slotDamage(slotTechId, atk, def, RAND_U16, field),
+      produce: (_side: number, slotTechId: number) => slotDamage(slotTechId, atk, def, RAND_U16, field),
     };
     const state = { count: 0, total: 0, done: 0 };
     multiHitReset(slotViews, { side: () => sideByte, id: () => skill?.id ?? 0 }, manager, state);

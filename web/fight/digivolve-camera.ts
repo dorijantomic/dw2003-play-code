@@ -24,7 +24,7 @@
 
 import { fieldsFromShot, CAMERA_FRAME_DELTA } from "./battle-camera.js";
 import type { CameraRecord } from '../types/battle3d.js';
-import type { ShotNode } from './types.js';
+import type { CamShot } from './types.js';
 interface RevertSchedule {
   swapFrame?: number;
   shotIndex?: number;
@@ -37,8 +37,8 @@ interface RevertSchedule {
 
 interface RevertCameraArgs {
   camRec: CameraRecord;
-  shotTen: () => ShotNode | undefined;
-  arena: () => ShotNode | undefined;
+  shotTen: () => CamShot | null | undefined;
+  arena: () => CamShot | null | undefined;
   schedule: RevertSchedule;
   setEnemyVisible: (visible: boolean) => void;
   setMotion: ((motion: number) => void) | undefined;
@@ -52,6 +52,31 @@ interface RevertCam {
   owns(): boolean;
   atOrigin(): boolean;
   stop(): void;
+}
+
+interface DigivolveSchedule {
+  startFrame?: number;
+  swapFrame: number;
+  returnFrame: number;
+  taskStartFrame?: number;
+  fadeFrame?: number;
+  startMotion?: number;
+  newMotionFrame?: number;
+  newMotion?: number;
+  returnMotion?: number;
+  weakReturnMotion?: number;
+}
+
+interface DigivolveCameraArgs {
+  camRec: CameraRecord;
+  shotNine: () => CamShot | null | undefined;
+  arena: () => CamShot | null | undefined;
+  homeZ: () => number;
+  schedule: DigivolveSchedule;
+  modelKey?: () => unknown;
+  setEnemyVisible?: ((visible: boolean) => void) | null;
+  setMotion?: ((motion: number) => void) | null;
+  weak?: boolean | (() => boolean);
 }
 
 interface FormChangeArenaShot {
@@ -141,7 +166,7 @@ export const DV_ISSUER = "digivolve";
  * `-homePos.z` added to the eye z and the look z. `homeZ` is the partner's home slot z in the
  * same PS1 units as the shot (near side: -(0x1400 + standoff)).
  */
-export function shotNineWithHomeOffset(shot, homeZ: number) {
+export function shotNineWithHomeOffset(shot: CamShot, homeZ: number) {
   const fields = fieldsFromShot(shot);
   const z = -(homeZ | 0);
   fields[2]! += z;   // vpz
@@ -165,9 +190,9 @@ export function shotNineWithHomeOffset(shot, homeZ: number) {
  * @param {boolean|(() => boolean)} [deps.weak]  the partner's idleMotion != 0 (the low-HP stance), read on f651
  */
 export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule, modelKey = () => null,
-  setEnemyVisible = null, setMotion = null, weak = false as boolean | (() => boolean) }) {
+  setEnemyVisible = null, setMotion = null, weak = false }: DigivolveCameraArgs) {
   let last = -1;
-  let keyAtCut: null | null = null;   // the model the last shot-9 cut was made for
+  let keyAtCut: unknown = null;   // the model the last shot-9 cut was made for
   let started = false;
   let returned = false;
   let faded = false;
@@ -194,19 +219,19 @@ export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule
       const f = frame | 0;
       const due = (at: number) => last < at && at <= f;
       // The start cut fires on the first call that has a shot 9 to cut to.
-      if (!started && f >= schedule.startFrame && cutShotNine(true)) {
+      if (!started && f >= schedule.startFrame! && cutShotNine(true)) {
         started = true;
         // startChange: the enemy model's layer off, the old model's change motion (14 Blast / 13 manual)
         if (setEnemyVisible) { enemyHidden = true; setEnemyVisible(false); }
         if (schedule.startMotion != null) setMotion?.(schedule.startMotion);
       }
       if (started && !returned) {
-        const swapDue = due(schedule.swapFrame) && schedule.swapFrame > schedule.startFrame;
+        const swapDue = due(schedule.swapFrame) && schedule.swapFrame > schedule.startFrame!;
         if (swapDue || modelKey() !== keyAtCut) cutShotNine(true);
         // substate 9: the new model's motion 13
         if (!newMotionDone && schedule.newMotionFrame != null && f >= schedule.newMotionFrame) {
           newMotionDone = true;
-          setMotion?.(schedule.newMotion);
+          setMotion?.(schedule.newMotion!);
         }
         if (f >= schedule.returnFrame) {
           returned = true;
@@ -222,7 +247,7 @@ export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule
         if (enemyHidden) { enemyHidden = false; setEnemyVisible?.(true); }
         if (schedule.returnMotion != null) {
           const isWeak = typeof weak === "function" ? weak() : weak;
-          setMotion?.(isWeak ? schedule.weakReturnMotion : schedule.returnMotion);
+          setMotion?.(isWeak ? schedule.weakReturnMotion! : schedule.returnMotion);
         }
       }
       last = f;
@@ -301,11 +326,11 @@ export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyV
      */
     preStep(frame: number) {
       const f = frame | 0;
-      if (started || f < schedule.fadeFrame) return;
+      if (started || f < schedule.fadeFrame!) return;
       const shot = shotTen();
       if (!shot) return;
       camRec.move(fieldsFromShot(shot), DV_FADE_FRAMES, { issuer: DV_ISSUER });
-      if (f <= 0) camRec.tick((-schedule.fadeFrame - 1) * CAMERA_FRAME_DELTA);
+      if (f <= 0) camRec.tick((-schedule.fadeFrame! - 1) * CAMERA_FRAME_DELTA);
       started = true;
     },
     elapsed,
@@ -313,8 +338,8 @@ export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyV
       const f = frame | 0;
       const due = (at: number) => last < at && at <= f;
       if (started && !returned) {
-        if (!hidden && f >= schedule.hideFrame) { hidden = true; setEnemyVisible(false); }
-        if (due(schedule.cutFrame)) {
+        if (!hidden && f >= schedule.hideFrame!) { hidden = true; setEnemyVisible(false); }
+        if (due(schedule.cutFrame!)) {
           const shot = shotTen();
           if (shot) camRec.cut(fieldsFromShot(shot), { issuer: DV_ISSUER });
           setMotion?.(REVERT_ENTER_MOTION);           // showEnteringModel: control->motion = 13

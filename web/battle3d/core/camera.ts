@@ -30,7 +30,7 @@ export function makeCamera(B$: Battle3DContext) {
 // An op5 canned shot, read from the record of the Digimon standing in the slot the
   // preset names. Falls back to the captured Renamon/Woodmon table if that record is not
   // loaded yet.
-  function cannedShot(preset: string) {
+  function cannedShot(preset: string | number) {
     const sel = op5ShotSlot(preset);
     if (!sel) return null;
     const slot = cannedShotSlot(sel.side, sel.index);

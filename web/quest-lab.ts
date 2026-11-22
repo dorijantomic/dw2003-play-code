@@ -7,13 +7,15 @@
 // "Hide" folds the panel into a small tab. "Reset quests" clears the quest layer's own progress. Nothing here touches the story or the normal save.
 // "Ways" reads one job's every ending out of its data (web/quest-endings.js): the same page tools/quest_endings.mjs prints.
 import { endingsBlock } from "./quest-endings.js";
+import type { SceneNpc } from "./game/types.js";
+import type { QuestLabDef, QuestLabDiffRow, QuestLabRecord, QuestLabShelfItem } from "./types/quest-lab.js";
 interface QuestSnapshot {
   [key: string]: QuestSnapshotValue;
 }
 type QuestSnapshotValue = string | number | boolean | null | QuestSnapshot | QuestSnapshotValue[];
 
 
-const $ = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const $ = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 
 const css = `
 #questlab[hidden],#questlab-tab[hidden]{display:none}
@@ -31,12 +33,12 @@ function ready() {
 }
 
 /** Put a quest's characters on the current map regardless of the story state (their spawn flags), one record each. */
-function showCast(def) {
+function showCast(def: QuestLabDef): number[] {
   const scene = window.__state.scenes[window.__quests.where().lastMap];
   if (!scene) return [];
   const want = new Set([def.offer?.npc, def.turnIn?.npc, ...def.objectives.filter((o) => o.type === "talk").map((o) => o.npc)].filter((n) => n != null));
-  const done = new Set(), here = [];
-  scene.npcs = scene.npcs.filter((n) => {
+  const done = new Set<number>(), here: number[] = [];
+  scene.npcs = scene.npcs.filter((n: SceneNpc) => {
     if (!want.has(n.npc_id)) return true;
     if (done.has(n.npc_id)) return false;
     done.add(n.npc_id); n.spawn_flags = []; here.push(n.npc_id); return true;
@@ -45,11 +47,11 @@ function showCast(def) {
   return here;
 }
 
-function go(def, say: (a0: string) => void) {
+function go(def: QuestLabDef, say: (a0: string) => void) {
   const q = window.__quests, st = window.__state;
   const giver = def.offer ?? def.objectives.find((o) => o.type === "talk") ?? null;
   const where = q.where().lastMap;
-  const mapOf = (r) => r?.maps?.find((m) => m === where) ?? r?.maps?.[0] ?? null;
+  const mapOf = (r: QuestLabRecord | null) => r?.maps?.find((m) => m === where) ?? r?.maps?.[0] ?? null;
   const target = giver ? mapOf(giver) : null;
   const info = q.lab.prepare(def.id);
   if (info.level > 1) for (const p of [st.partnerStats, ...(Array.isArray(st.partyStats) ? st.partyStats : [])]) if (p && (p.level ?? 1) < info.level) p.level = info.level;
@@ -59,7 +61,7 @@ function go(def, say: (a0: string) => void) {
     return;
   }
   const here = showCast(def);
-  const npc = giver && window.__state.scenes[where]?.npcs.find((n) => n.npc_id === giver.npc);
+  const npc = giver && window.__state.scenes[where]?.npcs.find((n: SceneNpc) => n.npc_id === giver.npc);
   if (npc) { st.x = npc.x; st.y = npc.y + 36; st.dir = "up"; st.moving = false; say(`Standing in front of ${giver.name ?? "the giver"}. Press Enter to talk.`); }
   else say(here.length ? "Characters are on the map." : "No giver on this map.");
 }
@@ -68,7 +70,7 @@ function build() {
   document.head.append($("style", { textContent: css }));
   const box = $("div", { id: "questlab" });
   const msg = $("div", { className: "msg" });
-  const say = (t) => { msg.textContent = t; };
+  const say = (t: string) => { msg.textContent = t; };
   const list = $("div");
   const search = $("input", { type: "search", placeholder: "search title, giver, place, id..." });
   search.style.cssText = "width:100%;box-sizing:border-box;margin:4px 0;padding:3px 6px;font:inherit";
@@ -79,17 +81,17 @@ function build() {
     const needle = search.value.trim().toLowerCase();
     let shown = 0;
     for (const d of window.__quests.defs) {
-      if (!d.offer && !d.objectives.some((o) => o.type === "talk")) continue;      // board and route jobs have no scene to see
+      if (!d.offer && !d.objectives.some((o: QuestLabRecord & { type: string }) => o.type === "talk")) continue;      // board and route jobs have no scene to see
       if (needle && !`${d.id} ${d.title} ${d.giver ?? ""} ${d.short ?? ""} ${(d.offer?.maps ?? []).join(" ")} ${window.__quests.status(d.id)}`.toLowerCase().includes(needle)) continue;
       if (++shown > 40) continue;                                                  // keep the panel light with hundreds of quests
       list.append($("div", { className: "q" },
         $("div", { className: "t" }, d.title),
-        $("div", { className: "s" }, `${d.giver ?? ""} · ${window.__quests.status(d.id)}${d.offer?.scene || d.objectives.some((o) => o.scene) ? " · scene" : ""}`),
+        $("div", { className: "s" }, `${d.giver ?? ""} · ${window.__quests.status(d.id)}${d.offer?.scene || d.objectives.some((o: { scene?: unknown }) => o.scene) ? " · scene" : ""}`),
         $("button", { textContent: "Go", onclick: () => { go(d, say); setTimeout(refresh, 300); } }),
         $("button", { textContent: "Goals", onclick: () => { say(window.__quests.lab.finishGoals(d.id) ? "Goals met. Talk to the giver." : "Nothing to finish."); refresh(); } }),
         $("button", { textContent: "Ways", onclick: () => { msg.style.whiteSpace = "pre-wrap"; say(endingsBlock(d)); } })));
     }
-    const total = window.__quests.defs.filter((d) => d.offer || d.objectives.some((o) => o.type === "talk")).length;
+    const total = window.__quests.defs.filter((d: QuestLabDef) => d.offer || d.objectives.some((o) => o.type === "talk")).length;
     count.textContent = `${Math.min(shown, 40)} shown of ${shown} matching, ${total} quests with a giver`;
   };
   const hide = $("button", { textContent: "Hide" });
@@ -107,7 +109,7 @@ function build() {
   refresh();
   setInterval(() => { if (document.activeElement !== search) refresh(); }, 4000);
   const pending = sessionStorage.getItem("questlabGo");
-  if (pending) { sessionStorage.removeItem("questlabGo"); const d = window.__quests.defs.find((x) => x.id === pending); if (d) setTimeout(() => go(d, say), 800); }
+  if (pending) { sessionStorage.removeItem("questlabGo"); const d = window.__quests.defs.find((x: QuestLabDef) => x.id === pending); if (d) setTimeout(() => go(d, say), 800); }
 }
 
 const wait = setInterval(() => { if (ready()) { clearInterval(wait); build(); } }, 300);
@@ -121,27 +123,27 @@ import { diffSnapshots, shelfAdd, shelfRemove, shelfRename, shelfExport, shelfIm
 /** The live quest state as a plain snapshot (window.__quests.state is the quest layer's own object). */
 const shelfNow = (): QuestSnapshot => JSON.parse(JSON.stringify(window.__quests.state));
 
-function shelfLoad() {
+function shelfLoad(): QuestLabShelfItem[] | null {
   try {
     const read = shelfImport(localStorage.getItem("dw.quests.shelf.v1") || "null");
     return read.problems.length ? [] : read.shelf;
   } catch { return []; }
 }
 
-function shelfStore(shelf: QuestSnapshot[]) {
+function shelfStore(shelf: QuestLabShelfItem[] | null) {
   try { localStorage.setItem("dw.quests.shelf.v1", JSON.stringify(shelfExport(shelf))); } catch { /* private window */ }
 }
 
 /** One plain line per diff row: + active id, - done id, pick id: from -> to. */
-function shelfRowText(row) {
+function shelfRowText(row: QuestLabDiffRow) {
   if (row.kind === "picks") return `pick ${row.id}: ${row.from} -> ${row.to}`;
   return `${row.from === null ? "+" : "-"} ${row.kind} ${row.id}`;
 }
 
-function shelfMount(box) {
+function shelfMount(box: HTMLElement) {
   let shelf = shelfLoad();
   const msg = $("div", { className: "msg" });
-  const say = (t) => { msg.textContent = t; };
+  const say = (t: string) => { msg.textContent = t; };
   const area = $("textarea", { rows: 4, placeholder: "Export puts the shelf here. Paste one here and press Import." });
   area.style.cssText = "width:100%;box-sizing:border-box;margin:4px 0;font:11px monospace";
   const list = $("div");
@@ -169,13 +171,13 @@ function shelfMount(box) {
     say(`Saved "${name.trim()}".`); render();
   };
 
-  const diff = (item) => {
+  const diff = (item: QuestLabShelfItem) => {
     const d = diffSnapshots(item.snap, shelfNow());
     msg.style.whiteSpace = "pre-wrap";
     say(d.rows.length ? d.rows.map(shelfRowText).join("\n") : `No difference from "${item.name}".`);
   };
 
-  const rename = (item) => {
+  const rename = (item: QuestLabShelfItem) => {
     const to = window.prompt("New name for this state", item.name);
     if (to == null) return;
     const out = shelfRename(shelf, item.name, to);
@@ -184,7 +186,7 @@ function shelfMount(box) {
     say(`Renamed to "${to.trim()}".`); render();
   };
 
-  const drop = (item) => {
+  const drop = (item: QuestLabShelfItem) => {
     if (!window.confirm(`Delete "${item.name}" from the shelf?`)) return;
     const out = shelfRemove(shelf, item.name);
     if (out.problems.length) { say(out.problems.join("; ")); return; }
@@ -194,7 +196,7 @@ function shelfMount(box) {
 
   // Restore: the state now goes to the backup key, the named state becomes the live one, then the page reloads.
   // reload() keeps the current URL, so ?questlab=1&map=... survives.
-  const restore = (item) => {
+  const restore = (item: QuestLabShelfItem) => {
     if (!window.confirm(`Restore "${item.name}"? The state now goes to dw.quests.v1.bak first, then the page reloads.`)) return;
     try {
       localStorage.setItem("dw.quests.v1.bak", localStorage.getItem("dw.quests.v1") ?? "null");

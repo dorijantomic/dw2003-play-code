@@ -2,6 +2,8 @@
 // (see tools/rewrite/add-types.mjs). Nothing here is emitted — node's strip mode erases the
 // declarations — so this file must never hold runtime code.
 
+import type { FightModel } from "../types.js";
+
 /** One rotation key of a bone channel: the ch0/ch1/ch2 triple and the frame it holds from (30000 ends the channel). */
 export type RetargetKey = number[];
 
@@ -21,6 +23,24 @@ export interface RetargetNumbers {
 export interface RetargetChannels {
   ch1?: RetargetKey[];
   ch2: RetargetKey[];
+}
+
+/** A limb the role bake paired up: the target chain and the donor chain, their lengths, and where the IK bends it. */
+export interface RetargetRolePair {
+  /** "arm" or "leg" */
+  kind: string;
+  side: string;
+  /** the target chain and the donor chain it was paired with */
+  tc: number[];
+  sc: number[];
+  tLen: number;
+  sLen: number;
+  /** the target chain's length over the donor's */
+  ratio: number;
+  /** which joint of the target chain the IK bends at */
+  split: number;
+  /** the target chain's tip bone */
+  tip: number;
 }
 
 /** A target bone the bake paired with a donor bone (world bake: the two rest points and how far apart). */
@@ -61,7 +81,9 @@ export interface RetargetMetrics {
 
 /** A retarget bake: the rebuilt rig, the numbers it was judged on, and the tag the ladder adds (which source rig and method produced it). */
 export interface RetargetBake {
-  clip?: string;
+  clip?: number;
+  /** the cast gate verdict castGate() attached to this candidate */
+  gate?: { used: boolean; reasons?: string[]; reason?: string; [k: string]: unknown };
   covered?: number;
   frames?: number;
   ik?: boolean;
@@ -79,7 +101,7 @@ export interface RetargetBake {
   numbers?: RetargetNumbers;
   /** frame shift between the donor's clip and the target's */
   offset?: number;
-  pairs?: RetargetPair[];
+  pairs?: (RetargetPair | RetargetRolePair)[];
   roles?: RigRoles;
   /** the donor model the bones were taken from */
   source?: RetargetModel;
@@ -92,6 +114,7 @@ export interface RigView {
   arms: RigChain[];
   box: { mn: number[]; mx: number[]; h: number; w: number; d: number; };
   legs: RigChain[];
+  pose?: unknown;
   props: RigProp[];
 }
 
@@ -101,11 +124,7 @@ export interface RigRoles {
   target: RigView;
 }
 
-export interface RetargetModel {
-  /** the loaded model's bone records (web/fight/*: the asset decode, untyped) */
-  bones: any;
-  timeline?: any;
-}
+export type RetargetModel = FightModel;
 
 /** One role chain of a rig: which side it is on, which of the pair it is, and its bones (root first). */
 export interface RigChain {
@@ -118,17 +137,17 @@ export interface RigChain {
 /** A weapon or other prop bone: which bone carries it and which side it hangs on. */
 export interface RigProp {
   bone: number;
-  side?: string;
+  side: string;
 }
 
 export interface K16Rig {
   arms: RigChain[];
   /** the geometry's bounding box, in the model's own units */
   box: { mn: number[]; mx: number[]; h: number; w: number; d: number; };
-  /** the bone of the cape, null when the model has none */
-  cape: number | null;
-  /** the bone the mesh is dominated by */
-  dom: number | null;
+  /** the cape's bone chain, null when the model has none */
+  cape: number[] | null;
+  /** the design's dominant (weapon) side ("left", "right", "both"), null when the bone map names none */
+  dom: string | null;
   folder: string | null;
   head: number;
   legs: RigChain[];
@@ -141,15 +160,16 @@ export interface K16Rig {
   props: RigProp[];
   roleBones?: number[];
   root: number;
-  rootFix?: { legRoot: number; upperRoot: number; rawCarriesLegs: boolean; moved: boolean; };
+  rootFix?: { legRoot: number | null; upperRoot: number | null; rawCarriesLegs: boolean; moved: boolean; };
   rootRaw?: number;
   roots: number[];
-  sc: number | null;
+  /** the bone map's side confidence ("high" | "medium" | "low"), null for a geometry rig */
+  sc: string | null;
   /** where the roles came from: the game's own bone map, or the geometry heuristics */
   source: "bonemap" | "geometry";
   tail: number[];
   torso: number | null;
-  torsoRaw?: number;
+  torsoRaw?: number | null;
   wings: RigChain[];
 }
 
@@ -159,14 +179,6 @@ export interface RigSampleOut {
   value?: unknown;
 }
 
-export interface RigBasicsModel {
-  /** the loaded model's bone records (web/fight/*: the asset decode, untyped) */
-  bones: any;
-  timeline?: any;
-}
+export type RigBasicsModel = FightModel;
 
-export interface RetargetWorldModel {
-  /** the loaded model's bone records (web/fight/*: the asset decode, untyped) */
-  bones: any;
-  timeline?: any;
-}
+export type RetargetWorldModel = FightModel;

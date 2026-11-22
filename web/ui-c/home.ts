@@ -7,30 +7,41 @@
 import { applyRel, dx, dy } from "./geometry.js";
 import { isCursorToken, badgeSvg } from "./icons.js";
 import { N, textPart, plate, rowPlate, cursor, typeWord, badgeText, stripes, cardBar } from "./base.js";
-import type { UiCapturePart, UiPart, UiRun } from './types.js';
-type HomeClip = UiCapturePart & { part: string; x: number; y: number };
+import type { UiClaimedPart, UiMatrix, UiPart, UiRun, UiScreenContext } from './types.js';
+type HomeClip = UiClaimedPart;
+/** One party card's runs (readCardRuns): strings, null where the game draws none. */
+export interface UiCardRuns {
+    name: string | null;
+    lvLabel: string | null;
+    lv: string | null;
+    hpLabel: string | null;
+    hp: [string | null, string | null];
+    mpLabel: string | null;
+    mp: [string | null, string | null];
+}
 
 
 const STD = { header: { x: 34, y: 13 }, panel: { x: 168, y: 40 }, money: { x: 0, y: 158 } };
 const CARD_H = 42, CARD_W_RUNS = 116, ROW_PITCH = 14, FIRST_ROW_TEXT_DY = 9;     // list label pen sits 9 native below the panel top
 
 /** A rect builder for design coordinates. Absolute design page x/y (px) become native, then move by the anchor offset and the call's matrix. */
-const at = (rel, ox = 0, oy = 0) => (px: number | undefined, py: number, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: dy(py) + oy, w: N(pw), h: N(ph) }, rel);
+const at = (rel: UiMatrix, ox = 0, oy = 0) => (px: number | undefined, py: number, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: dy(py) + oy, w: N(pw), h: N(ph) }, rel);
 /** Card sub-elements: x absolute design px, y relative to the card top (design px). */
-const inCard = (rel, ox: number, cardY: number) => (px: number | undefined, pyRel: number | undefined, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: cardY + N(pyRel), w: N(pw), h: N(ph) }, rel);
+const inCard = (rel: UiMatrix, ox: number, cardY: number) => (px: number | undefined, pyRel: number | undefined, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: cardY + N(pyRel), w: N(pw), h: N(ph) }, rel);
 
 const text = textPart;
 
 const inRegion = (r: { x: number; y: number; }, x0: number, x1: number, y0: number, y1: number) => r.x >= x0 && r.x < x1 && r.y >= y0 && r.y < y1;
-const num = (s) => { const n = parseInt(String(s).replace(/[^0-9-]/g, ""), 10); return Number.isFinite(n) ? n : null; };
+const num = (s: string | null | undefined) => { const n = parseInt(String(s).replace(/[^0-9-]/g, ""), 10); return Number.isFinite(n) ? n : null; };
 const ratio = (cur: number | null, max: number | null) => (cur !== null && max !== null && max > 0 ? Math.max(0, Math.min(1, cur / max)) : null);
 
 /** Read one party card's runs: { name, lvLabel, lv, hpLabel, hp:[cur,max], mpLabel, mp:[cur,max] } (strings, null where the game draws none). */
-export function readCardRuns(runs, cardY: number) {
+export function readCardRuns(runs: UiRun[], cardY: number): UiCardRuns {
     const mine = runs.filter((r: { x: number; y: number; }) => inRegion(r, 0, CARD_W_RUNS, cardY, cardY + CARD_H + 4));
     const row = (dyRun: number): UiRun[] => mine.filter((r: { y: number; }) => Math.abs(r.y - (cardY + dyRun)) <= 1);
-    const label = (list) => list.filter((r: { right: null; x: number; }) => r.right == null && r.x < 30)[0]?.text ?? null;
-    const aligned = (list): string[] => list.filter((r: { right: null; }) => r.right != null).sort((a: { right: number; }, b: { right: number; }) => a.right - b.right).map((r) => r.text);
+    const label = (list: UiRun[]) => list.filter((r) => r.right == null && r.x < 30)[0]?.text ?? null;
+    // ETS item 9: the filter keeps only runs with a right edge, so both are numbers in the sort
+    const aligned = (list: UiRun[]): string[] => list.filter((r) => r.right != null).sort((a, b) => a.right! - b.right!).map((r) => r.text);
     const lvRow = row(11), hpRow = row(20), mpRow = row(29);
     const name = mine.filter((r: { y: number; x: number; }) => Math.abs(r.y - (cardY + 2)) <= 1 && r.x >= 40)[0]?.text ?? null;
     const lvVals = aligned(lvRow);
@@ -65,7 +76,7 @@ export const CARD_VARIANTS: Readonly<{ home: CardVariant; picker: CardVariant }>
 });
 export const CARD_PLAIN: CardColors = Object.freeze({ edge: "var(--c-edge)", tabBody: "var(--c-name-body)", tabInk: null });
 
-export function partyCard(i: number, part, namePart: HomeClip | null, card, out, v: CardVariant = CARD_VARIANTS.home, c: CardColors = CARD_PLAIN) {
+export function partyCard(i: number, part: Pick<HomeClip, "x" | "y" | "rel">, namePart: HomeClip | null, card: UiCardRuns, out: UiPart[], v: CardVariant = CARD_VARIANTS.home, c: CardColors = CARD_PLAIN) {
     const Y = part.y, rel = part.rel, ox = part.x, f = inCard(rel, ox, Y), k = `card${i}`;
     const plateRect = v.abs ? applyRel({ x: dx(v.plate[0]!) + ox, y: Y, w: N(v.plate[1]), h: N(126) }, rel) : f(v.plate[0], 0, v.plate[1], 126);
     out.push(plate(`${k}.plate`, "card", plateRect, rel, { shape: "sr", edge: c.edge }));
@@ -79,7 +90,7 @@ export function partyCard(i: number, part, namePart: HomeClip | null, card, out,
     for (const [id, labelText, vals, top, barTop, numTop, color, numColor, numW] of [
         ["hp", card.hpLabel, card.hp, 52, 56, 48, "var(--c-hp)", null, v.numW[0]],
         ["mp", card.mpLabel, card.mp, 84, 88, 80, "var(--c-mpbar)", "var(--c-mp)", v.numW[1]],
-    ]) {
+    ] as const) {
         if (labelText) out.push(text(`${k}.${id}label`, "label", labelText, f(200, top, 40, 24), 16, 24, { color: "var(--c-dim-label)", rel }));
         const r = ratio(num(vals[0]), num(vals[1]));
         if (r !== null) out.push(cardBar(`${k}.${id}bar`, f(244, barTop, v.barW, 14), r, color, rel));
@@ -87,9 +98,9 @@ export function partyCard(i: number, part, namePart: HomeClip | null, card, out,
     }
 }
 
-const composeCard = (i: number, part: { y: number; }, namePart: HomeClip | null, runs: UiRun[], out: UiPart[]) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
+const composeCard = (i: number, part: HomeClip, namePart: HomeClip | null, runs: UiRun[], out: UiPart[]) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
 
-function composeHeader(part: HomeClip, runs: UiRun[], out) {
+function composeHeader(part: HomeClip, runs: UiRun[], out: UiPart[]) {
     const rel = part.rel, ox = part.x - STD.header.x, oy = part.y - STD.header.y, f = at(rel, ox, oy);
     out.push({ key: "header.plate", kind: "plate", part: "header", layer: "under", rect: f(520, 42, 760, 64), shape: "sl", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     const run = runs.find((r: { x: number; y: number; }) => inRegion(r, 120, 400, part.y, part.y + 22));
@@ -99,16 +110,16 @@ function composeHeader(part: HomeClip, runs: UiRun[], out) {
     out.push(text("header.text", "label", label.trim(), f(634, 56, 600, 36), 26, 36, { rel }));
 }
 
-function composeMoney(part: HomeClip, runs, out) {
+function composeMoney(part: HomeClip, runs: UiRun[], out: UiPart[]) {
     const rel = part.rel, ox = part.x - STD.money.x, oy = part.y - STD.money.y, f = at(rel, ox, oy);
     out.push({ key: "money.plate", kind: "plate", part: "money", layer: "under", rect: f(0, 474, 484, 64), shape: "sr", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     const mine = runs.filter((r: { x: number; y: number; }) => inRegion(r, 0, 110, part.y, part.y + 22));
-    const amount = mine.find((r: { right: null; }) => r.right != null), unit = mine.find((r: { right: null; }) => r.right == null);
+    const amount = mine.find((r) => r.right != null), unit = mine.find((r) => r.right == null);
     if (amount) out.push(text("money.amount", "number", amount.text, f(236, 484, 144, 42), 32, 42, { align: "right", rel, maxDp: 144 }));
     if (unit) out.push(text("money.unit", "label", unit.text, f(392, 492, 80, 28), 22, 28, { color: "var(--c-orange)", rel }));
 }
 
-function composePanel(part, runs, out, word = "MENU") {
+function composePanel(part: HomeClip, runs: UiRun[], out: UiPart[], word = "MENU") {
     const rel = part.rel, ox = part.x - STD.panel.x, oy = part.y - STD.panel.y, f = at(rel, ox, oy);
     const labels = runs.filter((r) => r.right == null && !isCursorToken(r.text) && r.x >= part.x + 12 && r.y >= part.y + 4)
         .sort((a: { y: number; }, b: { y: number; }) => a.y - b.y);
@@ -137,15 +148,15 @@ function composePanel(part, runs, out, word = "MENU") {
  * parts = the claimed clips in draw order [{ part, pack, id, x, y, rel }], runs = the text runs captured in the scope.
  * Returns the descriptors (native space) in paint order; `full: true` = the whole bleed limit.
  */
-export function composePauseHome({ parts, runs }: { parts: HomeClip[]; runs: UiRun[] }): UiPart[] {
+export function composePauseHome({ parts, runs }: UiScreenContext): UiPart[] {
     const of = (name: string) => parts.filter((p: { part: string; }) => p.part === name);
     const panel = of("panel")[0], header = of("header")[0], money = of("money")[0], back = of("backdrop")[0];
     const cards = of("card").sort((a: { y: number; }, b: { y: number; }) => a.y - b.y);
     // back from a sidebar page the game keeps its diamond backdrop under the home: shown as the C stripes (never old pixels), no wash
-    const out = [back ? stripes(back.x) : { key: "wash", kind: "wash", part: "wash", layer: "under", full: true }];
+    const out: UiPart[] = [back ? stripes(back.x) : { key: "wash", kind: "wash", part: "wash", layer: "under", full: true }];
     if (panel) composePanel(panel, runs, out);
     if (header) composeHeader(header, runs, out);
-    cards.forEach((c: { y: number; }, i: number) => composeCard(i, c, of("cardName").find((n: { y: number; }) => Math.abs(n.y - c.y) < 1) ?? null, runs, out));
+    cards.forEach((c, i: number) => composeCard(i, c, of("cardName").find((n: { y: number; }) => Math.abs(n.y - c.y) < 1) ?? null, runs, out));
     if (money) composeMoney(money, runs, out);
     return out;
 }

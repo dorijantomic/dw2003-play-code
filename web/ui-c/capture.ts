@@ -7,17 +7,17 @@
 // Nothing here reads or writes game state; it only sees what the draw functions are asked to draw.
 import { claimFor } from "./claims.js";
 import { relative } from "./geometry.js";
-import type { UiCapturePart } from "./types.js";
+import type { UiCapturePart, UiCaptureScope, UiClaim, UiHookPart } from "./types.js";
 import type { UiMatrix } from "./types.js";
 import type { UiRun } from './types.js';
 
 
-interface UiCaptureLayer { dx: number; dy: number; w: number; h: number; }
+interface UiCaptureLayer { x: number; y: number; dx: number; dy: number; w: number; h: number; }
 interface UiCaptureSpriteIds { layers?: UiCaptureLayer[]; }
 interface UiCapturePackDef { name: string; ids?: Record<string, UiCaptureSpriteIds>; }
 
 
-let cur = null;
+let cur: UiCaptureScope | null = null;
 
 export const capturing = () => cur !== null && !cur.inArt;
 
@@ -38,12 +38,12 @@ export function clipBounds(p: UiCapturePackDef, id: string | number) {
  * scope also takes the plain drawText() calls (web/uifont.js) as runs -- the battle HUD writes its names and numbers that way, not as
  * text widgets.
  */
-export function begin(key: string, ctx: CanvasRenderingContext2D, m0: UiMatrix, getArt: () => CanvasRenderingContext2D, o: { texts?: boolean; } = {}) {
+export function begin(key: string, ctx: CanvasRenderingContext2D, m0: Required<UiMatrix>, getArt: () => CanvasRenderingContext2D, o: { texts?: boolean; } = {}) {
     cur = { key, ctx, m0, getArt, parts: [], runs: [], unclaimed: [], claimed: [], arts: 0, inArt: false, domText: 0, texts: !!o.texts };
 }
 
 /** Close the scope and return what it saw. */
-export function end() {
+export function end(): UiCaptureScope | null {
     const s = cur;
     cur = null;
     return s;
@@ -53,7 +53,7 @@ export function end() {
  * The clip hook (web/screenpack.js): returns true when the scope took the draw. `draw(artCtx)` re-runs the real drawing on another context.
  */
 /** The battle's list rows (technique / item) carry the game's own little row icons (cmfont 57, 95, 97): the arc rows replace them (the element chip, the quantity), so they are taken and not drawn. */
-const battleIconClaim = (pack: string, id: string | number) => (pack === "cmfont" && [57, 95, 97].includes(Number(String(id).split("#")[0])) ? { part: "rowIcon", layer: "under" } : null);
+const battleIconClaim = (pack: string, id: string | number): UiClaim | null => (pack === "cmfont" && [57, 95, 97].includes(Number(String(id).split("#")[0])) ? { part: "rowIcon", layer: "under" } : null);
 export function clipHook(ctx: CanvasRenderingContext2D, p: UiCapturePackDef, id: string | number, x: number, y: number, draw: (c: CanvasRenderingContext2D) => void, drawW = null) {
     const s = cur;
     if (!s || s.inArt || ctx !== s.ctx) return false;
@@ -65,10 +65,11 @@ export function clipHook(ctx: CanvasRenderingContext2D, p: UiCapturePackDef, id:
     if (claim && !listedArt) {
         const [base, row = "0"] = String(id).split("#");
         // x, y = the game's draw position; bx, by, w, h = where the clip's pixels sit relative to it (read from the loaded sheet, never stored)
-        const part = { ...claim, rows: claim.rows ?? 0, pack: p.name, id: String(id), base: Number(base), row: Number(row) || 0, x, y, bx: b?.x ?? 0, by: b?.y ?? 0, w: b?.w ?? 0, h: b?.h ?? 0, rel } as UiCapturePart;
+        // ETS item 9: the claim spread carries its `layers` flag, which the line below replaces with the clip's rects
+        const part: UiCapturePart & Omit<UiClaim, "layers"> = { ...(claim as Omit<UiClaim, "layers">), rows: claim.rows ?? 0, pack: p.name, id: String(id), base: Number(base), row: Number(row) || 0, x, y, bx: b?.x ?? 0, by: b?.y ?? 0, w: b?.w ?? 0, h: b?.h ?? 0, rel };
         if (drawW != null) part.drawW = drawW;     // drawClipWidth: the width the game reveals (a gauge fill)
         // a claim that asks for them gets the clip's sheet layers (piece rects relative to the draw position), read at run time
-        if (claim.layers) part.layers = (p.ids?.[String(id)]?.layers ?? []).map((l: { dx: number; dy: number; w: number; h: number; }) => ({ x: l.dx | 0, y: l.dy | 0, w: l.w | 0, h: l.h | 0 }));
+        if (claim.layers) part.layers = (p.ids?.[String(id)]?.layers ?? []).map((l) => ({ x: l.dx | 0, y: l.dy | 0, w: l.w | 0, h: l.h | 0 }));
         s.parts.push(part);
         s.claimed.push({ pack: p.name, id: String(id), part: claim.part });
         if (claim.artSizes) { drawPieces(s, m, p, id, x, y, claim.artSizes); return true; }
@@ -93,10 +94,10 @@ export function clipHook(ctx: CanvasRenderingContext2D, p: UiCapturePackDef, id:
 }
 
 /** The sheet pieces of clip `id` whose size is one of `sizes` ([[w, h]]): the pictures inside a claimed frame. */
-export const artPieces = (layers = [], sizes = []) => layers.filter((l) => sizes.some(([w, h]) => (l.w | 0) === w && (l.h | 0) === h));
+export const artPieces = (layers: UiCaptureLayer[] = [], sizes: readonly (readonly [number, number])[] = []) => layers.filter((l) => sizes.some(([w, h]) => (l.w | 0) === w && (l.h | 0) === h));
 
 /** Draw only those pieces, in their own pixels, on the art canvas (the frame around them is the C plate). */
-function drawPieces(s: { getArt: () => CanvasRenderingContext2D | null; arts: number }, m: DOMMatrix, p: UiCapturePackDef & { img?: CanvasImageSource }, id: string | number, x: number, y: number, sizes: [number, number][]) {
+function drawPieces(s: { getArt: () => CanvasRenderingContext2D | null; arts: number }, m: DOMMatrix, p: UiCapturePackDef & { img?: CanvasImageSource }, id: string | number, x: number, y: number, sizes: readonly (readonly [number, number])[]) {
     const pieces = artPieces(p.ids?.[String(id)]?.layers, sizes);
     if (!pieces.length || !p.img) return;
     const art = s.getArt();
@@ -108,10 +109,10 @@ function drawPieces(s: { getArt: () => CanvasRenderingContext2D | null; arts: nu
 }
 
 /** The rect inside a clip's frame that keeps the game's pixels: `inset` = [left, top, right, bottom] native px off the clip's bounds. */
-export const insetRect = (x: number, y: number, w: number, h: number, [l, t, r, b]) => ({ x: x + l, y: y + t, w: Math.max(0, w - l - r), h: Math.max(0, h - t - b) });
+export const insetRect = (x: number, y: number, w: number, h: number, [l, t, r, b]: readonly [number, number, number, number]) => ({ x: x + l, y: y + t, w: Math.max(0, w - l - r), h: Math.max(0, h - t - b) });
 
 /** Draw a clip on the art canvas cut to its inner rect (a button's word): the frame around it is the C plate, the word stays pixels. */
-function drawInset(s: { getArt: () => CanvasRenderingContext2D | null; inArt: boolean; arts: number }, m: DOMMatrix, x: number, y: number, w: number, h: number, inset: [number, number, number, number], draw: (c: CanvasRenderingContext2D) => void) {
+function drawInset(s: { getArt: () => CanvasRenderingContext2D | null; inArt: boolean; arts: number }, m: DOMMatrix, x: number, y: number, w: number, h: number, inset: readonly [number, number, number, number], draw: (c: CanvasRenderingContext2D) => void) {
     const art = s.getArt();
     if (!art) return;
     const r = insetRect(x, y, w, h, inset);
@@ -150,7 +151,7 @@ export const capturingText = (ctx: CanvasRenderingContext2D | null | undefined) 
 /** A drawText() run (web/uifont.js builds it with the same pens it would paint). Returns true when the scope took it. */
 export function textRunHook(ctx: CanvasRenderingContext2D | null | undefined, run: UiRun) {
     if (!capturingText(ctx)) return false;
-    cur.runs.push(run);
+    cur!.runs.push(run);     // ETS item 9: capturingText just proved `cur` is set
     return true;
 }
 
@@ -158,7 +159,7 @@ export function textRunHook(ctx: CanvasRenderingContext2D | null | undefined, ru
  * A part the game paints with plain canvas calls, not a clip (the battle's HP bar fill, the "No techs!" panel): the owner hands its
  * native rect and data; the part gets the matrix of the draw relative to the scope start like a clip. Returns true when taken.
  */
-export function partHook(ctx: CanvasRenderingContext2D | undefined, part) {
+export function partHook(ctx: CanvasRenderingContext2D | undefined, part: UiHookPart) {
     const s = cur;
     if (!s || s.inArt || ctx !== s.ctx) return false;
     const rel = relative(s.m0, ctx!.getTransform());

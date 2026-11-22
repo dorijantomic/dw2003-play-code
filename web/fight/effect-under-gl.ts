@@ -11,6 +11,10 @@
 // The placement comes from spriteGeometry()/spriteCorners() in effect-player.js, the same maths the
 // 2D pass (drawEffects) uses.
 import { effectClip, spriteGeometry, spriteCorners } from "./effect-player.js";
+import type { EffectDrawManifest, EffectSprite, EffectView } from "./effect-player.js";
+/** An image the effect layer can both upload and measure. */
+type SizedImage = TexImageSource & { width: number; height: number; };
+
 interface UnderGlResources {
   prog: WebGLProgram;
   aP: number;
@@ -22,26 +26,6 @@ interface UnderGlResources {
   tex: WeakMap<TexImageSource, WebGLTexture>;
 }
 
-interface UnderEffectSprite {
-  /** archive key into manifest.archives and images */
-  arch: string | number;
-}
-
-interface UnderEffectArchive {
-  /** parsed clip table for this archive, consumed by effectClip() */
-  readonly clips?: Record<string, readonly number[]>;
-}
-
-interface UnderEffectManifest {
-  archives: Record<string, UnderEffectArchive>;
-}
-
-interface UnderEffectView {
-  centerX: number;
-  centerY: number;
-  pxScale: number;
-  worldToScreen: (x: number, y: number, z: number) => { x: number; y: number } | null;
-}
 
 
 const VS = "attribute vec2 aP; attribute vec2 aT; varying vec2 vT; void main(){ vT = aT; gl_Position = vec4(aP, 0.0, 1.0); }";
@@ -59,13 +43,13 @@ function resources(gl: WebGLRenderingContext): UnderGlResources {
   let r = perGl.get(gl);
   if (r) return r;
   const sh = (type: number, src: string) => {
-    const s = gl.createShader(type);
+    const s = gl.createShader(type)!;
     gl.shaderSource(s, src);
     gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error("effect-under shader: " + gl.getShaderInfoLog(s));
     return s;
   };
-  const prog = gl.createProgram();
+  const prog = gl.createProgram()!;
   gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
@@ -122,15 +106,15 @@ export function applySemiBlend(gl: WebGLRenderingContext, semi: number | undefin
 /** The constant the fragment alpha is multiplied by for a semi mode. */
 export function blendConstant(semi: number | undefined) { return semi === 0 ? 0.5 : semi === 3 ? 0.25 : 1; }
 
-function drawRect(gl, r, tex, img, rect, corners, W, H) {
-  const px = ([x, y]) => [x / W * 2 - 1, 1 - y / H * 2];
+function drawRect(gl: WebGLRenderingContext, r: UnderGlResources, tex: WebGLTexture | null, img: SizedImage, rect: { x: number; y: number; w: number; h: number; }, corners: [number, number][], W: number, H: number) {
+  const px = ([x, y]: [number, number]) => [x / W * 2 - 1, 1 - y / H * 2];
   const u0 = rect.x / img.width, v0 = rect.y / img.height;
   const u1 = (rect.x + rect.w) / img.width, v1 = (rect.y + rect.h) / img.height;
   const uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
   // sampling stays half a texel inside the rect, like the source-rect clamp of drawImage
   gl.uniform4f(r.uBox, u0 + 0.5 / img.width, v0 + 0.5 / img.height, u1 - 0.5 / img.width, v1 - 0.5 / img.height);
-  const v = [];
-  for (const i of [0, 1, 2, 0, 2, 3]) v.push(...px(corners[i]), ...uv[i]);
+  const v: number[] = [];
+  for (const i of [0, 1, 2, 0, 2, 3]) v.push(...px(corners[i]!), ...uv[i]!);
   gl.bindBuffer(gl.ARRAY_BUFFER, r.buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.DYNAMIC_DRAW);
   gl.vertexAttribPointer(r.aP, 2, gl.FLOAT, false, 16, 0);
@@ -144,7 +128,7 @@ function drawRect(gl, r, tex, img, rect, corners, W, H) {
  * W,H = drawing-buffer size, the same px the view maps to. Leaves the GL state as it found it.
  * Returns the number of sprites drawn.
  */
-export function drawUnderEffects(gl: WebGLRenderingContext, list: UnderEffectSprite[], manifest: UnderEffectManifest, images: Record<string, TexImageSource>, view: UnderEffectView, W: number, H: number) {
+export function drawUnderEffects(gl: WebGLRenderingContext, list: EffectSprite[], manifest: EffectDrawManifest, images: Record<string, SizedImage>, view: EffectView, W: number, H: number) {
   if (!list?.length) return 0;
   const r = resources(gl);
   const prev = {
@@ -167,7 +151,7 @@ export function drawUnderEffects(gl: WebGLRenderingContext, list: UnderEffectSpr
   gl.enableVertexAttribArray(r.aT);
   let drawn = 0;
   for (const s of list) {
-    const arch = manifest.archives[String(s.arch)];
+    const arch = manifest.archives![String(s.arch)];
     const img = images[String(s.arch)];
     if (!arch || !img) continue;
     const clip = effectClip(arch, s);

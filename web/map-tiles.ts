@@ -1,10 +1,4 @@
-interface MapTileEntry {
-  map: string;
-  bmp: ImageBitmap | null;
-  state: "queued" | "loading" | "ready" | "error";
-  split: Record<string, ImageBitmap>;
-  used: number;
-}
+import type { MapTileEntry, MapTileEnv, MapTileJob, TileIndex, TileIndexState, TiledMapInfo } from "./types/map-tiles.js";
 // HD Remaster field maps drawn from tiles (always on in HD; game.js HD_MAPS).
 //
 // A whole HD map is up to 7680x5632 (90 MB PNG, 176 MB decoded) and the game used to load it, its
@@ -21,27 +15,27 @@ const INDEX_URL = "assets-hd/map-tiles/index.json";
 const MAX_TILES = 40;          // decoded tiles kept (1032x1032 RGBA ~4.3 MB each)
 const MAX_INFLIGHT = 6;
 
-let index = null;              // parsed index.json, {} when absent
-let indexPromise = null;
-const maps = new Map();        // name -> TiledMap
-const cache = new Map();       // key -> entry {bmp, split: {ground, layer2}, used}; Map order = LRU
-const queue = [];              // keys waiting to fetch, most wanted first
+let index: TileIndexState | null = null;              // parsed index.json, {} when absent
+let indexPromise: Promise<TileIndexState> | null = null;
+const maps = new Map<string, TiledMap>();        // name -> TiledMap
+const cache = new Map<string, MapTileEntry>();       // key -> entry {bmp, split: {ground, layer2}, used}; Map order = LRU
+const queue: MapTileJob[] = [];              // keys waiting to fetch, most wanted first
 let inflight = 0;
 let frame = 0;
 
 // Test hooks (node has no fetch of local files, createImageBitmap or canvas).
-const env = {
-  load: async (url) => createImageBitmap(await (await fetch(url)).blob()),
-  canvas: (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; },
+const env: MapTileEnv = {
+  load: async (url: string) => createImageBitmap(await (await fetch(url)).blob()),
+  canvas: (w: number, h: number) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; },
   onTile: null,                // called after a tile lands (the game redraws every frame anyway)
 };
-export function setTileEnv(overrides) { Object.assign(env, overrides); }
+export function setTileEnv(overrides: Partial<MapTileEnv>) { Object.assign(env, overrides); }
 export function resetTiles() {
   for (const e of cache.values()) e.bmp?.close?.();
   cache.clear(); maps.clear(); queue.length = 0; inflight = 0; index = null; indexPromise = null;
 }
 
-export function loadTileIndex(fetchJson = () => fetch(INDEX_URL, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))) {
+export function loadTileIndex(fetchJson: () => Promise<TileIndex | null> = () => fetch(INDEX_URL, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))) {
   if (!indexPromise) {
     indexPromise = Promise.resolve().then(fetchJson).catch(() => null)
       .then((j) => { index = j && j.maps && j.tile ? j : {}; return index; });
@@ -62,12 +56,12 @@ export function tiledMap(name: string | null | undefined) {
 export function tickTiles() { frame++; }
 
 /** Drop every tile of maps not in `keepNames` (stage change). */
-export function retainTiledMaps(keepNames) {
+export function retainTiledMaps(keepNames: Iterable<string>) {
   const keep = new Set(keepNames);
   for (const [key, e] of [...cache]) {
     if (!keep.has(e.map)) { e.bmp?.close?.(); cache.delete(key); }
   }
-  for (let i = queue.length - 1; i >= 0; i--) if (!keep.has(queue[i].map)) queue.splice(i, 1);
+  for (let i = queue.length - 1; i >= 0; i--) if (!keep.has(queue[i]!.map)) queue.splice(i, 1);
 }
 
 export function tileStats() {
@@ -78,7 +72,7 @@ export function tileStats() {
 
 function pump() {
   while (inflight < MAX_INFLIGHT && queue.length) {
-    const job = queue.shift();
+    const job = queue.shift()!;
     const e = cache.get(job.key);
     if (!e || e.bmp || e.state !== "queued") continue;
     e.state = "loading";
@@ -102,16 +96,16 @@ function evict() {
 }
 
 export class TiledMap {
-  declare gutter: any;
+  declare gutter: number;
   declare h: number;
-  declare info: any;
-  declare name: any;
-  declare scale: any;
-  declare skip: Set<unknown>;
-  declare splitMask: any;
-  declare tile: any;
+  declare info: TiledMapInfo;
+  declare name: string;
+  declare scale: number;
+  declare skip: Set<string>;
+  declare splitMask: CanvasImageSource | null;
+  declare tile: number;
   declare w: number;
-  constructor(name, info, tile, gutter, scale) {
+  constructor(name: string, info: TiledMapInfo, tile: number, gutter: number, scale: number) {
     this.name = name;
     this.info = info;
     this.tile = tile; this.gutter = gutter; this.scale = scale;
@@ -122,7 +116,7 @@ export class TiledMap {
   }
 
   /** The layer split (game.js buildGroundCover): a native-size mask, white where layer 2 shows. */
-  setSplitMask(mask) {
+  setSplitMask(mask: CanvasImageSource | null) {
     if (this.splitMask === mask) return;
     this.splitMask = mask;
     for (const e of cache.values()) if (e.map === this.name) e.split = {};
@@ -146,15 +140,16 @@ export class TiledMap {
 
   // The tile with the split applied (kind "ground" erases the layer-2-only pixels, "layer2" keeps
   // only them), built once per tile from the native mask scaled up with no smoothing.
-  splitTile(e, c: number, r: number, kind) {
+  splitTile(e: MapTileEntry, c: number, r: number, kind: string | null) {
     if (!kind) return e.bmp;
     if (!this.splitMask) return null;
     if (e.split[kind]) return e.split[kind];
     const { tile: T, gutter: G, scale: S } = this;
-    const tw = e.bmp.width, th = e.bmp.height;
+    // ETS item 9: draw() only hands over a tile whose picture is decoded (its `e.bmp ?` test), TS cannot see that across the call.
+    const tw = e.bmp!.width, th = e.bmp!.height;
     const cv = env.canvas(tw, th);
     const g = cv.getContext("2d");
-    g!.drawImage(e.bmp, 0, 0);
+    g!.drawImage(e.bmp!, 0, 0);
     g!.globalCompositeOperation = kind === "ground" ? "destination-out" : "destination-in";
     g!.imageSmoothingEnabled = false;
     g!.drawImage(this.splitMask, (c * T - G) / S, (r * T - G) / S, tw / S, th / S, 0, 0, tw, th);
@@ -168,12 +163,12 @@ export class TiledMap {
    * Returns true when every visible tile was drawn; false = the caller should draw its native
    * picture FIRST next time (this call drew the tiles that are ready).
    */
-  draw(ctx, ox, oy, vx, vy, vw, vh, kind = null) {
+  draw(ctx: CanvasRenderingContext2D, ox: number, oy: number, vx: number, vy: number, vw: number, vh: number, kind: string | null = null) {
     const { tile: T, gutter: G, scale: S, info } = this;
     const L = T / S;                              // tile size in map pixels
     const c0 = Math.max(0, Math.floor(vx / L)), c1 = Math.min(info.cols - 1, Math.floor((vx + vw - 1e-6) / L));
     const r0 = Math.max(0, Math.floor(vy / L)), r1 = Math.min(info.rows - 1, Math.floor((vy + vh - 1e-6) / L));
-    const ready = [];
+    const ready: [CanvasImageSource, number, number][] = [];
     let complete = true;
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {

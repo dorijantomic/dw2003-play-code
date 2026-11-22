@@ -12,7 +12,7 @@ import {
   commitBattleFormChange,
 } from "../form-blast.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
-import type { EnemyStatBlock, FusedRecord } from "./types.js";
+import type { EnemyStatBlock, FusedRecord, FusionBoss } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { BattleState } from "../../types/battle.js";
 
@@ -29,7 +29,7 @@ export function makeFusion(B: BattleContext) {
    * is what the plate and the pages say, and the fused HP is the authored 2424 — never a
    * full heal of the player's side, and never the fallen body's own pool.
    */
-  function fuseIntoBoss(b, boss) {
+  function fuseIntoBoss(b: BattleState, boss: FusionBoss) {
     const en = b?.enemy;
     // A Fusion Lab part with no enemies.json row (a partner form) brings its own stat row in `boss.rows`.
     const bodyRow = B.enemiesDB?.[boss?.body] ?? boss?.rows?.[boss?.body] ?? null;

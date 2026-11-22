@@ -235,7 +235,8 @@ import { makeNative } from "./battle/core/native.js";
 import { makeHud } from "./battle/core/hud.js";
 import { makeReport } from "./battle/core/report.js";
 import { makeDraw } from "./battle/core/draw.js";
-import type { BattleContext } from "./types/battle.js";
+import type { BattleContext, EngineUi, EnemyRecord } from "./types/battle.js";
+import type { FightReportLayout } from "./battle/report.js";
 import type { GameState } from "./game/types.js";
 import type { BattleState } from "./types/battle.js";
 // moved by tools/rewrite/split.mjs: still exported from here
@@ -387,7 +388,7 @@ export const pgfgc00 = loadPack("pgfgc00");
 // CMFONT, the pack pro/fightstg's message panel uses for its blinking "press Circle"
 // glyph (handle 0x02860000 -- web/dialogue-translated.js:15 carries the same mapping).
 export const cmfont = loadPack("cmfont");
-export let REPORT_LAYOUT = null;
+export let REPORT_LAYOUT: FightReportLayout | null = null;
 fetch("assets/data/stfgtrep_ui.json").then((r) => r.json()).then((j) => { REPORT_LAYOUT = j; }).catch(() => {});
 
 // Original 4bpp fight UI texture page decoded from the true GPU VRAM in
@@ -452,7 +453,8 @@ export const BATTLE_UI_LAYOUT = Object.freeze({
 // scaledStat/partyCharismaTotal are also named at engine/index.ts:630). Re-exported
 // here because web/glossary-digimon.js, web/debugPanel.js and the tests import them
 // from this module; do not define a second copy.
-const { scaledHp, scaledMp, evolvedMaxStats } = battleStats;
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `battleStats` export; engine/dw3/battle-stats.ts is its source.
+const { scaledHp, scaledMp, evolvedMaxStats } = battleStats as typeof import("../engine/dw3/battle-stats.js");
 export { scaledStat, scaledHp, scaledMp, evolvedMaxStats };
 
 export { damageTermCategory4Arm as category4ArmFor };
@@ -487,7 +489,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     // in the `jalr` delay slot (pro/fightstg.s .L0x80098bd4) — SYSTEM07 0x4001C
     // through [0x80055C48], the same confirm blip the menus play. Every battle
     // line sounds it on the Circle press that reads it, "Annihilated..." included.
-    playSound: (id) => { if ((id >>> 0) === BATTLE_MESSAGE_PRESS_SOUND) sfx?.play("system07"); },
+    playSound: (id: number) => { if ((id >>> 0) === BATTLE_MESSAGE_PRESS_SOUND) sfx?.play("system07"); },
   });
   // The battle's OPENING PHASE MACHINE (engine/dw3/battle-opening-machine.ts), the
   // port of pro/wfightmn's #2 arm (F0x800a6c44): the seven phases whose exit hands
@@ -502,7 +504,8 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
   // UI-DISPLAY-TICK-CHAIN-2026-08-21) advances 0x133 of a tick per 50 Hz PAL field tick,
   // i.e. 256/307 of it = 60.4 Hz, which is the rate the message line's rules are stated
   // in: the second line after 3 ticks, the glyph one frame every 4.
-  B.msgClock = new ui.MenuDisplayClock();
+  // ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+  B.msgClock = new (ui as EngineUi).MenuDisplayClock();
   B.commandNative = createBattleCommandTranslated(sfx, { getState });
   // Step F, TECH screen: the six-row technique list runs the translated
   // pro/fightstg screen (web/battletech-translated.js, engine
@@ -697,7 +700,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     for (const party of Object.values(fej?.screens ?? {}) as any[]) {
       for (const e of party ?? []) if (e?.name != null && e.id != null) nameToId[e.name] = e.id | 0;
     }
-    emj.enemies.forEach((e, i) => {
+    emj.enemies.forEach((e: EnemyRecord, i: number) => {
       if (nameToId[e.enemy_id] == null && enemyRows[i]) nameToId[e.enemy_id] = enemyRows[i].id | 0;
     });
     S.enemyStatIdByName = nameToId;
@@ -773,10 +776,10 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     // MOVIEE02_STR, then 0x2d7 = screen 727 = stage 780) and calls
     // finishEnding() when it is done — the kind-6 equivalent of the report
     // hand-off above (wfightmn.s:2165-2174).
-    setEndingHandoff: (h) => { B.endingHandoff = h ?? null; },
+    setEndingHandoff: (h: BattleContext["endingHandoff"]) => { B.endingHandoff = h ?? null; },
     // The pre-battle presentation the field's handoff owes (F0x8008B798). The
     // host's handler returns a promise that resolves when it is over.
-    setFieldMovieHandoff: (h) => { B.fieldMovieHandoff = h ?? null; },
+    setFieldMovieHandoff: (h: BattleContext["fieldMovieHandoff"]) => { B.fieldMovieHandoff = h ?? null; },
     finishNativeReport: () => { if (B.battle) endBattle("win"); },
     finishEnding: () => { if (B.battle) endBattle("win"); },
     evoTargets, applyEvolution, initializePartyStats, partnerInfo, availableEvolutions,

@@ -5,6 +5,7 @@ import type { ActorAnimator } from "../../fight/actor-animator.js";
 
 import type { AnimHooks } from "../../types/battle3d.js";
 import type { DnaScriptOp } from "../../battle/core/types.js";
+import type { FightTimelineRow } from "../../fight/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeAnim(B$: Battle3DContext) {
 function _applyNamed(anim8r: ActorAnimator | null | undefined, name: string | null, hooks: AnimHooks) {
@@ -173,7 +174,7 @@ function enemyAttack(techId: number, opts: AttackOptions = {}) {
   }
 // The victory gesture: the model's own table 44, else (DW2 motion on, ?dw2motion=1) the DW2 victory clip I merged by
   // dw2-motion.js (DW2 plays I only when a battle is won: ~/dw3-knowledge/dw2-clips.md). model.dw2Motion exists only when it is on.
-  function victoryTable(model: { timeline?: ({ table?: DnaScriptOp[] } | undefined)[]; dw2Motion?: { I?: { table: number } | null } | null }): DnaScriptOp[] | null {
+  function victoryTable(model: { timeline?: ({ table?: FightTimelineRow[] } | undefined)[]; dw2Motion?: { I?: { table: number } | null } | null }): FightTimelineRow[] | null {
     const own = model?.timeline?.[44]?.table;
     if (own?.length) return own;
     const m = model?.dw2Motion?.I;

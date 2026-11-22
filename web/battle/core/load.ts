@@ -18,7 +18,7 @@ import { winBattleRewards, paidParticipants } from "../progress.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { BattleEndContext } from "./types.js";
 
-import type { EnemyRecord } from "../../types/battle.js";
+import type { EnemyRecord, BattleSkill, EnemyBattleRecord } from "../../types/battle.js";
 import type { GameState } from "../../game/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeLoad(B: BattleContext) {
@@ -60,7 +60,7 @@ async function loadFusionData() {
     const key = String(mapId).match(/(\d+)/)?.[1];
     const stage = key ? B.stageEncDB.stages?.[key] : null;
     if (!stage?.zones) return 0;
-    return zoneRateLevel(stage.zones, zoneAt(B.zoneGridDB?.stages?.[key], x, y),
+    return zoneRateLevel(stage.zones, zoneAt(B.zoneGridDB?.stages?.[key!], x, y),
                          stageZoneBlocks(stage, B.storyOrdinal(), B.entryKey()));
   }
 // Build a fake profile-like object from a sdigiedt enemy entry so elementFactor works.
@@ -113,7 +113,7 @@ function enemyMp(eStats: { spt: number; }, level: number) {
   // the damage one. The two refusals keep the walker's own words: the original's opcode-5
   // arm has no refusal page of its own — it tests `andi $v0, 0x8` at `:14990` and, when
   // it fails, stores the item id and prints kind 17 anyway.
-  function trySteal(skill, enemy, state, thiefName = "") {
+  function trySteal(skill: BattleSkill | null | undefined, enemy: EnemyBattleRecord, state: GameState, thiefName = "") {
     if (skill?.effect !== "steal" || enemy.hp <= 0) return { text: "", page: null };
     const stealBonus = B.battle?.player?.stealBonus ?? 0;  // HackSticker/System (+32/+64)
     // FIGHTSTG_F0x800a1114's own roll, through the port `stealProc`: a ratio of the

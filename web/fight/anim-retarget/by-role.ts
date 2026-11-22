@@ -25,15 +25,28 @@ import {
   shouldMirror,
 } from "./k16-rig.js";
 import { sample, shiftPlaylistEntry } from "./rig-basics.js";
-import type { RetargetChannels, RetargetModel } from "./types.js";
+import type { IdleSpan } from "./k16-rig.js";
+import type { RetargetBake, RetargetChannels, RetargetModel, RetargetRolePair } from "./types.js";
+
+/** The knobs of a role bake: the frame offset, the arm-side mirror (null = decide), IK on/off, the reach rule, the idle replay of unmapped roles, the root rule. */
+interface RoleBakeOpts {
+  offset?: number;
+  mirror?: boolean | null;
+  ik?: boolean;
+  trace?: null;
+  reach?: string;
+  idleRoles?: boolean;
+  idleRange?: IdleSpan | null;
+  rootNormalise?: boolean | string;
+}
 
 /**
  * The K16 bake: per-frame conjugation in the target's rest frame, root translation scaled, arm/leg
  * end effectors solved by a bounded two-bone IK, joint limits applied. Same return shape as
  * bakeRetargetGeometry(). null when this pair has no bone map or no playable table.
  */
-export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror = null, ik = true, trace = null,
-  reach = "point", idleRoles = false, idleRange = null, rootNormalise = "auto" } = {}) {
+export function bakeRetargetByRole(target: RetargetModel, source: RetargetModel, clip: number, { offset = 6000, mirror = null, ik = true, trace = null,
+  reach = "point", idleRoles = false, idleRange = null, rootNormalise = "auto" }: RoleBakeOpts = {}): RetargetBake | null {
   const src = source?.actions?.[clip];
   if (!src || !src.ops?.length) return null;
   const T0 = rigOf(target), S0 = rigOf(source);
@@ -47,9 +60,10 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   const Traw = T0.rootFix?.rawCarriesLegs, Sraw = S0.rootFix?.rawCarriesLegs;
   const disagree = !!(Traw !== Sraw && T0.rootFix?.legRoot != null && S0.rootFix?.legRoot != null);
   const normalise = rootNormalise === "auto" ? disagree : !!rootNormalise;
-  const T = normalise ? T0 : { ...T0, root: T0.rootRaw, torso: T0.torsoRaw };
-  const S = normalise ? S0 : { ...S0, root: S0.rootRaw, torso: S0.torsoRaw };
-  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2] | 0;
+  // ETS item 9: rigOf always sets rootRaw and torsoRaw
+  const T = normalise ? T0 : { ...T0, root: T0.rootRaw!, torso: T0.torsoRaw! };
+  const S = normalise ? S0 : { ...S0, root: S0.rootRaw!, torso: S0.torsoRaw! };
+  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2]! | 0;
   const srcTable = source.timeline?.[table]?.table;
   if (!table || !Array.isArray(srcTable) || !srcTable.length) return null;
   let lo = Infinity, hi = -1;
@@ -62,7 +76,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   const subs = k16Subtrees(target);
   const H = T.box.h || 1, HD = S.box.h || 1;
   const sizeRatio = HD > 1e-6 ? H / HD : 1;
-  const pairs = plan.pairs.map((p) => {
+  const pairs: RetargetRolePair[] = plan.pairs.map((p) => {
     const tLen = k16ChainLen(tRest.P, p.tc), sLen = k16ChainLen(sRest.P, p.sc);
     let split = 1;
     if (p.tc.length > 2) {
@@ -73,31 +87,31 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
         if (Math.abs(c - half) < best) { best = Math.abs(c - half); split = i; }
       }
     }
-    return { ...p, tLen, sLen, ratio: sLen > 1e-6 ? tLen / sLen : 1, split, tip: p.tc[p.tc.length - 1] };
+    return { ...p, tLen, sLen, ratio: sLen > 1e-6 ? tLen / sLen : 1, split, tip: p.tc[p.tc.length - 1]! };
   });
   const armPairs = ik ? pairs.filter((p) => p.kind === "arm" && p.tc.length >= 3) : [];
   const legPairs = ik ? pairs.filter((p) => p.kind === "leg" && p.tc.length >= 2) : [];
-  const mirrorBones = new Set();
+  const mirrorBones = new Set<number>();
   if (mirrorOn) for (const p of pairs.filter((q) => q.kind === "arm")) for (const b of p.tc) mirrorBones.add(b);
 
   const rootBone = T.root;
   const rootRestC1 = sample(target.bones[rootBone]?.anim?.ch1, 0);
   const sRootRestC1 = sample(source.bones[S.root]?.anim?.ch1, 0);
   // each model's REST-FRAME local rotation per bone (the "rest-pose orientation offset" of every joint)
-  const localOf = (model: RetargetModel, pose: { W: (typeof K16_ID)[] }): (typeof K16_ID)[] => model.bones.map((b, i: string | number) => {
+  const localOf = (model: RetargetModel, pose: { W: (typeof K16_ID)[] }): (typeof K16_ID)[] => model.bones.map((b, i: number) => {
     const p = (b.parent_slot ?? 0) - 1;
-    return k16mul(k16tr(p >= 0 && p < pose.W.length ? pose.W[p] : K16_ID), pose.W[i]);
+    return k16mul(k16tr(p >= 0 && p < pose.W.length ? pose.W[p]! : K16_ID), pose.W[i]!);
   });
   const LrestT = localOf(target, tRest), LrestD = localOf(source, sRest);
   // parents before children: a bone's world matrix is only built from its parent's
   const order: number[] = [];
   {
-    const kids = Array.from({ length: T.n }, () => []);
+    const kids = Array.from<unknown, number[]>({ length: T.n }, () => []);
     for (let i = 0; i < T.n; i++) {
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
       if (p >= 0 && p < T.n) kids[p]!.push(i);
     }
-    const rootsT = [];
+    const rootsT: number[] = [];
     for (let i = 0; i < T.n; i++) { const p = (target.bones[i]?.parent_slot ?? 0) - 1; if (p < 0 || p >= T.n) rootsT.push(i); }
     const visit = (i: number) => { order.push(i); for (const k of kids[i]!) visit(k); };
     for (const r of rootsT) visit(r);
@@ -110,65 +124,66 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   //             PATH instead of chasing a point this chain cannot reach. No interior-angle solve means no
   //             reach clamp and no bend-plane flip — which is what snapped Meramon's forearm 2.08 rad.
   const pass = (reachMode: string) => {
-  const rootKeys = [];
-  const keys = new Map();
-  const prevKeys = new Map();
-  const ikPlane = new Map();
+  const rootKeys: number[][] = [];
+  const keys = new Map<number, number[][]>();
+  const prevKeys = new Map<number, number[]>();
+  const ikPlane = new Map<string, number[]>();
   const rootLift = K16.rootLiftShare * H;
   let ikClamped = 0, ikSolved = 0, jointsClamped = 0, pathFrames = 0;
 
   for (let s = lo; s <= hi; s++) {
     const sp = k16Pose(source, s);
     const f = s + offset;
-    const Wt = new Array(T.n).fill(null);
+    const Wt: number[][][] = new Array(T.n).fill(null);
     // 1. the delta conjugation, per bone, in the TARGET's rest frame, parents before children:
     //        L_target = L_rest_target * (L_rest_donor^-1 * L_donor(frame))
     //    The angle of the transferred joint delta is the donor's own joint departure, measured against
     //    the target's own rest orientation, so a joint moves exactly as far as the donor's did.
     for (const i of order) {
-      const m = plan.map[i];
+      const m = plan.map[i]!;
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
       const Wp = p >= 0 && p < T.n ? (Wt[p] ?? K16_ID) : K16_ID;
-      if (m < 0) { Wt[i] = k16mul(Wp, LrestT[i]); continue; }
-      let D = k16mul(k16tr(LrestD[m]), k16FromCh2(sample(source.bones[m]?.anim?.ch2, s)));
+      if (m < 0) { Wt[i] = k16mul(Wp, LrestT[i]!); continue; }
+      let D = k16mul(k16tr(LrestD[m]!), k16FromCh2(sample(source.bones[m]?.anim?.ch2, s)));
       if (mirrorBones.has(i)) D = k16mul(k16mul(K16_SX, D), K16_SX);
       const lim = k16clampRot(D, K16.maxJoint);
       if (lim !== D) jointsClamped++;
-      Wt[i] = k16mul(Wp, k16mul(LrestT[i], lim));
+      Wt[i] = k16mul(Wp, k16mul(LrestT[i]!, lim));
     }
     // 2. positions from the TARGET's own bone offsets (its ch1 at rest - nothing can stretch)
-    let Pt = null;
-    const posOf = (i: number) => {
-      if (Pt[i]) return Pt[i];
+    let Pt: number[][] | null = null;
+    // ETS item 9: rebuild() fills Pt before anything reads it
+    const posOf = (i: number): number[] => {
+      if (Pt![i]) return Pt![i]!;
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
       const c1 = sample(target.bones[i]?.anim?.ch1, 0);
-      if (p < 0 || p >= T.n) { Pt[i] = [-c1[0], c1[1], -c1[2]]; return Pt[i]; }
+      if (p < 0 || p >= T.n) { Pt![i] = [-c1[0], c1[1], -c1[2]]; return Pt![i]!; }
       posOf(p);
-      const o = k16mv(Wt[p], c1);
-      Pt[i] = [Pt[p][0] - o[0], Pt[p][1] + o[1], Pt[p][2] - o[2]];
-      return Pt[i];
+      const o = k16mv(Wt[p]!, c1);
+      Pt![i] = [Pt![p]![0]! - o[0]!, Pt![p]![1]! + o[1]!, Pt![p]![2]! - o[2]!];
+      return Pt![i]!;
     };
     const rebuild = () => { Pt = new Array(T.n).fill(null); for (let i = 0; i < T.n; i++) posOf(i); };
     rebuild();
-    const setSubtree = (bone: string | number, R: number[][]) => { for (const j of subs[bone]) Wt[j] = k16mul(R, Wt[j]); };
+    const setSubtree = (bone: number, R: number[][]) => { for (const j of subs[bone]!) Wt[j] = k16mul(R, Wt[j]!); };
     // 3a. LEGS: the gate (and a planted cast) cares that a foot does not leave the ground, so the
     //     whole leg is turned about the hip until the ankle is back at the model's own rest height.
     //     A knee solve there would be hypersensitive (a nearly straight leg needs a huge knee angle for
     //     a small vertical move and the bend plane is undefined), a hip turn is one smooth angle.
     for (const p of legPairs) {
-      const tipBone = p.tc[p.tc.length - 1];
-      const hip = Pt![p.tc[0]], ankle = Pt![tipBone];
-      const restY = tRest.P[tipBone][1];
+      const tipBone = p.tc[p.tc.length - 1]!;
+      const hip = Pt![p.tc[0]!]!, ankle = Pt![tipBone]!;
+      const restY = tRest.P[tipBone]![1]!;
       const lim = K16.ankleShare * H;
-      const dy = ankle[1] - restY;
+      const dy = ankle[1]! - restY;
       if (Math.abs(dy) < lim) continue;
       const v1 = k16sub(ankle, hip);
-      const v2 = [v1[0], restY + Math.sign(dy) * lim * 0.5 - hip[1], v1[2]];
+      const v2 = [v1[0], restY + Math.sign(dy) * lim * 0.5 - hip[1]!, v1[2]];
       const ax = [v1[1]! * v2[2]! - v1[2]! * v2[1]!, v1[2]! * v2[0]! - v1[0]! * v2[2]!, v1[0]! * v2[1]! - v1[1]! * v2[0]!];
       const an = k16norm(ax);
       if (an < 1e-6) continue;
       const ang = Math.atan2(an, k16dot(v1, v2));
-      setSubtree(p.tc[0], k16axisAngle(k16scale(ax, 1 / an), Math.min(K16.maxIk, ang)));
+      setSubtree(p.tc[0]!, k16axisAngle(k16scale(ax, 1 / an), Math.min(K16.maxIk, ang)));
       rebuild();
       ikSolved++;
     }
@@ -179,14 +194,14 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
     //     wanted direction. Both are joint angles about a measured axis, so the correction is
     //     continuous from frame to frame, and both are bounded (K16.maxIk, reachSlack).
     for (const p of armPairs) {
-      const tipBone = p.tc[p.tc.length - 1];
-      const scTip = p.sc[p.sc.length - 1];
-      const S0 = Pt![p.tc[0]];
-      const cur = Pt![tipBone];
-      const hand = k16scale(k16sub(sp.P[scTip], sp.P[p.sc[0]]), p.ratio);
-      const want = [S0[0] + hand[0], S0[1] + hand[1], S0[2] + hand[2]];
+      const tipBone = p.tc[p.tc.length - 1]!;
+      const scTip = p.sc[p.sc.length - 1]!;
+      const S0 = Pt![p.tc[0]!]!;
+      const cur = Pt![tipBone]!;
+      const hand = k16scale(k16sub(sp.P[scTip]!, sp.P[p.sc[0]!]!), p.ratio);
+      const want = [S0[0]! + hand[0], S0[1]! + hand[1], S0[2]! + hand[2]];
       if (k16norm(k16sub(want, cur)) < K16.ikDeadband * H) continue;
-      const E0 = Pt![p.tc[p.split]];
+      const E0 = Pt![p.tc[p.split]!]!;
       const u1 = k16sub(E0, S0), u2 = k16sub(cur, E0);
       const l1 = k16norm(u1), l2 = k16norm(u2);
       if (l1 < 1e-6 || l2 < 1e-6) continue;
@@ -205,33 +220,33 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
         ikPlane.set(key, hinge);
         const dElbow = Math.max(-K16.maxIk, Math.min(K16.maxIk, curInterior - wantInterior));
         if (Math.abs(dElbow) > 1e-6) {
-          setSubtree(p.tc[p.split], k16axisAngle(hinge, dElbow));
+          setSubtree(p.tc[p.split]!, k16axisAngle(hinge, dElbow));
           rebuild();
         }
       }
-      const E1 = Pt![p.tc[p.split]];
+      const E1 = Pt![p.tc[p.split]!]!;
       const v1 = k16sub(E1, S0), v2 = k16sub(want, S0);
       const ax = [v1[1]! * v2[2]! - v1[2]! * v2[1]!, v1[2]! * v2[0]! - v1[0]! * v2[2]!, v1[0]! * v2[1]! - v1[1]! * v2[0]!];
       const an = k16norm(ax), vn = k16norm(v1) * k16norm(v2);
       if (an > 1e-6 && vn > 1e-9) {
         const ang = Math.min(K16.maxIk, Math.atan2(an, k16dot(v1, v2)));
-        setSubtree(p.tc[0], k16axisAngle(k16scale(ax, 1 / an), ang));
+        setSubtree(p.tc[0]!, k16axisAngle(k16scale(ax, 1 / an), ang));
         rebuild();
       }
       ikSolved++;
     }
     // 4. locals, joint limits against the target's own rest joints, and the keys
     for (let i = 0; i < T.n; i++) {
-      if (plan.map[i] < 0) continue;
+      if (plan.map[i]! < 0) continue;
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
-      const Wp = p >= 0 && p < T.n ? Wt[p] : K16_ID;
-      const L = k16mul(k16tr(Wp), Wt[i]);
-      const Lr = k16mul(k16tr(p >= 0 && p < T.n ? tRest.W[p] : K16_ID), tRest.W[i]);
+      const Wp = p >= 0 && p < T.n ? Wt[p]! : K16_ID;
+      const L = k16mul(k16tr(Wp), Wt[i]!);
+      const Lr = k16mul(k16tr(p >= 0 && p < T.n ? tRest.W[p]! : K16_ID), tRest.W[i]!);
       const d = k16clampRot(k16mul(k16tr(Lr), L), K16.maxJoint);
       const out = k16ToCh2(k16mul(Lr, d), prevKeys.get(i) ?? null);
       prevKeys.set(i, out);
       if (!keys.has(i)) keys.set(i, []);
-      keys.get(i).push([out[0], out[1], out[2], f]);
+      keys.get(i)!.push([out[0], out[1], out[2], f]);
     }
     // 5. the root translation channel, scaled by the size ratio; its vertical part is damped so a
     //    borrowed cast cannot lift the whole body (the ankle gate and a planted cast depend on it)
@@ -266,14 +281,14 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   // K22b rule 4: a ROLE the donor has no chain for (wings, tail, a second pair of arms) moves on the
   // TARGET's OWN idle instead of freezing at its rest rotation: its own keys are replayed over the baked
   // span from the model's own longest looping clip. `idleRoles` is OFF by default.
-  const idleBones = [];
+  const idleBones: number[] = [];
   const idle = idleRoles ? (idleRange ?? k16IdleSpan(target)) : null;
   if (idle) {
     for (const b of T.roleBones ?? []) {
-      if (plan.map[b] >= 0) continue;
+      if (plan.map[b]! >= 0) continue;
       const ch = target.bones[b]?.anim?.ch2;
       if (!ch?.length) continue;
-      const arr = [];
+      const arr: number[][] = [];
       for (let s = lo; s <= hi; s++) {
         const v = sample(ch, idle.lo + ((s - lo) % idle.len));
         arr.push([v[0], v[1], v[2], s + offset]);
@@ -283,6 +298,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
     }
   }
 
+  // ETS item 9: slice() of a key row is a key row (TS types a tuple's slice as number[])
   const model = {
     ...target,
     bones: target.bones.map((b, i) => {
@@ -290,12 +306,12 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
       const wantRoot = i === rootBone && rootKeys.length;
       if (!moved && !wantRoot) return b;
       const own2 = (b.anim?.ch2 ?? []).filter((r: number[]) => r[3] !== 30000).map((r) => r.slice());
-      const ch2 = moved ? [...own2, ...moved, [moved[moved.length - 1][0], moved[moved.length - 1][1], moved[moved.length - 1][2], 30000]] : (b.anim?.ch2 ?? []);
+      const ch2 = moved ? [...own2, ...moved, [moved[moved.length - 1]![0], moved[moved.length - 1]![1], moved[moved.length - 1]![2], 30000]] : (b.anim?.ch2 ?? []);
       const anim = { ...(b.anim || {}), ch2 } as RetargetChannels;
       if (wantRoot) {
         const own1 = (b.anim?.ch1 ?? []).filter((r: number[]) => r[3] !== 30000).map((r) => r.slice());
         const l1 = rootKeys[rootKeys.length - 1];
-        anim.ch1 = [...own1, ...rootKeys, [l1![0], l1![1], l1![2], 30000]];
+        anim.ch1 = [...own1, ...rootKeys, [l1![0]!, l1![1]!, l1![2]!, 30000]];
       }
       return { ...b, anim };
     }),
@@ -305,7 +321,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   model.timeline[table] = { table: srcTable.map((e) => shiftPlaylistEntry(e, offset)) };
   const roleBones = T.roleBones ?? [];
   const covered = roleBones.length
-    ? roleBones.filter((b: string | number) => plan.map[b] >= 0).length / roleBones.length
+    ? roleBones.filter((b: number) => plan.map[b]! >= 0).length / roleBones.length
     : plan.map.filter((m, i) => m >= 0 && i !== rootBone).length / Math.max(1, T.n - 1);
   return {
     model, table, map: plan.map, covered, roles: { target: T, source: S }, clip, offset,

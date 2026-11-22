@@ -11,21 +11,22 @@ import {
 import { normalizeDvGauge } from "./layout.js";
 import type { BattlePartyEntry } from "./core/types.js";
 
-import type { DigimonRecord, BattleState } from "../types/battle.js";
+import type { DigimonRecord, BattleState, PlayerRecord } from "../types/battle.js";
+import type { FormLedgerEntry } from "../game/types.js";
 interface FormChangeView {
   activeSlot: () => number;
-  liveFormId: (slot: string | number) => number;
-  writeLiveFormId: (slot: string | number, id: string | number) => void;
-  reservedSecondForm: (slot: string | number) => number;
-  reservedFormId: (slot: string | number) => number;
+  liveFormId: (slot: number) => number;
+  writeLiveFormId: (slot: number, id: string | number) => void;
+  reservedSecondForm: (slot: number) => number;
+  reservedFormId: (slot: number) => number;
   clearReservedSecondForm: () => void;
-  setFormFlag: (slot: string | number, k: string | number, value: number) => void;
-  clearFormGauge: (rosterKey: string | number) => void;
+  setFormFlag: (slot: number, k: number, value: number) => void;
+  clearFormGauge: (rosterKey: number) => void;
   findTimelineIndex: () => number;
   clearTimelineCounter: () => void;
-  rosterKey: (slot: string | number) => number;
-  equippedForms: (slot: string | number, dest: (number | undefined)[]) => number;
-  rosterSpecies: (slot: string | number) => number;
+  rosterKey: (slot: number) => number;
+  equippedForms: (slot: number, dest: (number | undefined)[]) => number;
+  rosterSpecies: (slot: number) => number;
 }
 
 /**
@@ -40,9 +41,9 @@ interface FormChangeView {
  * Returns the ids learned and the ids that became loadable, in call order. The
  * guards bound the loops at the slot counts the services can fill (6 and 5).
  */
-export function applyFormLearnPass(record, formProfile) {
-  const learned = [];
-  const loadable = [];
+export function applyFormLearnPass(record: FormLedgerEntry, formProfile: DigimonRecord) {
+  const learned: number[] = [];
+  const loadable: number[] = [];
   for (let guard = 0; guard < 6; guard++) {
     const tech = learnOneTechnique(record, formProfile);
     if (!tech) break;
@@ -58,7 +59,7 @@ export function applyFormLearnPass(record, formProfile) {
 
 // Sequential boss party: after the member at `index` is defeated, decide whether the next
 // member steps in (gauntlet) or the whole party is down. Pure.
-export function gauntletNext(party: BattlePartyEntry[] | null | undefined, index: number): { done: boolean; index?: number; entry?: BattlePartyEntry; } {
+export function gauntletNext(party: BattlePartyEntry[] | null | undefined, index: number): { done: boolean; index?: number; entry?: BattlePartyEntry | undefined; } {
   const next = index + 1;
   if (!party || next >= party.length) return { done: true };
   return { done: false, index: next, entry: party[next] };
@@ -98,7 +99,7 @@ export function giantModeOn() { return !!window.__fx?.giantmode; }
  * else setup's own value (`specialMode`). Stamped onto both combatant records so the
  * accuracy leaves read it; the phase writer is runFinaleBeat.
  */
-export function battleKindOf(b) {
+export function battleKindOf(b: { specialMode?: number; _finaleKind?: number | null; [k: string]: unknown; } | null | undefined) {
   return finaleBattleKind(b?.specialMode ?? 0, b?._finaleKind);
 }
 
@@ -123,7 +124,7 @@ export function finalBossPhaseSwitchesTrack(specialMode: number, battleKind: num
 // field_encounters, e.g. boss screens carry boss-specific hp / 9999 mp) over the walker's
 // computed fallback. A non-positive/absent real value (0 or undefined) means "not in the
 // data" → use the fallback. Pure.
-export function enemyVitals(real: { hp: number | undefined; mp: number | undefined; }, fallback) {
+export function enemyVitals(real: { hp: number | undefined; mp: number | undefined; }, fallback: { hp: number; mp: number; }) {
   return {
     hp: real?.hp! > 0 ? real.hp : fallback.hp,
     mp: real?.mp! > 0 ? real.mp : fallback.mp,
@@ -131,7 +132,7 @@ export function enemyVitals(real: { hp: number | undefined; mp: number | undefin
 }
 
 /** Native Manual-DV/Tag form commit: identity changes; the live stat body does not. */
-export function setLiveBattleForm(record, profile) {
+export function setLiveBattleForm(record: PlayerRecord | BattleState, profile: DigimonRecord) {
   record.profile = profile;
   return record;
 }
@@ -145,7 +146,7 @@ export function setLiveBattleForm(record, profile) {
  * fight's `mpKit.blastForm` both call it. The profile table is handed in, since
  * the page's `digimonDB` is a closure of its own.
  */
-export function blastTargetProfile(rec, db: { [k: string]: DigimonRecord; }) {
+export function blastTargetProfile(rec: PlayerRecord, db: { [k: string]: DigimonRecord; }) {
   const rookie = db?.[rec?.rookieId];
   const id = blastTargetId(rookie?.blasts, rec?.level ?? 1);
   return id ? (db?.[id] ?? null) : null;
@@ -171,7 +172,7 @@ export function blastTargetProfile(rec, db: { [k: string]: DigimonRecord; }) {
  * object online, so the online call is plain `endBlast(r)`. Returns true when a
  * Blast was ended.
  */
-export function endBlast(holder, { rec = holder, form = false, persist = null } = {}) {
+export function endBlast(holder: BattleState, { rec = holder, form = false, persist = null }: { rec?: BattleState | PlayerRecord; form?: boolean; persist?: (() => void) | null; } = {}) {
   const blast = holder?.blast;
   if (!blast?.active) return false;
   if (form && blast.saved) setLiveBattleForm(rec, blast.saved);
@@ -188,7 +189,7 @@ export function endBlast(holder, { rec = holder, form = false, persist = null } 
  * three with -1" (claim auto-equip-full-triple-is-never-reduced-2026-10-03), so
  * a padded position reads back as 0xffff and is not below 3.
  */
-export function equippedTriple(forms) {
+export function equippedTriple(forms: readonly (number | string)[] | null | undefined) {
   const valid = (Array.isArray(forms) ? forms : []).map(Number).filter((id) => id >= 3);
   return Array.from({ length: 3 }, (_, i) => (valid[i] ?? -1));
 }
@@ -199,34 +200,34 @@ export function equippedTriple(forms) {
  * acts on: F0x800A69F0's flag stores are indexed by it, and its lookups resolve
  * that position to the member's own equipped triple.
  */
-function formChangeView(b, position: number, profile = null): FormChangeView {
+function formChangeView(b: BattleState, position: number, profile: DigimonRecord | null = null): FormChangeView {
   return {
     activeSlot: () => position,
-    liveFormId: (slot: string | number) => Number(b.playerRecords[slot]?.profile?.id ?? -1),
+    liveFormId: (slot: number) => Number(b.playerRecords[slot]?.profile?.id ?? -1),
     // record +0x00: the form id, which the caller has already resolved to the
     // profile object the Digimon is taking.
-    writeLiveFormId: (slot: string | number, id) => {
+    writeLiveFormId: (slot: number, id: string | number) => {
       const target = b.playerRecords[slot];
       if (!target || !profile || Number(id) !== Number(profile?.id)) return;
       setLiveBattleForm(target, profile);
     },
     // record +0x1A: the reserved second form is Blast's own writer (ledger
     // BLAST-9767), and the walker keeps Blast's state where the flag lives.
-    reservedSecondForm: (slot) => (Number(slot) === position && b.blast?.active ? 1 : 0),
-    reservedFormId: (slot: string | number) => Number(b.playerRecords[slot]?.rosterSpeciesId ?? 0),
+    reservedSecondForm: (slot: number) => (Number(slot) === position && b.blast?.active ? 1 : 0),
+    reservedFormId: (slot: number) => Number(b.playerRecords[slot]?.rosterSpeciesId ?? 0),
     clearReservedSecondForm: () => releaseReservedSecondForm(b),
     // 0x80042B84 + position*4 + k. The original sets byte 6 on every form change
     // and byte 7 + the equipped row for the form just taken; the reader is the
     // report's DVEXP scan (stfgtrep.s state 0x14 arm, file 0x12C0), which pays
     // the gain and the form-level ladder for every marked row.
-    setFormFlag: (slot: string | number, k: string | number, value: number) => {
+    setFormFlag: (slot: number, k: number, value: number) => {
       b.formFlags ??= [];
       const flags = b.formFlags[slot] ?? (b.formFlags[slot] = new Array(10).fill(0));
       flags[k] = value & 0xff;
     },
     // [0x80042B1C + rosterKey*2 + 0x58] is the roster slot's DV gauge; the
     // walker's per-record gauge is the same value.
-    clearFormGauge: (rosterKey: string | number) => {
+    clearFormGauge: (rosterKey: number) => {
       const target = b.playerRecords[rosterKey] ?? b.player;
       if (!target) return;
       target.gauge = 0;
@@ -236,11 +237,11 @@ function formChangeView(b, position: number, profile = null): FormChangeView {
     // through; the walker models no timeline records, so it answers "none".
     findTimelineIndex: () => -1,
     clearTimelineCounter: () => {},
-    rosterKey: (slot: string | number) => Number(b.playerRecords[slot]?.rosterIndex ?? slot),
+    rosterKey: (slot: number) => Number(b.playerRecords[slot]?.rosterIndex ?? slot),
     // get_equipped's contract: fill `dest` with the three rows and return the
     // count of valid entries (F0x800A69F0 scans dest and leaves on the first
     // match).
-    equippedForms: (slot: string | number, dest: (number | undefined)[]) => {
+    equippedForms: (slot: number, dest: (number | undefined)[]) => {
       const triple = equippedTriple(b.playerRecords[slot]?.statsRecord?.equippedForms);
       for (let i = 0; i < 3; i++) dest[i] = triple[i];
       return triple.filter((id) => id !== -1).length;
@@ -250,7 +251,7 @@ function formChangeView(b, position: number, profile = null): FormChangeView {
     // is `rosterSpecies == live form` (wfightmn.s .L0x00000CA8), so the
     // comparison is against that rookie, never against the form the member is
     // configured to stand in.
-    rosterSpecies: (slot: string | number) => Number(b.playerRecords[slot]?.rookieId ?? -1),
+    rosterSpecies: (slot: number) => Number(b.playerRecords[slot]?.rookieId ?? -1),
   };
 }
 
@@ -273,7 +274,7 @@ export function markFormTaken(b: BattleState, position: number, speciesId: numbe
  * and the disc's `form >= 4` guard drops anything that is not an acquired form.
  * In the walker's id space the rookies are 1..8, so `> 8` is the same guard.
  */
-export function markedEquippedForms(flags, equipped) {
+export function markedEquippedForms(flags: readonly number[] | null | undefined, equipped: readonly (number | string)[] | null | undefined) {
   const out: (number | undefined)[] = [];
   const triple = equippedTriple(equipped);
   for (let i = 0; i < 3; i++) {
@@ -313,7 +314,7 @@ export function commitBattleFormChange(b: BattleState, profile: DigimonRecord, p
  * not overwritten on that branch. Module scope, because the gauge save below
  * and the release above are called from here as well as from inside the battle.
  */
-export function syncPlayerRoster(b) {
+export function syncPlayerRoster(b: BattleState | null | undefined) {
   for (const player of b?.playerRecords ?? []) writeBackBattleVitals(player);
 }
 
@@ -326,7 +327,7 @@ export function syncPlayerRoster(b) {
  * factory: the reserved-second-form release is the original's own routine and
  * is reached from the Digivolve commit, the Tag commit and the Blast revert.
  */
-export function persistPlayerGauge(b) {
+export function persistPlayerGauge(b: BattleState | null | undefined) {
   if (!b?.player) return;
   syncPlayerRoster(b);
   const state = b.getState?.();
@@ -345,7 +346,7 @@ export function persistPlayerGauge(b) {
  * the loss arm writes nothing to the card, so the walker must leave its stored
  * party untouched while still clearing the live gauge.
  */
-export function releaseReservedSecondForm(b, persist = true) {
+export function releaseReservedSecondForm(b: BattleState | null | undefined, persist = true) {
   if (!b?.blast?.active) return false;
   b._blastPending = false;
   b._blastRevertPending = false;
@@ -378,7 +379,7 @@ export function battleOutcomeRelease(b: BattleState, result: string) {
 }
 
 /** Native battle-outcome write-back for one resident player record. */
-export function writeBackBattleVitals(player) {
+export function writeBackBattleVitals(player: PlayerRecord) {
   if (!player?.statsRecord) return;
   if (player.hp <= 0) player.statsRecord.hp = 1;
   else {
@@ -419,7 +420,7 @@ export function writeBackBattleVitals(player) {
  * cancelled and ONLY the 0x04 bit is cleared. Poison (0x01), Frozen (0x02) and
  * Sleep (0x08) survive a Blast.
  */
-export function blastLandingHeal(player) {
+export function blastLandingHeal(player: PlayerRecord | null | undefined) {
   if (!player) return { healed: false, curedConfuse: false };
   const wasHp = player.hp;
   player.hp = player.maxHp;

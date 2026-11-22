@@ -23,8 +23,8 @@ import { emit as emitGameEvent } from "../../gameEvents.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { BattlePartyEntry } from "./types.js";
 
-import type { GameState } from "../../game/types.js";
-import type { RosterMember, BattleState } from "../../types/battle.js";
+import type { GameState, FormLedgerEntry } from "../../game/types.js";
+import type { RosterMember, BattleState, EnemyBattleRecord } from "../../types/battle.js";
 import type { DigimonRecord } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeRecords(B: BattleContext) {
@@ -275,7 +275,7 @@ export function makeRecords(B: BattleContext) {
     return out;
   }
 /** check_move_cond 10's operands for the actor `en`: the team's slots and the active one, or just `en` alone. */
-  function enemyConditionSlots(b: BattleState, en) {
+  function enemyConditionSlots(b: BattleState, en: EnemyBattleRecord) {
     if (b && en === b.enemy && enemyTeamActive(b)) {
       return { enemySlots: enemyTeamSlots(enemyTeamRecords(b)), activeEnemyIndex: b.partyIndex };
     }
@@ -297,9 +297,9 @@ function profileByName(name: string | number) {
   }
 // From a list of available evos, keep only those whose target form has a usable profile
   // (so the menu never offers an evolution we can't actually apply). Dedupes by `to`.
-  function evoTargets(evos) {
-    const seen = new Set();
-    const out = [];
+  function evoTargets<T extends { to: string | number; }>(evos: readonly T[] | null | undefined) {
+    const seen = new Set<string | number>();
+    const out: T[] = [];
     for (const e of evos ?? []) {
       if (seen.has(e.to)) continue;
       if (!profileByName(e.to)) continue; // no stat profile for this form → can't apply
@@ -346,7 +346,7 @@ function applyEvolution(toName: string | number, state = B.getState(), rosterInd
     if (!prof || !member || !ps) return { ok: false };
     const from = member.current?.name ?? "Your partner";
     ps.formLedger ??= [];
-    if (isFormDigimonId(prof.id) && !ps.formLedger.some((record) => Number(record.id) === Number(prof.id)))
+    if (isFormDigimonId(prof.id) && !ps.formLedger.some((record: FormLedgerEntry) => Number(record.id) === Number(prof.id)))
       ps.formLedger.push({ id: prof.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
     ps.equippedForms ??= [];
     if (isFormDigimonId(prof.id) && !ps.equippedForms.includes(prof.id)) {

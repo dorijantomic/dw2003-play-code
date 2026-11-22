@@ -4,8 +4,12 @@
 import { chevronSvg } from "./icons.js";
 import { ROLES, FACE, fitRun, measureText } from "./text.js";
 import { fillVic } from "./vic.js";
-import type { UiPart } from './types.js';
-interface BalloonTail { side: string; b0: number; b1: number; tip: number[]; }
+import type { UiBalloonTail, UiDockPart, UiNodePart, UiPart, UiPopPart, UiRingPart, UiSheetDef } from './types.js';
+type BalloonTail = UiBalloonTail;
+/** A point in page px. */
+type Pt = readonly [number, number];
+/** The tail's shape once it is placed on the body: which edge, where it starts and ends, the tip and (when it fits) the inner points. */
+interface BalloonTl { top: boolean; b0: number; b1: number; by: number; tip: Pt; inner: [Pt, Pt, Pt] | null; mid: Pt; }
 
 interface PartRect {
   left: number;
@@ -18,10 +22,11 @@ interface PartRect {
 interface PartEdges {
   u: number;
   d: number;
-  l?: number;
-  r?: number;
+  e1: number;
+  e2: number;
+  sh: number;
 }
-interface PartGeom {
+export interface PartGeom {
   rect: PartRect;
   ed: PartEdges;
   sx: number;
@@ -29,7 +34,7 @@ interface PartGeom {
 }
 
 
-const pt = (list: number[][]) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3)}px ${+y.toFixed(3)}px`).join(",")})`;
+const pt = (list: readonly Pt[]) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3)}px ${+y.toFixed(3)}px`).join(",")})`;
 
 /**
  * The silhouette of a plate of W x H page px. Returns { outer, inner, box } : outer = polygon of the edge layer, box = { l, t, r, b }
@@ -38,7 +43,7 @@ const pt = (list: number[][]) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3
  * plate), rowSolid = the same, one colour (active row), tab = chamfer top-left + slanted right (LV tab), wall = big chamfer top-left,
  * ch = chamfer top-left + bottom-right (frame).
  */
-export function plateShape(shape, W, H, d, e1, e2, underEdge = "e2") {
+export function plateShape(shape: string | undefined, W: number, H: number, d: number, e1: number, e2: number, underEdge = "e2") {
     const k = d;
     switch (shape) {
         case "sr": {
@@ -114,7 +119,7 @@ export function plateShape(shape, W, H, d, e1, e2, underEdge = "e2") {
  * The swap bracket path in page px for a W x H box, `u` page px per native px, `arrows` = arrow centre y (page px). Stroke 2 native,
  * arrow heads 7 native long and 8 native tall with the tip at x 0; the bar runs between the two arrows on the right side.
  */
-export function bracketPath(W, H, u, arrows) {
+export function bracketPath(W: number, H: number, u: number, arrows: number[]) {
     const t = Math.max(2, Math.round(2 * u)), head = Math.round(7 * u), half = Math.round(4 * u);
     const barX = Math.round(W - t - 2 * u), ys = arrows.map((a) => Math.round(a));
     if (!ys.length) return "";
@@ -129,7 +134,7 @@ export function bracketPath(W, H, u, arrows) {
  * x and y at once). The move is a phase shift of the colour stops along the gradient axis (a diagonal move of (o, o) is o * sqrt 2 along
  * it), so the field never restarts a tile: no seam, whatever the offset.
  */
-export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "var(--c-stripe-dark)") {
+export function stripesGradient(scroll: number, d: number, light = "var(--c-stripe)", dark = "var(--c-stripe-dark)") {
     const P = 72 * d, L = 24 * d, o = scroll * 3 * d * Math.SQRT2;
     const ph = ((o % P) + P) % P;                     // where the light stripe starts, 0..P
     const f = (n: number) => `${+n.toFixed(2)}px`;
@@ -139,43 +144,43 @@ export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "va
 }
 
 // ------------------------------------------------------------------------------------------------ the C balloon (C6)
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const sub = (a: Pt, b: Pt): Pt => [a[0] - b[0], a[1] - b[1]];
 /** The line p + t * d moved by `e` along its normal towards `inside`: returns [point, dir]. */
-function offsetLine(p: number[], q: number[], inside: number[], e: number): [number[], number[]] {
-    const d = sub(q, p), len = Math.hypot(d[0]!, d[1]!) || 1;
-    let n = [-d[1]! / len, d[0]! / len];
+function offsetLine(p: Pt, q: Pt, inside: Pt, e: number): [Pt, Pt] {
+    const d = sub(q, p), len = Math.hypot(d[0], d[1]) || 1;
+    let n: Pt = [-d[1] / len, d[0] / len];
     const m = sub(inside, p);
-    if (n[0]! * m[0]! + n[1]! * m[1]! < 0) n = [-n[0]!, -n[1]!];
-    return [[p[0] + n[0]! * e, p[1] + n[1]! * e], d];
+    if (n[0] * m[0] + n[1] * m[1] < 0) n = [-n[0], -n[1]];
+    return [[p[0] + n[0] * e, p[1] + n[1] * e], d];
 }
-function cross(a: [number[], number[]], b: [number[], number[]]) {
-    const [p, r] = a, [q, s] = b, den = r[0]! * s[1]! - r[1]! * s[0]!;
+function cross(a: [Pt, Pt], b: [Pt, Pt]): Pt | null {
+    const [p, r] = a, [q, s] = b, den = r[0] * s[1] - r[1] * s[0];
     if (Math.abs(den) < 1e-9) return null;
-    const t = ((q[0]! - p[0]!) * s[1]! - (q[1]! - p[1]!) * s[0]!) / den;
-    return [p[0]! + t * r[0]!, p[1]! + t * r[1]!];
+    const t = ((q[0] - p[0]) * s[1] - (q[1] - p[1]) * s[0]) / den;
+    return [p[0] + t * r[0], p[1] + t * r[1]];
 }
-const atY = ([p, d], y: number) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * d[0] / d[1], y]);
+const atY = ([p, d]: [Pt, Pt], y: number): Pt | null => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * d[0] / d[1], y]);
 
 /**
  * The balloon silhouette in page px (C6): body box `b` = { l, t, w, h } with the 24 dp chamfer top-left and bottom-right (`c`), an edge of
  * `e` px, and an optional tail { side, b0, b1, tip } on the top or bottom edge. Returns { outer, inner } as point lists. The inner line runs
  * `e` px inside the outer one everywhere, the tail too (its sides are offset along their normals, so a slanted tail keeps the same edge).
  */
-export function balloonShape(b: { l: number; t: number; w: number; h: number; }, tail: BalloonTail | null, e: number, c: number): { outer: number[][]; inner: (number[] | undefined)[] } {
+export function balloonShape(b: { l: number; t: number; w: number; h: number; }, tail: BalloonTail | null, e: number, c: number): { outer: Pt[]; inner: Pt[] } {
     const { l, t, w, h } = b, r = l + w, bo = t + h;
     const ci = c - e / 2;   // the inner chamfer (C6: 24 outer, the inner diagonal 22 + 4 down / right)
-    const outer = [], inner = [];
-    let tl = null;
+    const outer: Pt[] = [], inner: Pt[] = [];
+    let tl: BalloonTl | null = null;
     if (tail) {
         const top = tail.side === "top";
         const lo = top ? l + c + 1 : l + 2, hi = top ? r - 2 : r - c - 1;
         const b0 = Math.max(lo, Math.min(tail.b0, tail.b1)), b1 = Math.min(hi, Math.max(tail.b0, tail.b1));
         const by = top ? t : bo, tip = tail.tip;
         if (b1 - b0 >= 4 && (top ? tip[1] < t - e : tip[1] > bo + e)) {
-            const iy = top ? t + e : bo - e, mid = [(b0 + b1) / 2, by];
+            const iy = top ? t + e : bo - e, mid: Pt = [(b0 + b1) / 2, by];
             const A = offsetLine([b0, by], tip, [b1, by], e), B = offsetLine(tip, [b1, by], [b0, by], e);
             const itip = cross(A, B), i0 = atY(A, iy), i1 = atY(B, iy);
-            const ok = itip && i0 && i1 && i0[0] < i1[0] && (top ? itip[1]! < iy : itip[1]! > iy);
+            const ok = itip && i0 && i1 && i0[0] < i1[0] && (top ? itip[1] < iy : itip[1] > iy);
             tl = { top, b0, b1, by, tip, inner: ok ? [i0, itip, i1] : null, mid };
         }
     }
@@ -195,7 +200,7 @@ export function balloonShape(b: { l: number; t: number; w: number; h: number; },
 }
 
 /** Bar fill width in whole page px for ratio 0..1 over a track of `w` px. */
-export const barFill = (ratio, w) => Math.max(0, Math.min(w, Math.round(w * Math.max(0, Math.min(1, ratio)))));
+export const barFill = (ratio: number, w: number) => Math.max(0, Math.min(w, Math.round(w * Math.max(0, Math.min(1, ratio)))));
 
 // ------------------------------------------------------------------------------------------------ DOM
 const el = (cls: string, parent?: Element, tag = "div"): HTMLElement => {
@@ -204,8 +209,8 @@ const el = (cls: string, parent?: Element, tag = "div"): HTMLElement => {
     if (parent) parent.appendChild(e);
     return e;
 };
-const px = (n) => `${Math.round(n)}px`;
-const setBox = (e, r) => { e.style.left = px(r.left); e.style.top = px(r.top); e.style.width = px(r.width); e.style.height = px(r.height); };
+const px = (n: number) => `${Math.round(n)}px`;
+const setBox = (e: HTMLElement, r: PartRect) => { e.style.left = px(r.left); e.style.top = px(r.top); e.style.width = px(r.width); e.style.height = px(r.height); };
 
 /** Build the element for `desc` and fill it for the current geometry `g` = { rect (snapped page px), ed (edges), sx, sy (scale vs native) }. */
 export function buildPart(desc: UiPart, g: PartGeom) {
@@ -217,26 +222,45 @@ export function buildPart(desc: UiPart, g: PartGeom) {
 
 // ---------------------------------------------------------------------------------------------------------- the living ring
 const SVGNS = 'xmlns="http://www.w3.org/2000/svg"';
+/** One tick layer of the ring: [radius, stroke, dash array, class]. */
+type RingTick = readonly [number, number, string, string];
+/** One ring size (see RING_SHAPE). */
+interface RingGeom {
+    vb: number;
+    ticks: readonly RingTick[];
+    back: readonly RingTick[];
+    dv: readonly [number, number] | null;
+    dvt: readonly [number, number] | null;
+    hp: readonly [number, number];
+    mp: readonly [number, number];
+    core: number;
+}
+/** The dock's design numbers (see DOCK_SHAPE). */
+interface DockShape {
+    size: number; line: number; spacing: number; scale: number; arc: number;
+    guide: readonly [number, number]; dockArc: readonly [number, number];
+    listSize: number; listLine: number; chip: number; cost: number; gap: number;
+}
 /** Ring sizes (design px, the C file): [radius, stroke] of every arc, by variant. Mirrors base.RING (parts.js imports no composer). */
-export const RING_SHAPE = Object.freeze({
+export const RING_SHAPE: Readonly<Record<string, RingGeom> & { main: RingGeom }> = Object.freeze<Record<string, RingGeom> & { main: RingGeom }>({
     main: { vb: 360, ticks: [[167, 6, ".9 5.1", "tk"], [167, 10, "1.4 58.6", "tk"], [167, 5, "55 305", "scan"]], back: [[137, 5, ".6 4.4", "tk2"]], dv: [174, 3], dvt: [174, 2], hp: [150, 16], mp: [124, 9], core: 110 },
     mini: { vb: 150, ticks: [[72, 5, ".9 5.1", "tk"]], back: [], dv: null, dvt: null, hp: [60, 9], mp: [47, 5], core: 50 },
 });
 /** The stroke-dasharray of an arc whose path is 100 long, for a fraction 0..1. */
-export const arcDash = (f) => `${+(Math.min(1, Math.max(0, f)) * 100).toFixed(3)} 100`;
+export const arcDash = (f: number) => `${+(Math.min(1, Math.max(0, f)) * 100).toFixed(3)} 100`;
 
 /** Build the ring's inside once (rotating tick layers as their own elements so the compositor spins them), then only move the arcs. */
-function fillRing(root, desc, g) {
+function fillRing(root: HTMLElement, desc: UiRingPart, g: PartGeom) {
     const r = g.rect, sh = RING_SHAPE[desc.variant] ?? RING_SHAPE.main, c = sh.vb / 2, id = `r${String(desc.key).replace(/[^a-z0-9]/gi, "")}`;
     root.className = `uic-part uic-ring uic-ring-${desc.variant}`;
     root.dataset.uicPart = desc.part;
     root.dataset.uicRect = `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
     root.style.position = "absolute"; setBox(root, r);
     if (root.dataset.uicRingV !== desc.variant) {
-        const circ = (cls, rad, w, extra = "") => `<circle class="${cls}" cx="${c}" cy="${c}" r="${rad}" stroke-width="${w}" fill="none" ${extra}/>`;
-        const arc = (cls: string, rad, w, grad?: string) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
-        const ticks = (list) => list.map(([rad, w, da, cls]) => circ(cls, rad, w, `pathLength="360" stroke-dasharray="${da}"${cls === "scan" ? ` stroke="url(#${id}s)"` : ""}`)).join("");
-        const svg = (inner, cls = "") => `<svg ${SVGNS} class="${cls}" viewBox="0 0 ${sh.vb} ${sh.vb}" aria-hidden="true">${inner}</svg>`;
+        const circ = (cls: string, rad: number, w: number, extra = "") => `<circle class="${cls}" cx="${c}" cy="${c}" r="${rad}" stroke-width="${w}" fill="none" ${extra}/>`;
+        const arc = (cls: string, rad: number, w: number, grad?: string) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
+        const ticks = (list: readonly RingTick[]) => list.map(([rad, w, da, cls]) => circ(cls, rad, w, `pathLength="360" stroke-dasharray="${da}"${cls === "scan" ? ` stroke="url(#${id}s)"` : ""}`)).join("");
+        const svg = (inner: string, cls = "") => `<svg ${SVGNS} class="${cls}" viewBox="0 0 ${sh.vb} ${sh.vb}" aria-hidden="true">${inner}</svg>`;
         const stop = (o: number, v: string) => `<stop offset="${o}" style="stop-color:${v}"/>`;
         const defs = `<defs><linearGradient id="${id}h" x1="0" y1="0" x2="1" y2="1">${stop(0, "var(--c-hp-a)")}${stop(1, "var(--c-hp-b)")}</linearGradient>`
             + `<linearGradient id="${id}m" x1="0" y1="0" x2="1" y2="1">${stop(0, "var(--c-mp-a)")}${stop(1, "var(--c-mp-b)")}</linearGradient>`
@@ -257,12 +281,12 @@ function fillRing(root, desc, g) {
     // the command menu closing (a command was confirmed) = one pulse out of the ring; the menu opening does nothing
     if (desc.variant === "main" && root.dataset.uicMenu === "1" && !desc.menu) root.dataset.pulse = root.dataset.pulse === "a" ? "b" : "a";
     root.dataset.uicMenu = desc.menu ? "1" : "0";
-    const set = (cls: string, f) => { const e = root.querySelector(`.${cls}`); if (e) e.style.strokeDasharray = arcDash(f); };
+    const set = (cls: string, f: number) => { const e = root.querySelector<SVGElement>(`.${cls}`); if (e) e.style.strokeDasharray = arcDash(f); };
     // the real HP the game holds (read-only): a drop is remembered for the damage number that pops when the game's line appears
     if (desc.variant === "main" && desc.real != null) {
         const now = performance.now(), pr = root.dataset.uicReal === undefined ? null : Number(root.dataset.uicReal), pe = root.dataset.uicEReal === undefined ? null : Number(root.dataset.uicEReal);
         if (pr !== null && desc.real < pr) { root.dataset.dropP = String(pr - desc.real); root.dataset.dropPT = String(now); }
-        if (pe !== null && desc.eReal < pe) { root.dataset.dropE = String(pe - desc.eReal); root.dataset.dropET = String(now); }
+        if (pe !== null && desc.eReal! < pe) { root.dataset.dropE = String(pe - desc.eReal!); root.dataset.dropET = String(now); }
         root.dataset.uicReal = String(desc.real); root.dataset.uicEReal = String(desc.eReal);
     }
     // a drop of the shown HP = one short hurt shake of the whole ring (CSS, restarts only when the last one ended)
@@ -280,15 +304,15 @@ function fillRing(root, desc, g) {
 // ---------------------------------------------------------------------------------------------------------- the command dock
 /** Design numbers of the dock (size / line / spacing / scale mirror base.DOCK_WORD; parts.js imports no composer). `arc` = the guide circle's radius in its own
  *  viewBox units (the part's k = arcR / arc scales it to the real arc); the dock's radius, the pointer length and the list row's parts come from the descriptor. */
-export const DOCK_SHAPE = Object.freeze({ size: 40, line: 46, spacing: 2, scale: 1.7, arc: 330, guide: [-90, 36], dockArc: [-34, 14], listSize: 30, listLine: 36, chip: 76, cost: 60, gap: 16 });
+export const DOCK_SHAPE: DockShape = Object.freeze<DockShape>({ size: 40, line: 46, spacing: 2, scale: 1.7, arc: 330, guide: [-90, 36], dockArc: [-34, 14], listSize: 30, listLine: 36, chip: 76, cost: 60, gap: 16 });
 
 /**
  * The command dock: the six words each at a fixed slot on the arc around the ring, the focused one slid into the dock beside the ring. Built
  * once per geometry; a focus change only toggles `.on` (CSS transition for the slide, the kick for the feedback), so elements and animations live on.
  */
-function fillDock(root, desc, g) {
+function fillDock(root: HTMLElement, desc: UiDockPart, g: PartGeom) {
     const r = g.rect, d = g.ed.d, s = d * 3, D = DOCK_SHAPE, o = desc.rect;
-    const rel = (x, y) => [(x - o.x) * s, (y - o.y) * s];
+    const rel = (x: number, y: number): [number, number] => [(x - o.x) * s, (y - o.y) * s];
     root.className = "uic-part uic-dock";
     root.dataset.uicPart = desc.part;
     root.dataset.uicRect = `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
@@ -299,10 +323,10 @@ function fillDock(root, desc, g) {
         root.style.setProperty("--dk", `${d}px`);
         const [hx, hy] = rel(desc.hub.x, desc.hub.y), k = desc.k ?? 1, V = (D.arc + 10) * 2;
         const gd = el("dk-gd", root);
-        gd.style.cssText = `left:${hx! - V / 2 * d * k}px;top:${hy! - V / 2 * d * k}px;width:${V * d * k}px;height:${V * d * k}px`;
+        gd.style.cssText = `left:${hx - V / 2 * d * k}px;top:${hy - V / 2 * d * k}px;width:${V * d * k}px;height:${V * d * k}px`;
         const ring = (cls: string, rad: number, w: number, extra = "") => `<svg class="${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${V} ${V}" aria-hidden="true"><circle cx="${V / 2}" cy="${V / 2}" r="${rad}" fill="none" stroke-width="${w}" ${extra}/></svg>`;
         gd.innerHTML = ring("dk-line", D.arc, 1.2) + `<div class="dk-spin">${ring("dk-ticks", D.arc, 5, 'pathLength="360" stroke-dasharray=".35 4.65"')}${ring("dk-ticks dk-major", D.arc, 9, 'pathLength="360" stroke-dasharray=".8 29.2"')}</div>` + ring("dk-flash", D.arc, 3);
-        const pt = (a: number | undefined, rad: number) => `${V / 2 + rad * Math.cos(a! * Math.PI / 180)} ${V / 2 + rad * Math.sin(a! * Math.PI / 180)}`;
+        const pt = (a: number, rad: number) => `${V / 2 + rad * Math.cos(a * Math.PI / 180)} ${V / 2 + rad * Math.sin(a * Math.PI / 180)}`;
         const dk = el("dk-dkarc", root);
         dk.style.cssText = gd.style.cssText;
         const dR = (desc.dockR ?? 205) / k, arc = `M${pt(D.dockArc[0], dR)} A${dR} ${dR} 0 0 1 ${pt(D.dockArc[1], dR)}`;
@@ -313,8 +337,9 @@ function fillDock(root, desc, g) {
         const [dxp, dyp] = rel(desc.dock.x, desc.dock.y);
         const LS = desc.list ? { x: 300, chip: D.chip, r: D.cost, gap: D.gap, size: D.listSize, line: D.listLine } : null;
         if (desc.list && desc.title) {
-            const [tx, ty] = rel(desc.words[0].x, desc.words[0].y - 18);          // above the first row, flush with it
-            const t = el("dk-ttl", root); t.style.cssText = `left:${tx}px;top:${ty! - 12 * d}px;font-size:${16 * d}px;height:${24 * d}px;line-height:${24 * d}px`;
+            // ETS item 9: a list dock always has its rows (the title sits above the first)
+            const [tx, ty] = rel(desc.words[0]!.x, desc.words[0]!.y - 18);          // above the first row, flush with it
+            const t = el("dk-ttl", root); t.style.cssText = `left:${tx}px;top:${ty - 12 * d}px;font-size:${16 * d}px;height:${24 * d}px;line-height:${24 * d}px`;
             t.dataset.uicText = desc.title; t.textContent = desc.title;
             if (desc.pager) for (const k2 of ["L1", "R1"]) { const c = el("cap", t, "i"); c.textContent = k2; }
         }
@@ -323,23 +348,24 @@ function fillDock(root, desc, g) {
             if (LS) {                                  // a list row: name, element chip, cost (the same slot / dock mechanics as a command)
                 const nameW = Math.max(60, Math.min(LS.x, w.maxDp - (LS.chip + LS.r + 2 * LS.gap))), lh = LS.line * d, fs = LS.size * d;
                 const fit = fitRun((sz, spc) => measureText(w.t, FACE.text, 700, sz, spc), fs, 0, nameW * d);
-                const rowCss = `left:${x}px;top:${y! - lh / 2}px;height:${lh}px;line-height:${lh}px;font-size:${fs}px;`;
+                const rowCss = `left:${x}px;top:${y - lh / 2}px;height:${lh}px;line-height:${lh}px;font-size:${fs}px;`;
                 const ghost = el("dk-g", root, "div"); ghost.style.cssText = rowCss; ghost.dataset.dkI = String(i); ghost.style.display = "none";
                 const word = el("dk-w rw", root, "div");
-                word.style.cssText = `${rowCss}--tx:${rel(desc.dock.x, desc.dock.y)[0]! - x!}px;--ty:${rel(desc.dock.x, desc.dock.y)[1]! - y!}px;--sc:${desc.scale};gap:${LS.gap * d}px`;
+                word.style.cssText = `${rowCss}--tx:${rel(desc.dock.x, desc.dock.y)[0] - x}px;--ty:${rel(desc.dock.x, desc.dock.y)[1] - y}px;--sc:${desc.scale};gap:${LS.gap * d}px`;
                 word.dataset.dkI = String(i); word.dataset.uicText = w.t; word.dataset.uicFits = fit.fits ? "1" : "0"; if (w.dis) word.classList.add("dis");
                 const tn = el("tn", word, "span"); tn.textContent = w.t; tn.style.cssText = `max-width:${nameW * d}px;font-size:${+fit.size.toFixed(2)}px`;
                 const ch = el("chip", word, "i"); ch.style.cssText = `width:${LS.chip * d}px;font-size:${12 * d}px;line-height:${16 * d}px;padding:${2 * d}px 0;border-width:${Math.max(1, 1.5 * d)}px`;
                 if (w.chip) { ch.textContent = w.chip; if (w.el) ch.style.color = `var(--c-el-${w.el}, var(--c-cyan))`; } else ch.style.display = "none";
-                const tm = el("tm", word, "b"); tm.textContent = w.r; tm.style.cssText = `width:${LS.r * d}px`;
+                // ETS item 9: a list row always carries its cost text (base.dockPart)
+                const tm = el("tm", word, "b"); tm.textContent = w.r!; tm.style.cssText = `width:${LS.r * d}px`;
                 return;
             }
             const fit = fitRun((sz, spc) => measureText(w.t, family, 400, sz, spc), size, sp, w.maxDp * d);
-            const common = `left:${x}px;top:${y! - line / 2}px;font-size:${+fit.size.toFixed(2)}px;line-height:${+line.toFixed(2)}px;letter-spacing:${+fit.spacing.toFixed(2)}px;height:${+line.toFixed(2)}px`;
+            const common = `left:${x}px;top:${y - line / 2}px;font-size:${+fit.size.toFixed(2)}px;line-height:${+line.toFixed(2)}px;letter-spacing:${+fit.spacing.toFixed(2)}px;height:${+line.toFixed(2)}px`;
             const ghost = el("dk-g", root, "div");
             ghost.style.cssText = common; ghost.textContent = w.t; ghost.dataset.dkI = String(i);
             const word = el("dk-w", root, "div");
-            word.style.cssText = `${common};--tx:${dxp! - x!}px;--ty:${dyp! - y!}px;--sc:${D.scale}`;
+            word.style.cssText = `${common};--tx:${dxp - x}px;--ty:${dyp - y}px;--sc:${D.scale}`;
             word.dataset.dkI = String(i); word.dataset.uicText = w.t; word.dataset.uicFits = fit.fits ? "1" : "0";
             const wd = el("wd", word, "span");
             el("ol", wd, "span").textContent = w.t;
@@ -353,14 +379,14 @@ function fillDock(root, desc, g) {
     if (prev !== null && prev >= 0 && desc.on >= 0 && prev !== desc.on) root.dataset.kick = root.dataset.kick === "a" ? "b" : "a";
     root.dataset.dkOn = String(desc.on);
     root.classList.toggle("has", desc.on >= 0);
-    for (const e of root.querySelectorAll(".dk-w, .dk-g")) e.classList.toggle("on", Number(e.dataset.dkI) === desc.on);
+    for (const e of root.querySelectorAll<HTMLElement>(".dk-w, .dk-g")) e.classList.toggle("on", Number(e.dataset.dkI) === desc.on);
 }
 
 /** The damage pop: its own element, ONE `.pp` child per hit event (`desc.evt`). A re-fill with the same event only moves the box (the enemy walks on screen),
  *  it never builds a second number; a new event builds a new one, the CSS plays once and fades. `desc.o` = { kind: dmg | heal | miss | counter | status, tone: crit | weak | resist | "",
  *  tag: the small word, status: poison | frozen | confuse | sleep, text: the shown figure when it is not the HP drop }. */
 const POP_FONT: Record<string, number> = { player: 84, enemy: 100 };
-function fillPop(root, desc, g) {
+function fillPop(root: HTMLElement, desc: UiPopPart, g: PartGeom) {
     const r = g.rect, d = g.ed.d, o = desc.o ?? {}, kind = o.kind ?? "dmg", tone = o.tone ?? "";
     root.className = `uic-part uic-pop uic-pop-${desc.side} uic-pop-${kind}${tone ? ` uic-pop-${tone}` : ""}${o.status ? ` uic-pop-st-${o.status}` : ""}`;
     root.dataset.popKind = kind; root.dataset.popTone = tone;
@@ -370,15 +396,15 @@ function fillPop(root, desc, g) {
     const base = POP_FONT[desc.side] ?? 100, mul = { crit: 1.2, weak: 1.1, resist: 0.8 }[tone] ?? 1, small = kind === "miss" || kind === "status";
     root.style.fontSize = `${(base * mul * (small ? 0.5 : 1)) * d}px`; root.style.lineHeight = "1";
     root.style.setProperty("--tg", `${Math.max(26, base * 0.3) * d}px`);
-    const old = root.querySelector(".pp");
+    const old = root.querySelector<HTMLElement>(".pp");
     if (old && old.dataset.evt === (desc.evt ?? "")) { root.dataset.uicText = old.dataset.shown; return; }
     // the number is the HP the game really took (remembered by the main ring); the game's own figure only when no drop was seen
-    let shown;
+    let shown: string;
     if (kind === "miss") shown = "EVADE";
     else if (kind === "status") shown = "";
     else if (kind === "heal") shown = `+${desc.n}`;
     else {
-        const ring = typeof document !== "undefined" ? document.querySelector(".uic-ring-main") as HTMLElement : null, tag = desc.side === "player" ? "P" : "E";
+        const ring = typeof document !== "undefined" ? document.querySelector<HTMLElement>(".uic-ring-main") : null, tag = desc.side === "player" ? "P" : "E";
         const seen = kind === "dmg" && ring && ring.dataset[`drop${tag}`] !== undefined && performance.now() - Number(ring.dataset[`drop${tag}T`]) < 20000 ? Number(ring.dataset[`drop${tag}`]) : null;
         shown = String(seen !== null && seen > 0 ? seen : desc.n);
     }
@@ -391,7 +417,7 @@ function fillPop(root, desc, g) {
 }
 
 /** A turn-arc node: a round chip with the actor's initial; the one acting now is the biggest, enemies carry a red rim. */
-function fillNode(root, desc, g) {
+function fillNode(root: HTMLElement, desc: UiNodePart, g: PartGeom) {
     const r = g.rect;
     root.className = `uic-part uic-node uic-node-${desc.side} uic-node-${desc.turn}`;
     root.dataset.uicPart = desc.part; root.dataset.turn = desc.turn; root.dataset.side = desc.side;
@@ -404,13 +430,14 @@ function fillNode(root, desc, g) {
 }
 
 /** (Re)write an element for `desc`. Called only when the signature changed. */
-export function fillPart(root, desc, g) {
+export function fillPart(root: HTMLElement, desc: UiPart, g: PartGeom) {
     const { rect: r, ed } = g;
-    if (desc.kind === "ring") { fillRing(root, desc, g); return; }
-    if (desc.kind === "dock") { fillDock(root, desc, g); return; }
-    if (desc.kind === "pop") { fillPop(root, desc, g); return; }
-    if (desc.kind === "node") { fillNode(root, desc, g); return; }
-    if (desc.kind === "vic") { fillVic(root, desc, g); return; }          // words keep their elements: the slide is a CSS transition          // moves the arcs in place: the tick spin keeps running
+    // ETS item 9: a part of kind ring / dock / pop / node / vic is built by its base.ts / sheets.ts composer with all the members its builder reads
+    if (desc.kind === "ring") { fillRing(root, desc as UiRingPart, g); return; }
+    if (desc.kind === "dock") { fillDock(root, desc as UiDockPart, g); return; }
+    if (desc.kind === "pop") { fillPop(root, desc as UiPopPart, g); return; }
+    if (desc.kind === "node") { fillNode(root, desc as UiNodePart, g); return; }
+    if (desc.kind === "vic") { fillVic(root, desc as UiSheetDef, g); return; }          // words keep their elements: the slide is a CSS transition          // moves the arcs in place: the tick spin keeps running
     root.replaceChildren();
     root.style.cssText = "";
     root.dataset.uicPart = desc.part ?? desc.kind;
@@ -437,9 +464,10 @@ export function fillPart(root, desc, g) {
             root.className = "uic-part uic-box uic-balloon";
             setBox(root, r);
             if (desc.shadow) { root.classList.add("uic-shadowed"); root.style.setProperty("--sx", px(desc.shadow * ed.d)); root.style.setProperty("--sy", px(desc.shadow * ed.d)); }
-            const kx = desc.rect.w ? r.width / desc.rect.w : 0, ky = desc.rect.h ? r.height / desc.rect.h : 0;
-            const b = { l: desc.inner.x * kx, t: desc.inner.y * ky, w: desc.inner.w * kx, h: desc.inner.h * ky };
-            const tl = desc.tail ? { side: desc.tail.side, b0: desc.tail.b0 * kx, b1: desc.tail.b1 * kx, tip: [desc.tail.tip[0] * kx, desc.tail.tip[1] * ky] } : null;
+            // ETS item 9: a balloon part always carries its rect and its inner rect (base.balloonPart)
+            const kx = desc.rect!.w ? r.width / desc.rect!.w : 0, ky = desc.rect!.h ? r.height / desc.rect!.h : 0;
+            const b = { l: desc.inner!.x * kx, t: desc.inner!.y * ky, w: desc.inner!.w * kx, h: desc.inner!.h * ky };
+            const tl: UiBalloonTail | null = desc.tail ? { side: desc.tail.side, b0: desc.tail.b0 * kx, b1: desc.tail.b1 * kx, tip: [desc.tail.tip[0] * kx, desc.tail.tip[1] * ky] } : null;
             const sh = balloonShape(b, tl, ed.e1, 24 * ed.d);
             const edge = el("uic-fill", root), body = el("uic-fill", root);
             edge.style.cssText = `left:0;top:0;width:${px(r.width)};height:${px(r.height)};background:${desc.edge};clip-path:${pt(sh.outer)}`;
@@ -475,8 +503,8 @@ export function fillPart(root, desc, g) {
             root.className = "uic-part uic-corners"; setBox(root, r);
             const t = ed.e1, len = Math.round(5 * ed.u), w = r.width, h = r.height;
             const add = (css: string) => { const d = el("uic-fill", root); d.style.cssText = `background:${desc.color};${css}`; };
-            for (const [l, tp] of [[0, 0], [w - len, 0], [0, h - t], [w - len, h - t]]) add(`left:${px(l)};top:${px(tp)};width:${px(len)};height:${px(t)}`);
-            for (const [l, tp] of [[0, 0], [w - t, 0], [0, h - len], [w - t, h - len]]) add(`left:${px(l)};top:${px(tp)};width:${px(t)};height:${px(len)}`);
+            for (const [l, tp] of [[0, 0], [w - len, 0], [0, h - t], [w - len, h - t]] as const) add(`left:${px(l)};top:${px(tp)};width:${px(len)};height:${px(t)}`);
+            for (const [l, tp] of [[0, 0], [w - t, 0], [0, h - len], [w - t, h - len]] as const) add(`left:${px(l)};top:${px(tp)};width:${px(t)};height:${px(len)}`);
             break;
         }
         case "bar": {
@@ -484,7 +512,8 @@ export function fillPart(root, desc, g) {
             const slant = desc.slant ? `clip-path:polygon(0 0,100% 0,calc(100% - ${px(desc.slant * ed.d)}) 100%,0 100%);` : "";
             const track = el("uic-bar-track", root);
             track.style.cssText = `left:0;top:0;width:${px(r.width)};height:${px(r.height)};background:${desc.track};${slant}`;
-            const fillW = barFill(desc.ratio, r.width);
+            // ETS item 9: a bar part always carries its ratio (base.cardBar / hudBar)
+            const fillW = barFill(desc.ratio!, r.width);
             const fill = el("uic-bar-fill", track);
             // dir "rtl": the fill keeps the bar's right end (the battle's enemy HP bar shrinks towards its right anchor)
             fill.style.cssText = `${desc.dir === "rtl" ? `left:${px(r.width - fillW)};` : ""}width:${px(fillW)};background:${desc.color};`;
@@ -513,17 +542,19 @@ export function fillPart(root, desc, g) {
         }
         case "icon": {
             root.className = "uic-part uic-icon"; setBox(root, r);
-            root.innerHTML = desc.svg;
+            // ETS item 9: an icon part is only made for a token that has a badge (base.tokenLine)
+            root.innerHTML = desc.svg!;
             break;
         }
         case "text": {
             const family = desc.role === "label" ? FACE.label : FACE.text;
             const weight = desc.role === "label" ? 400 : desc.role === "number" ? 700 : 600;
-            root.className = `uic-part ${ROLES[desc.role] ?? ROLES.body}${desc.cls ? " " + desc.cls : ""}`;
-            const size = desc.sizeDp * ed.d * Math.abs(g.sy), line = desc.lineDp * ed.d * Math.abs(g.sy), sp0 = (desc.spacingDp ?? 0) * ed.d;
+            // ETS item 9: a text part always carries its role, text and sizes (base.textPart)
+            root.className = `uic-part ${ROLES[desc.role!] ?? ROLES.body}${desc.cls ? " " + desc.cls : ""}`;
+            const size = desc.sizeDp! * ed.d * Math.abs(g.sy), line = desc.lineDp! * ed.d * Math.abs(g.sy), sp0 = (desc.spacingDp ?? 0) * ed.d;
             const maxW = desc.maxDp ? desc.maxDp * ed.d * Math.abs(g.sx) : 0;
-            const fit = fitRun((s, sp) => measureText(desc.text, family, weight, s, sp), size, sp0, maxW);
-            root.textContent = desc.text;
+            const fit = fitRun((s, sp) => measureText(desc.text!, family, weight, s, sp), size, sp0, maxW);
+            root.textContent = desc.text!;
             root.dataset.uicText = desc.text;
             root.dataset.uicFits = fit.fits ? "1" : "0";
             const s = root.style;
@@ -537,16 +568,17 @@ export function fillPart(root, desc, g) {
         }
         case "type": {
             root.className = "uic-part uic-type";
-            let size = desc.sizeDp * ed.d * Math.abs(g.sy), sp = (desc.spacingDp ?? 0) * ed.d;
+            // ETS item 9: a type part always carries its text and size (base.typeWord)
+            let size = desc.sizeDp! * ed.d * Math.abs(g.sy), sp = (desc.spacingDp ?? 0) * ed.d;
             if (desc.fit && !desc.vertical) {
                 // a watermark that must stay inside its box (the home wall): shrink size and spacing (down to half) until it fits the rect width
-                const wide = (sz: number, sg: number) => measureText(desc.text, FACE.label, 400, sz, sg);
+                const wide = (sz: number, sg: number) => measureText(desc.text!, FACE.label, 400, sz, sg);
                 let k = 1;
                 while (k > 0.5 && wide(size * k, sp * k) > r.width) k -= 0.02;
                 size *= k; sp *= k;
                 root.dataset.uicFits = wide(size, sp) <= r.width + 0.5 ? "1" : "0";
             }
-            root.textContent = desc.text;
+            root.textContent = desc.text!;
             root.dataset.uicText = desc.text;
             root.style.cssText = `position:absolute;left:${px(r.left)};top:${px(r.top)};font-size:${+size.toFixed(2)}px;line-height:${+size.toFixed(2)}px;letter-spacing:${+sp.toFixed(2)}px;${desc.color ? `color:${desc.color};` : ""}${desc.vertical ? "writing-mode:vertical-rl;" : ""}`;
             break;

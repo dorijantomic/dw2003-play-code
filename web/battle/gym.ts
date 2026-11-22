@@ -1,6 +1,8 @@
 import { RAND_U16 } from "../vendor/engine.js";
 import { CORE_STATS } from "./progress.js";
-import type { DigimonRecord } from "../types/battle.js";
+import type { DigimonRecord, GymTables, GymDrill, GymRow } from "../types/battle.js";
+import type { EquipmentSlots } from "./core/types.js";
+import type { PartnerStats } from "../game/types.js";
 type GymElemDigimon = DigimonRecord & {
   elemCur?: Record<string, number>;
   elemGrowth?: Record<string, number>;
@@ -18,19 +20,10 @@ interface GymTrainingResult {
   effects: GymTrainingEffect[];
 }
 
-interface GymRecord {
-  tp_costs: number[];
-}
-
-interface GymDrillEntry {
-  id: number;
-  stat: string;
-  reps: number;
-}
 
 
 // Gym drill catalog for a gym rank (1..14): [{ drill, primary, secondary }].
-export function gymDrillsForRank(rank: number, gym) {
+export function gymDrillsForRank(rank: number, gym: GymTables) {
   return gym.rank_menus[Math.min(Math.max(rank, 1), gym.rank_menus.length) - 1] ?? [];
 }
 
@@ -56,11 +49,11 @@ export function gymStatForId(id: number) {
 //   tpChoice   = 0/1/2 (TP 1 / TP 5 / TP10), ultra = "Ultra Training Chance" challenge won
 //   dig        = { elemGrowth: {fire:1..5,...}, elemCur: {fire:0..999,...} } for brackets
 // Returns { tpCost, effects: [{ stat, delta }] } (negative delta = loss; "maxHp"/"maxMp").
-export function gymTrainingResult(drillEntry, tpChoice: number, ultra: boolean, dig: GymElemDigimon, gym, rng = RAND_U16): GymTrainingResult {
-  const roll = ([base, range]) => base + (range ? rng()! % range : 0);
+export function gymTrainingResult(drillEntry: GymDrill, tpChoice: number, ultra: boolean, dig: GymElemDigimon, gym: GymTables, rng = RAND_U16): GymTrainingResult {
+  const roll = ([base, range]: GymRow) => base + (range ? rng()! % range : 0);
   const superDrill = drillEntry.drill >= 13;
   const variant = !ultra ? 0 : superDrill ? 2 : 1; // elem/hpmp row variant
-  const effects = [];
+  const effects: GymTrainingEffect[] = [];
   const applyEffect = (id: number, isPrimary: boolean) => {
     if (!id) return;
     if (id >= 1 && id <= 5) {
@@ -93,7 +86,7 @@ export function gymTrainingResult(drillEntry, tpChoice: number, ultra: boolean, 
 // call site 0x44d4: percent = v0 + 0x4b): base 75, +3 when TrainingBook (337) sits in
 // either accessory slot (native roster +0x3c8/+0x3ca) — checked FIRST, so the book wins
 // over the brace — else +6 when PowerBrace (338) does. The bonuses do NOT stack.
-export function gymRepPercent(equip) {
+export function gymRepPercent(equip: EquipmentSlots | null | undefined) {
   const a = equip?.acc0, b = equip?.acc1;
   if (a === 337 || b === 337) return 78;
   if (a === 338 || b === 338) return 81;
@@ -120,7 +113,7 @@ export function gymRepResults(percent: number, superDrill = false, rng = RAND_U1
 // LAST won challenge trained (remembered in roster byte +0x3cc), so the same drill can
 // never win twice in a row. Win ⇒ ultra tables + remember drill; lose ⇒ "Failed..." +
 // normal tables.
-export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
+export function ultraChanceRoll(drill: number, lastUltraDrill: number | null | undefined, rng = RAND_U16) {
   const percent = drill === lastUltraDrill ? 0 : 50;
   return rng()! % 100 <= percent;
 }
@@ -136,7 +129,7 @@ export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
 // "Failed..." (estraini 71, F0x80087334 `arg4==0 && arg5==0` branch).
 //   repResults   = the ordinary reps (3, or 5 for a super/starred drill or an "As is" pick)
 //   challengeWon = null (no bonus rep) | true (won → +1 ultra roll) | false (lost → nothing)
-export function gymSessionResult(drillEntry: GymDrillEntry, tpChoice: number, repResults: boolean[], challengeWon: boolean, dig: DigimonRecord, gym: GymRecord, rng = RAND_U16): { tpCost: number; effects: { stat: string; delta: number }[] } {
+export function gymSessionResult(drillEntry: GymDrill, tpChoice: number, repResults: boolean[], challengeWon: boolean, dig: DigimonRecord, gym: GymTables, rng = RAND_U16): { tpCost: number; effects: { stat: string; delta: number }[] } {
   const totals = new Map();
   const add = (fx: GymTrainingEffect[]) => { for (const { stat, delta } of fx) totals.set(stat, (totals.get(stat) ?? 0) + delta); };
   for (const ok of repResults) if (ok) add(gymTrainingResult(drillEntry, tpChoice, false, dig, gym, rng).effects);
@@ -146,7 +139,7 @@ export function gymSessionResult(drillEntry: GymDrillEntry, tpChoice: number, re
 
 // Apply gymTrainingResult effects to the stored-stat block (store semantics as the
 // level-up rolls: maxHp/maxMp cap 9999, core/elems cap 999, core loss floors at 0).
-export function applyGymEffects(ps, effects, lu: { hpmp_cap: number; stat_cap: number; }) {
+export function applyGymEffects(ps: PartnerStats, effects: GymTrainingEffect[], lu: { hpmp_cap: number; stat_cap: number; }) {
   const hpmpCap = lu?.hpmp_cap ?? 9999;
   const statCap = lu?.stat_cap ?? 999;
   ps.stats ??= {};

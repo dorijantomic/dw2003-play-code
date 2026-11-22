@@ -13,7 +13,8 @@ import {
   FACE_BOX_LAYER_KEY, FACE_BOX_TICK, FACE_BOX_WORKER_SIZE,
   faceBoxShotFromRows, faceBoxShotRead, faceBoxLookAt, faceBoxTick, faceBoxSpawn,
 } from "../vendor/engine.js";
-import type { ShotNode } from "./types.js";
+import type { CamShot, ShotNode } from "./types.js";
+import type { FaceBoxRow } from "../../engine/dw3/battle-camera.js";
 
 import type { PlacementTable } from "../types/battle3d.js";
 type Op5Words = [
@@ -22,6 +23,38 @@ type Op5Words = [
   ...number[]
 ];
 
+
+/** What a camera install carries beside its record: who installed it. */
+export interface CameraMeta { issuer?: string; issuerVm?: unknown; }
+
+/** What a preset install carries: the same, and the glide length (0 cuts). */
+export interface CameraPresetMeta extends CameraMeta { duration?: number; }
+
+/** A cut: the staging block is the live record. */
+interface CameraCut extends CameraMeta {
+  kind: "cut"; fields: number[];
+  fromFields?: undefined; toFields?: undefined; preset?: undefined; duration?: undefined; progress?: undefined; rate?: undefined;
+}
+
+/** A move between two field blocks, advanced by the glide rate. */
+interface CameraMove extends CameraMeta {
+  kind: "move"; fromFields: number[]; toFields: number[]; duration: number; progress: number; rate: number;
+  fields?: undefined; preset?: undefined;
+}
+
+/** A canned shot named by index and resolved late; with a duration it glides from the live record. */
+interface CameraPreset extends CameraPresetMeta {
+  kind: "preset"; preset: number; fromFields?: number[] | null; progress?: number; rate?: number;
+  fields?: undefined; toFields?: undefined;
+}
+
+/** The camera object's one live record: a cut, a move between two field blocks, or a late-resolved preset. */
+export type CameraRec = CameraCut | CameraMove | CameraPreset;
+
+/** One entry of an authored op5 run: a preset or a field block, and the glide length. */
+export interface CameraSpec { preset?: number; fields?: number[]; duration?: number; }
+
+type Mat3 = [[number, number, number], [number, number, number], [number, number, number]];
 
 interface Op5Record {
   words: Op5Words;
@@ -58,10 +91,10 @@ interface FaceBoxShot {
 // to ~0.3 deg), with the eye/target/H living in the live cam struct D0x800a46d8. buildView here
 // reproduces that look-at exactly (== battle3d.mat4LookAt at roll=0), plus an optional roll.
 
-const sub3   = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
-const cross3 = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-const dot3   = (a: number[], b) => a[0]!*b[0] + a[1]!*b[1] + a[2]!*b[2];
-const norm3  = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+const sub3   = (a: number[], b: number[]) => [a[0]!-b[0]!, a[1]!-b[1]!, a[2]!-b[2]!];
+const cross3 = (a: number[], b: number[]) => [a[1]!*b[2]!-a[2]!*b[1]!, a[2]!*b[0]!-a[0]!*b[2]!, a[0]!*b[1]!-a[1]!*b[0]!];
+const dot3   = (a: number[], b: number[]) => a[0]!*b[0]! + a[1]!*b[1]! + a[2]!*b[2]!;
+const norm3  = (a: number[]) => { const l = Math.hypot(a[0]!, a[1]!, a[2]!) || 1; return [a[0]!/l, a[1]!/l, a[2]!/l]; };
 
 // Right-handed, column-major view matrix (identical convention to battle3d.mat4LookAt).
 export function buildView(eye: number[], target: number[], up = [0, 1, 0], roll = 0) {
@@ -75,16 +108,16 @@ export function buildView(eye: number[], target: number[], up = [0, 1, 0], roll 
     x = xr; y = yr;
   }
   const m = new Float32Array(16);
-  m[0]=x[0]; m[4]=x[1]; m[8]=x[2];  m[12]=-dot3(x, eye);
-  m[1]=y[0]; m[5]=y[1]; m[9]=y[2];  m[13]=-dot3(y, eye);
-  m[2]=z[0]; m[6]=z[1]; m[10]=z[2]; m[14]=-dot3(z, eye);
+  m[0]=x[0]!; m[4]=x[1]!; m[8]=x[2]!;  m[12]=-dot3(x, eye);
+  m[1]=y[0]!; m[5]=y[1]!; m[9]=y[2]!;  m[13]=-dot3(y, eye);
+  m[2]=z[0]!; m[6]=z[1]!; m[10]=z[2]!; m[14]=-dot3(z, eye);
   m[15]=1;
   return m;
 }
 
 // PS1 GTE projection: horizontal FOV = 2*atan((screenW/2)/H). PS1 screen width = 320; H is the
 // cam struct's projection distance (cam+0x30). fovFromH(280) ~= 59.5 deg (the ~60 deg idle FOV).
-export function fovFromH(H, screenW = 320) {
+export function fovFromH(H: number, screenW = 320) {
   return 2 * Math.atan((screenW / 2) / H) * 180 / Math.PI;
 }
 
@@ -95,7 +128,7 @@ export function fovFromH(H, screenW = 320) {
 // fighter sat pulled toward the screen centre and its screen-space tech effect stayed out to
 // the side of it. With fovY, a widescreen canvas widens the view horizontally through the
 // aspect term and the two layers agree exactly at any canvas size.
-export function fovYFromH(H, screenH = 240) {
+export function fovYFromH(H: number, screenH = 240) {
   return 2 * Math.atan((screenH / 2) / H) * 180 / Math.PI;
 }
 
@@ -226,7 +259,7 @@ export const FACE_BOX_GROUPS = { player: PORT_FACE_BOX_GROUPS.player, enemy: POR
  * Nothing here decides whether the shot produces a picture — that is `faceBoxDraws`, and it is
  * the console's own arithmetic, not a judgement about the record.
  */
-export function faceBoxShot(record, side: string) {
+export function faceBoxShot(record: { face_box?: readonly FaceBoxRow[] | undefined } | null | undefined, side: string) {
   // The group rule and the shot read are the port's (engine/dw3/battle-camera.ts,
   // FIGHTSTG_F0x80091c1c / faceBoxShotFromRows): this adapter only hands the parsed
   // placement rows over, so no caller can pick a different group.
@@ -257,7 +290,7 @@ export function faceBoxShot(record, side: string) {
  * and F0x800266b4 skips the fill when the flag is clear, exe/fns.s:24595-24601) the window is
  * left showing the battle view's own picture.
  */
-export function faceBoxDraws(shot) {
+export function faceBoxDraws(shot: { H: number } | null | undefined) {
   return !!shot && shot.H > 0;
 }
 
@@ -281,7 +314,7 @@ export function faceBoxSource(placementTable: PlacementTable | null | undefined,
 }
 
 /** The box window's own vertical field of view, from the projection distance H. */
-export function faceBoxFovY(H, screenH = FACE_BOX_RECT.h) {
+export function faceBoxFovY(H: number, screenH = FACE_BOX_RECT.h) {
   return 2 * Math.atan((screenH / 2) / H) * 180 / Math.PI;
 }
 
@@ -303,7 +336,7 @@ export function faceBoxView(shot: FaceBoxShot) {
  * 32-bit translation). This is what the emulator would hand the GTE; faceBoxView
  * above is the render-space equivalent the walker actually draws with.
  */
-export function faceBoxPs1View(shot) {
+export function faceBoxPs1View(shot: Parameters<typeof faceBoxLookAt>[0]) {
   const built = faceBoxLookAt(shot);
   return built ? built.view : null;
 }
@@ -382,7 +415,7 @@ export function faceBoxScene({ backdropOnly = false, draws = true } = {}) {
 // .L0x8002b6d0-.L0x8002b6e8), so low = sin and high = cos.
 export const ROT_UNIT = 4096;
 
-const s16 = (v) => ((v | 0) << 16) >> 16;          // the record stores the angles with `sh`,
+const s16 = (v: number) => ((v | 0) << 16) >> 16;          // the record stores the angles with `sh`,
                                                     // and RotMatrix reads them back with `lh`.
 /** The `lhu`/`subu`/`sh`/`lhu` round trip of the interpolator: every field is 16 bits wide and
  *  the subtraction wraps before it is read back signed. */
@@ -395,7 +428,7 @@ const wrap16 = (v: number) => (v << 16) >> 16;
  *   m[2][2] .L0x8002b794. (The original works in 1/4096 fixed point and truncates each product
  *   with `sra 0xc`; this uses doubles, so it differs from the console by well under one unit.)
  */
-export function rotMatrixYXZ(vx, vy, vz) {
+export function rotMatrixYXZ(vx: number, vy: number, vz: number): Mat3 {
   const k = 2 * Math.PI / ROT_UNIT;
   const a = s16(vx) * k, b = s16(vy) * k, c = s16(vz) * k;
   const sA = Math.sin(a), cA = Math.cos(a);
@@ -409,11 +442,11 @@ export function rotMatrixYXZ(vx, vy, vz) {
 }
 
 /** M . v for the row-major 3x3 above. */
-export function rotApply(m, v) {
+export function rotApply(m: Mat3, v: number[]): [number, number, number] {
   return [
-    m[0][0]*v[0] + m[0][1]*v[1] + m[0][2]*v[2],
-    m[1][0]*v[0] + m[1][1]*v[1] + m[1][2]*v[2],
-    m[2][0]*v[0] + m[2][1]*v[1] + m[2][2]*v[2],
+    m[0][0]*v[0]! + m[0][1]*v[1]! + m[0][2]*v[2]!,
+    m[1][0]*v[0]! + m[1][1]*v[1]! + m[1][2]*v[2]!,
+    m[2][0]*v[0]! + m[2][1]*v[1]! + m[2][2]*v[2]!,
   ];
 }
 
@@ -444,13 +477,13 @@ export const PS1_UP = [0, -1, 0];
 export const ROLL_IS_DEGREES = true;
 
 /** Rodrigues: turn `v` about unit-ish `axis` by `rad` (right-hand rule). */
-export function rotateAboutAxis(v, axis: number[], rad: number) {
+export function rotateAboutAxis(v: number[], axis: number[], rad: number) {
   const k = norm3(axis), c = Math.cos(rad), s = Math.sin(rad);
   const kv = dot3(k, v), kxv = cross3(k, v);
   return [
-    v[0]*c + kxv[0]!*s + k[0]!*kv*(1 - c),
-    v[1]*c + kxv[1]!*s + k[1]!*kv*(1 - c),
-    v[2]*c + kxv[2]!*s + k[2]!*kv*(1 - c),
+    v[0]!*c + kxv[0]!*s + k[0]!*kv*(1 - c),
+    v[1]!*c + kxv[1]!*s + k[1]!*kv*(1 - c),
+    v[2]!*c + kxv[2]!*s + k[2]!*kv*(1 - c),
   ];
 }
 
@@ -459,9 +492,9 @@ export function rotateAboutAxis(v, axis: number[], rad: number) {
  * backward axis eye-target by MINUS the roll, per the sign derivation above. rollDeg = 0 returns
  * `up` untouched, so every shot that authors no roll is bit-identical to before.
  */
-export function applyScreenRoll(up: number[] | undefined, eye, target, rollDeg: number) {
+export function applyScreenRoll(up: number[] | undefined, eye: number[], target: number[], rollDeg: number) {
   if (!rollDeg) return up;
-  return rotateAboutAxis(up, sub3(eye, target), -rollRadians(rollDeg));
+  return rotateAboutAxis(up!, sub3(eye, target), -rollRadians(rollDeg));
 }
 
 /**
@@ -485,27 +518,27 @@ export function rollRadians(rollDeg: number) {
  * at constant radius, which is what an authored 180-degree yaw means; interpolating the finished
  * world position instead cuts the chord straight through the fighter.
  */
-export function composeShot(fields): ComposedShot {
-  const anchor = [fields[6], fields[7], fields[8]];
-  const angles = [s16(fields[9]), s16(fields[10]), s16(fields[11])] as [number, number, number];
+export function composeShot(fields: number[]): ComposedShot {
+  const anchor = [fields[6]!, fields[7]!, fields[8]!];
+  const angles = [s16(fields[9]!), s16(fields[10]!), s16(fields[11]!)] as [number, number, number];
   // W = T(anchor) . R(angles) is the shot's own coordinate frame; eye/target are stated inside
   // it. R is the identity for a shot that authors no angles, so this reduces to the anchor add.
   const R = (angles[0] || angles[1] || angles[2]) ? rotMatrixYXZ(...angles) : null;
   const place = (v: [number, number, number]): [number, number, number] => {
     const p = R ? rotApply(R, v) : v;
-    return [p[0] + anchor[0], p[1] + anchor[1], p[2] + anchor[2]];
+    return [p[0]! + anchor[0]!, p[1]! + anchor[1]!, p[2]! + anchor[2]!];
   };
   return {
     fields,
     anchor,
     angles,
-    eye:    place([fields[0], fields[1], fields[2]]),
-    target: place([fields[3], fields[4], fields[5]]),
+    eye:    place([fields[0]!, fields[1]!, fields[2]!]),
+    target: place([fields[3]!, fields[4]!, fields[5]!]),
     // The angle frame turns the camera's up vector with it, so a shot with a non-zero vz or vx
     // tilts the horizon. Consumers must feed this to the look-at instead of a constant up.
     up:     R ? rotApply(R, PS1_UP) : PS1_UP.slice(),
-    roll:   fields[12],
-    H:      fields[13],
+    roll:   fields[12]!,
+    H:      fields[13]!,
   };
 }
 
@@ -535,12 +568,12 @@ export function composeShot(fields): ComposedShot {
  * `t` runs 0..1 here (the original's 0..0x1000 accumulator); it is taken back to that integer
  * scale, which is exact for every caller that divides the accumulator by 0x1000.
  */
-export function lerpFields(from, to, t: number) {
+export function lerpFields(from: number[], to: number[], t: number) {
   const acc = Math.round(t * 0x1000);
   const out = new Array(14);
   for (let i = 0; i < 14; i++) {
-    const a = s16(from[i]);
-    const d = s16(wrap16(s16(to[i]) - a));
+    const a = s16(from[i]!);
+    const d = s16(wrap16(s16(to[i]!) - a));
     out[i] = s16(a + wrap16(Math.floor(acc * d / 0x1000)));
   }
   return out;
@@ -570,7 +603,7 @@ export function op5GlideRate(duration: number) {
 
 /** One frame of the tween: `t += rate * delta`, clamped at 0x1000. `delta` is the raw
  *  per-frame delta, NOT the walker's slow-motion-published animation delta. */
-export function op5GlideT(t, rate, delta: number) {
+export function op5GlideT(t: number, rate: number, delta: number) {
   return Math.min(0x1000, (t | 0) + rate * delta);
 }
 
@@ -584,7 +617,7 @@ export function op5GlideFrames(duration: number, delta = CAMERA_FRAME_DELTA) {
 
 export function applyOp5(camState: Op5CamState, op5rec: Op5Record): Op5CamState {
   const w = op5rec.words || [];
-  const n0 = (v) => (v === 0 ? 0 : v);   // normalize -0
+  const n0 = (v: number) => (v === 0 ? 0 : v);   // normalize -0
   if (w[1] === 1) {
     const fields = [
       n0(w[2]),  n0(-w[3]),  n0(-w[4]),    // 0x00, 0x04, 0x08  (eye)
@@ -641,16 +674,16 @@ export function applyOp5(camState: Op5CamState, op5rec: Op5Record): Op5CamState 
 //
 // `resolvePreset(presetId)` reads a canned shot out of the acting Digimon's own record; it is
 // late-bound because the placement table can land after the op5 that named the shot.
-export function fieldsFromShot(shot) {
+export function fieldsFromShot(shot: CamShot) {
   // The record a composed shot installs: eye, target, H, and NOTHING else — the anchor, the
   // three angles and the roll stay zeroed exactly as the canned-shot loader leaves them
   // (F0x800923b4 .L0x80092530-.L0x80092548), so the shot is absolute about the arena origin.
   return [
-    shot.eye[0] | 0, shot.eye[1] | 0, shot.eye[2] | 0,
-    shot.target[0] | 0, shot.target[1] | 0, shot.target[2] | 0,
+    shot.eye[0]! | 0, shot.eye[1]! | 0, shot.eye[2]! | 0,
+    shot.target[0]! | 0, shot.target[1]! | 0, shot.target[2]! | 0,
     0, 0, 0,                            // +0x18 anchor
     0, 0, 0,                            // +0x24/+0x26/+0x28 frame angles
-    shot.roll | 0,                      // +0x2c roll
+    shot.roll! | 0,                      // +0x2c roll
     shot.H | 0,                         // +0x30 projection distance
   ];
 }
@@ -665,30 +698,30 @@ export function fieldsFromShot(shot) {
  * `issuerVm` is the live action VM tagged onto every op5 install (`web/battle3d.js _camHookFor`),
  * so identity — not the sticky label — answers the question.
  */
-export function cameraOwnedByAction(rec, side, vm) {
+export function cameraOwnedByAction(rec: CameraRec | null | undefined, side: string, vm: unknown) {
   return !!rec && rec.issuer === side && !!vm && rec.issuerVm === vm;
 }
 
-export function createCameraRecord(resolvePreset) {
-  let rec = null;
+export function createCameraRecord(resolvePreset?: (preset: number) => CamShot | null | undefined) {
+  let rec: CameraRec | null = null;
   // The authored op5 LIST a clip runs, in order (see `sequence`). `pending` holds the entries
   // not yet armed; `seqMeta` is the installer tag every entry of the run carries.
-  let pending = [];
-  let seqMeta = {};
+  let pending: CameraSpec[] = [];
+  let seqMeta: CameraMeta = {};
 
   const owner = {
     get: () => rec,
 
     // F0x80092244, the cut: the staging block becomes the live record and the tween parks at
     // 0x1000, so the next frame composes this record rather than moving toward it.
-    cut(fields, meta) {
+    cut(fields: number[], meta?: CameraMeta) {
       rec = { kind: "cut", fields, ...meta };
       return rec;
     },
 
     // F0x800922b4, the move: the start block is the LIVE record unless the caller names
     // another, the target block is the staging block, and t starts at 0.
-    move(toFields, duration, meta) {
+    move(toFields: number[], duration: number, meta?: CameraMeta) {
       const D = duration | 0;
       rec = {
         kind: "move",
@@ -712,9 +745,9 @@ export function createCameraRecord(resolvePreset) {
     // with a duration GLIDES from the live record to the resolved canned shot; without one it
     // cuts. The start block is the live record at the moment the move is armed, as F0x800922b4
     // takes it when the caller's `a1` is null.
-    preset(presetId, meta) {
-      const m = meta || {};
-      const D = m.duration | 0;
+    preset(presetId: number, meta?: CameraPresetMeta) {
+      const m: CameraPresetMeta = meta || {};
+      const D = m.duration! | 0;
       rec = D > 0
         ? { kind: "preset", preset: presetId | 0, ...m,
             fromFields: owner.live(), duration: D, progress: 0, rate: op5GlideRate(D) }
@@ -735,8 +768,8 @@ export function createCameraRecord(resolvePreset) {
     //
     // A spec is `{ preset, duration }` (the preset arm) or `{ fields, duration }` (a shot whose
     // record is not a preset, e.g. preset 0's arena/default battle cam). A duration of 0 cuts.
-    sequence(specs, meta) {
-      pending = (specs || []).filter(Boolean).slice();
+    sequence(specs: (CameraSpec | null | undefined)[] | null | undefined, meta?: CameraMeta) {
+      pending = (specs || []).filter(Boolean).slice() as CameraSpec[];
       seqMeta = meta || {};
       if (pending.length) drain();
       return rec;
@@ -746,14 +779,14 @@ export function createCameraRecord(resolvePreset) {
     // run, so the battle's own camera must not re-cut over it (battle3d's script-owned
     // arbitration ORs this in). False once the last glide lands.
     isGliding() {
-      return !!(rec && rec.duration && rec.progress < 0x1000);
+      return !!(rec && rec.duration && rec.progress! < 0x1000);
     },
 
     // F0x80091df4's per-frame step, on the RAW delta through 0x8004df9c. It advances the move's
     // accumulator AND a preset glide's — both are the same [0xfc] move on the console.
     tick(delta: number) {
-      if (rec?.duration && rec.progress < 0x1000) {
-        rec.progress = op5GlideT(rec.progress, rec.rate, delta);
+      if (rec?.duration && rec.progress! < 0x1000) {
+        rec.progress = op5GlideT(rec.progress!, rec.rate!, delta);
         // The clip's playback moves on: the next authored op5 arms from the shot just reached.
         if (rec.progress >= 0x1000 && pending.length) drain();
       }
@@ -774,9 +807,9 @@ export function createCameraRecord(resolvePreset) {
         const to = fieldsFromShot(shot);
         // A preset glide (op5 operand 0 != 0) tweens the live record toward the resolved shot,
         // exactly as the move branch below does; at progress 0 it still IS the start record.
-        if (rec.duration && rec.progress < 0x1000) {
+        if (rec.duration && rec.progress! < 0x1000) {
           const from = rec.fromFields || to;
-          return lerpFields(from, to, rec.progress / 0x1000);
+          return lerpFields(from, to, rec.progress! / 0x1000);
         }
         return to;
       }
@@ -793,13 +826,13 @@ export function createCameraRecord(resolvePreset) {
   // Arm one authored op5 entry. `fields` (when present) is a shot record the caller resolved
   // itself — the arena/default battle cam of preset 0 — and goes through the same cut/move the
   // op5 handler uses; otherwise the entry is a preset and resolves late through `resolvePreset`.
-  function armSpec(spec) {
+  function armSpec(spec: CameraSpec) {
     if (spec.fields) {
-      return (spec.duration | 0) > 0
-        ? owner.move(spec.fields, spec.duration, seqMeta)
+      return (spec.duration! | 0) > 0
+        ? owner.move(spec.fields, spec.duration!, seqMeta)
         : owner.cut(spec.fields, seqMeta);
     }
-    return owner.preset(spec.preset, { ...seqMeta, duration: spec.duration | 0 });
+    return owner.preset(spec.preset!, { ...seqMeta, duration: spec.duration! | 0 });
   }
 
   // Arm entries in order, skipping past any that are instant cuts (they have no glide to wait
@@ -807,7 +840,7 @@ export function createCameraRecord(resolvePreset) {
   function drain() {
     let guard = 0;
     while (pending.length && guard++ < 64) {
-      const spec = pending.shift();
+      const spec = pending.shift()!;
       armSpec(spec);
       if (owner.isGliding()) return;
     }

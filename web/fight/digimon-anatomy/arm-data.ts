@@ -9,7 +9,9 @@
 // `source` says whether the verdict comes from the hand's own mesh (m) or from a separate prop
 // bone hanging at the wrist (p); `attachment` is that bone's home (a arm, t torso, b back, h head,
 // l leg, y body). features = [L/F, W/F, T/W, L/W, cube/F, area/(F*TW)].
-export const ARM_EQUIP = {
+import type { ArmEquipRow } from "../types.js";
+
+export const ARM_EQUIP: Record<string, Record<string, ArmEquipRow>> = {
   "m003agum":{"left":["bare",0,"m",13,"a",[1.38,1.37,0.53,1.01,1.11,0.91]],"right":["bare",0,"m",17,"a",[1.38,1.37,0.53,1.01,1.11,0.91]]},
   "m004beta":{},
   "m005grey":{"left":["elongated",0,"p",12,"l",[1.52,0.66,1.0,2.31,0.87,0.23]],"right":["elongated",0,"p",19,"l",[1.52,0.66,1.0,2.31,0.87,0.23]]},
@@ -258,4 +260,4 @@ export const ARM_EQUIP = {
 
 export const ARM_EQUIP_CLASSES = ["bare", "elongated", "flat", "bulky"];
 
-export const ARM_ATTACH = { a: "arm", t: "torso", b: "back", h: "head", l: "leg", y: "body" };
+export const ARM_ATTACH: Record<string, string> = { a: "arm", t: "torso", b: "back", h: "head", l: "leg", y: "body" };

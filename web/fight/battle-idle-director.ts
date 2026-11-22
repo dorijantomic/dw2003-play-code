@@ -20,6 +20,7 @@ import {
   IDLE_TURN_UNITS, IDLE_SPIN_PER_DELTA, IDLE_HALF_TURN_UNITS, IDLE_ROW_END,
   IDLE_SHOT_TABLE, IDLE_ROW_WALK, IDLE_SUB_STATES,
 } from "../vendor/engine.js";
+import type { IdleDirector } from "../../engine/dw3/battle-idle-director.js";
 
 export {
   createIdleClock, idleSubState, idleNextRow, idleShotEntry, idleRowLength, idleSpinYaw,
@@ -39,7 +40,7 @@ export function createIdleDirector(opts = {}) {
   const director = engineDirector(opts);
   let primed = false;
   return {
-    update(delta): ReturnType<typeof engineTick> {
+    update(delta: number): ReturnType<typeof engineTick> {
       if (!primed) { director.prime(); primed = true; }
       return director.update(delta);
     },
@@ -52,7 +53,7 @@ export function createIdleDirector(opts = {}) {
 }
 
 /** The record the director cuts this tick, or null while the director does not exist. */
-export function idleDirectorTick(director, clock: { tick(dt: number): number; readonly frames: number; reset(): void; } | undefined, dt: number, exists: boolean) {
+export function idleDirectorTick(director: IdleDirector, clock: { tick(dt: number): number; readonly frames: number; reset(): void; } | undefined, dt: number, exists: boolean) {
   if (!exists) return null;
   return director.update(clock!.tick(dt)).fields;
 }

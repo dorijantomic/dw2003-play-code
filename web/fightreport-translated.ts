@@ -29,6 +29,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { composeReport } from "./ui-c/screens.js";
+import type { UiPart, UiReportContext } from "./ui-c/types.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
@@ -46,10 +47,6 @@ interface FightReportData {
     cursorGlyphs: Uint8Array;
     textButtons: Uint8Array;
     banks: Map<number, Uint8Array>;
-}
-
-interface ScreenCompose {
-    text: (x: number, y: number, text: string) => void;
 }
 
 
@@ -268,7 +265,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         fitNativeScreen(ctx);
-        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc: ScreenCompose): string[] => composeReport(sc, { view: reportView() }) } });
+        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc: UiReportContext): UiPart[] => composeReport(sc, { view: reportView() }) } });
         ctx.restore();
     };
 

@@ -55,7 +55,21 @@ import {
 // op11's WAIT (FIGHTSTG_F0x8008c220) and op2's record-BLOCK (FIGHTSTG_F0x8008b7f4,
 // the mode-5 sub-0 slot-motion wait) are the ported bodies too: the browser drives
 // them (below) instead of hand-counting its own wait and ramp state.
+import type { SlotMotion } from "../../engine/dw3/battle-slot-motion.js";
+import type { FightActionHooks, FightMotionSlot, FightScriptOp, FightVec3 } from "./types.js";
+import type { TimelinePlayer } from "./timeline-player.js";
 export { rampCurve, RAMP_TARGET };
+
+/** What a script is built with: its hooks, the table resolver (op2 bind), the base table, and the slot it moves. */
+interface ActionVMOpts {
+  timelineForTable?: ((table: number) => TimelinePlayer | null) | null;
+  baseTable?: (() => number) | null;
+  moveSpeed?: number;
+  hooks?: FightActionHooks;
+  currentEffect?: number | null;
+  currentMotion?: number | null;
+  slot?: FightMotionSlot | null;
+}
 
 const TERM = (op: number) => op === 0 || op === 255;          // shared terminator path (finding f)
 const STRIKE_TYPE = 99;                               // op10 type 0x63 = the damage strike (finding e)
@@ -85,24 +99,25 @@ export class ActionVM {
   declare _pActor: Int32Array<ArrayBuffer>;
   declare _pCtx: Int32Array<ArrayBuffer>;
   declare _portDelta: number;
-  declare _ramp: any;
+  declare _ramp: SlotMotion | null;
   declare _terminating: boolean;
   declare _waitCount: number;
   declare _waitFlag: number;
-  declare baseTable: any;
-  declare currentEffect: any;
-  declare currentMotion: any;
+  declare baseTable: (() => number) | null;
+  declare currentEffect: number | null;
+  declare currentMotion: number | null;
   declare ended: boolean;
-  declare hooks: any;
+  declare hooks: FightActionHooks;
   declare ip: number;
   declare justHit: boolean;
-  declare lastMotion: any;
+  declare lastMotion: number | null;
   declare moveSpeed: number;
-  declare ops: any;
-  declare player: any;
-  declare slot: any;
-  declare timelineForTable: any;
-  constructor(script, { timelineForTable = null, baseTable = null, moveSpeed = MOVE_SPEED, hooks = {}, currentEffect = null, currentMotion = null, slot = null } = {}) {
+  declare ops: FightScriptOp[];
+  declare player: TimelinePlayer | null;
+  declare slot: FightMotionSlot;
+  declare timelineForTable: ((table: number) => TimelinePlayer | null) | null;
+  // ETS item 42: a script is loaded JSON, so only its `ops` array is trusted (checked with Array.isArray below)
+  constructor(script: { ops?: unknown } | null | undefined, { timelineForTable = null, baseTable = null, moveSpeed = MOVE_SPEED, hooks = {}, currentEffect = null, currentMotion = null, slot = null }: ActionVMOpts = {}) {
     this.ops = Array.isArray(script?.ops) ? script.ops : [];
     this.timelineForTable = timelineForTable;   // (tableIndex) -> TimelinePlayer | null  (op2 bind)
     // () -> the actor's BASE idle table (the anim object's +0x18): 0 = normal idle, 1 = the low-HP
@@ -163,7 +178,7 @@ export class ActionVM {
     // (3) dispatch opcodes until a yield (wait / blocking op2 / terminator) or out of ops.
     let budget = OP_BUDGET;
     while (this.ip < this.ops.length && budget-- > 0) {
-      const rec = this.ops[this.ip++];
+      const rec = this.ops[this.ip++]!;
       const op = rec.op;
 
       if (rec.unknown) continue;          // deferred inline-blob ops → no-op (Phase C decodes these)
@@ -190,7 +205,7 @@ export class ActionVM {
         case "op5": this._drivePort("op5", rec); break;      // camera (ported; reuses the look-at)
         case "op11": {                                       // wait N → the ported op11 yield
           if (Number.isInteger(rec.untilEntry)) {           // DW2 motion only (clip-fallback withDw2Body): hold until the body's strike pose
-            if (this.player && !this.player.ended && (this.player.playhead | 0) < rec.untilEntry) { this.ip--; return; }
+            if (this.player && !this.player.ended && (this.player.playhead | 0) < rec.untilEntry!) { this.ip--; return; }
             break;
           }
           if (!this._driveWait(rec, delta)) { this.ip--; return; }
@@ -221,10 +236,11 @@ export class ActionVM {
 
   // op2 [mode, slot, table?] — returns false if this op BLOCKS (caller rewinds IP and yields this tick),
   // true if it executed and the dispatch should continue. mode/slot/table = words[0]/[1]/[2].
-  _dispatchOp2(rec) {
+  // ETS item 9: the decoder gives an op2 record every operand its mode reads, so the word reads below are present
+  _dispatchOp2(rec: FightScriptOp) {
     const words = rec.words;
-    const mode = words[0] | 0;
-    const table = words[2] | 0;          // only meaningful for the modes that carry a 3rd word
+    const mode = words[0]! | 0;
+    const table = words[2]! | 0;          // only meaningful for the modes that carry a 3rd word
     if (mode === 0) {
       // Word 1 is NOT table 1. The original's mode-0 arm special-cases it (.L0x8008b8e4 ->
       // .L0x8008b90c): it reads the actor's latched BASE table from the anim object's +0x18 and
@@ -234,7 +250,7 @@ export class ActionVM {
       // binding table 1 literally left every Digimon standing in the near-death stance after a
       // technique. Word >= 2 requests animId word+1, i.e. timeline table `word`, unchanged.
       if (table === 1) {
-        const p = this.timelineForTable?.((this.baseTable?.() | 0) || 0);
+        const p = this.timelineForTable?.((this.baseTable?.()! | 0) || 0);
         if (p) this.player = p;
         return true;
       }
@@ -252,7 +268,7 @@ export class ActionVM {
       const sub = table;                 // mode-5's 3rd word selects the motion kind / wait
       // [5, slot, kind] → build the slot motion object (F0x8009b460). Kind 4 alone carries a 4th
       // word (.L0x8008b9b4 reads one extra operand and passes it as a2 = the distance trim).
-      if (sub !== 0) { this._armRamp(sub, words[3] | 0); return true; }
+      if (sub !== 0) { this._armRamp(sub, words[3]! | 0); return true; }
       // [5, slot, 0]: the original reads the motion object pointer at context+0x4 (asm .L0x8008b958)
       // and PASSES if it is null, otherwise blocks until its state +0xc reaches 2. The ported op2
       // owns that decision and the rewind; the browser supplies the object's state and its cursor.
@@ -275,23 +291,23 @@ export class ActionVM {
     //   modes 1/2 = slot visibility flag (+0x34); 4 = set +0x22 vector; 9 = slot release.
     if (mode === 3) {
       const w = words;
-      this.hooks.onMove?.({ kind: "to", x: w[2] | 0, y: -(w[3] | 0), z: -(w[4] | 0), tween: w[5] | 0 });
+      this.hooks.onMove?.({ kind: "to", x: w[2]! | 0, y: -(w[3]! | 0), z: -(w[4]! | 0), tween: w[5]! | 0 });
       return true;
     }
     if (mode === 4) {
       // Slot secondary transform vector (+0x22/+0x24/+0x26). The handler
       // copies X and negates Y/Z; these are PS1 rotation angles (4096=360°).
       const neg = (v: number) => v ? -v : 0;
-      this.hooks.onRotate?.({ x: words[2] | 0, y: neg(words[3] | 0), z: neg(words[4] | 0) });
+      this.hooks.onRotate?.({ x: words[2]! | 0, y: neg(words[3]! | 0), z: neg(words[4]! | 0) });
       return true;
     }
-    if (mode === 7) { this.hooks.onMove?.({ kind: "home", tween: words[2] | 0 }); return true; }
-    if (mode === 8) { this.hooks.onMove?.({ kind: "contact", tween: words[2] | 0 }); return true; }
+    if (mode === 7) { this.hooks.onMove?.({ kind: "home", tween: words[2]! | 0 }); return true; }
+    if (mode === 8) { this.hooks.onMove?.({ kind: "contact", tween: words[2]! | 0 }); return true; }
     // modes 1/2 = slot visibility (+0x34): 1 shows, 2 hides. The DNA clip-12 presentation
     // stages its parent/result actors entirely through these, so surface them with the slot id
     // and let the owner decide which slot the on-screen actor currently embodies.
     if (mode === 1 || mode === 2) {
-      this.hooks.onVisibility?.({ slot: words[1] | 0, visible: mode === 1 });
+      this.hooks.onVisibility?.({ slot: words[1]! | 0, visible: mode === 1 });
       return true;
     }
     // Mode 6 assigns a model/resource id to a presentation slot; mode 9 releases
@@ -299,11 +315,11 @@ export class ActionVM {
     // table itself, so surface the exact lifecycle records to its presentation
     // owner (DNA clip 12 is the first consumer) while preserving VM timing.
     if (mode === 6) {
-      this.hooks.onModelAssign?.({ slot: words[1] | 0, model: words[2] | 0 });
+      this.hooks.onModelAssign?.({ slot: words[1]! | 0, model: words[2]! | 0 });
       return true;
     }
     if (mode === 9) {
-      this.hooks.onSlotRelease?.({ slot: words[1] | 0 });
+      this.hooks.onSlotRelease?.({ slot: words[1]! | 0 });
       return true;
     }
     return true;
@@ -318,7 +334,7 @@ export class ActionVM {
     return {
       sideFlag: s.sideSign === -1 ? 0x10 : 0,
       getY: () => s.getY(), setY: (v: number): void => s.setY(v),
-      getZ: () => s.getZ(), setZ: (v) => s.setZ(v),
+      getZ: () => s.getZ(), setZ: (v: number) => s.setZ(v),
       homeY: () => 0, homeZ: () => 0,
     };
   }
@@ -378,7 +394,8 @@ export class ActionVM {
   _portHost(rec: { words: number[]; }, slotBase = 0) {
     const self = this;
     const fx = () => { self._effect(rec.words); };
-    const playMotion = () => { self.lastMotion = rec.words[1]; self.hooks.onMotion?.(rec.words[1]); };
+    // ETS item 9: an op4 record carries its motion id in word 1
+    const playMotion = () => { self.lastMotion = rec.words[1]!; self.hooks.onMotion?.(rec.words[1]!); };
     const host = {
       managerFetch: () => 0,
       slotKeyResolve: () => 0, animSlotResolve: () => slotBase, animSlotPlace: () => {},
@@ -387,20 +404,20 @@ export class ActionVM {
       effectPreload: () => { fx(); return 1; },
       effectSpawn: () => { fx(); return 0; },
       effectStrike: () => {
-        self.hooks.onHit?.({ type: rec.words[0], words: rec.words });
+        self.hooks.onHit?.({ type: rec.words[0]!, words: rec.words });
         if (rec.words[0] === STRIKE_TYPE) self.justHit = true;
         return 0;
       },
       projectileFile: () => { self.hooks.setLunge?.({ sub: rec.words[0]! | 0, words: rec.words }); return 0; },
       projectileReady: () => 1,
-      projectileBuild: (_e, id, vecA, vecB) => {
+      projectileBuild: (_e: unknown, id: number, vecA: FightVec3, vecB: FightVec3) => {
         self.hooks.setLunge?.({ sub: 0, id, from: [...vecA], to: [...vecB] });
         return 0;
       },
       cameraView: () => { self.hooks.onCamera?.({ words: rec.words }); },
       cameraArm: () => {},
       motionSelect: playMotion, motionProbe: playMotion, motionReady: () => 0,
-      overlaySpawn: (arg) => { self.hooks.onOverlay?.({ type: rec.words[0]! | 0, duration: rec.words[1]! | 0 }); return 0; },
+      overlaySpawn: (arg: number) => { self.hooks.onOverlay?.({ type: rec.words[0]! | 0, duration: rec.words[1]! | 0 }); return 0; },
       overlayFree: () => { self.hooks.onOverlay?.({ type: rec.words[0]! | 0, duration: rec.words[1]! | 0 }); },
       allocateActionActor: () => { host.fired = true; return 0; },
       destroyActionActor: () => {},
@@ -488,9 +505,9 @@ export class ActionVM {
   // op4: the motion ENVELOPE (sentinel 56 = current motion, 0 = return-to-base/idle, else a direct id).
   // The per-frame table SEQUENCE is the op2 stream (§g), so op4 does NOT bind a table here — it only
   // records the envelope (motion 0 lets the ActorAnimator return to idle once the script terminates).
-  _playMotion(words) {
-    this.lastMotion = words[1];
-    this.hooks.onMotion?.(words[1]);
+  _playMotion(words: number[]) {
+    this.lastMotion = words[1]!;
+    this.hooks.onMotion?.(words[1]!);
   }
 
   // op3 — the VISUAL EFFECT opcode (decode 2026-07-05, tech-effects-decode.md; the old "no-op"
@@ -512,14 +529,14 @@ export class ActionVM {
 
   // op6 sub=0: [sub,id, x,y,z, x2,y2,z2]; the handler negates Y,Z of each vector
   // (PS1 Y-down/Z convention). sub=1 is the auto-target path (no explicit vectors).
-  _lunge(words) {
+  _lunge(words: number[]) {
     const neg = (v: number) => (v === 0 ? 0 : -v);   // avoid -0 leaking into offsets
     if (words[0] === 0 && words.length >= 8) {
       return {
         sub: 0,
-        id: words[1] | 0,      // projectile registry id (@0x800a2550 -> MEFT00xx pack)
-        from: [words[2], neg(words[3]), neg(words[4])],
-        to:   [words[5], neg(words[6]), neg(words[7])],
+        id: words[1]! | 0,      // projectile registry id (@0x800a2550 -> MEFT00xx pack)
+        from: [words[2]!, neg(words[3]!), neg(words[4]!)],
+        to:   [words[5]!, neg(words[6]!), neg(words[7]!)],
       };
     }
     return { sub: words[0], words };

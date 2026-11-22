@@ -17,13 +17,17 @@ import {
   BLINK_TABLE, BLINK_TARGET_VARIANT, BLINK_PAUSE_BASE, BLINK_PAUSE_MASK,
   CYCLE_PERIOD, CYCLE_HOLD, randU16,
 } from "../vendor/engine.js";
+import type { PatchBlock } from "../../engine/dw3/battle-presentation.js";
 
 export { cycleVariant, CYCLE_PERIOD, CYCLE_HOLD };
+
+/** One live patch block (a model_placement.json texture_anim row) with the picture it shows now. */
+export type TexturePatchEntry = PatchBlock & { variant: number };
 
 // D0x80082e1c, indexed by `timer >> 1`, read out of the disc table the port carries: the timer
 // counts DOWN, so read this right to left — open, half, shut, half, and index 0 reloads.
 // Anything past the table is open.
-export const BLINK_SEQUENCE = BLINK_TABLE.map((t) => BLINK_TARGET_VARIANT[t]);
+export const BLINK_SEQUENCE = BLINK_TABLE.map((t) => BLINK_TARGET_VARIANT[t as keyof typeof BLINK_TARGET_VARIANT]);
 // (rand() & 0x7f) + 0x3c — 60 to 187 ticks between blinks.
 export const BLINK_RELOAD_MIN = BLINK_PAUSE_BASE;
 export const BLINK_RELOAD_MASK = BLINK_PAUSE_MASK;
@@ -36,9 +40,9 @@ export const stateVariant = eyePatchVariant;
 
 export class TexturePatchAnimator {
   declare blinkTimer: number;
-  declare cycleTime: any;
-  declare entries: any;
-  declare rng: () => number;
+  declare cycleTime: number;
+  declare entries: TexturePatchEntry[];
+  declare rng: () => number | undefined;
   /**
    * @param entries model_placement.json `texture_anim` rows for one Digimon.
    * @param rng the disc's own random source: `rand_u16` (0..0x0fff), the game's ONE stream. The
@@ -47,7 +51,7 @@ export class TexturePatchAnimator {
    *            default is the ported stream, never Math.random — a second source would desync the
    *            blink from the one the rest of the battle draws.
    */
-  constructor(entries, rng = randU16) {
+  constructor(entries: readonly PatchBlock[] | null | undefined, rng = randU16) {
     this.entries = (entries || []).map((e) => ({ ...e, variant: 0 }));
     this.rng = rng;
     this.blinkTimer = 0;     // object +0x1a0

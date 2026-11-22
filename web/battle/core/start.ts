@@ -15,7 +15,7 @@ import { emit as emitGameEvent } from "../../gameEvents.js";
 import { fusionEnabled, partyEntriesFor } from "../../fusion.js";
 import type { BattleContext, EnemyBattleRecord, PlayerRecord } from "../../types/battle.js";
 import type { BattleWinResult, BattleEndContext } from "./types.js";
-import type { FieldEncounterEnemy } from "../../types/battle.js";
+import type { FieldEncounterEnemy, EngineUi } from "../../types/battle.js";
 
 
 
@@ -62,7 +62,8 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     // from the very first message rather than the walker's English: bank 0x7f for the
     // lines themselves, and bank 0x6a for the item name kind 14's second slot holds.
     await battleMsgBank();
-    await battleMsgBank(ui.BATTLE_MESSAGE_BANK_FIELD);
+    // ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+    await battleMsgBank((ui as EngineUi).BATTLE_MESSAGE_BANK_FIELD);
     // Phase 6.3 group 4: start fetching pro/fightstg now so the intro covers the
     // overlay's one-time load and the command list is up on the first frame the
     // player can act, and run the original battle boot pipeline (pro/wfightmn).
@@ -233,7 +234,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // walk-up encounters are always a SINGLE Digimon (user-confirmed in-game) — the multi-member
   // screens in the stage pool are scripted boss screens, so we fight only the lead here. The
   // sequential gauntlet (full party) is reserved for scripted battles via startParty.
-  async function startRandom(mapId: number | string, x: number, y: number, onWin: (result: BattleWinResult) => void, onFlee: (ctx: BattleEndContext) => void, onLose: (ctx: BattleEndContext) => void) {
+  async function startRandom(mapId: number | string, x: number, y: number, onWin: (result: BattleWinResult) => void, onFlee: () => void, onLose: () => void) {
     await B.loadData();
     const roll = B.pickEnemy(mapId, x, y);
     if (!roll) return false;
@@ -262,7 +263,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // resolves the party itself and then starts the battle therefore silently
   // does nothing on the first fight of a session. This awaits the load first,
   // which is the only safe order for a caller holding just a screen id.
-  async function startScreen(screenId: number, onWin: (result: BattleWinResult) => void, onFlee: (context: BattleEndContext) => void, onLose: (context: BattleEndContext) => void, { mapId, lead = true }: StartScreenOptions = {}) {
+  async function startScreen(screenId: number, onWin: (result: BattleWinResult) => void, onFlee: () => void, onLose: () => void, { mapId, lead = true }: StartScreenOptions = {}) {
     await B.loadData();
     const party = partyForScreen(screenId);
     if (!party || !party.length) {
@@ -272,7 +273,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     return startParty(lead ? [party[0]] : party, onWin, onFlee, onLose, { screenId, mapId });
   }
 // Start a battle from a resolved party array (1v1: take the lead, as startRandom).
-  async function startParty(party: (FieldEncounterEnemy | undefined)[], onWin: (result: BattleWinResult) => void, onFlee, onLose, { screenId, mapId }: StartPartyOptions = {}) {
+  async function startParty(party: (FieldEncounterEnemy | undefined)[], onWin: (result: BattleWinResult) => void, onFlee: () => void, onLose: () => void, { screenId, mapId }: StartPartyOptions = {}) {
     await B.loadData();
     if (!party || !party.length) return false;
     // F0x8008B798: the field's handoff runs its pre-battle presentation first —

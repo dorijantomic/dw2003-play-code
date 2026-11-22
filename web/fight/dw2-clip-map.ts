@@ -11,7 +11,10 @@
 // TECHNIQUE's (a cast takes F/G/H by the skill's DW2 cast type; a magical signature takes the cast
 // family, a physical one the melee clip).
 
-export const DW2_CLIP_MAP = {
+/** One clip slot of the map: its role, the DW2 letters it may take, and the reason. */
+export interface Dw2ClipRow { kind: string; letters: string[]; why: string; }
+
+export const DW2_CLIP_MAP: Record<string | number, Dw2ClipRow> = {
   0: { kind: "idle", letters: ["A"], why: "every DW2 fighter spawns on anim_A (fighter.c:261)" },
   1: { kind: "flinch", letters: ["C0"], why: "DW2 C0 = hop 1, the first part of every hit reaction (Stg30_HitReactUpdate case 0)" },
   2: { kind: "survive", letters: ["C2J"], why: "DW2 hit and survive = C0 -> C1 -> C2 -> J (get up); C2J is that chain joined (export_game.mjs)" },

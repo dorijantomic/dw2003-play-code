@@ -16,19 +16,21 @@ import * as THREE from "./lib3d/three.module.js";
 import { phaseFor, progressFor, sizeFor, themeIdFor, THEMES, DEFAULT_THEME, createBudgetGuard } from "./fishing-underwater-state.js";
 import { getSharedRenderer, sharedLost } from "./gl-shared.js";
 import { FIELD_VIEW_W } from "./field-view.js";
+import type { GameState } from "./game/types.js";
+import type { UwCamera, UwGroup, UwMesh, UwRenderer, UwScene, UwShafts, UwSun } from "./types/fishing-underwater.js";
 
 export const UW_W = 128;
 export const UW_H = 96;
 const SHARED_H = 240 * 2;   // the shared canvas is the field view at 2x (water3d / grass3d size)
 
-let renderer = null;
+let renderer: UwRenderer | null = null;
 let failed = false;
 let budget = createBudgetGuard(30, 4);
 let perfNow = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-export function __setClock(f) { perfNow = f; }
+export function __setClock(f: () => number) { perfNow = f; }
 export function __resetForTest() { budget = createBudgetGuard(30, 4); renderer = null; failed = false; scene = null; lastNow = -1; lastPhase = ""; appliedTheme = ""; }
-let scene = null;
-let camera = null;
+let scene: UwScene | null = null;
+let camera: UwCamera | null = null;
 let fog: THREE.FogExp2 | null = null;
 
 // ---- shared uniforms ---------------------------------------------------------------------
@@ -43,20 +45,20 @@ const uDensity = { value: 0.07 };
 const uShafts = { value: 0.5 };
 
 // ---- scene objects (built once) ---------------------------------------------------------
-let floorMesh = null;
+let floorMesh: UwMesh | null = null;
 let floorPos: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined | null = null;
 let rocks: THREE.InstancedMesh | null = null;
 let rockMat: THREE.MeshLambertMaterial | null = null;
 let ambient: THREE.AmbientLight | null = null;
-let sun = null;
-let shafts = null;
-let lureGroup = null;
-let floatMesh = null;
+let sun: UwSun | null = null;
+let shafts: UwShafts | null = null;
+let lureGroup: UwGroup | null = null;
+let floatMesh: UwMesh | null = null;
 let lineAttr: THREE.BufferAttribute | null = null;
-let fishGroup = null;
-let tailPivot = null;
+let fishGroup: UwGroup | null = null;
+let tailPivot: UwGroup | null = null;
 let fishMat: THREE.MeshBasicMaterial | null = null;
-let eyeMesh = null;
+let eyeMesh: UwMesh | null = null;
 
 const FLOOR_Y = -2.6;
 const SURFACE_Y = 3.1;
@@ -80,16 +82,17 @@ void main(){
   gl_Position = projectionMatrix * mv;
 }`;
 
+// ETS item 9: three.js defines position, rotation and scale on its objects with Object.defineProperties, which gives TypeScript no types for them; the objects built here are typed with them.
 function build() {
-    scene = new THREE.Scene();
+    scene = new THREE.Scene() as UwScene;
     fog = new THREE.FogExp2(0x1d6a62, 0.07);
     scene.fog = fog;
     scene.background = new THREE.Color(0x1d6a62);
-    camera = new THREE.PerspectiveCamera(40, UW_W / UW_H, 0.1, 60);
+    camera = new THREE.PerspectiveCamera(40, UW_W / UW_H, 0.1, 60) as UwCamera;
     camera.position.set(0, 0.2, 9);
 
     ambient = new THREE.AmbientLight(0x88aacc, 0.9);
-    sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun = new THREE.DirectionalLight(0xffffff, 1.1) as UwSun;
     sun.position.set(-2, 8, 4);
     scene.add(ambient, sun);
 
@@ -124,7 +127,7 @@ function build() {
               void main(){ float c=caus(vW.xz)*uCaus; vec3 col=uFloor*(.5+.22*sin(vW.x*3.)*sin(vW.z*2.7))+uLight*c*.5;
                 float f=1.-exp(-uDensity*uDensity*vDepth*vDepth); gl_FragColor=vec4(mix(col,uFog,f),1.); }`,
         }),
-    );
+    ) as UwMesh;
     floorMesh.position.y = FLOOR_Y;
     scene.add(floorMesh);
 
@@ -176,7 +179,7 @@ function build() {
         fragmentShader: `uniform float uTime,uShafts; uniform vec3 uLight; varying vec2 vUv; varying float vPh;
           void main(){ float a=1.-abs(vUv.x*2.-1.); a*=a; a*=pow(vUv.y,1.6); a*=.7+.3*sin(uTime*.7+vPh); gl_FragColor=vec4(uLight*a*uShafts*.5,1.); }`,
     });
-    shafts = new THREE.Group();
+    shafts = new THREE.Group() as UwShafts;
     for (let i = 0; i < SHAFT_COUNT; i++) {
         const m: any = new THREE.Mesh(shg, shMat);
         m.position.set(-8 + i * 4.6, SURFACE_Y, -3 + (i % 3) * 2);
@@ -218,7 +221,7 @@ function build() {
     scene.add(motes);
 
     // The lure on its line, and the float at the surface.
-    lureGroup = new THREE.Group();
+    lureGroup = new THREE.Group() as UwGroup;
     const lureBody: any = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
     lureBody.scale.set(1, 1.7, 1);
     const lureCap: any = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2d0 }));
@@ -228,7 +231,7 @@ function build() {
     hook.rotation.z = Math.PI * 0.8;
     lureGroup.add(lureBody, lureCap, hook);
     scene.add(lureGroup);
-    floatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    floatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })) as UwMesh;
     scene.add(floatMesh);
     const lg = new THREE.BufferGeometry();
     lineAttr = new THREE.BufferAttribute(new Float32Array(LINE_SEGS * 3), 3);
@@ -239,10 +242,10 @@ function build() {
 
     // The fish: a stylised silhouette (body, tail on a pivot, two fins, an eye for the bite).
     fishMat = new THREE.MeshBasicMaterial({ color: 0x0b2630 });
-    fishGroup = new THREE.Group();
+    fishGroup = new THREE.Group() as UwGroup;
     const body: any = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), fishMat);
     body.scale.set(1, 0.42, 0.28);
-    tailPivot = new THREE.Group();
+    tailPivot = new THREE.Group() as UwGroup;
     tailPivot.position.x = -0.85;
     const tail: any = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 3), fishMat);
     tail.rotation.z = Math.PI / 2;   // apex points +x (into the body), base at -x
@@ -256,7 +259,7 @@ function build() {
     belly.position.set(0.1, -0.36, 0);
     belly.rotation.z = Math.PI;
     belly.scale.set(1.4, 1, 0.3);
-    eyeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff6c8 }));
+    eyeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff6c8 })) as UwMesh;
     eyeMesh.position.set(0.62, 0.1, 0.25);
     fishGroup.add(body, tailPivot, dorsal, belly, eyeMesh);
     scene.add(fishGroup);
@@ -288,6 +291,7 @@ function makeRenderer() {
 // ---- theme ------------------------------------------------------------------------------
 let appliedTheme = "";
 
+// ETS item 9: applyTheme() and renderUnderwater() run only after makeRenderer() returned true, which means build() has set every scene object below.
 function applyTheme(id: string) {
     if (id === appliedTheme) return;
     appliedTheme = id;
@@ -295,18 +299,18 @@ function applyTheme(id: string) {
     uFog.value.set(t.fog); uTop.value.set(t.top); uDeep.value.set(t.deep);
     uLight.value.set(t.light); uMote.value.set(t.mote); uFloor.value.set(t.floorColor);
     uDensity.value = t.density; uShafts.value = t.shafts;
-    fog.color.set(t.fog); fog.density = t.density;
-    scene.background.set(t.fog);
-    sun.color.set(t.light);
-    ambient.color.set(t.top);
-    rockMat.color.set(t.floorColor).multiplyScalar(0.7);
-    rocks.count = t.rocks;
+    fog!.color.set(t.fog); fog!.density = t.density;
+    scene!.background.set(t.fog);
+    sun!.color.set(t.light);
+    ambient!.color.set(t.top);
+    rockMat!.color.set(t.floorColor).multiplyScalar(0.7);
+    rocks!.count = t.rocks;
     // Fish silhouette: the fog colour pulled dark, so it reads as a shape in the water.
-    fishMat.color.set(t.fog).multiplyScalar(0.3);
+    fishMat!.color.set(t.fog).multiplyScalar(0.3);
     // Floor relief: ice is flat, mud is soft, rock is lumpy, sand is gentle.
     const amp = t.floor === "ice" ? 0.05 : t.floor === "mud" ? 0.15 : t.floor === "rock" ? 0.4 : 0.22;
-    for (let i = 0; i < floorPos.count; i++) floorPos.setY(i, floorHeight(floorPos.getX(i), floorPos.getZ(i), amp));
-    floorPos.needsUpdate = true;
+    for (let i = 0; i < floorPos!.count; i++) floorPos!.setY(i, floorHeight(floorPos!.getX(i), floorPos!.getZ(i), amp));
+    floorPos!.needsUpdate = true;
 }
 
 // ---- per-frame state (module numbers: no allocation) ------------------------------------
@@ -320,8 +324,8 @@ let lastInfoPhase = "idle";
 const sstep = (e0: number, e1: number, x: number) => { const t = x < e0 ? 0 : x > e1 ? 1 : (x - e0) / (e1 - e0); return t * t * (3 - 2 * t); };
 
 // Theme lookup cache (the extras table never changes during a session).
-let cacheMap = null, cacheData = null, cacheTheme = DEFAULT_THEME;
-function themeOf(extrasData, mapId) {
+let cacheMap: string | number | null = null, cacheData: GameState["fishingExtras"] = null, cacheTheme = DEFAULT_THEME;
+function themeOf(extrasData: GameState["fishingExtras"], mapId: string | number) {
     if (mapId !== cacheMap || extrasData !== cacheData) {
         cacheMap = mapId; cacheData = extrasData; cacheTheme = themeIdFor(extrasData, mapId);
     }
@@ -332,7 +336,7 @@ function themeOf(extrasData, mapId) {
  * Draw one frame of the underwater scene for the live fishing state `f` (state.fishing) and
  * return the canvas, or null (idle / page hidden / no GPU WebGL). Read-only on `f`.
  */
-export function renderUnderwater(f, mapId, extrasData, nowSec: number) {
+export function renderUnderwater(f: GameState["fishing"], mapId: string | number, extrasData: GameState["fishingExtras"], nowSec: number) {
     if (typeof document !== "undefined" && document.hidden) return null;
     const phase = phaseFor(f);
     if (phase === "idle") { lastInfoPhase = "idle"; return null; }
@@ -431,11 +435,11 @@ export function renderUnderwater(f, mapId, extrasData, nowSec: number) {
     lureY += (ly - lureY) * (1 - Math.exp(-12 * dt));
 
     // Apply to the scene.
-    lureGroup.position.set(lureX, lureY, 0);
-    lureGroup.rotation.z = Math.sin(t * 3) * 0.08;
+    lureGroup!.position.set(lureX, lureY, 0);
+    lureGroup!.rotation.z = Math.sin(t * 3) * 0.08;
     const surfX = lureX - 0.5;
-    floatMesh.position.set(surfX, SURFACE_Y - 0.02 + Math.sin(t * 2.4) * 0.025, 0);
-    const lp = lineAttr.array;
+    floatMesh!.position.set(surfX, SURFACE_Y - 0.02 + Math.sin(t * 2.4) * 0.025, 0);
+    const lp = lineAttr!.array;
     const sag = phase === "bite" || phase === "strike" ? 0.02 : 0.25;
     const topY = lureY + 0.25;
     for (let i = 0; i < LINE_SEGS; i++) {
@@ -444,28 +448,28 @@ export function renderUnderwater(f, mapId, extrasData, nowSec: number) {
         lp[i * 3 + 1] = SURFACE_Y + (topY - SURFACE_Y) * u;
         lp[i * 3 + 2] = 0;
     }
-    lineAttr.needsUpdate = true;
+    lineAttr!.needsUpdate = true;
 
-    fishGroup.visible = show && fx > -7.5;
-    fishGroup.position.set(fx, fy, fz);
-    fishGroup.rotation.set(0, fyaw, (ty - fy) * 0.3);
-    fishGroup.scale.setScalar(fsize);
-    tailPivot.rotation.y = Math.sin(t * wag) * 0.55;
-    eyeMesh.visible = eye;
+    fishGroup!.visible = show && fx > -7.5;
+    fishGroup!.position.set(fx, fy, fz);
+    fishGroup!.rotation.set(0, fyaw, (ty - fy) * 0.3);
+    fishGroup!.scale.setScalar(fsize);
+    tailPivot!.rotation.y = Math.sin(t * wag) * 0.55;
+    eyeMesh!.visible = eye;
 
-    for (let i = 0; i < SHAFT_COUNT; i++) shafts.children[i].rotation.z = shaftBase[i]! + 0.05 * Math.sin(t * 0.3 + i);
-    camera.position.x = Math.sin(t * 0.2) * 0.3;
-    camera.lookAt(0.4, 0.2, 0);
+    for (let i = 0; i < SHAFT_COUNT; i++) shafts!.children[i]!.rotation.z = shaftBase[i]! + 0.05 * Math.sin(t * 0.3 + i);
+    camera!.position.x = Math.sin(t * 0.2) * 0.3;
+    camera!.lookAt(0.4, 0.2, 0);
 
     // Render into the bottom-left UW_W x UW_H corner of the shared canvas (viewport + scissor), then put the
     // shared state back for water3d / grass3d (full viewport, no scissor, transparent clear).
     const t0 = perfNow();
     try {
-        renderer.setViewport(0, 0, UW_W, UW_H);
-        renderer.setScissor(0, 0, UW_W, UW_H);
-        renderer.setScissorTest(true);
-        renderer.setClearColor(scene.background, 1);
-        renderer.render(scene, camera);
+        renderer!.setViewport(0, 0, UW_W, UW_H);
+        renderer!.setScissor(0, 0, UW_W, UW_H);
+        renderer!.setScissorTest(true);
+        renderer!.setClearColor(scene!.background, 1);
+        renderer!.render(scene!, camera!);
     } catch (err) {
         failed = true; renderer = null;
         console.warn("fishing-underwater: render failed, inset off", err);

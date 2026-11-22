@@ -29,6 +29,7 @@
 // plain sprite descriptors; the host (battle3d/battle.js or the Effects Lab) owns images/canvas.
 
 import { loadAssetImage } from "../assets.js";
+import type { FightVec3 } from "./types.js";
 import { noteBackdropBlend } from "../battle-layer.js";
 // The effect system's channel-record stepper (F0x800893dc) and screen/world draw
 // (F0x8008921c), ported once in engine/dw3/battle-effects.ts and proven against the
@@ -40,7 +41,7 @@ import {
   EFFECT_SCALE_ONE,
   newProjectileFlight, projectileRegistryFromIds,
 } from "../vendor/engine.js";
-interface EffectClip {
+export interface EffectClip {
   sheet?: string;
   frames?: number[];
   delay?: number;
@@ -49,6 +50,9 @@ interface EffectClip {
   y: number;
   w: number;
   h: number;
+  /** the authored anchor offset of the clip on its sheet rect */
+  ox: number;
+  oy: number;
   semi?: number;
   solid?: EffectRect;
 }
@@ -60,8 +64,63 @@ interface EffectRect {
   h: number;
 }
 
-interface ClipArchive {
+export interface ClipArchive {
   clips?: Record<string, EffectClip>;
+}
+
+/** The manifest the draw passes read: the clip table of each archive. */
+export interface EffectDrawManifest {
+  archives?: Record<string, ClipArchive>;
+}
+
+/** One record of an effect type's program: the channel mask, stride, length, start values and the keyframe rows. */
+export interface EffectTypeRecord { mask: number; stride: number; duration: number; defaults: number[]; frames: number[][]; }
+
+/** One effect type: the archive its sprites come from and the records it spawns. */
+export interface EffectTypeEntry { arch: number; records: EffectTypeRecord[]; }
+
+/** One op6 flight as the manifest keeps it: its clip length and its last authored keyframe. */
+export interface EffectProjectileEntry { ticks: number; dur: number; }
+
+/** The whole effects manifest the player reads: types, archives, op10 sound ids and flights. */
+export interface EffectManifest extends EffectDrawManifest {
+  types?: Record<string, EffectTypeEntry>;
+  op10_sounds?: Record<string, number>;
+  projectiles?: Record<string, EffectProjectileEntry>;
+}
+
+/** A PS1-world point relative to the attacker's slot, or a screen px when the effect is screen-space. */
+export interface EffectPos { x: number; y: number; z: number; }
+
+/** One sprite descriptor of a tick (EffectPlayer.renderList): which clip to draw, where, and how it is scaled and turned. */
+export interface EffectSprite {
+  arch: string | number;
+  frame: number;
+  clutShift?: number;
+  type?: number;
+  side?: string;
+  screen?: boolean;
+  pos: EffectPos;
+  dx: number;
+  dy: number;
+  sx: number;
+  sy: number;
+  rotX?: number;
+  rotY?: number;
+  rotZ?: number;
+  rot?: number;
+}
+
+/** A sprite's placement in canvas px: the 2x3 transform (a..f), the clip's own offset and the drawn size. */
+export interface SpriteGeometry { a: number; b: number; c: number; d: number; e: number; f: number; dx: number; dy: number; w: number; h: number; }
+
+/** How the draw passes map the PS1 screen to canvas px. */
+export interface EffectView {
+  centerX: number;
+  centerY: number;
+  pxScale: number;
+  /** a method, so a host may declare the point as its own tuple type (the hosts disagree on {x,y,z} vs [x,y,z]) */
+  worldToScreen(pos: EffectPos | FightVec3, side: string | undefined): { x: number; y: number; } | null;
 }
 
 
@@ -96,9 +155,9 @@ export class EffectPlayer {
   declare _projRegistry: any;
   declare instances: any[];
   declare lastProjectile: { id: any; from: any; to: any; side: string; known: boolean; };
-  declare manifest: any;
+  declare manifest: EffectManifest;
   declare projectiles: any[];
-  constructor(manifest) {
+  constructor(manifest: EffectManifest | null | undefined) {
     this.manifest = manifest || { types: {}, archives: {}, op10_sounds: {} };
     this.instances = [];
     this.projectiles = [];
@@ -114,7 +173,7 @@ export class EffectPlayer {
    * pos = {x,y,z} verbatim op3 operands; side = "player" | "enemy" (whose action spawned it —
    * the renderer mirrors world offsets for the enemy, who faces the other way down the arena).
    */
-  spawn(type, pos, side = "player") {
+  spawn(type: number | string, pos: EffectPos, side = "player") {
     const t = this.manifest.types?.[String(type)];
     if (!t) return 0;
     let n = 0;
@@ -146,7 +205,7 @@ export class EffectPlayer {
    * 0x280/0x100 constants" were the VRAM texture-slot coords, not a speed.)
    * Lifetime = the projectile's last authored keyframe (manifest `dur`; 30000 = hold).
    */
-  spawnProjectile(id, from, to, side = "player") {
+  spawnProjectile(id: number, from: number[], to: number[], side = "player") {
     const pr = this.manifest.projectiles?.[String(id)];
     // The flight object is built by the ported constructor FIGHTSTG_F0x80089844
     // (engine/dw3/battle-projectile.ts): it scans the op6 registry at 0x800a2550 for
@@ -163,7 +222,7 @@ export class EffectPlayer {
     // raises the end flag that FIGHTSTG_F0x8008970c frees the object on. `dur` - the last
     // authored track keyframe - is only the fallback for a pack whose clip did not decode,
     // and it disagrees with the clip for 17 of the 129 packs (see proj-layers.js).
-    const ticks = pr.ticks > 0 ? pr.ticks : (pr.dur > 0 ? pr.dur : BURST_TICKS);
+    const ticks = pr!.ticks > 0 ? pr!.ticks : (pr!.dur > 0 ? pr!.dur : BURST_TICKS);
     this.projectiles.push({ id, side, from: from.slice(), to: to.slice(), t: 0, ticks, flight });
     return 1;
   }
@@ -274,7 +333,7 @@ export class EffectPlayer {
 /** Load the manifest + sheet images in a browser (helper for battle3d / the lab). */
 export async function loadEffectAssets(base = "assets/battle/effects") {
   const manifest = await (await fetch(`${base}/manifest.json`)).json();
-  const images = {};
+  const images: Record<string, Awaited<ReturnType<typeof loadAssetImage>>> = {};
   await Promise.all(Object.entries(manifest.archives).map(async ([a, rec]: [string, any]) => {
     try { images[a] = await loadAssetImage(`${base}/${rec.sheet}`); }
     catch { /* Missing optional effect sheets remain non-fatal. */ }
@@ -283,7 +342,7 @@ export async function loadEffectAssets(base = "assets/battle/effects") {
 }
 
 /** The sheet clip a sprite descriptor draws (channel 1 selects a palette-cycled "id@shift" variant). */
-export function effectClip(arch, s): EffectClip | undefined {
+export function effectClip(arch: ClipArchive | undefined, s: { frame: number; clutShift?: number; }): EffectClip | undefined {
   return (s.clutShift ? arch?.clips?.[`${s.frame}@${s.clutShift & 0xFF}`] : null)
     ?? arch?.clips?.[String(s.frame)];
 }
@@ -295,7 +354,7 @@ const blendsBackdrop = (semi: number | undefined) => semi === 1 || semi === 2 ||
  * True when any sprite in the list is drawn with a mode that blends with what is under it (so the 3D
  * picture must be in the same canvas for it; see web/battle-layer.js). Same clip lookup as drawEffects.
  */
-export function effectsBlendBackdrop(list, manifest) {
+export function effectsBlendBackdrop(list: EffectSprite[] | null | undefined, manifest: EffectDrawManifest | null | undefined) {
   for (const s of list ?? []) {
     const clip = effectClip(manifest?.archives?.[String(s.arch)], s);
     if (clip && blendsBackdrop(clip.semi)) return true;
@@ -317,10 +376,10 @@ export const FRONT_EFFECT_TYPES = new Set([1000, 1001, 1002, 1007]);
  * stay "over" here. FRONT effects are "over" whatever their z. A descriptor with no numeric
  * `type` (the presentation's own synthetic sprites) is never classed "under".
  */
-export function effectLayer(s) {
+export function effectLayer(s: Partial<EffectSprite> | null | undefined) {
   if (typeof s?.type !== "number") return "over";
   if (FRONT_EFFECT_TYPES.has(s.type)) return "over";
-  return s.screen && (s.pos?.z | 0) === -1 ? "under" : "over";
+  return s.screen && (s.pos?.z! | 0) === -1 ? "under" : "over";
 }
 
 /**
@@ -328,7 +387,7 @@ export function effectLayer(s) {
  * (web/fight/effect-under-gl.js) so the two cannot differ. `view` as drawEffects.
  * Returns null when the sprite is not drawn. Units: canvas px.
  */
-export function spriteGeometry(s, clip, view) {
+export function spriteGeometry(s: EffectSprite, clip: EffectClip, view: EffectView): SpriteGeometry | null {
   let x, y;
   if (s.screen) {
     // BOTH sentinels are CENTRE-relative — but "centre" is the DRAW OFFSET OF THE LAYER the
@@ -346,7 +405,7 @@ export function spriteGeometry(s, clip, view) {
     // meaning "around the Digimon", not the top-left. Treating both as centre-relative threw
     // the FRONT ids (1002 and the 1007 Blast start fire, the 1000/1001 DNA burst) half a
     // screen down-right.
-    const o = FRONT_EFFECT_TYPES.has(s.type) ? 1 : 0;
+    const o = FRONT_EFFECT_TYPES.has(s.type!) ? 1 : 0;
     x = view.centerX + (s.pos.x - 160 * o) * view.pxScale;
     y = view.centerY + (s.pos.y - 120 * o) * view.pxScale;
   } else {
@@ -368,7 +427,7 @@ export function spriteGeometry(s, clip, view) {
   // angles apply: tip and turn foreshorten the sprite's quad (its plane turns away from
   // the camera), spin turns it in the screen plane. Sprites with no angles keep the
   // identity matrix, so the common case is untouched.
-  const rx = s.rotX | 0, ry = s.rotY | 0;
+  const rx = s.rotX! | 0, ry = s.rotY! | 0;
   const rz = s.rotZ != null ? (s.rotZ | 0) : Math.round((s.rot || 0) * TURN / (Math.PI * 2));
   let A = 1, B = 0, C = 0, D = 1;
   if (rx || ry) {
@@ -388,9 +447,9 @@ export function spriteGeometry(s, clip, view) {
 }
 
 /** The four canvas-px corners (TL, TR, BR, BL) of a rect (dx,dy,w,h) drawn under geometry `g`. */
-export function spriteCorners(g, rect = g) {
-  const pts = [[rect.dx, rect.dy], [rect.dx + rect.w, rect.dy], [rect.dx + rect.w, rect.dy + rect.h], [rect.dx, rect.dy + rect.h]];
-  return pts.map(([u, v]) => [g.a * u + g.c * v + g.e, g.b * u + g.d * v + g.f]);
+export function spriteCorners(g: SpriteGeometry, rect: { dx: number; dy: number; w: number; h: number; } = g): [number, number][] {
+  const pts: [number, number][] = [[rect.dx, rect.dy], [rect.dx + rect.w, rect.dy], [rect.dx + rect.w, rect.dy + rect.h], [rect.dx, rect.dy + rect.h]];
+  return pts.map(([u, v]): [number, number] => [g.a * u + g.c * v + g.e, g.b * u + g.d * v + g.f]);
 }
 
 /**
@@ -398,9 +457,9 @@ export function spriteCorners(g, rect = g) {
  *   worldToScreen(psxOffset, side) → {x,y} canvas px (project an attacker-relative PS1 point)
  *   centerX, centerY (canvas px of the PSX screen centre), pxScale (canvas px per PSX px)
  */
-export function drawEffects(ctx, list, manifest, images, view) {
+export function drawEffects(ctx: CanvasRenderingContext2D, list: EffectSprite[], manifest: EffectDrawManifest, images: Record<string, CanvasImageSource>, view: EffectView) {
   for (const s of list) {
-    const arch = manifest.archives[String(s.arch)];
+    const arch = manifest.archives![String(s.arch)];
     const img = images[String(s.arch)];
     if (!arch || !img) continue;
     // Channel 0 is a CLIP ID in the archive's sprite directory (drawn by EXE F0x8001ed6c —

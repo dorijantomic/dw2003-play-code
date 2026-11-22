@@ -5,7 +5,9 @@
 //   kind  = projectile | beam | breath | melee (melee = a striking limb, not a launcher)
 // SHOTS[folder][techKey] = [mode, [emitterId, ...], shots]
 //   mode  = none | single | per-emitter | per-limb-contact
-export const EMITTERS = {
+import type { EmitterRow, ShotRule } from "../types.js";
+
+export const EMITTERS: Record<string, EmitterRow[]> = {
   "m003agum":[["left-arm","left-arm",1,"melee",0,0],["right-arm","right-arm",1,"melee",0,0],["mouth","mouth",1,"breath",1,1]],
   "m004beta":[["mouth","mouth",1,"breath",0,1],["whole-body","whole-body",1,"beam",1,0]],
   "m005grey":[["left-arm","left-arm",1,"melee",0,0],["right-arm","right-arm",1,"melee",0,0],["mouth","mouth",1,"breath",1,1]],
@@ -252,7 +254,7 @@ export const EMITTERS = {
   "m465snat":[["left-arm","left-arm",1,"beam",1,0],["right-arm","right-arm",1,"beam",0,0],["mouth","mouth",1,"breath",0,1]],
 };
 
-export const SHOTS = {
+export const SHOTS: Record<string, Record<string, ShotRule>> = {
   "m003agum":{"fight":["per-limb-contact",["left-arm","right-arm"],2],"pepperbreath":["single",["mouth"],1]},
   "m004beta":{"fight":["per-limb-contact",["whole-body"],1],"thunderbolt":["single",["whole-body"],1]},
   "m005grey":{"fight":["per-limb-contact",["left-arm","right-arm"],2],"flameball":["single",["mouth"],1],"flamelance":["single",["mouth"],1],"doublepower":["none",[],0],"novablast":["single",["mouth"],1],"triplefire":["single",["mouth"],1]},

@@ -1,9 +1,10 @@
 import { ANATOMY, FOLDERS, SIZE_ORDER, TECH_MODE_PRIOR, W } from "./digimon-anatomy/anatomy-data.js";
 import { EMITTERS, SHOTS } from "./digimon-anatomy/emitter-data.js";
 import { ARM_ATTACH, ARM_EQUIP } from "./digimon-anatomy/arm-data.js";
+import type { AnatomyRec } from "./types.js";
 interface DonorRank {
   folder: string;
-  name: string;
+  name: string | null;
   score: number;
   reasons: string[];
 }
@@ -24,7 +25,7 @@ export { EMITTERS, EMITTER_KINDS, EMITTER_PARTS, SHOTS, SHOT_MODES } from "./dig
 export { ARM_EQUIP, ARM_EQUIP_CLASSES } from "./digimon-anatomy/arm-data.js";
 
 // ---------------------------------------------------------------- lookups
-export function anatomy(folder: string) {
+export function anatomy(folder: string | number) {
   return (folder && ANATOMY[folder]) || null;
 }
 
@@ -68,7 +69,7 @@ export function armament(folder: string) {
 export function builtInWeapons(folder: string) {
   const a = anatomy(folder);
   if (!a) return [];
-  return a.arm.filter((x: string[]) => x[2] && x[1] !== "hand").map((x) => ({ side: x[0], kind: x[1] }));
+  return a.arm.filter((x) => x[2] && x[1] !== "hand").map((x) => ({ side: x[0], kind: x[1] }));
 }
 
 export function dominantSide(folder: string) {
@@ -97,7 +98,7 @@ export function firingSide(folder: string, techName: string | null): "left" | "r
 // Resolution chain: per-technique annotation -> roster majority for that technique -> the
 // model's arm weapons -> dominantSide -> 'unknown'. `source` says which step answered, so the
 // caller can report it and K13 can audit a launch point against a real annotation.
-export function firingPart(folder, techName: string | null): FiringPart {
+export function firingPart(folder: string | number, techName: string | null): FiringPart {
   const a = anatomy(folder);
   const k = techKey(techName);
   if (!a) return { mode: "unknown", side: null, style: null, bodyPart: null, source: "no-model" };
@@ -151,7 +152,7 @@ export function similarityDetail(a: string, b: string) {
   const A = resolve(a);
   const B = resolve(b);
   if (!A || !B) return { score: 0, reasons: ["unknown model"] };
-  const reasons = [];
+  const reasons: string[] = [];
   let score = 0;
   const add = (pts: number, why: string) => {
     score += pts;
@@ -183,7 +184,7 @@ export function similarityDetail(a: string, b: string) {
 
 // Rank candidate donors for a target folder. `candidates` defaults to every model.
 export function rankDonors(target: string, candidates: string[] | undefined, limit: number | undefined): DonorRank[] {
-  const out = [];
+  const out: DonorRank[] = [];
   const pool = candidates && candidates.length ? candidates : FOLDERS;
   for (const f of pool) {
     if (f === target) continue;
@@ -199,8 +200,8 @@ function resolve(x: string): ReturnType<typeof anatomy> | null {
   return typeof x === "string" ? anatomy(x) : x;
 }
 
-function armTokens(a) {
-  const t = new Set();
+function armTokens(a: AnatomyRec) {
+  const t = new Set<string>();
   for (const arm of a.arm) {
     if (arm[1] && arm[1] !== "none") {
       t.add(arm[0] + ":" + arm[1]);

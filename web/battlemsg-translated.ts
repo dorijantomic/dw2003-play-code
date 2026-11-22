@@ -21,6 +21,7 @@ import { packReady } from "./screenpack.js";
 import { drawClip } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
 import type { BattleMsgBankFile } from "./types/battlemsg-translated.js";
+import type { EngineUi } from "./types/battle.js";
 interface BattleMsgBankData { strings?: (string | number)[] }
 
 type BattleMsgScreenPack = Parameters<typeof packReady>[0];
@@ -51,13 +52,14 @@ const {
   BATTLE_MESSAGE_PROMPT_Y, BATTLE_MESSAGE_PROMPT_TICKS, battleMessageArm,
   battleMessageDraw, battleMessageKindFor, battleMessageLineIndex, battleMessagePromptClipId,
   battleMessagePromptFrame,
-} = ui;
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+} = ui as EngineUi;
 
 /** The game key that drives `BATTLE_MESSAGE_CLOSE_BIT` (0x2000 = Circle). */
 export const BATTLE_MSG_CLOSE_KEY = "circle";
 
 /** The packs the original resolves: PGFGTC00 for the panel, CMFONT for the prompt. */
-const PACK_NAMES = {
+const PACK_NAMES: Record<number, string> = {
     [BATTLE_MESSAGE_PANEL_PACK]: "pgfgc00",
     [BATTLE_MESSAGE_PROMPT_PACK]: "cmfont",
 };
@@ -89,7 +91,7 @@ const BANK_FILES: Record<number, BattleMsgBankFile> = {
     [BATTLE_MESSAGE_BANK_FIELD]: { file: "battlecmd/esitmnam.json", what: "Battle item-name bank" },
 };
 
-const loadedBanks = Object.create(null);
+const loadedBanks: Record<number, Readonly<Record<number, string>> | null> = Object.create(null);
 
 function bankTable(data: BattleMsgBankData | null | undefined): Readonly<Record<number, string>> {
     const table = Object.create(null);
@@ -115,7 +117,7 @@ export function battleMsgBankSync(bank = BATTLE_MESSAGE_BANK) {
 }
 
 /** Called by each bank's loader once; also exposed so a test can await it. */
-export function battleMsgSetBank(table, bank = BATTLE_MESSAGE_BANK) {
+export function battleMsgSetBank(table: Readonly<Record<number, string>> | null | undefined, bank = BATTLE_MESSAGE_BANK) {
     loadedBanks[bank | 0] = table ?? null;
 }
 
@@ -139,14 +141,14 @@ for (const bank of Object.keys(BANK_FILES)) {
 }
 
 /** The widget-method calls a session records, in the original's order. */
-function methodHost(log) {
+function methodHost(log: (string | number)[][]) {
     return {
         createTextElement(target: number, kind: number, x: number, y: number) {
             log.push(["create", target | 0, kind | 0, x | 0, y | 0]);
             return 0x80180000 + ((x + y) % 16) * 0x100;
         },
         bankGet(bank: number) { log.push(["bank", bank | 0]); return bank | 0; },
-        callMethod(element: number, slot, args: number[]) {
+        callMethod(element: number, slot: number, args: number[]) {
             log.push(["method", element | 0, slot, ...args.map((a: number) => a | 0)]);
         },
         packResolve(handle: number) { log.push(["pack", handle >>> 0]); return handle >>> 0; },
@@ -160,8 +162,8 @@ function methodHost(log) {
  * Run the ported VM for one `unkAC(task, kind, payload)` call against a recording host.
  * Used by the test and by the UI lab's read-only peek; it never touches the canvas.
  */
-export function battleMsgShowCalls(kind, payload, widgetBase = 0x80180000) {
-    const log = [];
+export function battleMsgShowCalls(kind: number, payload: readonly number[], widgetBase = 0x80180000) {
+    const log: (string | number)[][] = [];
     const host = methodHost(log);
     const widgets = {
         line1: host.createTextElement(BATTLE_MESSAGE_LAYER, BATTLE_MESSAGE_FONT_KIND,
@@ -169,7 +171,8 @@ export function battleMsgShowCalls(kind, payload, widgetBase = 0x80180000) {
         line2: host.createTextElement(BATTLE_MESSAGE_LAYER, BATTLE_MESSAGE_FONT_KIND,
             BATTLE_MESSAGE_LINE2.x, BATTLE_MESSAGE_LINE2.y),
     };
-    const show = ui.battleMessageShow;
+    // ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+    const show = (ui as EngineUi).battleMessageShow;
     const result = show(host, widgets, kind, payload, battleMsgText, String);
     return { calls: log, result, widgets };
 }
@@ -192,18 +195,18 @@ export function battleMsgGeometry() {
             size: BATTLE_MESSAGE_PROMPT_SIZE,
         },
         reveal: {
-            delayTicks: ui.BATTLE_MESSAGE_LINE_DELAY_TICKS,
-            phaseTable: ui.BATTLE_MESSAGE_PHASE_TABLE,
-            tick: ui.BATTLE_MESSAGE_TICK,
+            delayTicks: (ui as EngineUi).BATTLE_MESSAGE_LINE_DELAY_TICKS,
+            phaseTable: (ui as EngineUi).BATTLE_MESSAGE_PHASE_TABLE,
+            tick: (ui as EngineUi).BATTLE_MESSAGE_TICK,
             promptTicks: BATTLE_MESSAGE_PROMPT_TICKS,
-            promptFrames: ui.BATTLE_MESSAGE_PROMPT_FRAMES,
+            promptFrames: (ui as EngineUi).BATTLE_MESSAGE_PROMPT_FRAMES,
         },
         // `.L0x80098bbc` keeps phase 3 waiting; phase 4's 21 ticks (`.L0x80098c58`) are
         // reachable only through `+0xb0`, which nothing in the decoded corpus calls.
         close: {
             bit: BATTLE_MESSAGE_CLOSE_BIT, holdTicks: null,
-            autoCloseTicks: ui.BATTLE_MESSAGE_AUTO_CLOSE_TICKS,
-            autoCloseSwitch: ui.BATTLE_MESSAGE_AUTO_CLOSE,
+            autoCloseTicks: (ui as EngineUi).BATTLE_MESSAGE_AUTO_CLOSE_TICKS,
+            autoCloseSwitch: (ui as EngineUi).BATTLE_MESSAGE_AUTO_CLOSE,
         },
         kinds: BATTLE_MESSAGE_ARMS.length,
         elementMethods: {

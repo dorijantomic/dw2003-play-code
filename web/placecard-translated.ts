@@ -16,8 +16,9 @@ import { ui } from "./vendor/engine.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import * as uiC from "./ui-c/index.js";
 import { composePlaceCard } from "./ui-c/message.js";
+import type { UiRun } from "./ui-c/types.js";
 interface PlaceCardComposeScreen {
-  runs: string[];
+  runs: UiRun[];
 }
 
 

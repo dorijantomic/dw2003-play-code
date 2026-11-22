@@ -8,6 +8,7 @@ import {
   fightReportMarkedSlot,
   expCountDisplayed,
 } from "../report.js";
+import type { FightReportGroupGeom, FightReportRow } from "../report.js";
 import { drawText as uiDrawText, fontReady as uiFontReady } from "../../uifont.js";
 import { stfrptChrome, REPORT_LAYOUT } from "../../battle.js";
 import type { BattleContext } from "../../types/battle.js";
@@ -26,7 +27,7 @@ export function makeReport(B: BattleContext) {
   //
   // The portrait animates: one frame every 13 vsyncs, from the table read off
   // the running game (claim FIGHT-REPORT-PORTRAIT-FRAMES-001).
-  function drawFightReportGroup(ctx: CanvasRenderingContext2D | undefined, G, row, opts: ReportGroupOptions = {}) {
+  function drawFightReportGroup(ctx: CanvasRenderingContext2D | undefined, G: FightReportGroupGeom | null | undefined, row: FightReportRow | null | undefined, opts: ReportGroupOptions = {}) {
     if (!G || !row) return;
     const t = opts.seconds ?? 0;
     // The plate is drawn plain. The screen's own code hands it the arrow's
@@ -53,7 +54,7 @@ export function makeReport(B: BattleContext) {
     const xp = opts.countingXp ?? row.xp ?? 0;
     uiDrawText(ctx, String(xp), G.xpValue.x, G.xpValue.y, { kind: 3, alignRight: true });
     uiDrawText(ctx, G.xpLabel.str, G.xpLabel.x, G.xpLabel.y, { kind: 3 });
-    G.slots.forEach((slot, j: string | number | null | undefined) => {
+    G.slots.forEach((slot, j: number) => {
       const barMarked = opts.markedSlot === j;
       if (barMarked) {
         // The bar picture is drawn plain, for the same reason as the plate.
@@ -129,7 +130,7 @@ function drawFightReport(b: BattleState) {
           { kind: CB.value.kind, alignRight: true });
         uiDrawText(B.ctx, CB.label.str, CB.label.x, CB.label.y, { kind: CB.label.kind });
       }
-      (b._winReportRows ?? []).slice(0, groups.length).forEach((row, i: string | number) => {
+      (b._winReportRows ?? []).slice(0, groups.length).forEach((row, i: number) => {
         const g = groups[i];
         drawFightReportGroup(B.ctx, g, row, {
           seconds: b.timer,

@@ -5,8 +5,24 @@ interface ThrowItemEffectRec {
   motion: number;
   effect: number;
   sound: number;
+  /** effect per branch ("str", "def", "none") */
+  effect_branch?: Record<string, number>;
+  sound_branch?: Record<string, number>;
+  /** the item picks its motion at random: base + step * k, k below count */
+  motion_random?: { base: number; step: number; count: number; };
 }
 
+
+/** One row of the skills table (digimon.json "skills"): the fields the fight reads. */
+export interface SkillRow {
+  id: number;
+  name?: string;
+  type?: string;
+  clip: number;
+  attack_category?: number | string;
+  /** how many contacts the technique lands */
+  hits?: number;
+}
 
 interface ThrowItemEffectTable {
   records?: ThrowItemEffectRec[];
@@ -25,9 +41,11 @@ interface ThrowItemEffectTable {
 // Unknown3 data; field map in docs/research/fight-3d/tech-effects-decode.md). Loaded async by
 // the host (battle3d) via setTechTable; until then techToClip falls back to the verified
 // 52/52 partition rule (which the extracted table reproduces exactly for techs 1..104).
-let TECH_TABLE = null;
+let TECH_TABLE: Record<string, FightTechRow> | null = null;
 export function setTechTable(json: Record<string, FightTechRow> | null) { TECH_TABLE = json || null; }
-export function techRecord(techId: number) { return TECH_TABLE?.[String(techId)] ?? null; }
+/** A tech table row; `hits` and `attack_category` are probed by callers but the extracted table carries neither. */
+export type TechRecord = FightTechRow & { hits?: number; attack_category?: number | string };
+export function techRecord(techId: number): TechRecord | null { return TECH_TABLE?.[String(techId)] ?? null; }
 
 export function techToClip(techId: number) {
   const rec = techRecord(techId);
@@ -48,7 +66,7 @@ export function techToClip(techId: number) {
 // A zero +0x0e on any other clip leaves the field as the actor was constructed (0), and an
 // absent record leaves the browser's field unset (null = op3 9999 skips, the faithful no-op).
 export const TECH_BASIC_FALLBACK_EFFECT = 0x2e;
-export function techEffectType(rec: { effect: number; clip: number; }) {
+export function techEffectType(rec: { effect: number; clip: number; } | null | undefined) {
   if (!rec) return null;
   const effect = rec.effect | 0;
   if (effect !== 0) return effect;
@@ -105,7 +123,7 @@ export const REACTION_EVADE_CLIP = 4;   // decoded accuracy roll missed
 // setThrowItemEffects. Until it loads, throwItemEffect() returns null -> the caller keeps the
 // default-arm clip-10 entry, the faithful behaviour for a context with no table.
 export const THROW_ITEM_BAND = [77, 90];   // the jump table's id range (id - 77 = table index)
-let THROW_ITEM_EFFECTS = null;             // Map item id -> { clip, motion, effect, sound, ... }
+let THROW_ITEM_EFFECTS: Map<number, ThrowItemEffectRec> | null = null;             // Map item id -> { clip, motion, effect, sound, ... }
 export function setThrowItemEffects(json: ThrowItemEffectTable | null) {
   const recs = json?.records;
   THROW_ITEM_EFFECTS = Array.isArray(recs)
@@ -134,9 +152,9 @@ export function isThrowItem(itemId: number) {
 // 77..90 is a typed attack arm (clips 14/15/17, motion/effect of the thrown item) and stays
 // aimed at the opponent.
 let SKILL_TYPES: Map<number, string> | null = null;                    // Map skill id -> "attack" | "heal" | "support"
-let SKILL_ROWS = null;                     // Map skill id -> the whole skills row (hits, name, clip)
-let SKILL_BY_NAME = null;                  // Map skill name -> the rows that carry it
-export function setSkillTable(json) {
+let SKILL_ROWS: Map<number, SkillRow> | null = null;                     // Map skill id -> the whole skills row (hits, name, clip)
+let SKILL_BY_NAME: Map<string, SkillRow[]> | null = null;                  // Map skill name -> the rows that carry it
+export function setSkillTable(json: SkillRow[] | { skills?: SkillRow[] } | null) {
   const rows = Array.isArray(json) ? json : (json?.skills ?? null);
   SKILL_TYPES = Array.isArray(rows)
     ? new Map(rows.map((s) => [s.id | 0, String(s.type || "attack")]))
@@ -147,16 +165,16 @@ export function setSkillTable(json) {
   // ("Fight" is 242 of them) and they do agree on category for a given clip, so the lookup keeps the
   // whole list and lets the caller narrow it by clip.
   SKILL_BY_NAME = Array.isArray(rows) ? new Map() : null;
-  for (const s of rows) {
+  for (const s of rows!) {
     const n = String(s.name ?? "");
     if (!n) continue;
     if (!SKILL_BY_NAME!.has(n)) SKILL_BY_NAME!.set(n, []);
-    SKILL_BY_NAME!.get(n).push(s);
+    SKILL_BY_NAME!.get(n)!.push(s);
   }
 }
 export function skillType(techId: number) { return SKILL_TYPES?.get(techId | 0) ?? null; }
 /** Every skills row that carries this NAME (the technique name the animator passes down), or []. */
-export function skillRowsForName(name): { clip: number; attack_category?: number; type?: number }[] { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
+export function skillRowsForName(name: unknown): SkillRow[] { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
 /** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
 export function skillRow(techId: number | null) { return SKILL_ROWS?.get(techId! | 0) ?? null; }
 /**

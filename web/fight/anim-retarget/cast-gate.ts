@@ -13,7 +13,10 @@ import {
 } from "./k16-rig.js";
 import { k23Cloud, k23NeutralFrame } from "./world.js";
 import type { RetargetBake } from "./types.js";
-import type { RetargetModel, RigProp } from "./types.js";
+import type { FightChanRow } from "../types.js";
+import type { RetargetModel, RigProp, RigView } from "./types.js";
+
+type RoleOpts = NonNullable<Parameters<typeof bakeRetargetByRole>[3]>;
 interface HandPointResult {
   bone: number;
   weapon: boolean;
@@ -39,15 +42,15 @@ interface HandPointOptions {
  * ever used when its own numbers pass. When none passes, the first candidate is returned and the caller
  * keeps the planted cast, exactly as before.
  */
-export function bakeRetarget(target, source, clip: number, { offset = 6000, mirror = null, ...opts } = {}) {
+export function bakeRetarget(target: RetargetModel, source: RetargetModel, clip: number, { offset = 6000, mirror = null, ...opts }: RoleOpts = {}) {
   // A/B switch used by the K16 measurements (tools/check_cast_contract.mjs --geometry) and nothing else:
   // it reproduces the pre-K16 bake without touching any other module.
   if (typeof process !== "undefined" && process.env?.K16_MODE === "geometry") {
-    const g: RetargetBake = bakeRetargetGeometry(target, source, clip, { offset });
+    const g: RetargetBake | null = bakeRetargetGeometry(target, source, clip, { offset });
     if (g) { g.source = source; g.method = "geometry"; }
     return g;
   }
-  const tries = [];
+  const tries: RetargetBake[] = [];
   const withIk = bakeRetargetByRole(target, source, clip, { offset, mirror, ik: true, ...opts });
   if (withIk) tries.push(withIk);
   const noIk = bakeRetargetByRole(target, source, clip, { offset, mirror, ik: false, ...opts });
@@ -57,7 +60,7 @@ export function bakeRetarget(target, source, clip: number, { offset = 6000, mirr
   if (!tries.length) return null;
   for (const t of tries) {
     t.source = source;
-    const verdict = castGate(t);
+    const verdict = castGate(t as Required<RetargetBake>);
     t.gate = verdict;
     t.method = t === geo ? "geometry" : (t === withIk ? "role+ik" : "role");
     if (verdict.used) return t;
@@ -107,7 +110,7 @@ export const CAST_GATE = {
 
 const TAU_R = (Math.PI * 2) / 4096;
 
-const angOf = (ch2, frame: number | undefined) => sample(ch2, frame!).map((v) => v * TAU_R);
+const angOf = (ch2: FightChanRow[] | undefined, frame: number | undefined) => sample(ch2, frame!).map((v) => v * TAU_R);
 
 const angBetween = (a: number[], b: number[]) => {
   let d = 0;
@@ -133,7 +136,7 @@ export function handPoint(model: RetargetModel, { table = null, side = null } = 
   const own = roles.props.length
     ? (side ? (roles.props.find((p) => p.side === side) ?? roles.props[0]) : roles.props[0])
     : null;
-  let bone = own ? own.bone : null;
+  let bone: number | null | undefined = own ? own.bone : null;
   if (bone == null && roles.arms.length) {
     const arm = side ? (roles.arms.find((a) => a.side === side) ?? roles.arms[0]) : roles.arms[0];
     bone = arm!.chain[arm!.chain.length - 1];
@@ -153,7 +156,7 @@ export function handPoint(model: RetargetModel, { table = null, side = null } = 
   } else frames.push(0);
   let best = null;
   for (const f of frames) {
-    const p = restPose(model, f).pos[bone];
+    const p = restPose(model, f).pos[bone]!;
     if (!best || p[1] < best.y) best = { x: p[0], y: p[1], z: p[2], frame: f };
   }
   return best ? { ...best, bone, weapon: !!own } : null;
@@ -163,7 +166,7 @@ export function handPoint(model: RetargetModel, { table = null, side = null } = 
  * The quality gate for one (target, donor, clip) retarget. `bake` is bakeRetarget()'s result on the target.
  * Returns every metric plus `used`: the pair's cast body is played only when `used` is true.
  */
-export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
+export function castGate(bake: Required<RetargetBake>, { samples = CAST_GATE.samples } = {}) {
   const { model: baked, roles } = bake;
   const T = roles.target, S = roles.source;
   const off = bake.offset;
@@ -192,18 +195,18 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
   }
   for (const p of T.props) {
     const parent = (T.pose ? 0 : 0) + ((baked.bones[p.bone]?.parent_slot ?? 0) - 1);
-    need.push({ kind: "prop", side: p.side, mapped: bake.map[p.bone] >= 0 || (parent >= 0 && bake.map[parent] >= 0) });
+    need.push({ kind: "prop", side: p.side, mapped: bake.map[p.bone]! >= 0 || (parent >= 0 && bake.map[parent]! >= 0) });
   }
   const missing = need.filter((r) => !r.mapped).map((r) => `${r.kind}:${r.side}`);
   const covered = bake.covered;
 
   // per-frame poses
-  const chainOf = (roles2, kind: string, side: string) =>
+  const chainOf = (roles2: RigView, kind: string, side: string) =>
     (kind === "arm" ? roles2.arms : roles2.legs).find((c: { side: string; }) => c.side === side)?.chain ?? null;
   let speedWorst = 0, ankleDrift = 0, motionT = 0, motionS = 0, returnGap = 0;
   let folds = 0, movedBones = 0, energyT = 0, energyS = 0;
   const baseT = new Map(), baseS = new Map(), rotPrev = new Map(), rotPrevS = new Map();
-  const handBone = T.props.length ? (T.props.find((p: { side: string; }) => p.side === "right") ?? T.props[0]).bone
+  const handBone = T.props.length ? (T.props.find((p: { side: string; }) => p.side === "right") ?? T.props[0]!).bone
     : (T.arms.find((a: { side: string; }) => a.side === "right") ?? T.arms[0])?.chain.slice(-1)[0];
   // the donor's own casting hand: its prop on the same side, else its arm tip - whichever bone the map used
   const donorHand = (S.props.find((p: { side: string; }) => p.side === "right") ?? S.props[0])?.bone
@@ -215,31 +218,31 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
     const Tp = restPose(baked, f), Sp = restPose(source, sf);
     if (handBone != null && Tp.pos[handBone]) {
       if (!handBaseT.length) { handBaseT.push(...Tp.pos[handBone]); }
-      handT = Math.max(handT, Math.hypot(Tp.pos[handBone][0] - handBaseT[0], Tp.pos[handBone][1] - handBaseT[1], Tp.pos[handBone][2] - handBaseT[2]));
-      const mh = bake.map[handBone];
+      handT = Math.max(handT, Math.hypot(Tp.pos[handBone]![0] - handBaseT[0]!, Tp.pos[handBone]![1] - handBaseT[1]!, Tp.pos[handBone]![2] - handBaseT[2]!));
+      const mh = bake.map[handBone]!;
       if (donorHand != null && Sp.pos[donorHand]) {
         if (!handBaseS.length) handBaseS.push(...Sp.pos[donorHand]);
-        handS = Math.max(handS, Math.hypot(Sp.pos[donorHand][0] - handBaseS[0], Sp.pos[donorHand][1] - handBaseS[1], Sp.pos[donorHand][2] - handBaseS[2]));
+        handS = Math.max(handS, Math.hypot(Sp.pos[donorHand]![0] - handBaseS[0]!, Sp.pos[donorHand]![1] - handBaseS[1]!, Sp.pos[donorHand]![2] - handBaseS[2]!));
       } else if (mh >= 0 && Sp.pos[mh]) {
         if (!handBaseS.length) handBaseS.push(...Sp.pos[mh]);
-        handS = Math.max(handS, Math.hypot(Sp.pos[mh][0] - handBaseS[0], Sp.pos[mh][1] - handBaseS[1], Sp.pos[mh][2] - handBaseS[2]));
+        handS = Math.max(handS, Math.hypot(Sp.pos[mh]![0] - handBaseS[0]!, Sp.pos[mh]![1] - handBaseS[1]!, Sp.pos[mh]![2] - handBaseS[2]!));
       }
     }
     for (let i = 1; i < baked.bones.length; i++) {
-      const m = bake.map[i];
+      const m = bake.map[i]!;
       if (m < 0) continue;
       if (!baseT.has(i)) { baseT.set(i, Tp.pos[i]); baseS.set(i, Sp.pos[m]); }
       const b0 = baseT.get(i), s0 = baseS.get(i);
-      const dt = Math.hypot(Tp.pos[i][0] - b0[0], Tp.pos[i][1] - b0[1], Tp.pos[i][2] - b0[2]);
-      const ds = Math.hypot(Sp.pos[m][0] - s0[0], Sp.pos[m][1] - s0[1], Sp.pos[m][2] - s0[2]);
+      const dt = Math.hypot(Tp.pos[i]![0] - b0[0], Tp.pos[i]![1] - b0[1], Tp.pos[i]![2] - b0[2]);
+      const ds = Math.hypot(Sp.pos[m]![0] - s0[0], Sp.pos[m]![1] - s0[1], Sp.pos[m]![2] - s0[2]);
       if (ds > 0.01 * H) movedBones++;
       if (k === frames.length - 1) { energyT += dt; energyS += ds; }
       // a joint never folds back onto its own parent segment
-      const par = (baked.bones[i].parent_slot ?? 0) - 1;
+      const par = (baked.bones[i]!.parent_slot ?? 0) - 1;
       const kids = baked.bones.map((b, j) => ((b.parent_slot ?? 0) - 1 === i ? j : -1)).filter((j: number) => j >= 0);
       if (par >= 0 && kids.length === 1) {
-        const u = [Tp.pos[i][0] - Tp.pos[par][0], Tp.pos[i][1] - Tp.pos[par][1], Tp.pos[i][2] - Tp.pos[par][2]];
-        const v = [Tp.pos[kids[0]][0] - Tp.pos[i][0], Tp.pos[kids[0]][1] - Tp.pos[i][1], Tp.pos[kids[0]][2] - Tp.pos[i][2]];
+        const u = [Tp.pos[i]![0] - Tp.pos[par]![0], Tp.pos[i]![1] - Tp.pos[par]![1], Tp.pos[i]![2] - Tp.pos[par]![2]];
+        const v = [Tp.pos[kids[0]!]![0] - Tp.pos[i]![0], Tp.pos[kids[0]!]![1] - Tp.pos[i]![1], Tp.pos[kids[0]!]![2] - Tp.pos[i]![2]];
         const lu = Math.hypot(...u), lv = Math.hypot(...v);
         if (lu > 1 && lv > 1) {
           const c = (u[0]! * v[0]! + u[1]! * v[1]! + u[2]! * v[2]!) / (lu * lv);
@@ -247,28 +250,28 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
         }
       }
       // rotation speed, same bone, same tick, against the donor
-      const a = angOf(baked.bones[i].anim?.ch2, f);
-      const b = angOf(source.bones[m].anim?.ch2, sf);
+      const a = angOf(baked.bones[i]!.anim?.ch2, f);
+      const b = angOf(source.bones[m]!.anim?.ch2, sf);
       const prev = rotPrev.get(i), prevS = rotPrevS.get(i);
       if (prev && prevS) speedWorst = Math.max(speedWorst, angBetween(a, prev) / Math.max(CAST_GATE.speedFloor, angBetween(b, prevS)));
       rotPrev.set(i, a);
       rotPrevS.set(i, b);
       if (k > 0) {
-        motionT = Math.max(motionT, angBetween(a, angOf(baked.bones[i].anim?.ch2, lo)));
-        motionS = Math.max(motionS, angBetween(b, angOf(source.bones[m].anim?.ch2, lo - off)));
+        motionT = Math.max(motionT, angBetween(a, angOf(baked.bones[i]!.anim?.ch2, lo)));
+        motionS = Math.max(motionS, angBetween(b, angOf(source.bones[m]!.anim?.ch2, lo - off)));
       }
     }
     // feet: the ankle's travel against its own rest height
     for (const side of ["left", "right"]) {
       const tc = chainOf(T, "leg", side);
       if (!tc) continue;
-      ankleDrift = Math.max(ankleDrift, Math.abs(Tp.pos[tc[tc.length - 1]][1] - Trest.pos[tc[tc.length - 1]][1]));
+      ankleDrift = Math.max(ankleDrift, Math.abs(Tp.pos[tc[tc.length - 1]!]![1] - Trest.pos[tc[tc.length - 1]!]![1]));
     }
     // return gap: last pose against the model's own rest pose
     if (k === frames.length - 1) {
       for (let i = 1; i < baked.bones.length; i++) {
-        if (bake.map[i] < 0) continue;
-        returnGap = Math.max(returnGap, angBetween(angOf(baked.bones[i].anim?.ch2, f), angOf(baked.bones[i].anim?.ch2, 0)));
+        if (bake.map[i]! < 0) continue;
+        returnGap = Math.max(returnGap, angBetween(angOf(baked.bones[i]!.anim?.ch2, f), angOf(baked.bones[i]!.anim?.ch2, 0)));
       }
     }
   }
@@ -307,7 +310,7 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
  * null when the pair's retarget is not used (the caller keeps the planted own-body cast).
  * The bake is memory only: the model object is a per-load copy, never written to disk.
  */
-export function applyCastBake(target, source, clip: number, { offset = null } = {}) {
+export function applyCastBake(target: RetargetModel, source: RetargetModel, clip: number, { offset = null }: { offset?: number | null } = {}) {
   const from = Math.max(0, (target.timeline?.length ?? 0));
   let table = Math.max(62, from);
   while (target.timeline?.[table]?.table) table++;
@@ -315,18 +318,18 @@ export function applyCastBake(target, source, clip: number, { offset = null } = 
   const bake = bakeRetarget(target, source, clip, { offset: off });
   if (!bake) return null;
   bake.source = source;
-  const bakedTable = bake.table;
-  bake.model!.timeline[table] = bake.model!.timeline[bakedTable];
+  const bakedTable = bake.table!;
+  bake.model!.timeline![table] = bake.model!.timeline![bakedTable];
   bake.table = table;
-  const gate = castGate(bake);
+  const gate = castGate(bake as Required<RetargetBake>);
   if (!gate.used) return { table: null, offset: off, gate };
   // write the bake onto the live model: appended ch2 keys + the re-based playlist at `table`
   for (let i = 0; i < target.bones.length; i++) {
-    const b = bake.model!.bones[i];
+    const b = bake.model!.bones[i]!;
     if (b !== target.bones[i]) target.bones[i] = b;
   }
   if (!target.timeline) target.timeline = [];
-  target.timeline[table] = bake.model!.timeline[bakedTable];
+  target.timeline[table] = bake.model!.timeline![bakedTable];
   target.__castBakes = (target.__castBakes ?? 0) + 1;
   return { table, offset: off, gate, map: bake.map, covered: bake.covered };
 }

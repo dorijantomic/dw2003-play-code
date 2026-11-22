@@ -7,7 +7,9 @@
 //   cmfont 24      : the header bar ("Button: Close Status")
 //   cmfont 0x19 0x1b 0x1c 0x100+n : the list panel (n = row count, web/panel-kit.js)
 //   cmfont 26      : the money band
-export const PAUSE_PANEL_ROWS = Object.freeze({ 0x1c: 5, 0x1b: 6, 0x19: 7 });
+import type { UiClaim, UiDrawCall } from "./types.js";
+
+export const PAUSE_PANEL_ROWS: Readonly<Record<number, number>> = Object.freeze({ 0x1c: 5, 0x1b: 6, 0x19: 7 });
 export const PAUSE_PANEL_EXTRA_BASE = 0x100;
 const panelRows = (id: number) => (PAUSE_PANEL_ROWS[id] ?? (id > PAUSE_PANEL_EXTRA_BASE + 7 && id <= PAUSE_PANEL_EXTRA_BASE + 12 ? id - PAUSE_PANEL_EXTRA_BASE : 0));
 
@@ -16,30 +18,30 @@ const panelRows = (id: number) => (PAUSE_PANEL_ROWS[id] ?? (id > PAUSE_PANEL_EXT
 // 32 = the footer band, 58 = the CARD FOLDERS window (title + rows); cmfont 22 = the portrait plate; the portrait pictures themselves
 // (ststat 7, 8, 17, 18, 21, 22 ...) are 32 x 32 sprites = art by size.
 // Lab, gym and shop screens (own packs): backdrop, header plate, window, hint plates, capsule window, info card, stat window.
-const PL = (part: string, shape: string, o = {}) => ({ part, shape, layer: "under", ...o });
-const BACKDROP = { part: "backdrop", layer: "under" };
-const ART = { part: "art", layer: "art" };
+const PL = (part: string, shape: string, o: Partial<UiClaim> = {}): UiClaim => ({ part, shape, layer: "under", ...o });
+const BACKDROP: UiClaim = { part: "backdrop", layer: "under" };
+const ART: UiClaim = { part: "art", layer: "art" };
 // T3 lists and grids (lists.js): a claim with keepArt records the part AND draws the clip's own pixels (a frame goes under the picture)
-const ROWLINE = { part: "rowLine", layer: "under" };
-const CHIP = { part: "pageChip", layer: "over" };
-const GRID_ART = { part: "gridArt", layer: "under", keepArt: true };
-const CURSOR_BOX = { part: "cursorBox", layer: "over" };
+const ROWLINE: UiClaim = { part: "rowLine", layer: "under" };
+const CHIP: UiClaim = { part: "pageChip", layer: "over" };
+const GRID_ART: UiClaim = { part: "gridArt", layer: "under", keepArt: true };
+const CURSOR_BOX: UiClaim = { part: "cursorBox", layer: "over" };
 // T5 the two-row confirm box (Buy / No, Yes / No): pages.js composeRows({ confirm }); layer "over" = above the art canvas, as the game
 // draws it over the card / item pictures
-const CONFIRM_BOX = Object.freeze({ part: "confirm", layer: "over" });
+const CONFIRM_BOX: UiClaim = Object.freeze({ part: "confirm", layer: "over" });
 // a claimed clip that carries small pictures inside its frame (the deck's element cubes, 16 x 16 pieces): the frame becomes the C
 // plate, the pieces of these sizes stay the game's pixels on the art canvas (capture.js reads the pieces from the sheet at run time)
-const CUBES = Object.freeze({ artSizes: Object.freeze([[16, 16]]) });
+const CUBES: Pick<UiClaim, "artSizes"> = Object.freeze({ artSizes: Object.freeze<(readonly [number, number])[]>([[16, 16]]) });
 
 // T7 full-screen pages (fullpages.js). Name entry keyboard (namedt; also the deck folder rename): title plate (29), portrait frame (30; its
 // scanline backing 31 is replaced by the C body), the name slots (55 = 8, 53 = 10; the slot rects are the clip's own sheet layers), the
 // keyboard window + key grid (37, grid blocks from its layers), the key cursor (39), the slot cursor (40), the buttons: 72 x 17 (DEL / SPC
 // in every language), 16 x 17 (arrows), 40 x 17 (OK). A button's frame is the C plate; its word stays the game's pixels (artInset =
 // the native px cut off its bounds), so every language keeps its own word and no word is stored here.
-const LANG_CURSOR = { part: "langCursor", layer: "under" };
-const KEY_BUTTON = Object.freeze({ part: "keyButton", layer: "under", artInset: Object.freeze([5, 2, 3, 3]) });
-const WIZ_STEPS = Object.freeze({ part: "wizSteps", layer: "over", layers: true });
-const NAMEDT: Record<string, { part: string; layer: string; } | { part: string; layer: string; layers: boolean; }> = { 29: { part: "nameHdr", layer: "under" }, 30: { part: "portraitFrame", layer: "under" }, 31: { part: "portraitBack", layer: "under" },
+const LANG_CURSOR: UiClaim = { part: "langCursor", layer: "under" };
+const KEY_BUTTON: UiClaim = Object.freeze({ part: "keyButton", layer: "under", artInset: Object.freeze<[number, number, number, number]>([5, 2, 3, 3]) });
+const WIZ_STEPS: UiClaim = Object.freeze({ part: "wizSteps", layer: "over", layers: true });
+const NAMEDT: Record<string, UiClaim> = { 29: { part: "nameHdr", layer: "under" }, 30: { part: "portraitFrame", layer: "under" }, 31: { part: "portraitBack", layer: "under" },
     55: { part: "nameSlots", layer: "under", layers: true }, 53: { part: "nameSlots", layer: "under", layers: true },
     37: { part: "keyboard", layer: "under", layers: true }, 39: { part: "keyCursor", layer: "over" }, 40: { part: "slotCursor", layer: "over" } };
 for (const id of [60, 61, 62, 63, 64, 70, 71, 72, 44, 45, 46, 47, 48, 77, 78, 79]) NAMEDT[id] = KEY_BUTTON;
@@ -51,8 +53,8 @@ for (const id of [60, 61, 62, 63, 64, 70, 71, 72, 44, 45, 46, 47, 48, 77, 78, 79
 // technique and item list windows (42, 39: the row boxes are 12 x 12 sheet layers), the MP plate (41: plate in its layers below y 18), the
 // item count plate (40), the Digivolve stat panel (37), the DNA species strip (43), the message / description pane (49). The page arrows
 // (31, 32, 8 x 8) are pictures.
-const PGF = (part: string, o = {}) => ({ part, layer: "under", ...o });
-const PGFGC00: Record<string, { part: string; layer: string; }> = {
+const PGF = (part: string, o: Partial<UiClaim> = {}): UiClaim => ({ part, layer: "under", ...o });
+const PGFGC00: Record<string, UiClaim> = {
     0: PGF("hudPlate", { side: "enemy" }), 1: PGF("hudPlate", { side: "player" }), 10: PGF("bezel", { layer: "over" }),
     30: PGF("dvFrame"), 11: PGF("dvInner"),
     34: PGF("cmdRow", { layers: true }), 36: PGF("cmdRow", { layers: true }), 47: PGF("tagRow", { layers: true }),
@@ -62,12 +64,12 @@ const PGFGC00: Record<string, { part: string; layer: string; }> = {
 for (let id = 51; id <= 58; id++) PGFGC00[id] = PGF("dvFill", { layer: "over" });
 for (const id of [12, 13, 14, 15, 60, 61, 62, 63]) PGFGC00[id] = PGF("pip", { layer: "over" });
 
-export const CLAIMS = Object.freeze({
+export const CLAIMS: Readonly<Record<string, Readonly<Record<number, UiClaim>>>> = Object.freeze({
     pgfgc00: Object.freeze(PGFGC00),
     namedt: Object.freeze(NAMEDT),
     // the partner chooser before the keyboard (stdgnm): the diamond backdrop (36; 49 is a corner piece drawn off screen), title plate (29),
     // Back hint (35), one row per partner (30), the portrait backing (31, replaced by the C body), the cursor frame (32)
-    stdgnm: Object.freeze({
+    stdgnm: Object.freeze<Record<number, UiClaim>>({
         36: BACKDROP, 49: ART, 29: { part: "nameHdr", layer: "under" }, 35: PL("hint", "ch"),
         30: { part: "pickRow", layer: "under" }, 31: { part: "portraitBack", layer: "under" }, 32: { part: "pickCursor", layer: "over" },
     }),
@@ -75,7 +77,7 @@ export const CLAIMS = Object.freeze({
     // "1 / 2" (29), the slot info frame (36: line art from its layers; the three 48 x 32 partner diamonds stay pictures), the diamond
     // halves (37), the top bar (32), the card reader (34) and the memory cards (35) are pictures; the pipe (31) runs BEHIND the panel in
     // the game, so it is a part (a C column under the panel plate), never art (art always sits over the plates)
-    stmcrd: Object.freeze({
+    stmcrd: Object.freeze<Record<number, UiClaim>>({
         30: BACKDROP, 33: { part: "mcPanel", layer: "under", layers: true }, 29: { part: "mcSlots", layer: "under" },
         36: { part: "mcInfo", layer: "under", layers: true, artSizes: Object.freeze([[48, 32]]) },
         31: { part: "mcPipe", layer: "under" }, 37: ART, 32: ART, 34: ART, 35: ART,
@@ -86,7 +88,7 @@ export const CLAIMS = Object.freeze({
     // 48 x 32 pedestals stay pictures, the A / B / C tab frames and the rules come from its layers; 50 = the chosen tab, 8 = the pedestal
     // rims over the partners), the confirm page: the name window (2: the 32 x 32 portrait stays a picture), its portrait frame (6), the
     // pack window (9, pedestals kept; 10 = their rims), the wire band holding the Register box (1: the box is its 54 tall pieces)
-    stnmet: Object.freeze({
+    stnmet: Object.freeze<Record<number, UiClaim>>({
         15: { part: "netWin", layer: "under", layers: true, artSizes: Object.freeze([[56, 58]]) }, 56: ART, 8: ART, 10: ART, 1: { part: "netWin", layer: "under", layers: true, artSizes: Object.freeze([[56, 58], [16, 58]]) },
         12: WIZ_STEPS, 13: WIZ_STEPS, 14: WIZ_STEPS, 7: { part: "packWin", layer: "under", layers: true, artSizes: Object.freeze([[48, 32]]) },
         50: { part: "packSel", layer: "over" }, 2: { part: "cfName", layer: "under", layers: true, artSizes: Object.freeze([[32, 32]]) },
@@ -101,13 +103,13 @@ export const CLAIMS = Object.freeze({
     // the language page (cntselwn): the tile backdrop (0); the header band (1) with its SELECT LANGUAGE word (136 x 14) kept as a picture;
     // the right column (2) with the flags (44 x 28) and the language words (72 / 64 / 76 x 14, 64 x 16) kept as pictures; the logo band (3)
     // with the logo (120 x 58) kept; the cursor frame (4-8, one clip per row) = the focus plate under the row
-    cntselwn: Object.freeze({
+    cntselwn: Object.freeze<Record<number, UiClaim>>({
         0: BACKDROP, 1: { part: "langHeader", layer: "under", artSizes: Object.freeze([[136, 14]]) },
         2: { part: "langColumn", layer: "under", artSizes: Object.freeze([[44, 28], [72, 14], [64, 14], [76, 14], [64, 16]]) },
         3: { part: "langBand", layer: "under", artSizes: Object.freeze([[120, 58]]) },
         4: LANG_CURSOR, 5: LANG_CURSOR, 6: LANG_CURSOR, 7: LANG_CURSOR, 8: LANG_CURSOR,
     }),
-    cmfont: Object.freeze({
+    cmfont: Object.freeze<Record<number, UiClaim>>({
         21: { part: "card", layer: "under" },
         22: { part: "portrait", layer: "under" },
         23: { part: "cardName", layer: "under" },
@@ -136,7 +138,7 @@ export const CLAIMS = Object.freeze({
         7: { part: "more", layer: "over", box: Object.freeze([0, 10, 5, 10]) }, 10: { part: "more", layer: "over" },
         8: { part: "msgBand", layer: "under" }, 9: { part: "msgBand", layer: "under" },
     }),
-    ststat: Object.freeze({
+    ststat: Object.freeze<Record<number, UiClaim>>({
         29: BACKDROP,
         30: { part: "highlight", layer: "over" },
         32: { part: "footer", layer: "under" },
@@ -160,7 +162,7 @@ export const CLAIMS = Object.freeze({
         // T7 the pause MAP page: the place-name window (the map, its markers and the area title are pictures)
         59: { part: "mapName", layer: "under" },
     }),
-    stdglabo: Object.freeze({
+    stdglabo: Object.freeze<Record<number, UiClaim>>({
         55: BACKDROP,
         32: PL("header", "sl"), 37: PL("hint", "ch"), 38: PL("hint", "ch"), 36: PL("hint", "ch"),
         33: PL("window", "ch"), 30: PL("info", "sr"), 39: PL("capsule", "ch"),
@@ -174,7 +176,7 @@ export const CLAIMS = Object.freeze({
         68: PL("header", "sr"), 67: PL("pagePlate", "sl"), 70: CHIP, 61: { part: "cellFrame", layer: "under" },
         63: { part: "cellFrame", layer: "under", layers: true }, 64: { part: "connector", layer: "under" }, 71: CURSOR_BOX,
     }),
-    sttrng3: Object.freeze({
+    sttrng3: Object.freeze<Record<number, UiClaim>>({
         45: BACKDROP,
         // the drill grid adds the drill description plate under the grid (35, slanted left edge like the disc)
         34: PL("header", "sl"), 39: PL("hint", "ch"), 35: PL("hint", "sl"), 36: PL("capsule", "ch"), 33: PL("tp", "sr"), 32: PL("stats", "ch"), 31: PL("info", "sr"),
@@ -183,7 +185,7 @@ export const CLAIMS = Object.freeze({
         // the drill result: the room frame (40; its 168 x 88 room picture stays the game's pixels) and the drill name plate (37)
         40: PL("frame", "ch", { artSizes: Object.freeze([[168, 88]]) }), 37: PL("plate", "ch"),
     }),
-    stshop: Object.freeze({
+    stshop: Object.freeze<Record<number, UiClaim>>({
         20: BACKDROP,
         0: PL("hint", "ch"), 5: PL("window", "ch"), 2: PL("money", "sl"), 1: PL("name", "ch"),
         // "Equip who?": the prompt plate (21), the item line + price (14, split by its own layers), the partner cards (8), the cursor
@@ -200,19 +202,19 @@ export const CLAIMS = Object.freeze({
     }),
     // fight report (T4): backdrop (30), total EXP badge (33), message band (29), partner group plate (31; its portrait, 8, is art by size),
     // form bars (32), the highlight of the partner the page is about (36, split by its own sheet layers)
-    stfrpt: Object.freeze({
+    stfrpt: Object.freeze<Record<number, UiClaim>>({
         30: BACKDROP, 33: { part: "expPlate", layer: "under" }, 29: { part: "msgBand", layer: "under" }, 31: { part: "reportCard", layer: "under" },
         32: { part: "formBar", layer: "under" }, 36: { part: "reportHl", layer: "over", layers: true },
     }),
     // card album: backdrop (8), title plate (9), Back hint (15), page plate (14), R1 arrow (27), the card back of a slot (6: a picture, kept
     // in its pixels on a C frame, as the disc shows a card back where the player has no card)
-    stalbm: Object.freeze({
+    stalbm: Object.freeze<Record<number, UiClaim>>({
         8: BACKDROP, 9: PL("header", "sr"), 15: PL("hint", "ch"), 14: PL("pagePlate", "chip"), 27: CHIP, 6: GRID_ART,
     }),
     // card shop + deck editor: backdrop (8), shop name (40), money (41), root window (47), hint (15), card name window (10), count plates
     // (13), AP / HP panel (12), card faces (0-5, pixels kept), the card cursor (7); deck: header (48), folder rows (65 off, 66 on, 68 held),
     // actions window (45), card grid window (64), grid card pictures (83-88, pixels kept), the grid cursor (67)
-    stcdsp: Object.freeze({
+    stcdsp: Object.freeze<Record<number, UiClaim>>({
         8: BACKDROP, 40: PL("name", "ch"), 41: PL("money", "sl"), 47: PL("window", "ch"), 15: PL("hint", "ch"),
         10: PL("plate", "ch"), 13: PL("plate", "ch"), 12: PL("plate", "ch"),
         0: GRID_ART, 1: GRID_ART, 2: GRID_ART, 3: GRID_ART, 4: GRID_ART, 5: GRID_ART, 7: CURSOR_BOX,
@@ -232,7 +234,7 @@ export const KIT_PANEL = Object.freeze({ part: "window", layer: "under" });
 export const isKitPanel = (pack: string, id: string | number) => pack === "cmfont" && /^kit-\d+x\d+$/.test(String(id));
 
 /** The claim for a clip: { part, layer, rows? } or null (art). `id` may be "n#row" (a palette variant of clip n). */
-export function claimFor(pack: string, id: string | number) {
+export function claimFor(pack: string, id: string | number): UiClaim | null {
     if (isKitPanel(pack, id)) return KIT_PANEL;
     const base = Number(String(id).split("#")[0]);
     if (isPicturePack(pack)) return ART;
@@ -241,11 +243,11 @@ export function claimFor(pack: string, id: string | number) {
 }
 
 /** True when the draw calls are the pause home: a list panel, the money band and the cards (all in pack cmfont, dir 0x286). */
-export function isPauseHome(calls = []) {
+export function isPauseHome(calls: readonly UiDrawCall[] = []) {
     let panel = false, money = false;
     for (const c of calls) {
         if (c.method !== "drawSprite") continue;
-        const id = Number(c.args[1]), dir = (c.args[0] >>> 16) & 0xffff;
+        const id = Number(c.args[1]), dir = (c.args[0]! >>> 16) & 0xffff;     // ETS item 9: a drawSprite call carries its four numbers
         if (dir !== 0x286) continue;
         if (panelRows(id) && c.args[2] === 168 && c.args[3] === 40) panel = true;
         if (id === 26) money = true;
@@ -258,8 +260,9 @@ export function isPauseHome(calls = []) {
 export const CMFONT_DIR = 0x286, STSTAT_DIR = 0x404;
 /** The status sheet family (status, See Digivolve, See Equipment, the equipment item grid): any of its own clips is drawn. */
 export const STATUS_CLIPS = Object.freeze([31, 33, 36, 39, 42, 44, 60]);
+// ETS item 9: a drawSprite call always carries its four numbers (dir id in args[0]).
 /** Does the frame draw clip `id` of the pack directory `dir`? */
-export const hasClip = (calls, dir: number, id: number) => calls.some((c) => c.method === "drawSprite" && ((c.args[0] >>> 16) & 0xffff) === dir && Number(c.args[1]) === id);
+export const hasClip = (calls: readonly UiDrawCall[], dir: number, id: number) => calls.some((c) => c.method === "drawSprite" && ((c.args[0]! >>> 16) & 0xffff) === dir && Number(c.args[1]) === id);
 
 /** The party sidebar pages (picker, items categories, folders, demo): the party cards with their portrait plates. */
-export const isSidebarPage = (calls = []) => hasClip(calls, CMFONT_DIR, 21) && hasClip(calls, CMFONT_DIR, 22);
+export const isSidebarPage = (calls: readonly UiDrawCall[] = []) => hasClip(calls, CMFONT_DIR, 21) && hasClip(calls, CMFONT_DIR, 22);

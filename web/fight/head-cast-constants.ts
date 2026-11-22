@@ -1,3 +1,4 @@
+import type { SizeClassName } from "./types.js";
 type HeadCastBase = NonNullable<typeof HEAD_CAST.spells> | NonNullable<typeof HEAD_CAST.all>;
 type HeadCastSize = NonNullable<(typeof HEAD_CAST_BY_SIZE)[keyof typeof HEAD_CAST_BY_SIZE]>;
 // HEAD-CAST CONSTANTS - how the disc's own mouth/head casts move the head.
@@ -782,7 +783,7 @@ export const HEAD_CAST_MIN_CELL = 4;
  * 4 casts, and all four of them are head = root = torso bodies.
  * Returns { ...cell, source } or null.
  */
-export function headCastFor(sizeClass = null, { minCell = HEAD_CAST_MIN_CELL } = {}): (HeadCastBase & { source: string }) | (HeadCastBase & HeadCastSize & { source: string }) | null {
+export function headCastFor(sizeClass: SizeClassName | null = null, { minCell = HEAD_CAST_MIN_CELL } = {}): (HeadCastBase & { source: string }) | (HeadCastBase & HeadCastSize & { source: string }) | null {
   const size = sizeClass && HEAD_CAST_BY_SIZE[sizeClass] ? HEAD_CAST_BY_SIZE[sizeClass] : null;
   const base = HEAD_CAST.spells ?? HEAD_CAST.all;
   if (size && size.n >= minCell) return { ...base, ...size, source: "size:" + sizeClass };

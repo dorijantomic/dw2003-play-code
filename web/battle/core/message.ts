@@ -17,7 +17,7 @@ import { attackPageSpec, evadePageSpec } from "../hit-results.js";
 import { createHpPlateState } from "../hud.js";
 import type { BattleContext, BattleState } from "../../types/battle.js";
 
-import type { BattleLineSpec } from "../../types/battle.js";
+import type { BattleLineSpec, EngineUi } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeMessage(B: BattleContext) {
 function tickBattleMessage(b: BattleState, dt: number) {
@@ -140,7 +140,8 @@ function tickBattleMessage(b: BattleState, dt: number) {
    * arrives the way every other battle line does.
    */
   function startLossSession(b: BattleState) {
-    const session = new ui.BattleLossSession({
+    // ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+    const session = new (ui as EngineUi).BattleLossSession({
       playSound: (id: number) => { if ((id >>> 0) === 0x60040008) B.bgm?.play("gameover"); },
       armDefeatEffect: () => { B.renderer3d?.setCameraMode?.(B.lossCameraMode()); return 0; },
       turnDefeatCamera: () => {},
@@ -183,7 +184,7 @@ function tickBattleMessage(b: BattleState, dt: number) {
    * `unkAC(kind 2, {0x1d, 0x10})` — three sites because three different attackers can
    * miss, and all three write the same two payload words.
    */
-  function techniqueSpec(b: BattleState, skill) {
+  function techniqueSpec(b: BattleState, skill: { name: string; }) {
     return {
       kind: MSG_KIND.TECHNIQUE, payload: [MSG.ATTACK], name: b.player.profile.name,
       slots: [skill.name],
@@ -199,7 +200,7 @@ function tickBattleMessage(b: BattleState, dt: number) {
    * rather than the acting Digimon -- the enemy is the other side of the fight from the
    * player's partner.
    */
-  function enemyTechniqueSpec(enemyName: string, skill) {
+  function enemyTechniqueSpec(enemyName: string, skill: { name: string; }) {
     // `battleMessagePage(3, ...)` IS the original's call: payload[0] = 0x10 (the side
     // test) and the technique name in slot 1 out of bank 0xa2 by payload[1]
     // (`pro/fightstg.s:23476` / `:23479`).
@@ -228,7 +229,7 @@ function tickBattleMessage(b: BattleState, dt: number) {
    */
   function itemAnnouncementSpec(b: BattleState, item: { id: number | undefined; }) {
     return itemAnnouncementPage(
-      b.player.profile.name, item.id, battleMsgText(ui.BATTLE_MESSAGE_BANK_FIELD, item.id));
+      b.player.profile.name, item.id, battleMsgText((ui as EngineUi).BATTLE_MESSAGE_BANK_FIELD, item.id));
   }
 function evadeSpec(b: BattleState, enemyName: string) {
     return evadePageSpec(enemyName);
@@ -366,7 +367,7 @@ function openingPorts(b: BattleState) {
       // method 0x80093a74, size 0x88 and flags 0x14. The browser has no allocator — its
       // factory is createHpPlateState — so it supplies the allocator and the port owns the
       // call and its constants; nothing in the spawner's body is hand-written here.
-      b._hpPlate = spawnPlateHud((method, size, flags) =>
+      b._hpPlate = spawnPlateHud((method: number, size: number, flags: number) =>
         Object.assign(createHpPlateState(hpPlateMembers(b)), { method, size, flags }));
     }
     return b._hpPlate;
@@ -384,7 +385,7 @@ function openingPorts(b: BattleState) {
    * of the port's +0x54 store, so the id the machine sees is the one the original stored.
    */
   function spawnFightTaskFor(side: number, techniqueId: number) {
-    const spawn = (method, size, flags) => {
+    const spawn = (method: number, size: number, flags: number) => {
       const cell = { method, size, flags, side: 0, technique: 0 };
       return {
         cell,

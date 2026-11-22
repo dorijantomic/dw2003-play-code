@@ -21,13 +21,14 @@
 // builder; the geometry itself still comes from the layer's decoded verts.
 
 import { runDisplayList } from "../vendor/engine.js";
+import type { DisplayListNode } from "../../engine/dw3/battle-displaylist.js";
 
 /**
  * Walk one display-list byte stream (the node's +0x68 bytes) and return the
  * ported loop's full step trace. `node` is the same field block the engine uses
  * (colour override, texpage bases) when the caller has it.
  */
-export function walkMeshDisplayList(bytes, node) {
+export function walkMeshDisplayList(bytes: Uint8Array, node?: DisplayListNode | null) {
   return runDisplayList(bytes, node ? { node } : {});
 }
 

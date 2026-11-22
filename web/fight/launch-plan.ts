@@ -21,7 +21,7 @@ import { shotsFor, emitters, armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
-import type { LaunchOpsSpec, FightVec3 } from "./types.js";
+import type { LaunchOpsSpec, FightVec3, FightModel, BoneMapRec, FightChanRow } from "./types.js";
 import type { Dw2LoadedModel } from "../types/anim-viewer-dw2.js";
 interface PoseSample {
   frame: number;
@@ -46,7 +46,7 @@ interface LaunchPointsOpts {
   frame?: number | null | undefined;
 }
 
-interface TipPointModel {
+interface TipPointModel extends FightModel {
   folder: string;
 }
 
@@ -88,12 +88,12 @@ const EMPTY = Object.freeze({ mode: "none", shots: 0, points: [], limbs: [], bas
 
 /** The model's own CENTRE emitters, in the order a shot should leave from one: a mouth fires, a head/chest
  *  hatch next, then the body itself. Used when a side-specific bone would be a guess. */
-function centreBone(m): number | null {
+function centreBone(m: BoneMapRec): number | null {
   return m.f?.mouth ?? m.f?.head ?? m.f?.chest ?? m.f?.eyes ?? m.f?.["whole-body"] ?? m.t ?? m.r ?? null;
 }
 
 /** The body's own launch site: the whole-body emitter, else the torso/root bone. */
-function bodyBone(m): number | null {
+function bodyBone(m: BoneMapRec): number | null {
   return m.f?.["whole-body"] ?? m.t ?? m.r ?? null;
 }
 
@@ -122,11 +122,11 @@ export function emitterBone(folder: string | number, id: string): number | null 
     const side = site[1] === "left-arm" ? "left" : "right";
     const chains = armChains(folder, side);
     const chain = chains[(site[2] | 0) - 1];
-    if (chain && chain.length) return chain[chain.length - 1];
+    if (chain && chain.length) return chain[chain.length - 1]!;
     // the rig has no such extra arm: the first arm of that side is the honest place for the shot, and a rig
     // with NO arm at all launches from its body emitter (never from a bone it does not have)
     const first = chains[0];
-    if (first && first.length) return first[first.length - 1];
+    if (first && first.length) return first[first.length - 1]!;
     return m.f?.[site[1]] ?? bodyBone(m);
   }
   if (sided && !(m.f && m.f[part] != null) && !armChains(folder, part === "left-arm" ? "left" : "right").length) {
@@ -152,8 +152,8 @@ export function emitterBones(folder: string | number) {
 }
 
 /** The frame window a timeline table plays (frames it names), or null. */
-export function tableWindow(model, table: string | number | null) {
-  const tab = table != null ? model?.timeline?.[table]?.table : null;
+export function tableWindow(model: FightModel | null | undefined, table: string | number | null) {
+  const tab = table != null ? model?.timeline?.[table as number]?.table : null;
   if (!Array.isArray(tab) || !tab.length) return null;
   let lo = Infinity, hi = -1;
   for (const e of tab) {
@@ -169,7 +169,7 @@ export function tableWindow(model, table: string | number | null) {
  * launch point is taken over the whole body, so it does not depend on which of those tables happens to
  * be playing at the launch tick.
  */
-export function bodyWindow(model, tables) {
+export function bodyWindow(model: FightModel | null | undefined, tables: (string | number | null)[] | string | number | null | undefined) {
   const list = (Array.isArray(tables) ? tables : [tables]).filter((t) => t != null);
   let lo = Infinity, hi = -1;
   for (const t of list) {
@@ -185,7 +185,7 @@ export function bodyWindow(model, tables) {
  * The model's own poses over a body's frame window: `samples` evenly spaced frames, each with every
  * bone's world position (the renderer's own rest-pose arithmetic, anim-retarget.restPose).
  */
-export function poseWindow(model: Parameters<typeof bodyWindow>[0], tables: Parameters<typeof bodyWindow>[1], samples = 16): PoseSample[] {
+export function poseWindow(model: FightModel, tables: Parameters<typeof bodyWindow>[1], samples = 16): PoseSample[] {
   const w = bodyWindow(model, tables);
   const frames = [];
   if (w) for (let k = 0; k < samples; k++) frames.push(Math.round(w.lo + ((w.hi - w.lo) * k) / Math.max(1, samples - 1)));
@@ -207,12 +207,12 @@ export function poseWindow(model: Parameters<typeof bodyWindow>[0], tables: Para
  *      this pack ships carry a self-referential slot, so this rarely fires);
  *   3. none - the bone's own point (a root/torso emitter has no limb to extend along).
  */
-export function tipOf(pos, model, bone: string | number, prevBone: number | null = null): FightVec3 | null {
-  const p = pos?.[bone];
+export function tipOf(pos: FightVec3[] | null | undefined, model: FightModel | null | undefined, bone: string | number, prevBone: number | null = null): FightVec3 | null {
+  const p = pos?.[bone as number];
   if (!p) return null;
   let q = prevBone != null ? pos?.[prevBone] : null;
   if (!q) {
-    const par = model?.bones?.[bone]?.parent_slot;
+    const par = model?.bones?.[bone as number]?.parent_slot;
     if (par != null && par >= 0 && par !== bone) q = pos?.[par];
   }
   if (!q) return [p[0], p[1], p[2]];
@@ -227,7 +227,7 @@ export function chainPrevBone(folder: string | number, id: string, bone: number)
   if (!side) return null;
   for (const ch of armChains(folder, side)) {
     const i = ch.indexOf(bone);
-    if (i > 0) return ch[i - 1];
+    if (i > 0) return ch[i - 1]!;
   }
   return null;
 }
@@ -244,7 +244,7 @@ export function chainPrevBone(folder: string | number, id: string, bone: number)
  * (C12 measured the closest approach at 6493 units). Reaching forward first, high second, picks the
  * extended pose the flight is authored for.
  */
-export function boneTip(model, bone: string | number | null, { table = null, window = null, prev = null }: BoneTipOpts = {}) {
+export function boneTip(model: FightModel | null | undefined, bone: string | number | null, { table = null, window = null, prev = null }: BoneTipOpts = {}) {
   if (!model || bone == null) return null;
   const poses = window ?? poseWindow(model, table);
   let best = null;
@@ -280,12 +280,12 @@ export function emitterSide(id: string) {
  *   * bare hand, no data, or a prop worn on the torso/back -> null, and the caller keeps the bone tip.
  * No species names, no per-model pins: the verdict is K17's data and the vertices are the model's own.
  */
-export function propTipPoint(model, folder: string | number, side: string, { window = null }: { window?: PoseSample[] | null | undefined } = {}) {
+export function propTipPoint(model: FightModel | null | undefined, folder: string | number, side: string, { window = null }: { window?: PoseSample[] | null | undefined } = {}) {
   if (!model || !folder || !side) return null;
   const equip = armEquip(folder, side);
   if (!equip || equip.class === "none" || equip.class === "bare") return null;
   if (equip.attachment && equip.attachment !== "arm") return null;
-  const bone = equip.bone;
+  const bone = equip.bone!;
   const b = model?.bones?.[bone];
   const verts = b?.verts ?? [];
   if (!verts.length) return null;
@@ -296,15 +296,15 @@ export function propTipPoint(model, folder: string | number, side: string, { win
     if (!R || !t) continue;
     let far = null, fd = -1;
     for (const v of verts) {
-      const wx = -(R[0] * v[0] + R[3] * v[1] + R[6] * v[2]) + t[0];
-      const wy =  (R[1] * v[0] + R[4] * v[1] + R[7] * v[2]) + t[1];
-      const wz = -(R[2] * v[0] + R[5] * v[1] + R[8] * v[2]) + t[2];
+      const wx = -(R[0]! * v[0] + R[3]! * v[1] + R[6]! * v[2]) + t[0];
+      const wy =  (R[1]! * v[0] + R[4]! * v[1] + R[7]! * v[2]) + t[1];
+      const wz = -(R[2]! * v[0] + R[5]! * v[1] + R[8]! * v[2]) + t[2];
       const d = Math.hypot(wx - t[0], wy - t[1], wz - t[2]);
       if (d > fd) { fd = d; far = [wx, wy, wz]; }
     }
     if (!far) continue;
-    if (!best || far[2] > best.z || (far[2] === best.z && far[1] < best.y)) {
-      best = { frame: p.frame, x: far[0], y: far[1], z: far[2], reach: fd };
+    if (!best || far[2]! > best.z || (far[2] === best.z && far[1]! < best.y)) {
+      best = { frame: p.frame, x: far[0]!, y: far[1]!, z: far[2]!, reach: fd };
     }
   }
   if (!best) return null;
@@ -318,7 +318,7 @@ export function propTipPoint(model, folder: string | number, side: string, { win
 }
 
 /** Linear read of a ch3 scale channel ([x,y,z,frame] keys, 4096 = 1.0) at `frame`. */
-function scaleAt(ch3, frame: number) {
+function scaleAt(ch3: FightChanRow[] | undefined, frame: number) {
   if (!Array.isArray(ch3) || !ch3.length) return 1;
   let prev = null;
   for (const k of ch3) {
@@ -329,7 +329,7 @@ function scaleAt(ch3, frame: number) {
     const span = (f - (prev[3] | 0)) || 1;
     const t = (frame - (prev[3] | 0)) / span;
     const v = [prev[0] + (k[0] - prev[0]) * t, prev[1] + (k[1] - prev[1]) * t, prev[2] + (k[2] - prev[2]) * t];
-    return Math.max(Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2])) / 4096;
+    return Math.max(Math.abs(v[0]!), Math.abs(v[1]!), Math.abs(v[2]!)) / 4096;
   }
   return prev ? Math.max(Math.abs(prev[0]), Math.abs(prev[1]), Math.abs(prev[2])) / 4096 : 1;
 }
@@ -338,7 +338,7 @@ function scaleAt(ch3, frame: number) {
  * The point an emitter's shot leaves from: the WEAPON's tip when the arm carries a prop (C15), else the
  * limb's own tip as before.
  */
-export function emitterTip(model, folder: string | number, id, bone: string | number | null, { window = null, prev = null }: BoneTipOpts = {}) {
+export function emitterTip(model: FightModel | null | undefined, folder: string | number, id: string, bone: string | number | null, { window = null, prev = null }: BoneTipOpts = {}) {
   const side = emitterSide(id);
   const prop = side ? propTipPoint(model, folder, side, { window }) : null;
   if (prop) return { frame: prop.frame, x: prop.x, y: prop.y, z: prop.z, source: "prop", propBone: prop.bone, equip: prop.equip };
@@ -377,13 +377,13 @@ export function tipPointFor(model: TipPointModel, point: TipPointPoint, frame: n
  *
  * opts.volley forces the one-per-emitter reading for a move the disc presents with its volley clip.
  */
-export function launchPointsFor(model, { folder = model?.folder, tech = null, volley = false, table = null, tables = null, frame = null }: LaunchPointsOpts = {}) {
+export function launchPointsFor(model: FightModel | null | undefined, { folder = model?.folder, tech = null, volley = false, table = null, tables = null, frame = null }: LaunchPointsOpts = {}) {
   if (!model || !folder) return { ...EMPTY };
   const rule = shotsFor(folder, tech, { volley: !!volley });
   const mode = rule.mode;
   if (mode === "none") return { mode, shots: 0, points: [], limbs: [], basis: rule.basis };
   if (mode === "per-limb-contact") {
-    const limbs = (rule.emitters || []).map((id) => ({ id, bone: emitterBone(folder, id) })).filter((l: { bone: null; }) => l.bone != null);
+    const limbs = (rule.emitters || []).map((id) => ({ id, bone: emitterBone(folder, id) })).filter((l: { bone: number | null; }) => l.bone != null);
     return { mode, shots: 0, points: [], limbs, basis: rule.basis };
   }
   const sites = emitters(folder);
@@ -423,7 +423,7 @@ export function launchPointsFor(model, { folder = model?.folder, tech = null, vo
   return { mode, shots: points.length, points, limbs: [], basis: rule.basis };
 }
 
-function modelHeight(model, window: PoseSample[]) {
+function modelHeight(model: FightModel, window: PoseSample[]) {
   let lo = Infinity, hi = -Infinity;
   for (const p of window) for (const v of p.pos) { if (!v) continue; if (v[1] < lo) lo = v[1]; if (v[1] > hi) hi = v[1]; }
   return isFinite(lo) && hi > lo ? hi - lo : 1;
@@ -451,7 +451,7 @@ function modelHeight(model, window: PoseSample[]) {
  * per-pack rule moved Minotarumon's shot from 1 unit off the victim line to 459 (C12 visClose). The
  * script's frame, not the pack's, is what these words are written in.
  */
-export function launchOps(plan, { sprite, homeZ = 0, flight = null, lane = 0, side = "player" }: LaunchOpsSpec = {}) {
+export function launchOps(plan: { points: { id: string; bone: number; index: number; x: number; y: number; z: number; }[]; }, { sprite, homeZ = 0, flight = null, lane = 0, side = "player" }: LaunchOpsSpec = {}) {
   const yaw = side === "enemy" ? 0 : 2048;
   const out = [];
   for (const p of plan.points) {

@@ -13,21 +13,22 @@
 //   value === 0x8000 (pure loop marker)   → the playhead jumps to loop_target
 //   value === 0xffff (end marker)         → the sampler freezes
 //   otherwise                             → frame = value
+import type { FightTimelineRow } from "./types.js";
 import { frameTableFromEntries, newSamplerState, readPhase, sampleTick, SAMPLE_BIT, LOOP_MARKER, END_MARKER, BLEND_TARGET } from "../vendor/engine.js";
 
 export class TimelinePlayer {
-  declare _frames: { length: any; values: any; loopTargets: any; aux: any; };
-  declare _prevFrame: any;
-  declare _s: any;
-  declare blend: { from: any; t: number; };
+  declare _frames: ReturnType<typeof frameTableFromEntries>;
+  declare _prevFrame: number | null;
+  declare _s: ReturnType<typeof newSamplerState>;
+  declare blend: { from: number; t: number; } | null;
   declare ended: boolean;
-  declare frame: any;
-  declare justLooped: any;
-  declare length: any;
+  declare frame: number;
+  declare justLooped: boolean;
+  declare length: number;
   declare looped: boolean;
-  declare table: any;
+  declare table: FightTimelineRow[];
   // `prevFrame` (optional) seeds the "from" for a LEADING aux=0xffff ease-in blend.
-  constructor(table, prevFrame = null) {
+  constructor(table: FightTimelineRow[], prevFrame: number | null = null) {
     this.table = table;
     this.length = table.length;
     this._frames = frameTableFromEntries(table);
@@ -83,7 +84,7 @@ export class TimelinePlayer {
   lookaheadHold(maxRun = 96) {
     const t = this.table, n = this.table.length, p = this._s.playhead;
     if (!t || p < 0 || p >= n) return null;
-    const frameOf = (e: { value: number; loop_target: number; }) => {
+    const frameOf = (e: FightTimelineRow | undefined) => {
       if (!e) return null;
       const v = e.value | 0;
       if (v === 0xffff) return null;
@@ -93,13 +94,13 @@ export class TimelinePlayer {
     if (f0 == null) return null;
     let run = 1;
     while (p + run < n && run < maxRun) {
-      const v = t[p + run].value | 0;
+      const v = t[p + run]!.value | 0;
       if (v === 0x8000 || v === 0xffff) return null;
       if (frameOf(t[p + run]) !== f0) break;
       run++;
     }
     if (p + run >= n) return null;
-    const vn = t[p + run].value | 0;
+    const vn = t[p + run]!.value | 0;
     if (vn === 0x8000 || vn === 0xffff) return null;
     const nf = frameOf(t[p + run]);
     if (nf == null || nf === f0) return null;
@@ -115,17 +116,17 @@ export class TimelinePlayer {
 // when the last ends, the whole playlist is ended. Single-element playlists behave
 // like a bare TimelinePlayer.
 export class PlaylistPlayer {
-  declare blend: any;
-  declare cur: TimelinePlayer;
+  declare blend: TimelinePlayer["blend"];
+  declare cur: TimelinePlayer | null;
   declare ended: boolean;
-  declare frame: any;
+  declare frame: number;
   declare idx: number;
-  declare justLooped: any;
-  declare tables: any;
-  constructor(tables) {
+  declare justLooped: boolean;
+  declare tables: FightTimelineRow[][];
+  constructor(tables: FightTimelineRow[][] | null | undefined) {
     this.tables = (tables || []).filter((t) => t && t.length);
     this.idx = 0;
-    this.cur = this.tables.length ? new TimelinePlayer(this.tables[0]) : null;
+    this.cur = this.tables.length ? new TimelinePlayer(this.tables[0]!) : null;
     this.frame = this.cur ? this.cur.currentFrame() : 0;
     this.blend = this.cur ? this.cur.blend : null;
     this.ended = !this.cur;
@@ -147,7 +148,7 @@ export class PlaylistPlayer {
     if (subDone) {
       if (!isLast) {                                  // advance to the next sub-table
         this.idx += 1;
-        this.cur = new TimelinePlayer(this.tables[this.idx]);
+        this.cur = new TimelinePlayer(this.tables[this.idx]!);
         this.frame = this.cur.currentFrame();
         this.blend = this.cur.blend;
       } else {

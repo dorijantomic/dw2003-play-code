@@ -8,7 +8,8 @@ import { ST } from "../messages.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
 import type { BattleContext } from "../../types/battle.js";
 
-import type { BattleState } from "../../types/battle.js";
+import type { BattleState, PlayerRecord, DigimonRecord } from "../../types/battle.js";
+import type { FormLedgerEntry, PartnerStats } from "../../game/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeForms(B: BattleContext) {
 /**
@@ -71,7 +72,7 @@ export function makeForms(B: BattleContext) {
    * 22 stat halfwords. F0x800953E4 opens the SAME panel in both screens, so the
    * data is built once here rather than per screen.
    */
-  function formPanelMemberSeed(b: BattleState, index: number, rec) {
+  function formPanelMemberSeed(b: BattleState, index: number, rec: PlayerRecord) {
     const forms = B.formOptionsFor(index, b);
     const elems = B.FORM_ELEMENTS;
     // The panel's own seven numbers are the F0x80017174 scratch's +0x18..+0x24:
@@ -79,14 +80,14 @@ export function makeForms(B: BattleContext) {
     // resist. `rec.elemBonuses` already holds the last two (buildPlayerRecord
     // folds the equipment's elemResists in), so the shared helper reads it as
     // the original does.
-    const elemValue = (profile, points, key: string) => elementValue(profile, points, key);
+    const elemValue = (profile: DigimonRecord, points: Record<string, number>, key: string) => elementValue(profile, points, key);
     // F0x80017A1C copies the roster's own 0x14-byte technique block for a form:
     // its level byte at +0x02 and its six entry words at +0x08. The walker's form
     // ledger holds the same six words, and battleFormLevel the same level, so the
     // panel's pages one and two list the Digimon's real techniques.
     const ledger = rec?.statsRecord?.formLedger ?? [];
-    const techsFor = (formId) => {
-      const entry = ledger.find((row) => Number(row?.id) === Number(formId));
+    const techsFor = (formId: number) => {
+      const entry = ledger.find((row: FormLedgerEntry) => Number(row?.id) === Number(formId));
       return Array.from({ length: 6 }, (_, i) => (Number(entry?.techSlots?.[i] ?? 0) & 0xffff));
     };
     return {
@@ -96,9 +97,9 @@ export function makeForms(B: BattleContext) {
         right: elems!.map((k) => form.resistances?.[k] ?? 0),
         techs: techsFor(form.id),
         level: B.battleFormLevel(index, form.id, b),
-        dvexp: Number(ledger.find((row) => Number(row?.id) === Number(form.id))?.dvexp ?? 0) >>> 0,
+        dvexp: Number(ledger.find((row: FormLedgerEntry) => Number(row?.id) === Number(form.id))?.dvexp ?? 0) >>> 0,
       })),
-      equipped: (rec?.statsRecord?.equippedForms ?? []).slice(0, 3).map((id) => Number(id)),
+      equipped: (rec?.statsRecord?.equippedForms ?? []).slice(0, 3).map((id: number) => Number(id)),
       panelBlock: [
         rec?.level | 0, 0, rec?.hp | 0, rec?.maxHp | 0, rec?.mp | 0, rec?.maxMp | 0,
         rec?.str | 0, rec?.def | 0, rec?.spt | 0, rec?.wis | 0, rec?.spd | 0, rec?.chr | 0,
@@ -160,14 +161,14 @@ export function makeForms(B: BattleContext) {
    * walker's id numbers), so a caller cannot hand this pane an id in the wrong
    * space. Real play is checked by tools/verify_dna_realplay.mjs.
    */
-  function dnaPaneSeed(b) {
+  function dnaPaneSeed(b: BattleState) {
     const choice = b._dnaChoice;
     const active = b.activePlayerIndex | 0;
     const partner = Number(choice?.rosterIndex ?? 0) | 0;
     const members = [0, 1, 2].map((slot) => {
       const member = b.playerRoster?.[slot];
       const record = b.playerRecords?.[slot];
-      const stats = member?.stats ?? record?.statsRecord ?? {};
+      const stats: Partial<PartnerStats> = member?.stats ?? record?.statsRecord ?? {};
       // The stat carry-over preview F0x800953E4 opens is the same panel the
       // Digivolve form list shows, and it describes the member the player picked,
       // so every member carries its own panel data here.
@@ -206,7 +207,7 @@ export function makeForms(B: BattleContext) {
    * fightstg.s:16314-16316 loads -2 in the branch delay slot, before the poll.
    * Cancel restarts the partner picker, without spending a turn or MP.
    */
-  function applyDnaAnswer(b: BattleState, answer, kind: string = "command") {
+  function applyDnaAnswer(b: BattleState, answer: number, kind: string = "command") {
     const action = dnaAnswerAction(kind, answer);
     if (action === "wait") return false;
     if (action === "restart") {

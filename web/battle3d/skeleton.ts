@@ -78,7 +78,7 @@ export async function loadSkeletalModel(folder: string) {
 // Build static IBO + UV buffer from anim.json model. Called once after load.
 // Returns { ibo, ubo, indexCount, totalVerts, boneOffsets, vbo:null }
 // vbo is created dynamically each frame (DYNAMIC_DRAW) by updateSkeletalVBO.
-export function buildSkeletalGLBuffers(gl, model): SkelBufs {
+export function buildSkeletalGLBuffers(gl: WebGLRenderingContext, model): SkelBufs {
   // One VBO/UBO slot per face corner (3 per face), not per unique vert.
   // This prevents UV overwrites when multiple faces share the same vertex index.
   const boneOffsets = [];
@@ -146,7 +146,7 @@ export function posedVertex(bone, vertexIndex, boneIndex: number, mats) {
   return [x, y, z];
 }
 
-export function updateSkeletalVBO(model, frame, bwm, positions) {
+export function updateSkeletalVBO(model, frame: number, bwm, positions: Float32Array | number[]) {
   const { mats } = (bwm && bwm.mats) ? bwm : { mats: bwm };
 
   // Mesh geometry = bone.faces indexed DIRECTLY into bone.verts × worldMat (3 corners/face).
@@ -180,7 +180,7 @@ export function updateSkeletalVBO(model, frame, bwm, positions) {
 // Internal GL version used by createBattle3D.
 // Emits one position per face corner (3 per face) to match buildSkeletalGLBuffers layout.
 // bwm = { mats, worldTrans } from buildBoneWorldMatrices — both outputs consumed together.
-export function _updateSkeletalVBOGL(gl, model, buffers, bwm, worldPos, scale, flipX, yaw = 0) {
+export function _updateSkeletalVBOGL(gl: WebGLRenderingContext, model, buffers: SkelBufs, bwm, worldPos: readonly number[], scale: number, flipX: boolean, yaw = 0) {
   const { mats } = bwm;
   const posData = new Float32Array(buffers.totalVerts * 3);
   // The posed vertex above is the PS1 battle world, so this is the ONE mapping

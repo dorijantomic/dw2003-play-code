@@ -44,12 +44,12 @@ function dispatchMemory(w: Map<number, number>) {
 }
 
 export class FightCoordinator {
-  declare _defender: any;
+  declare _defender: ActorAnimator | null;
   declare _reacted: boolean;
-  declare enemy: any;
-  declare extraActors: any;
-  declare player: any;
-  constructor(player, enemy) {
+  declare enemy: ActorAnimator | null;
+  declare extraActors: (() => ActorAnimator[]) | null;
+  declare player: ActorAnimator | null;
+  constructor(player: ActorAnimator | null, enemy: ActorAnimator | null) {
     this.player = player;        // ActorAnimator (our fighter)
     this.enemy = enemy;          // ActorAnimator (opponent)
     this._defender = null;       // the actor that should react to the current attack
@@ -146,7 +146,7 @@ export class FightCoordinator {
   // SCRIPT_OWNED_CAMERA_STATES state list was removed 2026-10-08 (worker-bc) in favour of the
   // director's own resume/retire edges.
   cameraScriptOwned() {
-    const running = (a) => !!(a && a.vm && !a.vm.ended);
+    const running = (a: ActorAnimator | null | undefined) => !!(a && a.vm && !a.vm.ended);
     return running(this.player) || running(this.enemy) || running(this._defender)
       || (!!this.extraActors && this.extraActors().some(running));
   }

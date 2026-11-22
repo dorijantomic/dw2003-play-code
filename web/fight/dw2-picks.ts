@@ -8,16 +8,20 @@
 export const DW2_PICKS_URL = "dw2-motion-picks.json";
 export const PICK_VALUES = ["dw2", "dw3"];
 
-let picks: {} | null = null;              // folder -> { slot: "dw2"|"dw3" }, null until loaded
-let loading: Promise<{}> | null = null;
+/** folder -> { slot: "dw2"|"dw3" } */
+export type Dw2PicksTable = Record<string, Record<string, string>>;
+
+let picks: Dw2PicksTable | null = null;   // folder -> { slot: "dw2"|"dw3" }, null until loaded
+let loading: Promise<Dw2PicksTable> | null = null;
 
 /** Keep only well-formed rows (a hand-edited or old file can never break a fight). */
-export function cleanPicks(raw: string[]) {
-  const out = {};
+// ETS item 42: the picks file is outside data, so it comes in as unknown and is checked below
+export function cleanPicks(raw: unknown) {
+  const out: Dw2PicksTable = {};
   const src = raw && typeof raw === "object" ? raw : {};
   for (const [folder, slots] of Object.entries(src)) {
     if (!/^[A-Za-z0-9_]+$/.test(folder) || !slots || typeof slots !== "object") continue;
-    const row = {};
+    const row: Record<string, string> = {};
     for (const [slot, v] of Object.entries(slots) as [any, any][]) {
       if (/^\d{1,2}$/.test(slot) && PICK_VALUES.includes(v)) row[String(slot | 0)] = v;
     }
@@ -52,7 +56,7 @@ export async function ensureDw2Picks() {
 }
 
 /** Tests and the viewer set the picks directly. */
-export function setDw2Picks(raw: string[]) { picks = cleanPicks(raw); loading = Promise.resolve(picks); }
+export function setDw2Picks(raw: unknown) { picks = cleanPicks(raw); loading = Promise.resolve(picks); }
 
 /** "dw2" | "dw3" | null for one body's clip slot. */
 export function dw2Pick(folder: string | number, slot: number | null) {

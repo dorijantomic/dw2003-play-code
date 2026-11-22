@@ -1,9 +1,67 @@
+import type { SizeClassName } from "./types.js";
+
 interface HandPointOptions {
   emitterClass: string;
-  sizeClass?: null;
+  sizeClass?: SizeClassName | null;
   bodyHeight: number;
   quantile?: number;
 }
+
+/** Which arm class, which size cell, how long the arm: what armShape is asked for. */
+interface ArmShapeOptions {
+  emitterClass: string;
+  sizeClass?: SizeClassName | null;
+  armLength: number;
+  quantile?: number;
+  hand?: boolean;
+}
+
+/** A measure's spread over the casts of a class: the 10th, 50th and 90th percentile. */
+interface Quantiles { p10: number; p50: number; p90: number; }
+
+/** One class record of MOTION: every measure is a distribution (see "How to read it"); the arm and wrist measures exist for the arm classes only. */
+interface MotionClassRec {
+  n: number;
+  hH: Quantiles;
+  fH: Quantiles;
+  lH: Quantiles;
+  hL?: Quantiles;
+  fL?: Quantiles;
+  lL?: Quantiles;
+  handHH?: Quantiles;
+  handFH?: Quantiles;
+  handLH?: Quantiles;
+  handHL?: Quantiles;
+  handFL?: Quantiles;
+  backH: Quantiles;
+  upH: Quantiles;
+  travelH: Quantiles;
+  backL?: Quantiles;
+  upL?: Quantiles;
+  speedH: Quantiles;
+  peakSpeedH: Quantiles;
+  windup: Quantiles;
+  flight: Quantiles;
+  follow: Quantiles;
+  total: Quantiles;
+  peakBefore: Quantiles;
+  strikeHH: Quantiles;
+  strikeFH: Quantiles;
+  handGapH?: Quantiles;
+  discXErrH: Quantiles;
+  discYErrH: Quantiles;
+  backShare: number;
+  upShare: number;
+}
+
+/** The measures a class x size cell carries, in file order. */
+type CellKey = "hH" | "fH" | "lH" | "handHH" | "handFH" | "backH" | "upH" | "windup" | "flight";
+
+/** One class x size cell of MOTION_BY_CLASS_SIZE: [p10, p50, p90] per measure. */
+type SizeCell = { n: number; } & { [K in CellKey]?: [number, number, number]; };
+
+/** A cell widened to the class record's own { p10, p50, p90 } form. */
+type FullCell = { n: number; } & { [K in CellKey]?: Quantiles; };
 
 
 interface HandPointResult {
@@ -60,7 +118,7 @@ export const MOTION_SIZES = ["tiny","small","medium","large","giant"];
 export const MOTION_CENSUS = {"casts":234,"models":135,"usable":224,"spells":139,"throws":85,"byClip":{"5":88,"9":71,"11":31,"13":44},"byClass":{"both-hands":18,"hand":5,"prop":20,"mouth":66,"eyes":0,"body":30},"byClassThrow":{"both-hands":10,"hand":2,"prop":6,"mouth":49,"eyes":2,"body":16},"bySize":{"tiny":1,"small":7,"medium":56,"large":56,"giant":19}};
 
 /** Per emitter class, over every SPELL cast of that class. */
-export const MOTION = {
+export const MOTION: Record<string, MotionClassRec> = {
   "both-hands": {
     n: 18,
     hH: { p10: 0.147, p50: 0.535, p90: 0.953 },
@@ -215,7 +273,7 @@ export const MOTION_THROW = {"both-hands":{"n":10,"hH":[0.033,0.48,0.824],"fH":[
 export const MOTION_BY_SIZE = {"tiny":{"n":1,"hH":[0.713,0.713,0.713],"fH":[0.265,0.265,0.265],"lH":[0,0,0],"backH":[0.052,0.052,0.052],"upH":[0.05,0.05,0.05],"windup":[20,20,20],"flight":[86,86,86]},"small":{"n":7,"hH":[0.307,0.524,0.654],"fH":[0.045,0.342,0.573],"lH":[0,0.062,0.162],"handHH":[0.177,0.391,0.605],"handFH":[0.089,0.223,0.357],"backH":[0,0.01,0.814],"upH":[0.023,0.114,1.01],"windup":[28,155,175],"flight":[82,105,136]},"medium":{"n":56,"hH":[0.313,0.541,0.951],"fH":[-0.05,0.132,0.559],"lH":[0,0.051,0.27],"handHH":[0.474,0.564,0.878],"handFH":[-0.02,0.105,0.383],"backH":[0,0.027,0.172],"upH":[0,0.026,0.259],"windup":[21,41,138],"flight":[80,130,170]},"large":{"n":56,"hH":[0.339,0.687,0.805],"fH":[0.001,0.275,0.601],"lH":[0,0,0.089],"handHH":[0.224,0.626,0.776],"handFH":[-0.037,0.108,0.465],"backH":[0,0.096,0.605],"upH":[0,0.035,0.306],"windup":[40,87,163],"flight":[82,118,170]},"giant":{"n":19,"hH":[0.292,0.637,1.124],"fH":[-0.232,0.117,0.526],"lH":[0,0.015,0.249],"handHH":[0.671,0.891,0.897],"handFH":[-0.024,-0.011,0.114],"backH":[0,0.047,0.608],"upH":[0,0.063,0.959],"windup":[37,83,217],"flight":[70,130,213]}};
 
 /** Emitter class x size class, where at least one cast exists. Compact: [p10, p50, p90] per key. */
-export const MOTION_BY_CLASS_SIZE = {"both-hands":{"medium":{"n":9,"hH":[0.218,0.741,0.959],"fH":[-0.035,0.099,0.276],"lH":[0,0.044,0.267],"handHH":[0.408,0.645,0.959],"handFH":[-0.035,0.048,0.137],"backH":[0,0.055,0.158],"upH":[0,0.004,0.132],"windup":[21,46,62],"flight":[122,145,176]},"large":{"n":8,"hH":[-0.019,0.437,0.777],"fH":[-0.037,0.294,0.611],"lH":[0,0,0],"handHH":[0.224,0.472,0.777],"handFH":[-0.037,0.242,0.486],"backH":[0,0.065,0.322],"upH":[0,0.009,0.031],"windup":[41,50,198],"flight":[130,130,170]},"giant":{"n":1,"hH":[0.527,0.527,0.527],"fH":[0.315,0.315,0.315],"lH":[0.123,0.123,0.123],"handHH":[0.525,0.525,0.525],"handFH":[0.197,0.197,0.197],"backH":[0.231,0.231,0.231],"upH":[0,0,0],"windup":[39,39,39],"flight":[80,80,80]}},"hand":{"small":{"n":1,"hH":[0.008,0.008,0.008],"fH":[0.128,0.128,0.128],"lH":[0.096,0.096,0.096],"handHH":[0.123,0.123,0.123],"handFH":[0.056,0.056,0.056],"backH":[0.01,0.01,0.01],"upH":[0.002,0.002,0.002],"windup":[156,156,156],"flight":[90,90,90]},"medium":{"n":1,"hH":[1.125,1.125,1.125],"fH":[-0.291,-0.291,-0.291],"lH":[0.058,0.058,0.058],"handHH":[0.877,0.877,0.877],"handFH":[-0.126,-0.126,-0.126],"backH":[0.003,0.003,0.003],"upH":[0.027,0.027,0.027],"windup":[25,25,25],"flight":[170,170,170]},"large":{"n":1,"hH":[0.022,0.022,0.022],"fH":[0.323,0.323,0.323],"lH":[0.276,0.276,0.276],"handHH":[0.102,0.102,0.102],"handFH":[0.135,0.135,0.135],"backH":[0.002,0.002,0.002],"upH":[0.001,0.001,0.001],"windup":[29,29,29],"flight":[91,91,91]},"giant":{"n":2,"hH":[0.971,0.971,0.971],"fH":[-0.057,-0.057,-0.057],"lH":[0.093,0.093,0.093],"handHH":[0.897,0.897,0.897],"handFH":[-0.024,-0.024,-0.024],"backH":[0,0,0],"upH":[0,0,0],"windup":[33,33,33],"flight":[134,150,166]}},"prop":{"small":{"n":1,"hH":[0.524,0.524,0.524],"fH":[0.86,0.86,0.86],"lH":[0.228,0.228,0.228],"handHH":[0.658,0.658,0.658],"handFH":[0.39,0.39,0.39],"backH":[1.02,1.02,1.02],"upH":[1.665,1.665,1.665],"windup":[188,188,188],"flight":[90,90,90]},"medium":{"n":14,"hH":[0.314,0.416,0.542],"fH":[0.165,0.404,0.559],"lH":[0.185,0.257,0.543],"handHH":[0.487,0.544,0.772],"handFH":[0.079,0.237,0.432],"backH":[0.002,0.067,0.22],"upH":[0,0.015,0.447],"windup":[18,42,158],"flight":[76,130,170]},"large":{"n":3,"hH":[0.347,0.347,0.401],"fH":[-0.107,0.2,0.2],"lH":[0.272,0.272,0.378],"handHH":[0.637,0.637,0.644],"handFH":[-0.032,0.08,0.08],"backH":[0.019,0.096,0.096],"upH":[0.046,0.111,0.111],"windup":[88,88,88],"flight":[98,110,130]},"giant":{"n":2,"hH":[1.735,1.735,1.735],"fH":[-0.344,-0.344,-0.344],"lH":[0.684,0.684,0.684],"handHH":[0.891,0.891,0.891],"handFH":[-0.011,-0.011,-0.011],"backH":[0.035,0.035,0.035],"upH":[0.031,0.031,0.031],"windup":[52,52,52],"flight":[134,150,166]}},"mouth":{"small":{"n":3,"hH":[0.532,0.564,0.745],"fH":[-0.037,0.131,0.3],"lH":[0.013,0.062,0.107],"backH":[0.021,0.103,0.561],"upH":[0.163,0.358,0.53],"windup":[75,155,164],"flight":[77,105,109]},"medium":{"n":24,"hH":[0.477,0.842,0.933],"fH":[-0.031,0.132,0.631],"lH":[0,0.018,0.097],"backH":[0,0.021,0.287],"upH":[0,0.116,0.236],"windup":[25,41,118],"flight":[80,120,164]},"large":{"n":30,"hH":[0.636,0.737,0.844],"fH":[0.08,0.386,0.601],"lH":[0,0.001,0.031],"backH":[0,0.109,0.66],"upH":[0,0.159,0.349],"windup":[43,93,142],"flight":[79,104,161]},"giant":{"n":9,"hH":[0.255,0.714,0.893],"fH":[0.085,0.388,0.728],"lH":[0,0.015,0.073],"backH":[0.02,0.317,0.958],"upH":[0.111,0.652,1.209],"windup":[80,97,186],"flight":[70,130,219]}},"body":{"tiny":{"n":1,"hH":[0.713,0.713,0.713],"fH":[0.265,0.265,0.265],"lH":[0,0,0],"backH":[0.052,0.052,0.052],"upH":[0.05,0.05,0.05],"windup":[20,20,20],"flight":[86,86,86]},"small":{"n":2,"hH":[0.507,0.507,0.507],"fH":[0.382,0.382,0.382],"lH":[0,0,0],"backH":[0,0,0],"upH":[0.037,0.037,0.037],"windup":[28,28,28],"flight":[124,140,156]},"medium":{"n":8,"hH":[0.311,0.468,0.513],"fH":[-0.25,0.049,0.053],"lH":[0,0.019,0.253],"backH":[0.019,0.044,0.102],"upH":[0.013,0.026,0.169],"windup":[21,45,117],"flight":[124,153,213]},"large":{"n":14,"hH":[0.44,0.604,0.718],"fH":[-0.184,0.113,0.196],"lH":[0,0.006,0.041],"backH":[0,0.024,0.194],"upH":[0.002,0.067,0.169],"windup":[19,88,188],"flight":[94,115,166]},"giant":{"n":5,"hH":[0.315,0.347,0.521],"fH":[-0.085,0.117,0.25],"lH":[0,0,0.084],"backH":[0.002,0.015,0.048],"upH":[0.001,0.015,0.06],"windup":[38,83,217],"flight":[70,86,139]}}};
+export const MOTION_BY_CLASS_SIZE: Record<string, { [S in SizeClassName]?: SizeCell; }> = {"both-hands":{"medium":{"n":9,"hH":[0.218,0.741,0.959],"fH":[-0.035,0.099,0.276],"lH":[0,0.044,0.267],"handHH":[0.408,0.645,0.959],"handFH":[-0.035,0.048,0.137],"backH":[0,0.055,0.158],"upH":[0,0.004,0.132],"windup":[21,46,62],"flight":[122,145,176]},"large":{"n":8,"hH":[-0.019,0.437,0.777],"fH":[-0.037,0.294,0.611],"lH":[0,0,0],"handHH":[0.224,0.472,0.777],"handFH":[-0.037,0.242,0.486],"backH":[0,0.065,0.322],"upH":[0,0.009,0.031],"windup":[41,50,198],"flight":[130,130,170]},"giant":{"n":1,"hH":[0.527,0.527,0.527],"fH":[0.315,0.315,0.315],"lH":[0.123,0.123,0.123],"handHH":[0.525,0.525,0.525],"handFH":[0.197,0.197,0.197],"backH":[0.231,0.231,0.231],"upH":[0,0,0],"windup":[39,39,39],"flight":[80,80,80]}},"hand":{"small":{"n":1,"hH":[0.008,0.008,0.008],"fH":[0.128,0.128,0.128],"lH":[0.096,0.096,0.096],"handHH":[0.123,0.123,0.123],"handFH":[0.056,0.056,0.056],"backH":[0.01,0.01,0.01],"upH":[0.002,0.002,0.002],"windup":[156,156,156],"flight":[90,90,90]},"medium":{"n":1,"hH":[1.125,1.125,1.125],"fH":[-0.291,-0.291,-0.291],"lH":[0.058,0.058,0.058],"handHH":[0.877,0.877,0.877],"handFH":[-0.126,-0.126,-0.126],"backH":[0.003,0.003,0.003],"upH":[0.027,0.027,0.027],"windup":[25,25,25],"flight":[170,170,170]},"large":{"n":1,"hH":[0.022,0.022,0.022],"fH":[0.323,0.323,0.323],"lH":[0.276,0.276,0.276],"handHH":[0.102,0.102,0.102],"handFH":[0.135,0.135,0.135],"backH":[0.002,0.002,0.002],"upH":[0.001,0.001,0.001],"windup":[29,29,29],"flight":[91,91,91]},"giant":{"n":2,"hH":[0.971,0.971,0.971],"fH":[-0.057,-0.057,-0.057],"lH":[0.093,0.093,0.093],"handHH":[0.897,0.897,0.897],"handFH":[-0.024,-0.024,-0.024],"backH":[0,0,0],"upH":[0,0,0],"windup":[33,33,33],"flight":[134,150,166]}},"prop":{"small":{"n":1,"hH":[0.524,0.524,0.524],"fH":[0.86,0.86,0.86],"lH":[0.228,0.228,0.228],"handHH":[0.658,0.658,0.658],"handFH":[0.39,0.39,0.39],"backH":[1.02,1.02,1.02],"upH":[1.665,1.665,1.665],"windup":[188,188,188],"flight":[90,90,90]},"medium":{"n":14,"hH":[0.314,0.416,0.542],"fH":[0.165,0.404,0.559],"lH":[0.185,0.257,0.543],"handHH":[0.487,0.544,0.772],"handFH":[0.079,0.237,0.432],"backH":[0.002,0.067,0.22],"upH":[0,0.015,0.447],"windup":[18,42,158],"flight":[76,130,170]},"large":{"n":3,"hH":[0.347,0.347,0.401],"fH":[-0.107,0.2,0.2],"lH":[0.272,0.272,0.378],"handHH":[0.637,0.637,0.644],"handFH":[-0.032,0.08,0.08],"backH":[0.019,0.096,0.096],"upH":[0.046,0.111,0.111],"windup":[88,88,88],"flight":[98,110,130]},"giant":{"n":2,"hH":[1.735,1.735,1.735],"fH":[-0.344,-0.344,-0.344],"lH":[0.684,0.684,0.684],"handHH":[0.891,0.891,0.891],"handFH":[-0.011,-0.011,-0.011],"backH":[0.035,0.035,0.035],"upH":[0.031,0.031,0.031],"windup":[52,52,52],"flight":[134,150,166]}},"mouth":{"small":{"n":3,"hH":[0.532,0.564,0.745],"fH":[-0.037,0.131,0.3],"lH":[0.013,0.062,0.107],"backH":[0.021,0.103,0.561],"upH":[0.163,0.358,0.53],"windup":[75,155,164],"flight":[77,105,109]},"medium":{"n":24,"hH":[0.477,0.842,0.933],"fH":[-0.031,0.132,0.631],"lH":[0,0.018,0.097],"backH":[0,0.021,0.287],"upH":[0,0.116,0.236],"windup":[25,41,118],"flight":[80,120,164]},"large":{"n":30,"hH":[0.636,0.737,0.844],"fH":[0.08,0.386,0.601],"lH":[0,0.001,0.031],"backH":[0,0.109,0.66],"upH":[0,0.159,0.349],"windup":[43,93,142],"flight":[79,104,161]},"giant":{"n":9,"hH":[0.255,0.714,0.893],"fH":[0.085,0.388,0.728],"lH":[0,0.015,0.073],"backH":[0.02,0.317,0.958],"upH":[0.111,0.652,1.209],"windup":[80,97,186],"flight":[70,130,219]}},"body":{"tiny":{"n":1,"hH":[0.713,0.713,0.713],"fH":[0.265,0.265,0.265],"lH":[0,0,0],"backH":[0.052,0.052,0.052],"upH":[0.05,0.05,0.05],"windup":[20,20,20],"flight":[86,86,86]},"small":{"n":2,"hH":[0.507,0.507,0.507],"fH":[0.382,0.382,0.382],"lH":[0,0,0],"backH":[0,0,0],"upH":[0.037,0.037,0.037],"windup":[28,28,28],"flight":[124,140,156]},"medium":{"n":8,"hH":[0.311,0.468,0.513],"fH":[-0.25,0.049,0.053],"lH":[0,0.019,0.253],"backH":[0.019,0.044,0.102],"upH":[0.013,0.026,0.169],"windup":[21,45,117],"flight":[124,153,213]},"large":{"n":14,"hH":[0.44,0.604,0.718],"fH":[-0.184,0.113,0.196],"lH":[0,0.006,0.041],"backH":[0,0.024,0.194],"upH":[0.002,0.067,0.169],"windup":[19,88,188],"flight":[94,115,166]},"giant":{"n":5,"hH":[0.315,0.347,0.521],"fH":[-0.085,0.117,0.25],"lH":[0,0,0.084],"backH":[0.002,0.015,0.048],"upH":[0.001,0.015,0.06],"windup":[38,83,217],"flight":[70,86,139]}}};
 
 /**
  * How the raw offsets grow with the body (log-log OLS over the corpus):
@@ -241,7 +299,7 @@ export const MOTION_SCALING_ARM = {
 };
 
 const VALID_CLASSES = new Set(MOTION_CLASSES);
-const CELL_ORDER = ["hH","fH","lH","handHH","handFH","backH","upH","windup","flight"];
+const CELL_ORDER: CellKey[] = ["hH","fH","lH","handHH","handFH","backH","upH","windup","flight"];
 
 /**
  * A requested quantile as the record's own key: 0.1 -> "p10", 0.5 -> "p50", 0.9 -> "p90"; anything else is
@@ -252,8 +310,8 @@ const CELL_ORDER = ["hH","fH","lH","handHH","handFH","backH","upH","windup","fli
 const quantKey = (quantile: number) => { const p = Math.round(Number(quantile) * 100); return p === 10 ? "p10" : p === 90 ? "p90" : "p50"; };
 
 /** A compact class x size cell ([p10,p50,p90] triples) as the same {p10,p50,p90} records. */
-function fullCell(cell) {
-  const o = { n: cell.n };
+function fullCell(cell: SizeCell) {
+  const o: FullCell = { n: cell.n };
   for (const k of CELL_ORDER) if (Array.isArray(cell[k])) o[k] = { p10: cell[k][0], p50: cell[k][1], p90: cell[k][2] };
   return o;
 }
@@ -263,7 +321,7 @@ function fullCell(cell) {
  * least `minCell` casts, MERGED over the class record (the cell wins where it has a measure), else the
  * class record alone. Returns null for an unknown class.
  */
-export function motionFor(emitterClass: string, sizeClass = null, { minCell = 4 } = {}) {
+export function motionFor(emitterClass: string, sizeClass: SizeClassName | null = null, { minCell = 4 } = {}) {
   if (!VALID_CLASSES.has(emitterClass)) return null;
   // An EYE emitter has no spell cast of its own in the corpus (2 throws only): it is a head-front
   // emitter, so the mouth record is its data. Resolve it here so a solver never gets null for a class
@@ -282,12 +340,12 @@ export function motionFor(emitterClass: string, sizeClass = null, { minCell = 4 
  *   y = floor - height; +z forward).
  * Fractions are the class medians (p50); pass `quantile` 0.1 / 0.9 to stay inside the disc's spread.
  */
-export function releasePoint({ emitterClass, sizeClass = null, bodyHeight, quantile = 0.5 }): ReleasePointResult | null {
+export function releasePoint({ emitterClass, sizeClass = null, bodyHeight, quantile = 0.5 }: HandPointOptions): ReleasePointResult | null {
   const m = motionFor(emitterClass, sizeClass);
   const H = Number(bodyHeight);
   if (!m || !(H > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a: Quantiles | undefined, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   return {
     height: pick(m.hH, 0) * H, forward: pick(m.fH, 0) * H, lateral: pick(m.lH, 0) * H,
     source: m.source, quantile: q, unit: "body",
@@ -305,7 +363,7 @@ export function handPoint({ emitterClass, sizeClass = null, bodyHeight, quantile
   if (!m || !(H > 0)) return null;
   if (m.handHH == null) return { ...releasePoint({ emitterClass, sizeClass, bodyHeight, quantile }), source: (m.source ?? "class") + ":emitter" };
   const q = quantKey(quantile);
-  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a: Quantiles | undefined, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   return {
     height: pick(m.handHH, 0) * H, forward: pick(m.handFH, 0) * H, lateral: pick(m.handLH, 0) * H,
     source: m.source, quantile: q, unit: "body",
@@ -317,12 +375,12 @@ export function handPoint({ emitterClass, sizeClass = null, bodyHeight, quantile
  * about the limb's own shape (a hand 0.9 arm lengths forward and 0.3 up is a raised, extended arm).
  * Null for a class with no arm measure.
  */
-export function armShape({ emitterClass, sizeClass = null, armLength, quantile = 0.5, hand = false }) {
+export function armShape({ emitterClass, sizeClass = null, armLength, quantile = 0.5, hand = false }: ArmShapeOptions) {
   const m = motionFor(emitterClass, sizeClass);
   const L = Number(armLength);
   if (!m || !(L > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a: Quantiles | undefined, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   const Hk = hand ? "handHL" : "hL", Fk = hand ? "handFL" : "fL";
   if (m[Hk] == null || m[Fk] == null) return null;
   return { above: pick(m[Hk], 0) * L, forward: pick(m[Fk], 0) * L, source: m.source, quantile: q };
@@ -332,12 +390,12 @@ export function armShape({ emitterClass, sizeClass = null, armLength, quantile =
  * The wind-up excursion and the phase timing a solver should use for a class:
  *   { back, up, travel } in model units, { windup, flight, follow } in ticks.
  */
-export function windupFor({ emitterClass, sizeClass = null, bodyHeight, quantile = 0.5 }) {
+export function windupFor({ emitterClass, sizeClass = null, bodyHeight, quantile = 0.5 }: HandPointOptions) {
   const m = motionFor(emitterClass, sizeClass);
   const H = Number(bodyHeight);
   if (!m || !(H > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, f: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : f);
+  const pick = (a: Quantiles | undefined, f: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : f);
   return {
     back: pick(m.backH, 0) * H, up: pick(m.upH, 0) * H, travel: pick(m.travelH, 0) * H,
     speed: pick(m.speedH, 0) * H,

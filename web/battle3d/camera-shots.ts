@@ -73,7 +73,7 @@ export function attackLateralFraction(moveZ: number | undefined, reach: number) 
  * its high nibble selects the side (claim terra-037-speaker16-enemy-side-20260906).
  * Accepts the numeric id or the "player"/"enemy" side name.
  */
-export function faceCamSideFor(speaker: string) {
+export function faceCamSideFor(speaker: string | number) {
   const id = typeof speaker === "number" ? speaker : (speaker === "enemy" ? 0x10 : 0);
   return (id & 0x10) ? "enemy" : "player";
 }

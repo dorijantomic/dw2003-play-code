@@ -1,11 +1,24 @@
-import type { K16Rig, RigBasicsModel, RigSampleOut } from "./types.js";
+import type { K16Rig, RigBasicsModel, RigSampleOut, RigChain, RigProp } from "./types.js";
+import type { FightChanRow, FightTimelineRow, FightVec3 } from "../types.js";
+
+/** A rest pose: every bone's world rotation (9 numbers, column-major) and position. */
+interface RestPoseOut { rot: number[][]; pos: FightVec3[]; }
+
+/** A mesh part's world box, its extent per axis. */
+interface MeshBoxOut { mn: number[]; mx: number[]; d: number[]; }
+
+/** One chain the rig walk found: the root it hangs off, its first bone, its bones and its tip. */
+interface WalkedChain { root: number; from: number; seq: number[]; tip: number; limbRoot: boolean; }
+
+/** A terminal prop bone the rig walk found. */
+interface WalkedProp { bone: number; side: string; len: number | undefined; x: number | undefined; }
 interface ReachChain { from: number; tip: number; limbRoot: boolean; root?: number; seq?: number[]; }
 
 export const TAU = (Math.PI * 2) / 4096;
 
-export function sample(ch, frame: number) {
+export function sample(ch: FightChanRow[] | undefined, frame: number): FightVec3 {
   if (!ch || !ch.length) return [0, 0, 0];
-  let lo = ch[0], hi = ch[0];
+  let lo = ch[0]!, hi = ch[0]!;
   for (const rec of ch) {
     if (rec[3] === 30000) break;
     if (rec[3] <= frame) lo = rec; else { hi = rec; break; }
@@ -18,7 +31,7 @@ export function sample(ch, frame: number) {
 function mat3Mul(a: number[], b: number[]): number[] {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k]!;
     o[c * 3 + r] = s;
   }
   return o;
@@ -37,46 +50,46 @@ function ps1Mat3(ax: number, ay: number, az: number) {
 function compose(a: number[], b: number[]) {
   const o = new Array(9).fill(0);
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j]! * b[i * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j]! * b[i * 3 + k]!;
     o[i * 3 + j] = s;
   }
   return o;
 }
 
-function applyRot(R: number[], v) {
-  return [R[0]! * v[0] + R[3]! * v[1] + R[6]! * v[2],
-          R[1]! * v[0] + R[4]! * v[1] + R[7]! * v[2],
-          R[2]! * v[0] + R[5]! * v[1] + R[8]! * v[2]];
+function applyRot(R: number[], v: FightVec3): FightVec3 {
+  return [R[0]! * v[0]! + R[3]! * v[1]! + R[6]! * v[2]!,
+          R[1]! * v[0]! + R[4]! * v[1]! + R[7]! * v[2]!,
+          R[2]! * v[0]! + R[5]! * v[1]! + R[8]! * v[2]!];
 }
 
 /** Rest-pose world position/rotation per bone (the renderer's own formula, battle3d.js buildBoneWorldMatrices). */
-export function restPose(model, frame = 0) {
+export function restPose(model: RigBasicsModel, frame = 0): RestPoseOut {
   const n = model.num_bones ?? model.bones.length;
-  const rot = new Array(n).fill(null), pos = new Array(n).fill(null);
+  const rot: number[][] = new Array(n).fill(null), pos: FightVec3[] = new Array(n).fill(null);
   const proc = (i: number) => {
-    const b = model.bones[i], anim = b.anim || {};
+    const b = model.bones[i]!, anim = b.anim || {};
     const c2 = sample(anim.ch2, frame), c1 = sample(anim.ch1, frame);
-    const R = ps1Mat3(c2[2], c2[1], c2[0]);
+    const R = ps1Mat3(c2[2]!, c2[1]!, c2[0]!);
     const p = (b.parent_slot ?? 0) - 1;
-    if (p < 0) { rot[i] = R; pos[i] = [-c1[0], c1[1], -c1[2]]; return; }
+    if (p < 0) { rot[i] = R; pos[i] = [-c1[0]!, c1[1]!, -c1[2]!]; return; }
     if (!rot[p]) proc(p);
-    rot[i] = compose(rot[p], R);
-    const rt = applyRot(rot[p], c1);
-    pos[i] = [pos[p][0] - rt[0]!, pos[p][1] + rt[1], pos[p][2] - rt[2]!];
+    rot[i] = compose(rot[p]!, R);
+    const rt = applyRot(rot[p]!, c1);
+    pos[i] = [pos[p]![0]! - rt[0]!, pos[p]![1]! + rt[1]!, pos[p]![2]! - rt[2]!];
   };
   for (let i = 0; i < n; i++) if (!rot[i]) proc(i);
   return { rot, pos };
 }
 
-function meshBox(model: RigBasicsModel, i: number, pose) {
-  const b = model.bones[i], vs = b.verts || [];
+function meshBox(model: RigBasicsModel, i: number, pose: RestPoseOut): MeshBoxOut | null {
+  const b = model.bones[i]!, vs = b.verts || [];
   if (!vs.length) return null;
-  const R = pose.rot[i], t = pose.pos[i];
+  const R = pose.rot[i]!, t = pose.pos[i]!;
   const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
   for (const v of vs) {
-    const x = -(R[0] * v[0] + R[3] * v[1] + R[6] * v[2]) + t[0];
-    const y =  (R[1] * v[0] + R[4] * v[1] + R[7] * v[2]) + t[1];
-    const z = -(R[2] * v[0] + R[5] * v[1] + R[8] * v[2]) + t[2];
+    const x = -(R[0]! * v[0] + R[3]! * v[1] + R[6]! * v[2]) + t[0]!;
+    const y =  (R[1]! * v[0] + R[4]! * v[1] + R[7]! * v[2]) + t[1]!;
+    const z = -(R[2]! * v[0] + R[5]! * v[1] + R[8]! * v[2]) + t[2]!;
     if (x < mn[0]!) mn[0] = x; if (x > mx[0]!) mx[0] = x;
     if (y < mn[1]!) mn[1] = y; if (y > mx[1]!) mx[1] = y;
     if (z < mn[2]!) mn[2] = z; if (z > mx[2]!) mx[2] = z;
@@ -94,14 +107,14 @@ function meshBox(model: RigBasicsModel, i: number, pose) {
  * that begins a chain of two or more bones is read as a LIMB root: its chain's side and reach come from the
  * chain's TIP instead of its start (the start is the body's centre line by construction).
  */
-export function rolesOf(model, { limbRoots = false } = {}) {
+export function rolesOf(model: RigBasicsModel, { limbRoots = false } = {}) {
   const n = model.num_bones ?? model.bones.length;
   const pose = restPose(model);
-  const kids = new Map();
+  const kids = new Map<number, number[]>();
   for (let i = 0; i < n; i++) {
-    const p = (model.bones[i].parent_slot ?? 0) - 1;
+    const p = (model.bones[i]!.parent_slot ?? 0) - 1;
     if (!kids.has(p)) kids.set(p, []);
-    kids.get(p).push(i);
+    kids.get(p)!.push(i);
   }
   const roots = kids.get(-1) ?? [0];
   const box = (() => {
@@ -109,54 +122,54 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     for (let i = 0; i < n; i++) {
       const bb = meshBox(model, i, pose);
       if (!bb) continue;
-      for (let k = 0; k < 3; k++) { if (bb.mn[k]! < mn[k]!) mn[k] = bb.mn[k]; if (bb.mx[k]! > mx[k]!) mx[k] = bb.mx[k]; }
+      for (let k = 0; k < 3; k++) { if (bb.mn[k]! < mn[k]!) mn[k] = bb.mn[k]!; if (bb.mx[k]! > mx[k]!) mx[k] = bb.mx[k]!; }
     }
     return { mn, mx, h: mx[1]! - mn[1]!, w: mx[0]! - mn[0]!, d: mx[2]! - mn[2]! };
   })();
   // every root-child chain, walked to its tip (a bone with != 1 child ends the chain); a branch continues
   // down the child that carries the longest subtree, so an arm's shoulder->hand path is one chain
-  const depthOf = (i, seen = 0) => {
+  const depthOf = (i: number, seen = 0): number => {
     const ks = kids.get(i) ?? [];
     if (!ks.length || seen > 12) return 1;
     return 1 + Math.max(...ks.map((k) => depthOf(k, seen + 1)));
   };
-  const chains = [];
+  const chains: WalkedChain[] = [];
   for (const r of roots) {
     for (const c of kids.get(r) ?? []) {
-      const seq = []; let cur = c;
+      const seq: number[] = []; let cur = c;
       for (;;) {
         seq.push(cur);
         const ks = kids.get(cur) ?? [];
         if (ks.length !== 1) {
           if (ks.length > 1) {
-            const next = ks.slice().sort((a, b) => depthOf(b) - depthOf(a))[0];
+            const next = ks.slice().sort((a, b) => depthOf(b) - depthOf(a))[0]!;
             if (depthOf(next) > 1) { cur = next; if (seq.length < 14) continue; }
           }
           break;
         }
-        cur = ks[0];
+        cur = ks[0]!;
         if (seq.length > 14) break;
       }
-      chains.push({ root: r, from: c, seq, tip: seq[seq.length - 1],
+      chains.push({ root: r, from: c, seq, tip: seq[seq.length - 1]!,
                     limbRoot: limbRoots && (kids.get(r) ?? []).length === 1 && seq.length >= 2 });
     }
   }
   const H = box.h || 1, W = box.w || 1;
-  const tipY = (ch: ReachChain): number => pose.pos[ch.tip][1];
+  const tipY = (ch: ReachChain): number => pose.pos[ch.tip]![1]!;
   const maxY = Math.max(...chains.map(tipY));
   const topY = Math.min(...pose.pos.map((p) => p[1]));
   // a limb-rooted chain starts on the body's centre line, so its side/reach are the TIP's
-  const sideX = (ch: ReachChain) => (ch.limbRoot ? pose.pos[ch.tip][0] : pose.pos[ch.from][0]);
+  const sideX = (ch: ReachChain) => (ch.limbRoot ? pose.pos[ch.tip]![0] : pose.pos[ch.from]![0]);
   const reachX = (ch: ReachChain) => Math.abs(sideX(ch));
   const feet = chains.filter((ch) => tipY(ch) > maxY - 0.12 * H
-    && (ch.limbRoot ? reachX(ch) > 0.03 * W : Math.abs(pose.pos[ch.from][0]) > 0.03 * W));
+    && (ch.limbRoot ? reachX(ch) > 0.03 * W : Math.abs(pose.pos[ch.from]![0]!) > 0.03 * W));
   const legs = feet.map((ch) => ({ side: sideX(ch) < 0 ? "left" : "right", chain: ch.seq }));
   // arms: chains that start in the upper half and reach out to one side, longest first
   const armsAll = chains
     .filter((ch) => !feet.includes(ch) && reachX(ch) > 0.10 * W
-                    && pose.pos[ch.from][1] < topY + 0.55 * H && ch.seq.length >= 2)
+                    && pose.pos[ch.from]![1]! < topY + 0.55 * H && ch.seq.length >= 2)
     .sort((a, b) => b.seq.length - a.seq.length);
-  const arms = [];
+  const arms: RigChain[] = [];
   for (const ch of armsAll) {
     const side = sideX(ch) < 0 ? "left" : "right";
     if (!arms.some((a) => a.side === side)) arms.push({ side, chain: ch.seq });
@@ -164,8 +177,8 @@ export function rolesOf(model, { limbRoots = false } = {}) {
   // head: the top-most bone near the centre line with a small mesh, not a segment of the trailing cape chain
   const capeSeq = (() => {
     const cand = chains
-      .filter((ch) => Math.abs(pose.pos[ch.from][0]) <= 0.10 * W && ch.seq.length >= 3
-                      && pose.pos[ch.tip][2] < -0.15 * (box.d || 1))
+      .filter((ch) => Math.abs(pose.pos[ch.from]![0]!) <= 0.10 * W && ch.seq.length >= 3
+                      && pose.pos[ch.tip]![2]! < -0.15 * (box.d || 1))
       .sort((a, b) => b.seq.length - a.seq.length)[0];
     return cand ? cand.seq : null;
   })();
@@ -177,12 +190,12 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     const bb = meshBox(model, i, pose);
     if (!bb) continue;
     // a head is compact, near the centre line, and much smaller than the torso box
-    if (Math.abs(pose.pos[i][0]) > 0.15 * W) continue;
+    if (Math.abs(pose.pos[i]![0]!) > 0.15 * W) continue;
     if (bb.d[0]! > 0.30 * W || bb.d[1]! > 0.35 * H) continue;
-    if (pose.pos[i][1] < bestY) { bestY = pose.pos[i][1]; head = i; }
+    if (pose.pos[i]![1]! < bestY) { bestY = pose.pos[i]![1]; head = i; }
   }
   // props: a terminal bone whose mesh is much longer than it is wide (a blade/lance) on either side
-  const props = [];
+  const props: WalkedProp[] = [];
   for (let i = 0; i < n; i++) {
     const ks = kids.get(i) ?? [];
     if (ks.length) continue;
@@ -190,8 +203,8 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     if (!bb) continue;
     const s = [...bb.d].sort((a, b) => b - a);
     if (s[0]! >= 0.45 * H && s[0]! >= 2.2 * Math.max(s[1]!, 1)) {
-      props.push({ bone: i, side: pose.pos[i][0] < 0 ? "left" : (pose.pos[i][0] > 0 ? "right" : "center"),
-                   len: s[0], x: pose.pos[i][0] });
+      props.push({ bone: i, side: pose.pos[i]![0]! < 0 ? "left" : (pose.pos[i]![0]! > 0 ? "right" : "center"),
+                   len: s[0], x: pose.pos[i]![0] });
     }
   }
   const cape = capeSeq;
@@ -211,7 +224,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
  * (5..10 roots) has no single leg root and keeps whatever root it names. Nothing here is species-specific:
  * the inputs are the rig's own chains.
  */
-export function normaliseRoots(rig: K16Rig, model) {
+export function normaliseRoots(rig: K16Rig, model: RigBasicsModel) {
   const n = rig.n ?? model.num_bones ?? model.bones.length;
   const parentOf = (i: number) => { const p = (model.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
   let roots = (rig.roots ?? []).filter((i) => i >= 0 && i < n).slice();
@@ -229,21 +242,21 @@ export function normaliseRoots(rig: K16Rig, model) {
   ];
   const legsUnder = roots.filter((r) => legStarts.length > 0 && legStarts.every((b) => under(b, r)));
   const upperUnder = roots.filter((r) => upper.length > 0 && upper.some((b) => under(b, r)));
-  const storedRoot = rig.root != null && rig.root >= 0 ? rig.root : roots[0];
+  const storedRoot = rig.root != null && rig.root >= 0 ? rig.root : roots[0]!;
   let root = storedRoot;
-  if (legsUnder.length === 1) root = legsUnder[0];
+  if (legsUnder.length === 1) root = legsUnder[0]!;
   else if (legsUnder.length > 1 && legsUnder.includes(storedRoot!)) root = storedRoot;
   // the second root: when another root carries the upper body, that root IS the torso (a stored torso may
   // be a chest bone inside the same tree; the upper ROOT is what has to take the donor's torso motion).
   const otherUpper = upperUnder.filter((r) => r !== root);
   const storedTorso = rig.torso != null && rig.torso >= 0 ? rig.torso : null;
   let torso = storedTorso === root ? null : storedTorso;
-  if (otherUpper.length) torso = otherUpper[0];
+  if (otherUpper.length) torso = otherUpper[0]!;
   return { roots, root, torso, rootRaw: storedRoot, torsoRaw: storedTorso, legRoots: legsUnder, upperRoot: otherUpper[0] ?? null };
 }
 
 /** target bone index -> source bone index (-1 = keep the target's own rest rotation). */
-export function buildBoneMap(target, source) {
+export function buildBoneMap(target: RigBasicsModel, source: RigBasicsModel) {
   const T = rolesOf(target), S = rolesOf(source);
   const map = new Array(T.n).fill(-1);
   map[0] = 0;                                   // root: body lean / turn comes straight across
@@ -254,12 +267,12 @@ export function buildBoneMap(target, source) {
   // donor's does with one bend instead of two.
   const chainMap = (tc: number[], sc: number[]) => {
     const m = tc.length, n = sc.length;
-    const taken = new Set();
+    const taken = new Set<number>();
     for (let i = 0; i < m; i++) {
       const j = m === 1 ? n - 1 : Math.round((i * (n - 1)) / (m - 1));
       if (taken.has(j)) continue;
       taken.add(j);
-      map[tc[i]] = sc[j];
+      map[tc[i]!] = sc[j];
     }
   };
   for (const side of ["left", "right"]) {
@@ -297,9 +310,9 @@ export function buildBoneMap(target, source) {
  * the rest of the cast, and a mesh the idle keeps scaled to 0 (Boltmon's thrown second axe) popped
  * back at full size. That is the operator's "reset to a flat pose" + "a second axe" report.
  */
-export function shiftPlaylistEntry(e, offset: number) {
+export function shiftPlaylistEntry(e: FightTimelineRow, offset: number) {
   const v = e.value | 0;
-  const out = { ...e } as RigSampleOut;
+  const out: FightTimelineRow = { ...e };
   const loopIndex = v === 0x8000;                 // a playhead index, not a frame
   if (v === 0xffff) out.value = v;                // end marker
   else if (v & 0x8000) out.value = 0x8000 | (v & 0x7fff);
@@ -316,7 +329,7 @@ export function shiftPlaylistEntry(e, offset: number) {
  * shifted the same way, so playing `table` on the clone reproduces the donor's timing on the target's body.
  * Returns null when the bone map covers too little of the target to be a real pose.
  */
-export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {}) {
+export function bakeRetargetGeometry(target: RigBasicsModel, source: RigBasicsModel, clip: number, { offset = 6000 } = {}) {
   const src = source.actions?.[clip];
   if (!src || !src.ops?.length) return null;
   const { map, T, S } = buildBoneMap(target, source);
@@ -324,15 +337,16 @@ export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {
   if (covered < 0.45) return null;
   const tableIdx = [];
   for (const o of src.ops) {
-    if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tableIdx.push(o.words[2] | 0);
+    if (o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1) tableIdx.push(o.words[2]! | 0);
   }
-  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2] | 0;
+  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2]! | 0;
   if (!table) return null;
   const srcTable = source.timeline?.[table]?.table;
   if (!Array.isArray(srcTable) || !srcTable.length) return null;
+  // ETS item 9: slice() of a key row is a key row (TS types a tuple's slice as number[])
   const model = {
     ...target,
-    bones: target.bones.map((b, i: string | number) => {
+    bones: target.bones.map((b, i: number) => {
       const m = map[i];
       const srcBone = m >= 0 ? source.bones[m] : null;
       const ch2 = srcBone?.anim?.ch2;
@@ -344,7 +358,7 @@ export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {
         if (r[3] === 30000) continue;
         moved.push([r[0], r[1], r[2], r[3] + offset]);
       }
-      moved.sort((a, b) => a[3] - b[3]);
+      moved.sort((a, b) => a[3]! - b[3]!);
       const last = moved[moved.length - 1];
       const merged = [...own, ...moved, [last ? last[0] : 0, last ? last[1] : 0, last ? last[2] : 0, 30000]];
       return { ...b, anim: { ...(b.anim || {}), ch2: merged } };

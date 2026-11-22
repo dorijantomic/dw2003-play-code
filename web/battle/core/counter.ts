@@ -15,7 +15,8 @@ import { noteHit } from "../hit-results.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
 import type { BattleContext } from "../../types/battle.js";
 
-import type { BattleState } from "../../types/battle.js";
+import type { BattleState, BattleRecord, PlayerRecord, EnemyBattleRecord } from "../../types/battle.js";
+import type { QueuedCounter } from "./types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeCounter(B: BattleContext) {
 /**
@@ -66,7 +67,7 @@ export function makeCounter(B: BattleContext) {
    * and the intermediates are capped so the victim is still standing for the strike
    * that carries the death reaction.
    */
-  function armContactDamage(target: { hp: number; }, total, dmgPerHit, attempts) {
+  function armContactDamage(target: { hp: number; }, total: number, dmgPerHit: number, attempts: number) {
     return contactDamager({
       total, perHit: dmgPerHit, hits: attempts, hp: target.hp,
       pay: (amount: number) => { target.hp = Math.max(0, target.hp - amount); },
@@ -79,10 +80,10 @@ export function makeCounter(B: BattleContext) {
    * the swing is queued: when the provoking action's animation is over the defender plays its own basic attack
    * toward the attacker, and the HP comes off at that attack's contact. `from` is the countering side.
    */
-  function queueCounter(b: BattleState, from: string, { dmg, hit = true, techId }) {
+  function queueCounter(b: BattleState, from: string, { dmg, hit = true, techId }: { dmg: number; hit?: boolean; techId: number | null | undefined; }) {
     b._counter = { from, dmg: Math.max(0, dmg | 0), hit, techId, phase: "wait", applied: false };
   }
-function applyCounter(b: BattleState, c) {
+function applyCounter(b: BattleState, c: QueuedCounter) {
     if (c.applied) return;
     c.applied = true;
     if (!c.hit) return;
@@ -204,7 +205,7 @@ function applyCounter(b: BattleState, c) {
   }
 // Our Digimon swings back (Counter Crest). The outcome is decided here, so the page can name it; the
   // swing itself is queued and plays after the enemy's blow (queueCounter), where the damage lands at its contact.
-  function triggerPlayerCounter(b: BattleState, attacker, defender, damage: number, attackerName: string, defenderName: string) {
+  function triggerPlayerCounter(b: BattleState, attacker: BattleRecord, defender: PlayerRecord, damage: number, attackerName: string, defenderName: string) {
     if (!defender.counterCrest || defender.hp <= 0 || damage <= 0 ||
         !counterCrestProc(damage, defender.maxHp, RAND_U16)) return "";
     const basic = B.skillDB[defender.profile?.tech_basic];
@@ -241,7 +242,7 @@ function applyCounter(b: BattleState, c) {
    * no row and never counters — never the 0x58-byte player profile's bytes at +0x42..+0x44,
    * which are growth fields (`phase2-rtarget.md` 2.2).
    */
-  function triggerEnemyCounterRow(b: BattleState, attacker: { hp: number; }, defender, damage: number, attackerName: string, defenderName: string) {
+  function triggerEnemyCounterRow(b: BattleState, attacker: { hp: number; }, defender: EnemyBattleRecord, damage: number, attackerName: string, defenderName: string) {
     if (damage <= 0 || defender.hp <= 0) return "";
     // Gate 2 (fightstg.s:12433-12440, .L0x8008ef14-.L0x8008ef40): a Frozen defender whose Frozen roll
     // F0x800a19d8 returns non-zero starts no reaction. Gate 4: comparator 0 means NO counter, never "always".

@@ -29,13 +29,24 @@ import { fetchBytes } from "./resident-data.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import type { BattleHudPipsOptions, RecordMemory } from "./types/battlehud-translated.js";
 
-import type { BattleState } from "./types/battle.js";
+import type { BattleState, BattleRecord, EngineUi } from "./types/battle.js";
+import type { Ailment } from "../engine/dw3/battle-combat.js";
+import type { BattleHudDvFrame, BattleHudHost } from "../engine/dw3/ui/native/battle-hud.js";
 interface BattleHudPartyMember {
     hp: number;
     maxHp: number;
-    ailments: Record<string, number>;
-    statusBits: number;
+    ailments: Record<string, Ailment>;
+    statusBits: number | undefined;
 }
+
+/** The two engine routines this read-out calls with a partial host (only the hooks it needs). */
+interface BattleHudLooseUi {
+    battleHudDrawPartyPips(mem: RecordMemory, host: Partial<BattleHudHost>): BattleHudPip[];
+    battleHudDvGauge(mem: RecordMemory, host: Partial<BattleHudHost>): DvGaugeFrame;
+}
+
+/** What the DV gauge routine returns once battleHudDvFrame has laid the painter's pieces on it. */
+type DvGaugeFrame = BattleHudDvFrame & DvPaintFrame & { baseCel?: number };
 
 interface BattleHudPip {
     side: number;
@@ -87,7 +98,9 @@ const {
   battleHudBuildSeparator, battleHudDrawPartyPips, battleHudDvGauge,
   battleHudDvLeftEdge, battleHudGradientRgb, battleHudHpBarLength, battleHudHpBarRamp,
   battleHudHpGradient,
-} = ui;
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+// The read-out hosts below are deliberately partial, and the DV frame is completed with the painter's pieces by battleHudDvFrame, so those two are typed to match.
+} = ui as Omit<EngineUi, "battleHudDrawPartyPips" | "battleHudDvGauge"> & BattleHudLooseUi;
 
 /** The Digimon-name bank, family 0x4e (the pause/pause/report manifests call it that). */
 export const BATTLE_HUD_NAME_BANK = 0x4e;
@@ -95,7 +108,7 @@ export const BATTLE_HUD_NAME_BANK = 0x4e;
 /** The fill cels are 40x8 in the chrome pack (ids 51-58), so the fill cannot exceed it. */
 const BATTLE_HUD_DV_FILL_W = 40;
 
-function rgbHex([r, g, b]) {
+function rgbHex([r, g, b]: readonly [number, number, number]) {
     return `#${[r, g, b].map((v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, "0")).join("")}`;
 }
 
@@ -109,7 +122,7 @@ function recordStore() {
         read8(addr: number) { return (mem.read16(addr) & 0xff) | 0; },
         read16(addr: number) { return half.get(addr & ~1) | 0; },
         read32(addr: number) { return (mem.read16(addr) | (mem.read16(addr + 2) << 16)) | 0; },
-        write16(addr, value: number) { half.set(addr & ~1, value & 0xffff); },
+        write16(addr: number, value: number) { half.set(addr & ~1, value & 0xffff); },
         write32(addr: number, value: number) { mem.write16(addr, value & 0xffff); mem.write16(addr + 2, (value >>> 16) & 0xffff); },
     };
     return mem;
@@ -119,7 +132,7 @@ function recordStore() {
 // `lbu $v0, 0x1c($s1)` / `bnez $v0` / `li $a1, 0x3`, fightstg.fns.s:17473-17476), which
 // is the same byte the command rows use, so this builds it with battleAilmentByte.
 
-function writeRecord(mem: RecordMemory, sideIndex: number, slot, member) {
+function writeRecord(mem: RecordMemory, sideIndex: number, slot: number, member: BattleHudPartyMember | null | undefined) {
     if (!member) return;
     const rec = BATTLE_HUD_RECORDS + sideIndex * BATTLE_HUD_SIDE_STRIDE + slot * 0x20;
     mem.write16(rec + 0x00, 1);
@@ -132,7 +145,7 @@ function writeRecord(mem: RecordMemory, sideIndex: number, slot, member) {
  * Run the ported marker loop and return the markers the original would have drawn:
  * `{side, index, cel, x, y}` per member, in the original's order.
  */
-export function battleHudPartyPips(players, enemies: (BattleHudPartyMember | null)[], options: BattleHudPipsOptions = {}): BattleHudPip[] {
+export function battleHudPartyPips(players: (BattleHudPartyMember | null)[], enemies: (BattleHudPartyMember | null)[], options: BattleHudPipsOptions = {}): BattleHudPip[] {
     const mem = recordStore() as RecordMemory;
     mem.write8 = (addr, value) => mem.write16(addr, value & 0xffff);
     players.forEach((m, i) => writeRecord(mem, 0, i, m));
@@ -176,8 +189,8 @@ export function battleHudPlayerRecords(b: BattleState) {
  * is drawn). With `team` (an array of up to three slot records, in slot order, null for
  * an empty slot) every present member is returned, a knocked-out one with hp 0.
  */
-export function battleHudEnemyRecords(b: BattleState, team = null) {
-    const rec = (e) => (e ? { hp: Number(e.hp ?? 0), maxHp: Number(e.maxHp ?? 0),
+export function battleHudEnemyRecords(b: BattleState, team: (BattleRecord | null)[] | null = null) {
+    const rec = (e: BattleRecord | null | undefined) => (e ? { hp: Number(e.hp ?? 0), maxHp: Number(e.maxHp ?? 0),
         ailments: e.ailments, statusBits: e.statusBits } : null);
     if (Array.isArray(team) && team.length > 0) return [0, 1, 2].map((i) => rec(team[i]));
     return [rec(b.enemy), null, null];
@@ -362,7 +375,7 @@ export function battleHudNameBank(language = 2) {
         .then((bytes) => {
             const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
             const count = view.getUint32(0, true);
-            const lines = new Array(count);
+            const lines: string[] = new Array(count);
             for (let i = 0; i < count; i++) {
                 const start = view.getUint32(4 + i * 4, true);
                 let end = start;
@@ -374,9 +387,9 @@ export function battleHudNameBank(language = 2) {
     return nameBankPromise;
 }
 
-let loadedNameBank = null;
+let loadedNameBank: readonly string[] | null = null;
 /** Called once the bank resolves, so a battle that starts early still finds the names. */
-export function battleHudSetNameBank(lines) { loadedNameBank = lines ?? null; }
+export function battleHudSetNameBank(lines: readonly string[] | null | undefined) { loadedNameBank = lines ?? null; }
 battleHudNameBank().then(battleHudSetNameBank).catch(() => {});
 
 /** Test seam: the decoded Digimon-name bank, or null until it has loaded. */
@@ -399,7 +412,7 @@ export function battleHudBankBase(id: number) {
  * anything else is the original's empty string, because `fetchTableEntry` returns 0 for
  * an index past the table.
  */
-export function battleHudBankString(source, index) {
+export function battleHudBankString(source: number, index: number) {
     const id = BANK_IDS.get(source >>> 0);
     if (id === undefined) return "";
     if (id === BATTLE_HUD_BANK_SEPARATOR) return battleMsgText(BATTLE_HUD_BANK_SEPARATOR, index | 0);
@@ -444,33 +457,33 @@ export function battleHudPlateLabels({
     }
     // The port hands each created element its own address so the call log can be read.
     let next = 0;
-    const calls = [];
+    const calls: (string | number)[][] = [];
     const host = {
         packResolve: () => 0, drawSprite() {}, drawQuad() {},
-        createTextElement(target, kind, x, y) {
+        createTextElement(target: number, kind: number, x: number, y: number) {
             const element = LABEL_WIDGET_BASE + next * 0x100;
             next += 1;
             calls.push(["create", target | 0, kind | 0, x | 0, y | 0]);
             return element;
         },
-        callMethod(element: number, slot: number, args: number[]) { calls.push(["method", element | 0, slot, ...args.map((a) => a | 0)]); },
+        callMethod(element: number, slot: number, args: number[]) { calls.push(["method", element | 0, slot, ...args.map((a: number) => a | 0)]); },
         tick: () => 0,
         gaugeSlotIndex: () => 0,
         // [0x80044f4c] is handed the language base plus the family offset, exactly as
         // ScreenTextBanks keys its own banks by `offset + language`; the family is the
         // offset, so that is what the synthetic base is registered under.
-        resourceBase: (id) => battleHudBankBase((id | 0) - (language | 0)),
+        resourceBase: (id: number) => battleHudBankBase((id | 0) - (language | 0)),
         rosterSlot: () => (rosterSlot == null ? (activePlayerIndex | 0) : (rosterSlot | 0)),
         // FIGHTSTG_F0x8009b8d0 over the synthetic table this read-out lays down: one
         // record whose leading u16 is `enemyId`, terminating at the next index (a zero id
         // ends the scan). A found id returns the record's base, a miss returns 0 — the
         // original's `bltz` delay-slot answer. A caller that supplies only the name line
         // (a headless read-out with no numeric id) keeps the plain base, as before.
-        enemyStatsBlock: (id) => {
+        enemyStatsBlock: (id: number) => {
             if (enemyNameId == null) return 0;
             if (!enemyId) return LABEL_ENEMY_STATS;
             return engineEnemyStatsBlock(LABEL_ENEMY_STATS,
-                (index) => (index === 0 ? (enemyId | 0) : 0), id | 0);
+                (index: number) => (index === 0 ? (enemyId | 0) : 0), id | 0);
         },
     };
     const hud = LABEL_WIDGET_BASE + 0x8000;

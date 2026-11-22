@@ -52,6 +52,7 @@ import type { BattleContext } from "../../types/battle.js";
 import type { BattleEndContext } from "./types.js";
 
 import type { EnemyBattleRecord } from "../../types/battle.js";
+import type { FormLedgerEntry } from "../../game/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeEnemyAction(B: BattleContext) {
 function applyEnemyAction() {
@@ -330,7 +331,7 @@ function applyEnemyAction() {
       B.renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, { miss: true });
     }
   }
-function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | undefined) {
+function applyParticipantProgress(b: BattleEndContext, rosterIndex: number) {
     const player = b.playerRecords[rosterIndex];
     const ps = player.statsRecord;
     const prof = player.profile;
@@ -357,7 +358,7 @@ function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | und
     const loadableTechs = [];
     const formLevelsGained = [];
     const unlocked = [];
-    const namedSkill = (id) => B.skillDB?.[Number(id) & 0x1fff]?.name ?? "";
+    const namedSkill = (id: number) => B.skillDB?.[Number(id) & 0x1fff]?.name ?? "";
 
     if (newLevel > oldLevel) {
       levelUp = true;
@@ -391,7 +392,7 @@ function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | und
       const participants = dvexpShareCount(b.formFlags, paidParticipants(b));
       for (const formId of markedEquippedForms(b.formFlags?.[rosterIndex], ps.equippedForms)) {
         const formProfile = B.digimonDB?.[formId] ?? B.profileById(formId!) ?? prof;
-        let record = ps.formLedger.find((r) => Number(r.id) === Number(formId));
+        let record = ps.formLedger.find((r: FormLedgerEntry) => Number(r.id) === Number(formId));
         if (!record) {
           record = { id: formId, formLevel: 1, dvexp: ps.dvexpByForm[formId] ?? 0,
             techSlots: [0, 0, 0, 0, 0, 0] };
@@ -445,7 +446,7 @@ function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | und
     const acquiredProf = acquired ? B.profileById(acquired.toId) : null;
     if (acquiredProf) {
       ps.formLedger ??= [];
-      if (!ps.formLedger.some((r) => Number(r.id) === Number(acquiredProf.id)))
+      if (!ps.formLedger.some((r: FormLedgerEntry) => Number(r.id) === Number(acquiredProf.id)))
         ps.formLedger.push({ id: acquiredProf.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
       ps.equippedForms ??= [];
       let slotFull = false;

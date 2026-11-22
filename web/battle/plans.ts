@@ -11,8 +11,11 @@ import { battleRestoreTargets, clearActionAffinity } from "./restore.js";
 import { applyCategory5Plan } from "./status.js";
 import { effStats } from "./hit-results.js";
 import type { ScriptedPlanOptions } from "./core/types.js";
-import type { BattleState, FightTechRow } from "../types/battle.js";
+import type { BattleState, FightTechRow, BattleRecord } from "../types/battle.js";
 import type { PlayerRecord, EnemyBattleRecord } from "../types/battle.js";
+import type { BattleRestoreState } from "./restore.js";
+
+type Category5Arm = NonNullable<ReturnType<typeof damageTermCategory5Arm>>;
 
 /**
  * THE WHOLE CATEGORY-5 FAMILY — one call per technique, both sides of a battle.
@@ -97,7 +100,7 @@ import type { PlayerRecord, EnemyBattleRecord } from "../types/battle.js";
  * `null` means "this technique is not a category-5 member", so a caller can use it as the
  * gate the way `battleRestorePlanFor` is used for category 4.
  */
-export function battleScriptedPlanFor(b, side: number, record, techniqueId: number, options: ScriptedPlanOptions = {}) {
+export function battleScriptedPlanFor(b: BattleRestoreState, side: number, record: Partial<FightTechRow> | null, techniqueId: number, options: ScriptedPlanOptions = {}) {
   const id = techniqueId | 0;
   if ((record?.category | 0) !== 5) return null;
   const arm = damageTermCategory5Arm(id);
@@ -192,7 +195,7 @@ export function battleScriptedPlanFor(b, side: number, record, techniqueId: numb
  * measured. It returns null for every other category-5 arm, which is exactly the
  * question it was written to answer: "does this technique charge anybody?"
  */
-export function battleAffinityPlanFor(b: BattleState, side: number, record: PlayerRecord | EnemyBattleRecord, techniqueId: number, options = {}): ReturnType<typeof battleScriptedPlanFor> | null {
+export function battleAffinityPlanFor(b: BattleState, side: number, record: FightTechRow | null, techniqueId: number, options: ScriptedPlanOptions = {}): ReturnType<typeof battleScriptedPlanFor> | null {
   const plan = battleScriptedPlanFor(b, side, record, techniqueId, options);
   if (!plan) return null;
   return plan.effect === "affinity" || plan.effect === "healCharge" ? plan : null;
@@ -206,7 +209,7 @@ export function battleAffinityPlanFor(b: BattleState, side: number, record: Play
  * the selected screen's own record (`0x80042b58..0x80042b65`, `battleConfig.raw_2b58_2b65`,
  * which `web/battle.js` already keeps on the battle object). Index 0 here is `0x80042b62`.
  */
-export function encounterGateBytes(b) {
+export function encounterGateBytes(b: BattleRestoreState | null | undefined) {
   const raw = b?.encounterGateBytes;
   if (!Array.isArray(raw)) return [];
   return [0, 1, 2].map((i) => (Number(raw[10 + i]) | 0) & 0xff);
@@ -221,7 +224,7 @@ export function encounterGateBytes(b) {
  * effective value each row needs is the target's own `effStats()` for that stat, which is
  * the block the arm reads at `+0x02 + 2 * .L0x800a4694[stat]`.
  */
-function category5Targets(b, targetSide: number, arm, techniqueId: number) {
+function category5Targets(b: BattleRestoreState, targetSide: number, arm: Category5Arm, techniqueId: number) {
   const stat = damageTermStatRowId(arm, techniqueId);
   if (stat === null) return [];
   const slots = arm.effect === "statParty" ? [0, 1, 2] : [activeSlotOf(b, targetSide)];
@@ -248,11 +251,11 @@ function category5Targets(b, targetSide: number, arm, techniqueId: number) {
 }
 
 /** Tech 0x187 (391): its roll landed, so tech_action.c:586-588 queues EVENT_DIGIDEVOLVE and builds no page. */
-export function forcedDedigivolveLanded(plan) {
+export function forcedDedigivolveLanded(plan: ReturnType<typeof battleScriptedPlanFor>) {
   return plan?.effect === "statusOnly" && plan.rollLanded === true;
 }
 
-export function activeSlotOf(b, side: number) {
+export function activeSlotOf(b: Pick<BattleRestoreState, "activePlayerIndex"> | null | undefined, side: number) {
   return (side | 0) < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
 }
 
@@ -262,14 +265,14 @@ export function activeSlotOf(b, side: number) {
  * (`+0x00`; the old `+0x10` reading added the base's own 0x10 twice, see engine/dw3/battle-damage-terms.ts). Whichever
  * side casts, it is the PLAYER's active record it reads.
  */
-function playerActiveIsRookie(b) {
+function playerActiveIsRookie(b: BattleRestoreState) {
   const rec = battleRestoreTargets(b, 0)[activeSlotOf(b, 0)];
   const id = Number(rec?.profile?.id ?? rec?.rookieId ?? 0);
   return id >= 1 && id <= 8;
 }
 
 /** The acting side's active fighter's WIS, the getter's own second operand. */
-function actingFighterWisdom(b, actingSide: number) {
+function actingFighterWisdom(b: BattleRestoreState, actingSide: number) {
   const slot = activeSlotOf(b, actingSide);
   const rec = battleRestoreTargets(b, actingSide)[slot];
   return rec ? engineEffStats(rec).wis : 0;
@@ -283,12 +286,12 @@ function damageTermStatRowId(arm: { ids: number[]; }, techniqueId: number) {
 }
 
 /** The row this arm's technique id addresses, or null when it has none. */
-function category5Row(arm, techniqueId: number) {
+function category5Row(arm: Category5Arm, techniqueId: number) {
   return DAMAGE_TERM_STAT_ROWS.find((r) => r.id === (techniqueId | 0)) ?? null;
 }
 
 /** The stat the arm changes, 0 attack / 1 defense / 2 speed, for one record. */
-export function statValue(rec, stat: number) {
+export function statValue(rec: BattleRecord, stat: number) {
   const values = engineEffStats(rec);
   return [values.str, values.def, values.spd][stat]! | 0;
 }
@@ -310,11 +313,11 @@ export function effectiveSpd(rec: PlayerRecord | EnemyBattleRecord | undefined) 
 }
 
 /** One record's own modifier for that stat — the walker's `statMods`, absent is 0. */
-export function statModifier(rec, stat: number) {
+export function statModifier(rec: BattleRecord | null | undefined, stat: number) {
   return [rec?.statMods?.str ?? 0, rec?.statMods?.def ?? 0, rec?.statMods?.spd ?? 0][stat] | 0;
 }
 
-export function setStatModifier(rec: { statMods: { str: number; def: number; spd: number; }; }, stat: number, value: number) {
+export function setStatModifier(rec: { statMods: { str: number; def: number; spd: number; }; } | null | undefined, stat: number, value: number) {
   if (!rec) return;
   const key = ["str", "def", "spd"][stat];
   const mods = rec.statMods ?? { str: 0, def: 0, spd: 0 };

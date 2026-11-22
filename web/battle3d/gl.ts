@@ -4,7 +4,7 @@ import { mat4Identity } from "../fight/proj-layers.js";
 import { TEXTURE_PAGE_TEXELS, normalize } from "./math.js";
 import { S } from "./state.js";
 import type { ArenaCullLog } from "./types.js";
-import type { TexProgram } from "../types/battle3d.js";
+import type { TexProgram, SkelBufs, QuadBuffers } from "../types/battle3d.js";
 import type { ArenaGroupBuf } from '../types/battle3d.js';
 interface LayerBuf extends ArenaGroupBuf { ibo?: WebGLBuffer | null; }
 
@@ -37,10 +37,10 @@ export const FIGHTER_TINT = [1, 1, 1, 1];
 // ours; web/fusion.js's boss record carries the rgba, and web/battle.js sets it when the
 // two halves fuse (Kimeramon's body wearing Millenniummon's dark palette). With the
 // switch off nothing calls setFighterTint and every side keeps FIGHTER_TINT.
-const FIGHTER_TINTS = { player: FIGHTER_TINT, enemy: FIGHTER_TINT, extra: FIGHTER_TINT };
+const FIGHTER_TINTS: Record<string, number[]> = { player: FIGHTER_TINT, enemy: FIGHTER_TINT, extra: FIGHTER_TINT };
 
 /** The tint a side draws with: the game's own FIGHTER_TINT unless a fusion set one. */
-export function fighterTint(side: string): [number, number, number, number] {
+export function fighterTint(side: string): number[] {
   return FIGHTER_TINTS[side] ?? FIGHTER_TINT;
 }
 
@@ -70,7 +70,7 @@ export const SCENE_LIGHT_WINDING = -1;
 // before it resolves (BLAST-C010 phase 4, "green wireframe of the new form").
 // It reuses the model's own geometry, so the wireframe is the real silhouette
 // of the Digimon being blasted into, not a stand-in shape.
-export function drawSkeletalMesh(gl, prog, mvp, buffers, tex, tint, alpha = 1.0, wire = false) {
+export function drawSkeletalMesh(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, buffers: Pick<SkelBufs, "indexCount" | "vbo" | "ubo" | "ibo" | "nbo" | "litOn"> | null | undefined, tex: WebGLTexture | null, tint: readonly number[] | null | undefined, alpha = 1.0, wire = false) {
   if (!buffers || buffers.indexCount === 0 || !buffers.vbo) return;
 
   gl.useProgram(prog.program);
@@ -107,7 +107,7 @@ export function drawSkeletalMesh(gl, prog, mvp, buffers, tex, tint, alpha = 1.0,
 
 // ─── GL helpers ───────────────────────────────────────────────────────────────
 
-export function compileShader(gl, type, src) {
+export function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
@@ -131,7 +131,7 @@ export function createProgram(gl: WebGLRenderingContext, vsrc: string, fsrc: str
 // changes (GP0 0x80, a VRAM-to-VRAM blit — FIGHTSTG_F0x8008b160). texSubImage2D is
 // the same operation, but it needs a source, so keep the page CPU-side as well.
 // `scale` is 4 in HD asset mode, where every patch coordinate is 4x too.
-export function loadTexturePixels(url) {
+export function loadTexturePixels(url: string) {
   return fetchAsset(url)
     .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
     .then((blob) => createImageBitmap(blob))
@@ -149,7 +149,7 @@ export function loadTexturePixels(url) {
     .catch(() => null);
 }
 
-export function loadTexture(gl, url, onLoad?: any) {
+export function loadTexture(gl: WebGLRenderingContext, url: string, onLoad?: (tex: WebGLTexture | null, w: number, h: number) => void) {
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   // 1×1 transparent placeholder
@@ -173,7 +173,7 @@ export function loadTexture(gl, url, onLoad?: any) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
       // HD arena sheets (1024 px) are seen far smaller than that on the walls: without mipmaps every screen pixel picks
       // one texel of many and the wall shimmers and looks pixelated as the camera moves (user 2026-10-28, Dark Dungeon).
-      const pow2 = (n) => (n & (n - 1)) === 0, mip = hd && /\/battle\/arenas\//.test(url) && pow2(bw) && pow2(bh);
+      const pow2 = (n: number) => (n & (n - 1)) === 0, mip = hd && /\/battle\/arenas\//.test(url) && pow2(bw) && pow2(bh);
       if (mip) {
         gl.generateMipmap(gl.TEXTURE_2D);
         const af = gl.getExtension("EXT_texture_filter_anisotropic");
@@ -195,7 +195,7 @@ export function loadTexture(gl, url, onLoad?: any) {
   return tex;
 }
 
-export function makeQuadBuffers(gl, verts, uvs) {
+export function makeQuadBuffers(gl: WebGLRenderingContext, verts: number[][], uvs: number[][]): QuadBuffers {
   // verts: 4×[x,y,z], uvs: 4×[u,v], two triangles (0,1,2, 0,2,3)
   const vbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
@@ -219,7 +219,7 @@ export function makeQuadBuffers(gl, verts, uvs) {
 // look correct, while wider characters will appear stretched. This is improved
 // when UV decoding is completed.
 
-function drawBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, viewEye, worldPos: [number, number, number],
+function drawBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, viewEye: readonly number[], worldPos: [number, number, number],
                        widthUnits: number, heightUnits: number, tex: WebGLTexture, alpha: number, tint: [number, number, number]) {
   // Compute billboard right/up vectors (always face camera)
   const camRight = normalize([mvp[0], mvp[4], mvp[8]]);
@@ -240,7 +240,7 @@ function drawBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32
   gl.deleteBuffer(bufs.vbo); gl.deleteBuffer(bufs.ubo); gl.deleteBuffer(bufs.ibo);
 }
 
-export function drawQuad(gl, prog, mvp, bufs, tex, alpha, tint) {
+export function drawQuad(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, bufs: QuadBuffers, tex: WebGLTexture | null, alpha: number, tint: readonly number[] | null | undefined) {
   gl.useProgram(prog.program);
   gl.uniformMatrix4fv(prog.uMVP, false, mvp);
   gl.uniform1f(prog.uAlpha, alpha);
@@ -265,7 +265,7 @@ export function drawQuad(gl, prog, mvp, bufs, tex, alpha, tint) {
 // the bone rotation from FIGHTSTG_poseBone's integer key blend): ONE function in the engine, changeStageMeshMatrix,
 // builds it from the mesh's rotation keys and the motion frame; this only lays its row-major 3x3 (1.0 = 0x1000) out
 // as a column-major mat4 for the mesh, applied before the fight-model -> world mapping.
-export function changeStageMat4(keys, frame) {
+export function changeStageMat4(keys: Parameters<typeof changeStageMeshMatrix>[0], frame: number) {
   const r = changeStageMeshMatrix(keys, frame);
   const m = mat4Identity();
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col]! / 4096;
@@ -273,7 +273,7 @@ export function changeStageMat4(keys, frame) {
 }
 
 // Draw one projectile mesh layer (interleaved static pos+uv buffers, non-indexed tris).
-export function drawProjLayer(gl, prog, mvp, layer, tex, alpha = 1.0, tint = null) {
+export function drawProjLayer(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: ArenaGroupBuf, tex: WebGLTexture | null, alpha = 1.0, tint: readonly number[] | null = null) {
   gl.useProgram(prog.program);
   gl.uniformMatrix4fv(prog.uMVP, false, mvp);
   gl.uniform1f(prog.uAlpha, alpha);
@@ -292,9 +292,9 @@ export function drawProjLayer(gl, prog, mvp, layer, tex, alpha = 1.0, tint = nul
 
 export const arenaCullLog = { kept: 0, total: 0 } as ArenaCullLog;
 
-export function setArenaCullSign(s) { S.arenaCullSign = s < 0 ? -1 : 1; return S.arenaCullSign; }
+export function setArenaCullSign(s: number) { S.arenaCullSign = s < 0 ? -1 : 1; return S.arenaCullSign; }
 
-export function arenaCullIndices(mvp, layer) {
+export function arenaCullIndices(mvp, layer: ArenaGroupBuf) {
   const pos = layer.pos, ref = layer.cullRef;
   if (!pos) return null;
   const nt = (pos.length / 9) | 0;
@@ -329,7 +329,7 @@ export function arenaCullIndices(mvp, layer) {
 
 // Draw one arena layer through the ported cull: only the front-facing primitives
 // are drawn (the original's own post-cull set). Uses a dynamic index buffer.
-export function drawProjLayerIndexed(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, layer: LayerBuf, tex: WebGLTexture | null, idx: number[] | null, tint = null) {
+export function drawProjLayerIndexed(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32List, layer: LayerBuf, tex: WebGLTexture | null, idx: number[] | null, tint = null) {
   if (!idx) { drawProjLayer(gl, prog, mvp, layer, tex, 1, tint); return; }
   if (!layer.ibo) layer.ibo = gl.createBuffer();
   gl.useProgram(prog.program);

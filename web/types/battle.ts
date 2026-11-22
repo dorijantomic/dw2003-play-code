@@ -1,20 +1,24 @@
 import type { createBattle3D } from "../battle3d.js";
+import type { FIGHT_UI_CLIPS } from "../battle/layout.js";
 import type { CameraMode } from "./battle3d.js";
 import type { Combatant } from "../../engine/dw3/battle-combat.js";
 import type { ActorTimeline } from "../../engine/dw3/battle-formulas.js";
 import type { newOpeningState } from "../vendor/engine.js";
 import type { StatusEventPool } from "../../engine/dw3/battle-status-events.js";
-import type { BattleEndContext, BattleMusicTrack, BattlePartyEntry, BattleStartArgs, ParticipantProgress, WinReward } from "../battle/core/types.js";
+import type { BattleEndContext, BattleMusicTrack, BattlePartyEntry, FusionBoss, BattleStartArgs, ParticipantProgress, ParticipantReward, WinReward } from "../battle/core/types.js";
 import type { GameState, PartnerStats } from "../game/types.js";
+
+/** The engine's `ui` namespace as its own source types it (web/vendor/engine.js is a bundle whose `ui` export carries no types). */
+export type EngineUi = typeof import("../../engine/dw3/ui/index.js");
 
 /** one page of battle text: the message kind, its payload words, and the words its template fills in */
 export interface BattleLineSpec {
   kind: number;
   payload: number[];
   /** line one, usually the actor's name */
-  name?: string;
+  name?: string | null | undefined;
   /** the words the template's {n} placeholders take */
-  slots?: string[];
+  slots?: string[] | undefined;
 }
 
 /** what a heal page needs: how much was restored, how much was missing, and who healed */
@@ -61,7 +65,7 @@ export type StatGrowth = {
 }
 
 /** one species row of assets/data/digimon.json (battle.ts keys the table by id) */
-export interface DigimonRecord {
+export type DigimonRecord = {
   id: number;
   name: string;
   hp: number;
@@ -233,16 +237,31 @@ export interface ProgressionTables {
     /** the DV experience ceiling; the extractor (tools/extract_progression_tables.py) writes it, the shipped file may not carry it */
     dvexp_cap?: number;
   };
-  gym: {
-    tp_costs: number[];
-    rank_menus: Record<string, unknown>[][];
-    core_rows: number[][];
-    loss_rows: number[][];
-    elem_tables: { low: number[][]; mid: number[][]; high: number[][]; };
-    elem_ptr: string[][];
-    elem_brackets: number[];
-    hpmp_rows: number[][];
-  };
+  gym: GymTables;
+}
+
+/** one gain row of the gym tables: [base, random range] */
+export type GymRow = readonly [number, number];
+
+/** one drill of a gym rank menu: its number and the two stats it trains */
+export interface GymDrill {
+  drill: number;
+  primary: number;
+  secondary: number;
+}
+
+/** progression.json's gym block: what a drill costs and what each rep gains */
+export interface GymTables {
+  tp_costs: number[];
+  rank_menus: GymDrill[][];
+  core_rows: GymRow[];
+  loss_rows: GymRow[];
+  /** per growth bracket, the gain rows by variant and TP choice */
+  elem_tables: GymRow[][];
+  /** per element growth (1-based), the elem_tables index of each stat bracket */
+  elem_ptr: number[][];
+  elem_brackets: number[];
+  hpmp_rows: GymRow[];
 }
 
 /** one member of the party as buildPlayerRoster lists it (web/battle/core/records.ts) */
@@ -292,7 +311,12 @@ export interface PlayerRecord extends Combatant {
   gaugeAccessories: number[];
   rightWeapon: number | null;
   gauge: number;
+  /** the raw record +0x1c ailment byte, when a record carries it (nothing writes it yet) */
+  statusBits?: number;
 }
+
+/** a live combat record of either side */
+export type BattleRecord = PlayerRecord | EnemyBattleRecord;
 
 /** the live combat record of the enemy (buildEnemyRecord, then the phase modules hang their own fields on) */
 export interface EnemyBattleRecord extends Combatant {
@@ -315,10 +339,14 @@ export interface EnemyBattleRecord extends Combatant {
   bossId?: string | null;
   /** the boss phase cursor, -1 before the first line */
   bossPhase?: number;
+  /** the raw record +0x1c ailment byte, when a record carries it (nothing writes it yet) */
+  statusBits?: number;
+  /** only a party record carries its stored stat block */
+  statsRecord?: undefined;
 }
 
 /** the profile-like object enemyToProfile builds from an enemy row so elementFactor works */
-export interface EnemyProfile {
+export type EnemyProfile = {
   name: string;
   resistances: ElementNumbers;
   family: number;
@@ -352,9 +380,9 @@ export type BattleState = {
   party: BattlePartyEntry[];
   partyIndex: number;
   /** the battle id: keys progression.battle_rewards */
-  screenId?: number;
+  screenId?: number | undefined;
   /** the field screen the fight started on */
-  mapId?: number | string;
+  mapId?: number | string | undefined;
   statusImmunities: Record<string, boolean>;
   specialMode: number;
   _finaleKind: number | null;
@@ -374,25 +402,25 @@ export type BattleState = {
   timeline: ActorTimeline;
   /** the battle's ONE shared status-event pool; both records are linked to the same array */
   statusEvents: StatusEventPool;
-  onWin?: BattleStartArgs["onWin"];
-  onFlee?: BattleStartArgs["onFlee"];
-  onLose?: BattleStartArgs["onLose"];
+  onWin?: BattleStartArgs["onWin"] | undefined;
+  onFlee?: BattleStartArgs["onFlee"] | undefined;
+  onLose?: BattleStartArgs["onLose"] | undefined;
   _hudClock: number;
   /** drops: what endBattle banks; candidates: defeated enemies carrying an item (one disc roll at the win) */
   _loot: BattleEndContext["_loot"];
-  _winApplied?: boolean;
-  _winProgress?: ParticipantProgress[];
+  _winApplied?: boolean | undefined;
+  _winProgress?: ParticipantProgress[] | undefined;
   _winReportRows?: BattleEndContext["_winReportRows"];
-  _winReward?: WinReward;
+  _winReward?: WinReward | undefined;
   /** per participant, the ten form flags the DNA/revert rules read (form-blast.ts creates it at the first form mark) */
-  formFlags?: number[][];
+  formFlags?: number[][] | undefined;
 } & Record<string, any>;
 
 export interface BattleContext {
   _battleTargetSize: () => { w: number; h: number; };
   _init3DRenderer: (b: BattleState) => Promise<void>;
   _profileByName?: any;
-  _savedCanvas?: { w: number; h: number; };
+  _savedCanvas?: { w: number; h: number; } | null;
   advanceAfterResult: (b: BattleState) => void;
   advanceBlastPresentation: (b: BattleState, dt: number) => void;
   advanceBossPhase: (b: BattleState) => { text: string; spec: BattleLineSpec; }[];
@@ -404,7 +432,7 @@ export interface BattleContext {
   applyDvAction: (action: any) => void;
   applyEnemyAction: () => void;
   applyEvolution?: any;
-  applyParticipantProgress?: any;
+  applyParticipantProgress: (b: BattleEndContext, rosterIndex: number) => ParticipantReward;
   applyPlayerAction?: any;
   applyTagAction: (action: any) => boolean;
   armContactDamage?: any;
@@ -459,7 +487,7 @@ export interface BattleContext {
   dnaTableReader: (species: any, techniques?: any) => { read8: (addr: number) => number; read16: (addr: number) => number; };
   draw: () => void;
   drawBattleHud: (b: BattleState) => void;
-  drawChrome: (name: string, x: number, y: number, w?: number, h?: number) => boolean;
+  drawChrome: (name: keyof typeof FIGHT_UI_CLIPS, x: number, y: number, w?: number, h?: number) => boolean;
   drawCommandMenu: (b: BattleState) => void;
   drawDescription: (text: string, mp?: number) => void;
   drawDnaChoice: (b: BattleState) => void;
@@ -513,8 +541,8 @@ export interface BattleContext {
   formOptionsFor: (rosterIndex: number, bb?: any) => any[];
   formPanelMemberSeed?: any;
   frozenGateLosesTurn: (b: BattleState) => boolean;
-  fuseIntoBoss: (b: BattleState, boss: any) => void;
-  fusionBossesDB?: any;
+  fuseIntoBoss: (b: BattleState, boss: FusionBoss) => void;
+  fusionBossesDB?: Record<string, FusionBoss> | null;
   fusionDataTried?: boolean;
   getPlayerProfile: (state: GameState) => any;
   /** the field state accessor, carried on the context so shared routines can save a gauge */
@@ -524,7 +552,7 @@ export interface BattleContext {
   hpPlateOf: (b: BattleState) => any;
   HUD_CELS_DECODED?: Set<number>;
   hudCels?: any[];
-  hudClip: (cel: any, x: number, y: number) => boolean;
+  hudClip: (cel: string | number, x: number, y: number) => boolean;
   initializePartyStats: (state: GameState) => boolean;
   introLinePendingFor: (b: BattleState) => boolean;
   isActive: () => boolean;
@@ -536,7 +564,7 @@ export interface BattleContext {
   liveFormId: (b: BattleState, slot: number) => number;
   loadData: () => Promise<void>;
   loadFusionData: () => Promise<void>;
-  LOSS_MESSAGE_WORDS?: { 83: string; };
+  LOSS_MESSAGE_WORDS?: Record<number, string>;
   lossCameraMode: () => CameraMode;
   mpKit?: any;
   mpKitTechs?: any;
@@ -548,7 +576,7 @@ export interface BattleContext {
   nativePanelPath: (x: number, y: number, w: number, h: number, notch?: number) => void;
   nativeText?: any;
   noteFinalBossPhaseDamage: (b: BattleState) => void;
-  offscreen3d?: HTMLCanvasElement | OffscreenCanvas;
+  offscreen3d?: HTMLCanvasElement | OffscreenCanvas | null;
   onBattleResize: () => void;
   openingPorts?: any;
   ORBIT_STATES?: Set<number>;

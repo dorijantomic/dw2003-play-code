@@ -48,14 +48,13 @@
 import { armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChain, tailChain, wingChains, boneMap } from "./digimon-bonemap.js";
 import { authoredSide } from "./side-mirror.js";
-import type { FightSkeleton, FightVec3 } from './types.js';
-import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+import type { FightChanRow, FightModel, FightSkeleton, FightVec3 } from './types.js';
 interface RestPoseClip {
   start_frame?: number;
 }
 
 
-interface RestPoseModel extends Dw2LoadedModel {
+interface RestPoseModel extends FightSkeleton {
   clips?: RestPoseClip[];
 }
 
@@ -70,17 +69,24 @@ interface PcaFrame {
 }
 
 interface AxisCandidates {
-  push: number[];
-  long: number[];
-  thin: number[];
+  push: FightVec3;
+  long: FightVec3;
+  thin: FightVec3;
   pca: PcaFrame;
 }
 
 
+/** The part of a pose the axis maths reads: every bone's world rotation (9 numbers) and position. */
+export interface PoseRP {
+  rot: number[][];
+  pos: FightVec3[];
+  scale?: number[][];
+}
+
 /** A posed skeleton as poseFromChannels builds it: one rotation (9 numbers), position and draw scale per bone, which bones are drawn, and the frame. */
 export interface ChannelPose {
   rot: number[][];
-  pos: number[][];
+  pos: FightVec3[];
   scale: number[][];
   visible: boolean[];
   frame: number;
@@ -91,7 +97,7 @@ type HandVariant = "push" | "palm";
 
 /** The options of firingAxis: the rest pose (the carried facing is measured from it; the pose itself when absent) and the hand variant. */
 interface FiringAxisOpts {
-  rest?: ChannelPose | null | undefined;
+  rest?: PoseRP | null | undefined;
   variant?: HandVariant | null | undefined;
 }
 
@@ -99,11 +105,15 @@ interface FiringAxis {
   calibrated: boolean;
   emitterId: string;
   cls: string;
-  bone: string;
+  bone: number;
   method: string;
-  origin: number[];
-  joint: number[];
-  axis: number[];
+  origin: FightVec3;
+  joint: FightVec3;
+  axis: FightVec3;
+  detail: object;
+  confidence: string;
+  axisQuality: number;
+  arm: { side: string; chain: number[]; } | null;
 }
 
 
@@ -114,13 +124,13 @@ export const EMITTER_CLASSES = ["prop", "hand", "head", "chest", "back", "tail",
 
 // ---------------------------------------------------------------- vector helpers
 
-export function add(a, b): FightVec3 { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+export function add(a: number[], b: number[]): FightVec3 { return [a[0]! + b[0]!, a[1]! + b[1]!, a[2]! + b[2]!]; }
 export function sub(a: number[], b: number[]): FightVec3 { return [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!]; }
-export function mul(a: number[], s: number): FightVec3 { return [a[0]! * s, a[1]! * s, a[2]! * s]; }
-export function dot(a, b: (number | undefined)[]) { return a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!; }
-export function len(a: number[]) { return Math.sqrt(dot(a, a)); }
-export function unit(a: (number | undefined)[]): FightVec3 { const l = len(a!!!!!!); return l > 1e-9 ? mul(a!!!!!!, 1 / l) : [0, 0, 0]; }
-export function dist(a, b: number[]) { return len(sub(a, b)); }
+export function mul(a: (number | undefined)[], s: number): FightVec3 { return [a[0]! * s, a[1]! * s, a[2]! * s]; }
+export function dot(a: (number | undefined)[], b: (number | undefined)[]) { return a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!; }
+export function len(a: (number | undefined)[]) { return Math.sqrt(dot(a, a)); }
+export function unit(a: (number | undefined)[]): FightVec3 { const l = len(a); return l > 1e-9 ? mul(a, 1 / l) : [0, 0, 0]; }
+export function dist(a: number[], b: number[]) { return len(sub(a, b)); }
 
 /** The angle between two vectors in degrees (0 = same direction, 180 = opposite). */
 export function angleBetween(a: (number | undefined)[], b: number[]) {
@@ -156,9 +166,9 @@ export function aimError(axis: number[], origin: number[], target: number[]) {
 
 // ---------------------------------------------------------------- the pose
 
-function sampleChannel(ch, frame: number) {
+function sampleChannel(ch: FightChanRow[] | undefined, frame: number): FightVec3 {
   if (!ch || !ch.length) return [0, 0, 0];
-  let lo = ch[0], hi = ch[0];
+  let lo = ch[0]!, hi = ch[0]!;
   for (const rec of ch) {
     if (rec[3] === 30000) break;
     if (rec[3] <= frame) lo = rec; else { hi = rec; break; }
@@ -179,20 +189,20 @@ function ps1Mat3(ax: number, ay: number, az: number) {
   const Rx = [1, 0, 0, 0, cz, sz, 0, -sz, cz];
   return mat3Mul(Rz, mat3Mul(Ry, Rx));
 }
-function mat3Mul(a: number[], b) {
+function mat3Mul(a: number[], b: number[]): number[] {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k]!;
     o[c * 3 + r] = s;
   }
   return o;
 }
-function applyRot(R, v): FightVec3 {
-  return [R[0] * v[0] + R[3] * v[1] + R[6] * v[2],
-          R[1] * v[0] + R[4] * v[1] + R[7] * v[2],
-          R[2] * v[0] + R[5] * v[1] + R[8] * v[2]];
+function applyRot(R: number[], v: number[]): FightVec3 {
+  return [R[0]! * v[0]! + R[3]! * v[1]! + R[6]! * v[2]!,
+          R[1]! * v[0]! + R[4]! * v[1]! + R[7]! * v[2]!,
+          R[2]! * v[0]! + R[5]! * v[1]! + R[8]! * v[2]!];
 }
-function transpose3(R) { return [R[0], R[3], R[6], R[1], R[4], R[7], R[2], R[5], R[8]]; }
+function transpose3(R: number[]) { return [R[0]!, R[3]!, R[6]!, R[1]!, R[4]!, R[7]!, R[2]!, R[5]!, R[8]!]; }
 
 /**
  * The pose at `frame`: per-bone world rotation (3x3, column-major) and world translation, in the
@@ -207,14 +217,14 @@ function transpose3(R) { return [R[0], R[3], R[6], R[1], R[4], R[7], R[2], R[5],
  * collapses its matrix. The ROTATION reported here is always the unscaled one: a direction (which
  * way a muzzle faces) does not shrink, while a POSITION read off the mesh does.
  */
-export function poseFromChannels(model, frame, { blend = null } = {}) {
+export function poseFromChannels(model: FightSkeleton, frame: number, { blend = null }: { blend?: { from?: number | null; t: number; } | null; } = {}) {
   const n = model.num_bones ?? model.bones.length;
   const rot = new Array(n).fill(null), pos = new Array(n).fill(null);
   const scale = new Array(n).fill(null), visible = new Array(n).fill(true);
-  const sample = (ch) => {
+  const sample = (ch: FightChanRow[] | undefined): FightVec3 => {
     const a = sampleChannel(ch, frame);
     if (!blend || blend.from == null) return a;
-    const b = sampleChannel(ch, blend.from);
+    const b = sampleChannel(ch, blend.from!);
     const t = blend.t;
     return [b[0] + (a[0] - b[0]) * t, b[1] + (a[1] - b[1]) * t, b[2] + (a[2] - b[2]) * t];
   };
@@ -222,9 +232,9 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
     const b = model.bones[i];
     if (!b || !b.anim) { rot[i] = ps1Mat3(0, 0, 0); pos[i] = [0, 0, 0]; scale[i] = [1, 1, 1]; return; }
     const c2 = sample(b.anim.ch2), c1 = sample(b.anim.ch1);
-    const R = ps1Mat3(c2[2], c2[1], c2[0]);
+    const R = ps1Mat3(c2[2]!, c2[1], c2[0]);
     const p = (b.parent_slot ?? 0) - 1;
-    if (p < 0) { rot[i] = R; pos[i] = [-c1[0], c1[1], -c1[2]]; } else {
+    if (p < 0) { rot[i] = R; pos[i] = [-c1[0]!, c1[1], -c1[2]!]; } else {
       if (!rot[p]) proc(p);
       rot[i] = mat3Mul(rot[p], R);
       const rt = applyRot(rot[p], c1);
@@ -232,7 +242,7 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
     }
     if (b.anim.ch3) {
       const c3 = sample(b.anim.ch3);
-      scale[i] = [c3[0] / 4096, c3[1] / 4096, c3[2] / 4096];
+      scale[i] = [c3[0]! / 4096, c3[1]! / 4096, c3[2]! / 4096];
       visible[i] = scale[i][0] !== 0 && scale[i][1] !== 0 && scale[i][2] !== 0;
     } else scale[i] = [1, 1, 1];
   };
@@ -241,28 +251,28 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
 }
 
 /** The renderer's matrix for one bone at this pose: the rotation columns times the ch3 draw scale. */
-export function boneMatrix(pose, i: string | number) {
-  const R = pose.rot[i], s = pose.scale?.[i] || [1, 1, 1], t = pose.pos[i];
-  return [R[0] * s[0], R[1] * s[0], R[2] * s[0],
-          R[3] * s[1], R[4] * s[1], R[5] * s[1],
-          R[6] * s[2], R[7] * s[2], R[8] * s[2],
+export function boneMatrix(pose: PoseRP, i: number) {
+  const R = pose.rot[i]!, s = pose.scale?.[i] || [1, 1, 1], t = pose.pos[i]!;
+  return [R[0]! * s[0]!, R[1]! * s[0]!, R[2]! * s[0]!,
+          R[3]! * s[1]!, R[4]! * s[1]!, R[5]! * s[1]!,
+          R[6]! * s[2]!, R[7]! * s[2]!, R[8]! * s[2]!,
           t[0], t[1], t[2]];
 }
 
 /** One mesh vertex of `boneIdx` in the pose frame (the renderer's vertex path, D-flip included). */
-export function vertexWorld(model, boneIdx: string | number, v: number[], pose): FightVec3 {
-  const R = pose.rot[boneIdx], t = pose.pos[boneIdx];
+export function vertexWorld(model: FightSkeleton, boneIdx: number, v: number[], pose: PoseRP): FightVec3 {
+  const R = pose.rot[boneIdx]!, t = pose.pos[boneIdx]!;
   const s = pose.scale?.[boneIdx] || [1, 1, 1];
-  const x = v[0]! * s[0], y = v[1]! * s[1], z = v[2]! * s[2];
+  const x = v[0]! * s[0]!, y = v[1]! * s[1]!, z = v[2]! * s[2]!;
   return [
-    -(R[0] * x + R[3] * y + R[6] * z) + t[0],
-     (R[1] * x + R[4] * y + R[7] * z) + t[1],
-    -(R[2] * x + R[5] * y + R[8] * z) + t[2],
+    -(R[0]! * x + R[3]! * y + R[6]! * z) + t[0]!,
+     (R[1]! * x + R[4]! * y + R[7]! * z) + t[1]!,
+    -(R[2]! * x + R[5]! * y + R[8]! * z) + t[2]!,
   ];
 }
 
 /** Every bone index in the subtree rooted at `root` (root included). */
-export function subtree(model, root: string | number) {
+export function subtree(model: FightSkeleton, root: number) {
   const n = model.num_bones ?? model.bones.length;
   const kids = new Map();
   for (let i = 0; i < n; i++) {
@@ -270,42 +280,42 @@ export function subtree(model, root: string | number) {
     if (!kids.has(p)) kids.set(p, []);
     kids.get(p).push(i);
   }
-  const out: (string | number)[] = [];
-  const walk = (i: string | number) => { out.push(i); for (const k of kids.get(i) ?? []) walk(k); };
+  const out: number[] = [];
+  const walk = (i: number) => { out.push(i); for (const k of kids.get(i) ?? []) walk(k); };
   walk(root);
   return out;
 }
 
 /** The posed mesh of a set of bones: [x,y,z] per vertex, in the pose frame. */
-export function pointsOf(model: FightSkeleton, bones, pose) {
-  const out = [];
+export function pointsOf(model: FightSkeleton, bones: number[], pose: PoseRP) {
+  const out: FightVec3[] = [];
   for (const b of bones) for (const v of model.bones[b]?.verts || []) out.push(vertexWorld(model, b, v, pose));
   return out;
 }
 
 // ---------------------------------------------------------------- PCA
 
-function jacobiEigen3(A) {
+function jacobiEigen3(A: number[][]) {
   // symmetric 3x3 -> eigenvalues/vectors (cyclic Jacobi; 3x3 converges in a few sweeps)
   const a = A.map((r) => r.slice());
   let V = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
   for (let sweep = 0; sweep < 24; sweep++) {
     let off = 0;
-    for (let p = 0; p < 3; p++) for (let q = p + 1; q < 3; q++) off += a[p][q] * a[p][q];
+    for (let p = 0; p < 3; p++) for (let q = p + 1; q < 3; q++) off += a[p]![q]! * a[p]![q]!;
     if (off < 1e-18) break;
     for (let p = 0; p < 3; p++) {
       for (let q = p + 1; q < 3; q++) {
-        if (Math.abs(a[p][q]) < 1e-21) continue;
-        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+        if (Math.abs(a[p]![q]!) < 1e-21) continue;
+        const theta = (a[q]![q]! - a[p]![p]!) / (2 * a[p]![q]!);
         const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
         const c = 1 / Math.sqrt(t * t + 1), s = t * c;
         for (let k = 0; k < 3; k++) {
-          const akp = a[k][p], akq = a[k][q];
-          a[k][p] = c * akp - s * akq; a[k][q] = s * akp + c * akq;
+          const akp = a[k]![p]!, akq = a[k]![q]!;
+          a[k]![p] = c * akp - s * akq; a[k]![q] = s * akp + c * akq;
         }
         for (let k = 0; k < 3; k++) {
-          const apk = a[p][k], aqk = a[q][k];
-          a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk;
+          const apk = a[p]![k]!, aqk = a[q]![k]!;
+          a[p]![k] = c * apk - s * aqk; a[q]![k] = s * apk + c * aqk;
         }
         for (let k = 0; k < 3; k++) {
           const vkp = V[k]![p], vkq = V[k]![q];
@@ -314,8 +324,8 @@ function jacobiEigen3(A) {
       }
     }
   }
-  const eig = [a[0][0], a[1][1], a[2][2]];
-  const order = [0, 1, 2].sort((x, y) => eig[y] - eig[x]);
+  const eig = [a[0]![0], a[1]![1], a[2]![2]];
+  const order = [0, 1, 2].sort((x, y) => eig[y]! - eig[x]!);
   return {
     values: order.map((i) => eig[i]),
     vectors: order.map((i) => [V[0]![i], V[1]![i], V[2]![i]]),
@@ -327,28 +337,28 @@ function jacobiEigen3(A) {
  * `sigma` is the standard deviation along that axis, `sigmaPct` its share of the total variance, so
  * an elongated prop reads sigmaPct[0] ~ 0.8-0.95 and a cube reads ~0.33 on all three.
  */
-export function pca(points) {
+export function pca(points: number[][]) {
   const n = points.length;
   if (!n) return { mean: [0, 0, 0], axes: [], extents: [0, 0, 0], n: 0 };
   const mean = [0, 0, 0];
-  for (const p of points) { mean[0] += p[0]; mean[1] += p[1]; mean[2] += p[2]; }
+  for (const p of points) { mean[0]! += p[0]!; mean[1]! += p[1]!; mean[2]! += p[2]!; }
   mean[0]! /= n; mean[1]! /= n; mean[2]! /= n;
   const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
   for (const p of points) {
-    const d = [p[0] - mean[0]!, p[1] - mean[1]!, p[2] - mean[2]!];
+    const d = [p[0]! - mean[0]!, p[1]! - mean[1]!, p[2]! - mean[2]!];
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i]![j]! += d[i]! * d[j]!;
   }
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i]![j]! /= n;
   const { values, vectors } = jacobiEigen3(C);
-  const total = values[0] + values[1] + values[2];
+  const total = values[0]! + values[1]! + values[2]!;
   const axes = vectors.map((v, i) => ({
     axis: v,
-    sigma: Math.sqrt(Math.max(0, values[i])),
-    sigmaPct: total > 0 ? values[i] / total : 0,
+    sigma: Math.sqrt(Math.max(0, values[i]!)),
+    sigmaPct: total > 0 ? values[i]! / total : 0,
   }));
   const extents = [0, 0, 0];
   for (const p of points) {
-    const d = [p[0] - mean[0]!, p[1] - mean[1]!, p[2] - mean[2]!];
+    const d = [p[0]! - mean[0]!, p[1]! - mean[1]!, p[2]! - mean[2]!];
     for (let i = 0; i < 3; i++) {
       const e = Math.abs(dot(d, axes[i]!.axis));
       if (e > extents[i]!) extents[i] = e;
@@ -360,15 +370,15 @@ export function pca(points) {
 // ---------------------------------------------------------------- emitter class
 
 /** The arm chain a bone belongs to ('left' | 'right' | null), and whether it is that arm's tip. */
-export function armOfBone(folder: string | number, boneIdx) {
+export function armOfBone(folder: string | number, boneIdx: number) {
   const m = boneMap(folder);
   if (!m) return null;
-  const sides = [["left", m.aL], ["right", m.aR]];
+  const sides = [["left", m.aL], ["right", m.aR]] as const;
   for (const [side, chain] of sides) {
     if (chain && chain.length && chain[chain.length - 1] === boneIdx) return { side, chain, tip: true };
     if (chain && chain.indexOf(boneIdx) >= 0) return { side, chain, tip: false };
   }
-  for (const key of ["aLe", "aRe"]) {
+  for (const key of ["aLe", "aRe"] as const) {
     for (const chain of m[key] || []) {
       if (chain && chain.length && chain[chain.length - 1] === boneIdx) {
         return { side: key === "aLe" ? "left" : "right", chain, tip: true, extra: true };
@@ -385,7 +395,7 @@ export function armOfBone(folder: string | number, boneIdx) {
  *   { cls, bone, arm: {side, chain} | null, equip, reason }
  * `cls` is one of EMITTER_CLASSES; null for an unknown model or a site the rig does not have.
  */
-export function emitterClass(folder: string | number, emitterId) {
+export function emitterClass(folder: string | number, emitterId: unknown) {
   const m = boneMap(folder);
   if (!m) return { cls: null, bone: null, reason: "no-model" };
   const id = String(emitterId || "");
@@ -436,7 +446,7 @@ export function emitterClass(folder: string | number, emitterId) {
  * (poseFromChannels(model, restFrame)); the direction that was +Z in the rest pose is turned by
  * R_now * R_rest^T. The result is unit length.
  */
-export function carriedFacing(boneIdx: string | number, pose, rest): FightVec3 {
+export function carriedFacing(boneIdx: number, pose: PoseRP, rest: PoseRP): FightVec3 {
   const R = pose.rot[boneIdx], R0 = rest.rot[boneIdx];
   if (!R || !R0) return [0, 0, 1];
   const local = applyRot(transpose3(R0), [0, 0, 1]);
@@ -444,12 +454,12 @@ export function carriedFacing(boneIdx: string | number, pose, rest): FightVec3 {
 }
 
 /** The direction of a bone CHAIN in the pose (first joint -> last joint), unit length. */
-export function chainDirection(chain, pose: { pos: { [x: string]: number[]; }; }): FightVec3 {
+export function chainDirection(chain: number[] | null | undefined, pose: { pos: FightVec3[]; }): FightVec3 {
   if (!chain || chain.length < 2) return [0, 0, 1];
-  return unit(sub(pose.pos[chain[chain.length - 1]]!, pose.pos[chain[0]]!));
+  return unit(sub(pose.pos[chain[chain.length - 1]!]!, pose.pos[chain[0]!]!));
 }
 
-function propAxis(model, bone: string | number, pose, bones, kind = "elongated", anchor = null) {
+function propAxis(model: FightSkeleton, bone: number, pose: PoseRP, bones: number[] | null | undefined, kind = "elongated", anchor: number[] | null = null) {
   const pts = pointsOf(model, bones ?? subtree(model, bone), pose);
   const P = pca(pts);
   if (!P.axes.length) return null;
@@ -468,7 +478,7 @@ function propAxis(model, bone: string | number, pose, bones, kind = "elongated",
     spread = P.axes[0]!.sigmaPct;
   }
   // sign: away from the joint the prop hangs off (the wrist, or the shoulder when that is all there is)
-  const root = anchor || pose.pos[0];
+  const root = anchor || pose.pos[0]!;
   if (dot(axis, sub(P.mean, root)) < 0) axis = mul(axis, -1);
   const reach = kind === "flat" ? P.extents[2] : P.extents[0];
   const far = add(P.mean, mul(axis, reach! / 2));
@@ -492,12 +502,12 @@ function propAxis(model, bone: string | number, pose, bones, kind = "elongated",
   return { axis, pca: P, which, spread, sep, collapsed, unstable };
 }
 
-function handAxes(model, bone: string | number, pose, arm) {
+function handAxes(model: FightSkeleton, bone: number, pose: PoseRP, arm: { chain?: number[]; } | null | undefined) {
   const P = pca(pointsOf(model, subtree(model, bone), pose));
   if (!P.axes.length) return null;
   // push: from the wrist (the bone before the hand in the chain) into the hand block
   const chain = arm?.chain ?? [];
-  const wrist = chain.length >= 2 ? pose.pos[chain[chain.length - 2]] : pose.pos[bone];
+  const wrist = chain.length >= 2 ? pose.pos[chain[chain.length - 2]!]! : pose.pos[bone]!;
   const push = unit(sub(P.mean, wrist));
   // palm: the thinnest axis of the hand block, signed outward (same sign as push)
   const thinnest = P.axes.slice().sort((a, b) => a.sigma - b.sigma)[0];
@@ -524,7 +534,7 @@ function handAxes(model, bone: string | number, pose, arm) {
  * `variant` picks the hand-class candidate ('push' | 'palm'); the class default comes from the
  * calibration (HAND_DEFAULT). Returns null when the site has no geometry to read.
  */
-export function firingAxis(model: FightSkeleton, folder: string | number, emitterId: string, pose, { rest = null, variant = null }: FiringAxisOpts = {}) {
+export function firingAxis(model: FightSkeleton, folder: string | number, emitterId: string, pose: PoseRP, { rest = null, variant = null }: FiringAxisOpts = {}) {
   const info = emitterClass(folder, emitterId);
   if (!info.cls || info.bone == null) return null;
   const bone = info.bone;
@@ -534,7 +544,7 @@ export function firingAxis(model: FightSkeleton, folder: string | number, emitte
 
   if (info.cls === "prop") {
     const chain = info.arm?.chain ?? [];
-    const anchor = chain.length >= 2 ? pose.pos[chain[chain.length - 2]] : null;
+    const anchor = chain.length >= 2 ? pose.pos[chain[chain.length - 2]!] : null;
     const r = propAxis(model, bone, pose, undefined, info.equip?.class || "elongated", anchor);
     if (!r) return null;
     detail = { sigmaPct: r.spread, sep: r.sep, length: r.pca.extents[0], equip: info.equip?.class || null, collapsed: r.collapsed };
@@ -590,7 +600,7 @@ export function firingAxis(model: FightSkeleton, folder: string | number, emitte
   let pts = pointsOf(model, chained ? subtree(model, bone) : [bone], pose);
   if (!pts.length) pts = pointsOf(model, subtree(model, bone), pose);
   const origin = pts.length
-    ? pts.reduce((best, p) => (dot(p, axis) > dot(best, axis) ? p : best), pts[0])
+    ? pts.reduce((best, p) => (dot(p, axis) > dot(best, axis) ? p : best), pts[0]!)
     : joint;
   const spread = model?.bones?.[bone]?.verts?.length ?? 0;
   // Confidence is about the GEOMETRY, not the vertex count: a collapsed block has 30 verts and no
@@ -614,7 +624,7 @@ export const HAND_DEFAULT: HandVariant = "push";
  * unit vectors in the pose frame; none is right for every arm design, which is why the K19b
  * calibration measured them against the disc's own casts and firingAxis() picks by class.
  */
-export function armAxisCandidates(model: FightSkeleton, folder: string | number, emitterId: string, pose): AxisCandidates | null {
+export function armAxisCandidates(model: FightSkeleton, folder: string | number, emitterId: string, pose: PoseRP): AxisCandidates | null {
   const info = emitterClass(folder, emitterId);
   if (!info.bone) return null;
   const bone = info.bone;
@@ -623,24 +633,24 @@ export function armAxisCandidates(model: FightSkeleton, folder: string | number,
   const P = pca(pts);
   if (!P.axes.length) return null;
   const chain = info.arm?.chain ?? [];
-  const wrist = chain.length >= 2 ? pose.pos[chain[chain.length - 2]] : pose.pos[bone];
+  const wrist = chain.length >= 2 ? pose.pos[chain[chain.length - 2]!]! : pose.pos[bone]!;
   const push = unit(sub(P.mean, wrist));
   const out = { push, long: unit(P.axes[0]!.axis), thin: unit(P.axes[2]!.axis), pca: P };
   // sign every candidate outward (away from the wrist), so a comparison is not a sign coin-flip
-  for (const k of ["long", "thin"]) if (dot(out[k], push) < 0) out[k] = mul(out[k], -1);
+  for (const k of ["long", "thin"] as const) if (dot(out[k], push) < 0) out[k] = mul(out[k], -1);
   return out;
 }
 
 /** Both hand-class candidates, so a caller (or the calibration) can compare them. */
-export function axisVariants(model: FightSkeleton, folder: string | number, emitterId: string, pose: ChannelPose, { rest = null }: FiringAxisOpts = {}): { push: FiringAxis; palm: FiringAxis } {
+export function axisVariants(model: FightSkeleton, folder: string | number, emitterId: string, pose: PoseRP, { rest = null }: FiringAxisOpts = {}): { push: FiringAxis; palm: FiringAxis } {
   const out: Record<string, any> = {};
   for (const v of ["push", "palm"] satisfies HandVariant[]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
   return { push: out.push, palm: out.palm };
 }
 
 /** Authored arena coordinates -> this model's own pose frame (+Z = the way it faces). */
-export function toLocal(model, p) {
-  return authoredSide(model) === "enemy" ? [-p[0], p[1], -p[2]] : [p[0], p[1], p[2]];
+export function toLocal(model: FightModel | null | undefined, p: number[]): FightVec3 {
+  return authoredSide(model) === "enemy" ? [-p[0]!, p[1]!, -p[2]!] : [p[0]!, p[1]!, p[2]!];
 }
 
 /** The model's rest pose, cached per model object (frame 0 of the model's own channels). */
@@ -715,7 +725,7 @@ export const R1 = {
 
 /** R1's acceptance for one emitter class (an unknown class gets the loose arm-class values). */
 export function r1Acceptance(cls: string | number) {
-  return R1.acceptance[cls] ?? { yaw: 25, pitch: 30, enforce: "axis" };
+  return R1.acceptance[cls as "body"] ?? { yaw: 25, pitch: 30, enforce: "axis" };
 }
 
 /**
@@ -728,7 +738,7 @@ export function r1Acceptance(cls: string | number) {
  * how well the prop is conditioned). They differ by design: a raised sword's blade can point 56 deg
  * off while the arm that fires the spell points at the target.
  */
-export function aimAxisFor(model: FightSkeleton, folder: string | number, emitterId: string, pose: ChannelPose, { rest = null }: FiringAxisOpts = {}): FiringAxis | null {
+export function aimAxisFor(model: FightSkeleton, folder: string | number, emitterId: string, pose: PoseRP, { rest = null }: FiringAxisOpts = {}): FiringAxis | null {
   const fa = firingAxis(model, folder, emitterId, pose, { rest });
   if (!fa) return null;
   if (fa.cls !== "prop" && fa.cls !== "hand") return { ...fa, calibrated: true };

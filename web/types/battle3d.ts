@@ -1,8 +1,10 @@
 // Types only: the shapes the converted battle-3D code creates empty and fills in (see
 // tools/rewrite/add-types.mjs). Nothing here is emitted.
 
+import type { ProjLayer } from "../fight/proj-layers.js";
 import type { ActorAnimator } from "../fight/actor-animator.js";
 import type { createCameraRecord } from "../fight/battle-camera.js";
+import type { FaceBoxRow } from "../../engine/dw3/battle-camera.js";
 import type { EffectPlayer } from "../fight/effect-player.js";
 import type { FightCoordinator } from "../fight/fight-coordinator.js";
 import type {
@@ -216,7 +218,7 @@ export interface BackdropPack {
 
 // One projectile's model (`B$.projCache`): one quad layer per texture page.
 export interface ProjectileMesh {
-  layers: { count: number; groups: any[]; }[];
+  layers: { count: number; groups: any[]; parent: number; tracks: ProjLayer["tracks"]; }[];
   /** the pack's playback clip, null when it did not decode */
   clip: any;
 }
@@ -312,10 +314,14 @@ export interface PanoProjectOptions {
 // One entry of the extractor's camera placement table (assets/battle/camera_ref*.json).
 export interface PlacementRecord {
   camera?: { eye?: number[]; };
+  /** the 1-based far-side shot this slot picks from the near camera table */
+  shot?: number;
   standoff?: number;
   hover?: number;
   /** the record's texture animation, when it names one */
   texture_anim?: any;
+  /** the close-up box's shots, as extract_smdldata.py writes them */
+  face_box?: readonly FaceBoxRow[];
 }
 
 export type PlacementTable = Record<string, PlacementRecord>;
@@ -404,7 +410,7 @@ export interface Battle3DContext {
   ARENA_FALLBACK_ID?: number;
   ARENA_W?: number;
   ARENA_WATER?: Set<string>;
-  arenaBg?: number[];
+  arenaBg?: number[] | null;
   arenaDebug?: { legacy: boolean; cull: boolean; opaque: boolean; voidRaw: boolean; depthWrite: boolean; depthClear: boolean; };
   arenaIdFor: (mapId: number | string | null | undefined, screenId: number | null | undefined) => number | null;
   arenaLegacy?: boolean;
@@ -455,7 +461,7 @@ export interface Battle3DContext {
   camRefLoading?: boolean;
   camRefSizes?: any;
   camScriptOwned?: boolean;
-  cannedShot: (preset: string) => any;
+  cannedShot: (preset: string | number) => any;
   cannedShotSlot: (side: string, index: number) => any;
   canvas?: CaptureCanvas;
   captureArenaFace: (eye: number[], look: number[], up: number[], size?: number, opts?: PanoProjectOptions) => any;
@@ -488,10 +494,10 @@ export interface Battle3DContext {
   DNA_ORB_TURNS?: number;
   dnaFusionStart: () => void;
   dnaOrbIgnite: (key: string) => void;
-  dnaOrbs?: DnaOrbs;
+  dnaOrbs?: DnaOrbs | null;
   dnaOrbsClear: () => void;
   dnaOrbsPath: (path: any, durTicks: number) => void;
-  dnaPresentation?: { tick: number; fusionTick: number | null; };
+  dnaPresentation?: { tick: number; fusionTick: number | null; } | null;
   dnaPresentationStart: () => void;
   dnaPresentationStop: () => void;
   drawDigimonBillboard: (gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, worldPos: number[], w: number, h: number, tex: WebGLTexture | null, alpha: number, tint: number[] | null, flipX: boolean) => void;
@@ -502,7 +508,7 @@ export interface Battle3DContext {
   dvHome: () => any;
   eAABBLast?: Battle3dAABB | null;
   eBwm?: { mats: any[]; worldTrans: any[]; } | null;
-  effectAssets?: { manifest: any; images: Record<string, any>; };
+  effectAssets?: { manifest: any; images: Record<string, any>; } | null;
   effectPlayer?: EffectPlayer | null;
   enemyAnim?: string;
   enemyAnim8r?: ActorAnimator | null;
@@ -512,7 +518,7 @@ export interface Battle3DContext {
   enemyModel?: any;
   enemyPage?: Battle3dTexturePage | null;
   enemyPatches?: any;
-  enemyPatchHold?: number;
+  enemyPatchHold?: number | null;
   enemySkelBufs?: SkelBufs | null;
   enemyTex?: WebGLTexture | null;
   enemyVisible?: boolean;
@@ -526,7 +532,7 @@ export interface Battle3DContext {
   faceBoxOnScreen?: boolean;
   faceBoxSubject?: any;
   faceBoxSuppressed?: boolean;
-  faceCamRect?: { x: number; y: number; w: number; h: number; };
+  faceCamRect?: { x: number; y: number; w: number; h: number; } | null;
   faceCamSpeaker?: string | null;
   fighterAction: (id: string, clip: number) => boolean;
   fighterAttack: (attId: string, defId: string, techId: number, opts?: AttackOptions) => boolean;
@@ -601,7 +607,7 @@ export interface Battle3DContext {
   openClock?: { tick(dt: number): number; readonly frames: number; reset(): void; };
   opts?: Battle3DInitOptions;
   orbitClock?: number;
-  pAABB?: Battle3dAABB;
+  pAABB?: Battle3dAABB | null;
   pano?: PanoState | null;
   PANO_FADE?: number[];
   PANO_FAR_M?: number;
@@ -631,7 +637,7 @@ export interface Battle3DContext {
   playerNearCamera: () => unknown;
   playerPage?: Battle3dTexturePage | null;
   playerPatches?: any;
-  playerPatchHold?: number;
+  playerPatchHold?: number | null;
   playerSkelBufs?: SkelBufs | null;
   playerTex?: WebGLTexture | null;
   playerVisible?: boolean;
@@ -655,7 +661,7 @@ export interface Battle3DContext {
   resolveArenaStage: () => void;
   retireIdleDirector: () => void;
   rockCoverCache?: Map<string, number>;
-  sceneLight?: { dir: any[]; colour: any[]; ambient: any[]; };
+  sceneLight?: { dir: any[]; colour: any[]; ambient: any[]; } | null;
   screenOverlay?: { type: number; duration: number; t: number; } | null;
   setArenaDebug: (d: { legacy?: boolean; cull?: boolean; opaque?: boolean; voidRaw?: boolean; depthWrite?: boolean; depthClear?: boolean; }) => unknown;
   setArenaLegacy: (on: boolean) => boolean;

@@ -20,69 +20,39 @@
 // when it is skipped, on a warp, before a battle, and on every stage entry (so a load or a map change clears it too).
 
 import { questGhostClear } from "./quest-ghost.js";
-interface QuestFxSpec {
-    kind?: string;
-    name?: string;
-    sheet?: string;
-    x?: number;
-    y?: number;
-    clip?: string;
-    layer?: string;
-    fall?: number;
-    slide?: number;
-    rise?: number;
-    scale?: number;
-    ysort?: number;
-}
-
-
-interface QuestFx {
-    name: string;
-    sheet: CanvasImageSource;
-    sheetName: string;
-    x: number;
-    y: number;
-    layer: string;
-    scale: number;
-    ysort: number;
-    clip: string | null;
-    fall?: number;
-    slide?: number;
-    rise?: number;
-}
-
+import type { QuestFx, QuestFxClip, QuestFxDrawable, QuestFxDrive, QuestFxFade, QuestFxLayer, QuestFxMotionInput, QuestFxPlaySpec, QuestFxRemoveSpec, QuestFxShake, QuestFxShakeSpec, QuestFxSheet, QuestFxSheetDef, QuestFxSpec } from "./types/quest-fx.js";
 
 const FIELDS_PER_SECOND = 60;          // the field's own blank rate (FIELD_TICK_RATE)
-const LAYERS = ["entity", "behind", "front"];
+const LAYERS: (QuestFxLayer | undefined)[] = ["entity", "behind", "front"];
 
 /** Loaded sheets by name: { def, img } once loaded, null when the sheet is missing (a step using it is skipped). */
-const sheets = new Map();
+const sheets = new Map<string, QuestFxSheet | null>();
 /** Live effects by instance name (the name a scene gives the `fx` step). */
-const live = new Map();
+const live = new Map<string, QuestFx>();
 /** How many whole blanks the frame clock still owes the effect list. */
 let blankAccumulator = 0;
 /** The `fade` step's overlay: alpha 0..1 and where it is heading. */
-const fade = { alpha: 0, target: 0, speed: 0, waiters: [] };
+const fade: QuestFxFade = { alpha: 0, target: 0, speed: 0, waiters: [] };
 /** The `drop`/`rise` steps' character-Y drive, in field blanks (the s680 machine). */
-let drive = null;
+let drive: QuestFxDrive | null = null;
 /** The `shake` steps: one running batch of thuds (amplitude in view px, dying out over each thud's frames). */
-let shake = null;
+let shake: QuestFxShake | null = null;
 /** Injected by the host: add a 16.8 displacement to the field character's +0x54 (fieldCharAddY). */
-let addPlayerY = null;
+let addPlayerY: ((delta: number) => void) | null = null;
 
 /** The host hands us engine/systems/field-character.ts's own writer, so a drop moves the character the game moves. */
-export function installQuestFxPlayerDrive(addY) {
+export function installQuestFxPlayerDrive(addY: ((delta: number) => void) | null | undefined) {
     addPlayerY = typeof addY === "function" ? addY : null;
 }
 
 /** One sheet's address, for a host that wants to prefetch: web/extra_fx/<name>.{json,png}. */
-export const questFxSheetUrl = (name) => `extra_fx/${name}`;
+export const questFxSheetUrl = (name: string) => `extra_fx/${name}`;
 
 /**
  * Load the sheets a scene names (idempotent, cached). A sheet that fails to load is remembered as missing, so every use of
  * it is skipped for the rest of the session instead of retried per step. Never rejects.
  */
-export async function loadQuestFxSheets(names) {
+export async function loadQuestFxSheets(names: (string | null | undefined)[] | null | undefined) {
     const want = [...new Set((names ?? []).filter(Boolean).map(String))];
     await Promise.all(want.map(async (name) => {
         if (sheets.has(name)) return;
@@ -90,7 +60,7 @@ export async function loadQuestFxSheets(names) {
             const res = await fetch(`${questFxSheetUrl(name)}.json`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             let def = await res.json();
-            let img = null;
+            let img: CanvasImageSource | null = null;
             // `prefer`: a local, git-ignored sheet to play under this name when it is present; silently this one otherwise
             if (def?.prefer) {
                 try {
@@ -113,7 +83,7 @@ export async function loadQuestFxSheets(names) {
 }
 
 function loadSheetImage(url: string) {
-    return new Promise((resolve) => {
+    return new Promise<HTMLImageElement | null>((resolve) => {
         if (typeof Image === "undefined") return resolve(null);   // headless tests: no art, no crash
         const img = new Image();
         img.onload = () => resolve(img);
@@ -132,7 +102,7 @@ export function questFxSheetInfo(name: string) {
  * Register a sheet directly instead of loading its two files: the loader calls this once the PNG is in, and a verifier or
  * a test with no network uses it to drive the effect list itself. `img` is anything CanvasImageSource-shaped.
  */
-export function defineQuestFxSheet(name, def, img = null) {
+export function defineQuestFxSheet(name: string, def: QuestFxSheetDef | null | undefined, img: CanvasImageSource | null = null): QuestFxSheet | null | undefined {
     const key = String(name);
     const [fw, fh] = Array.isArray(def?.frame) ? def.frame.map(Number) : [];
     if (!(fw > 0) || !(fh > 0) || !def?.clips) { sheets.set(key, null); return null; }
@@ -141,14 +111,14 @@ export function defineQuestFxSheet(name, def, img = null) {
 }
 
 /** The clip a sheet plays when a step does not name one: "default", else the first clip it holds. */
-function defaultClip(sheet) {
+function defaultClip(sheet: QuestFxSheet) {
     const clips = sheet.def.clips ?? {};
     if (sheet.def.default && clips[sheet.def.default]) return sheet.def.default;
     return Object.keys(clips)[0] ?? null;
 }
 
 /** Start a clip on a live effect: frame 0, clock 0. A clip the sheet does not hold leaves the effect as it was. */
-function startClip(fx, name) {
+function startClip(fx: QuestFx, name: string | null | undefined) {
     const clip = name != null ? fx.sheet.def.clips?.[name] : null;
     if (!clip) return false;
     fx.clip = name;
@@ -159,7 +129,7 @@ function startClip(fx, name) {
 }
 
 /** The current cell of a live effect's clip. */
-function currentFrame(fx) {
+function currentFrame(fx: QuestFx) {
     const frames = fx.clipDef?.frames;
     if (!Array.isArray(frames) || !frames.length) return 0;
     return frames[Math.min(fx.frameIdx, frames.length - 1)] ?? 0;
@@ -186,12 +156,12 @@ export function questFxSpawn(spec: QuestFxSpec): QuestFx | null {
 }
 
 /** One fx object from a spec: the sheet it draws, its place, its layer and its first clip. Shared with the props. */
-function makeFx(spec, name: string) {
+function makeFx(spec: QuestFxSpec, name: string) {
     const sheetName = String(spec.sheet ?? name);
     const sheet = sheets.get(sheetName);
     if (!sheet) return null;
     const layer = LAYERS.includes(spec.layer) ? spec.layer : "entity";
-    const fx = {
+    const fx: QuestFx = {
         name, sheet, sheetName,
         x: Number(spec.x) || 0,
         y: Number(spec.y) || 0,
@@ -214,7 +184,7 @@ function makeFx(spec, name: string) {
         // no clip at all: the sheet still draws its first cell, so an effect never silently vanishes
         fx.clipDef = { frames: [0], hold: 60 };
     }
-    const motion = spec.fall ? { kind: "fall", ...spec.fall }
+    const motion: QuestFxMotionInput | null = spec.fall ? { kind: "fall", ...spec.fall }
         : spec.slide ? { kind: "slide", ...spec.slide }
             : spec.rise ? { kind: "rise", ...spec.rise }
                 : null;
@@ -223,12 +193,12 @@ function makeFx(spec, name: string) {
 }
 
 /** The effect a scene name refers to, or null. */
-export function questFxGet(name) {
+export function questFxGet(name: string | number) {
     return live.get(String(name)) ?? null;
 }
 
 /** Switch a live effect's clip: `{ name, clip, loop }`. Unknown effects and clips are skipped, not errors. */
-export function questFxPlay(spec: QuestFxSpec & { loop?: boolean }) {
+export function questFxPlay(spec: QuestFxPlaySpec) {
     const fx = live.get(String(spec?.name ?? ""));
     if (!fx) return false;
     const clip = spec?.clip != null ? fx.sheet.def.clips?.[spec.clip] : null;
@@ -239,10 +209,10 @@ export function questFxPlay(spec: QuestFxSpec & { loop?: boolean }) {
 }
 
 /** Start a motion on a live effect (`fall`, `slide`, `rise`), e.g. after it appeared. */
-export function questFxMove(spec) {
+export function questFxMove(spec: QuestFxSpec) {
     const fx = live.get(String(spec?.name ?? ""));
     if (!fx) return false;
-    const motion = spec.fall ? { kind: "fall", ...spec.fall }
+    const motion: QuestFxMotionInput | null = spec.fall ? { kind: "fall", ...spec.fall }
         : spec.slide ? { kind: "slide", ...spec.slide }
             : spec.rise ? { kind: "rise", ...spec.rise }
                 : null;
@@ -257,7 +227,7 @@ export function questFxMove(spec) {
  * the rebound is too small to matter; a slide spreads a straight move over `frames` blanks; a rise lifts `pixels` over
  * `frames` blanks. A motion with no sane numbers does nothing.
  */
-function setMotion(fx, m) {
+function setMotion(fx: QuestFx, m: QuestFxMotionInput | null | undefined) {
     if (!m || typeof m !== "object") return;
     if (m.kind === "fall") {
         const floor = Number(m.floor);
@@ -284,9 +254,9 @@ function setMotion(fx, m) {
 }
 
 /** True when an effect has nothing left to do (no motion, no fade-out): `fxwait` resolves on it. */
-const isSettled = (fx) => !fx.motion && !fx.fadeOut;
+const isSettled = (fx: QuestFx) => !fx.motion && !fx.fadeOut;
 
-function settle(fx) {
+function settle(fx: QuestFx) {
     fx.motion = null;
     const waiting = fx.waiters.splice(0);
     for (const resolve of waiting) resolve(true);
@@ -300,11 +270,11 @@ function settle(fx) {
 export function questFxWait(name: string) {
     const fx = live.get(String(name ?? ""));
     if (!fx || isSettled(fx)) return Promise.resolve(false);
-    return new Promise((resolve) => { fx.waiters.push(resolve); });
+    return new Promise<boolean>((resolve) => { fx.waiters.push(resolve); });
 }
 
 /** Remove an effect, optionally fading it out over `fade` blanks first (`{ name, fade }`). */
-export function questFxRemove(spec) {
+export function questFxRemove(spec: QuestFxRemoveSpec | null | undefined) {
     const fx = live.get(String(spec?.name ?? ""));
     if (!fx) return false;
     const frames = Math.max(0, Math.round(Number(spec?.fade) || 0));
@@ -316,7 +286,7 @@ export function questFxRemove(spec) {
     return true;
 }
 
-function removeFx(fx) {
+function removeFx(fx: QuestFx) {
     if (live.get(fx.name) === fx) live.delete(fx.name);
     const waiting = fx.waiters.splice(0);
     for (const resolve of waiting) resolve(true);
@@ -328,7 +298,7 @@ function removeFx(fx) {
  * the game's own transition wipe belongs to stage changes, and a quest must not fake one (that would fire the arrival
  * events of the map it is still on).
  */
-export function questFxFade(mode: number, frames: number) {
+export function questFxFade(mode: string | number | null | undefined, frames?: number) {
     const m = String(mode ?? "out");
     const target = m === "in" || m === "clear" ? 0 : 1;
     if (m === "black" || m === "clear") {
@@ -341,7 +311,7 @@ export function questFxFade(mode: number, frames: number) {
     fade.target = target;
     fade.speed = 1 / (n / FIELDS_PER_SECOND);
     if (fade.alpha === target) { fade.speed = 0; return Promise.resolve(fade.alpha); }
-    return new Promise((resolve) => { fade.waiters.push(resolve); });
+    return new Promise<number>((resolve) => { fade.waiters.push(resolve); });
 }
 
 /** The fade overlay's current alpha (0 = off). A verifier reads this. */
@@ -361,7 +331,7 @@ export function questFxDrivePlayer(pixels: number, step = 0.25) {
     if (!addPlayerY) return Promise.resolve(0);
     const dir = Math.sign(total);
     const per = Math.max(0.02, Math.abs(Number(step) || 0.25));
-    return new Promise((resolve) => {
+    return new Promise<number>((resolve) => {
         drive = { left: Math.abs(total), dir, step: per, v: 0, moved: 0, resolve };
     });
 }
@@ -374,14 +344,14 @@ export const questFxDriveState = () => (drive ? { left: Math.round(drive.left * 
  * the promise resolves when the last thud has died out, so the line after a giant's footstep is heard after it. A batch
  * already running is replaced (its waiter resolves at once): a scene never waits on a shake it has superseded.
  */
-export function questFxShake(spec) {
+export function questFxShake(spec: QuestFxShakeSpec | null | undefined) {
     const amp = Math.max(0, Number(spec?.amp) || 0);
     const frames = Math.max(1, Math.round(Number(spec?.frames) || 20));
     const times = Math.max(1, Math.min(12, Math.round(Number(spec?.times) || 1)));
     const every = times > 1 ? Math.max(1, Math.round(Number(spec?.every) || frames)) : 0;
     if (shake) { const waiting = shake.waiters.splice(0); for (const resolve of waiting) resolve(0); }
     if (!(amp > 0)) return Promise.resolve(0);
-    return new Promise((resolve) => {
+    return new Promise<number>((resolve) => {
         shake = { amp, frames, times, every, decay: spec?.decay !== false, t: 0, waiters: [resolve] };
     });
 }
@@ -468,8 +438,8 @@ function stepBlank() {
         } else if (m?.kind === "slide") {
             m.done += 1;
             const t = Math.min(1, m.done / m.frames);
-            fx.x = Math.round(m.from[0] + (m.to[0] - m.from[0]) * t);
-            fx.y = Math.round(m.from[1] + (m.to[1] - m.from[1]) * t);
+            fx.x = Math.round(m.from[0] + (m.to[0]! - m.from[0]) * t);
+            fx.y = Math.round(m.from[1] + (m.to[1]! - m.from[1]) * t);
             if (fx.layer === "entity") fx.ysort = fx.y;
             if (t >= 1) settle(fx);
         } else if (m?.kind === "rise") {
@@ -537,7 +507,7 @@ export function questFxTick(dt: number) {
  * `camX`/`camY` are the frame's camera, the same numbers drawSprite subtracts.
  */
 export function questFxDrawables(camX: number, camY: number) {
-    const out = [];
+    const out: QuestFxDrawable[] = [];
     for (const fx of live.values()) {
         if (fx.layer === "front") continue;          // drawn after every entity instead (questFxDrawOver)
         out.push({ y: fx.ysort, draw: () => drawFx(fx, camX, camY) });
@@ -547,10 +517,10 @@ export function questFxDrawables(camX: number, camY: number) {
 
 /** The "front" layer: effects that must cover every person on the map. */
 export function questFxDrawOver(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
-    for (const fx of live.values()) if (fx.layer === "front") drawFx(fx, camX, camY, ctx!);
+    for (const fx of live.values()) if (fx.layer === "front") drawFx(fx, camX, camY, ctx);
 }
 
-function drawFx(fx, camX: number, camY: number, ctx2 = null) {
+function drawFx(fx: QuestFx, camX: number, camY: number, ctx2: CanvasRenderingContext2D | null = null) {
     const g = ctx2 ?? drawContext;
     if (!g) return;
     const ax = Array.isArray(fx.sheet.def.anchor) ? Number(fx.sheet.def.anchor[0]) : 0.5;
@@ -568,7 +538,7 @@ function drawFx(fx, camX: number, camY: number, ctx2 = null) {
 }
 
 /** The host installs the field's 2D context here, so a drawable closure does not need it passed down the list. */
-let drawContext: CanvasRenderingContext2D | null | null = null;
+let drawContext: CanvasRenderingContext2D | null = null;
 export function installQuestFxCanvas(ctx: CanvasRenderingContext2D | null) {
     drawContext = ctx;
 }

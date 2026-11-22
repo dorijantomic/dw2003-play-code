@@ -22,7 +22,9 @@ import {
 import { activeSlotOf, effectiveSpd, setStatModifier } from "./plans.js";
 import { RAND_FRAC, battleRestoreTargets } from "./restore.js";
 import type { PostHitDispatchOptions } from "./core/types.js";
-import type { BattleState, BattleResultPage } from "../types/battle.js";
+import type { BattleState, BattleResultPage, BattleRecord, FightTechRow } from "../types/battle.js";
+import type { BattleRestoreState } from "./restore.js";
+import type { category5Plan } from "../vendor/engine.js";
 interface StatusEventExpiry {
   kind: string;
   side: number;
@@ -30,6 +32,23 @@ interface StatusEventExpiry {
   stat?: number;
   lock?: number;
   ailment?: string;
+}
+
+/** What the poison formula reads off a combatant: its own status resistances, else its enemy row's. */
+interface PoisonDefenceSource {
+  statusResists?: Record<string, number>;
+  eStats?: { status_resist?: Record<string, number> } | null;
+}
+
+/** What applyCategory5Plan is handed: the records the plan lands on. */
+interface Category5Targets {
+  activeSlot: number;
+  playerRec: BattleRecord | null;
+  mpSource: BattleRecord | null;
+  mpDest: BattleRecord | null;
+  targetRec: BattleRecord | null;
+  targets: (BattleRecord | null)[];
+  recordMagnitude: number;
 }
 
 interface DamageTermPenalty {
@@ -156,7 +175,7 @@ function battleAilmentTarget(b: BattleState, side: number, slot: number) {
 }
 
 /** The poison formula's two inputs, the same pair `advanceAilmentTimeline` used to read. */
-function poisonDefenceFieldsOf(c) {
+function poisonDefenceFieldsOf(c: PoisonDefenceSource) {
   const eStats = c.eStats;
   const water = c.statusResists?.water ?? eStats?.status_resist?.water ?? 0;
   const poisonResistance = c.statusResists?.poison
@@ -170,7 +189,7 @@ function poisonDefenceFieldsOf(c) {
  * Every line here is the record offset the arm's instruction stream writes; which arm
  * writes what is `category5Plan`'s decision, not this function's.
  */
-export function applyCategory5Plan(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, plan, ctx) {
+export function applyCategory5Plan(b: BattleRestoreState, plan: NonNullable<ReturnType<typeof category5Plan>>, ctx: Category5Targets) {
   const { playerRec, targetRec, targets } = ctx;
   // Each change names ITS OWN slot: the party arm writes every living record of the side
   // (`.L0x800903f4`'s walk, `:13857 addiu $s1, 0x1` / `:13858 slti $v0, $s1, 0x3`), so a
@@ -285,7 +304,7 @@ export function applyCategory5Plan(b: { statusEvents: { code: number; time: numb
  * else `{ dispatch, landed, queueWord, penalty }`. `penalty` is the record's three
  * halfwords after the arm ran.
  */
-export function applyPostHitDispatch(b: BattleState, record, options: PostHitDispatchOptions = {}): PostHitDispatchResult | null {
+export function applyPostHitDispatch(b: BattleState, record: FightTechRow | null, options: PostHitDispatchOptions = {}): PostHitDispatchResult | null {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch === 13) return applyFleeLockDispatch(b, record, options);
   if (dispatch === 29) return applyMpAbsorbDispatch(b, record, options);
@@ -324,7 +343,7 @@ export function applyPostHitDispatch(b: BattleState, record, options: PostHitDis
  * units on the PLAYER's active slot, the flee bit (+0x1c bit 0x10) is set, and the page is esmfight[0x44]
  * "Can't run away!". The pool's expiry clears the bit (wfightmn.s:2925-2948). `options.rng` is a 16-bit draw.
  */
-function applyFleeLockDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, record: { f8: number; }, options: PostHitDispatchOptions = {}) {
+function applyFleeLockDispatch(b: BattleRestoreState, record: FightTechRow | null, options: PostHitDispatchOptions = {}) {
   const rng = options.rng ?? RAND_U16;
   if (!damageTermFleeLockRoll(record?.f8 | 0, rng)) return { dispatch: 13, landed: false, page: null };
   const slot = activeSlotOf(b, 0);
@@ -345,7 +364,7 @@ function applyFleeLockDispatch(b: { statusEvents: { code: number; time: number; 
  * current MP, and the enemy's active fighter gains it (clamped at its own maximum). Page: kind 18 with payload
  * word 2 = 1, "{1} MP absorbed!" (esmfight[0x8f]), the amount in slot 1.
  */
-function applyMpAbsorbDispatch(b: BattleState, record: { f9: number }, options: PostHitDispatchOptions = {}): PostHitDispatchResult {
+function applyMpAbsorbDispatch(b: BattleState, record: FightTechRow | null, options: PostHitDispatchOptions = {}): PostHitDispatchResult {
   const src = battleRestoreTargets(b, 0)[activeSlotOf(b, 0)] ?? null;
   const dst = battleRestoreTargets(b, 1)[activeSlotOf(b, 1)] ?? null;
   if (!src || !dst) return { dispatch: 29, landed: false, page: null };

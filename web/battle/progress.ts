@@ -1,7 +1,11 @@
 import { unlockedTreeRecords, firstUnlockedTreeRecord, RAND_U16, scaledStat } from "../vendor/engine.js";
 import { evolvedMaxStats } from "../battle.js";
 import type { BattleEndContext, WinBattleRewardsArgs } from "./core/types.js";
-import type { DigimonRecord } from "../types/battle.js";
+import type { DigimonRecord, ProgressionTables } from "../types/battle.js";
+import type { FormLedgerEntry } from "../game/types.js";
+
+type LevelUpTable = ProgressionTables["level_up"];
+type EvolutionTrees = Parameters<typeof unlockedTreeRecords>[0];
 import type { PartnerStats } from "../game/types.js";
 interface LevelUpTables {
   exp_tier_bounds: number[];
@@ -73,11 +77,11 @@ export function paidParticipants(b: BattleEndContext) {
 // own ledger, level and stats are the gates. Returns [{ record, index, toName }]
 // in table order; a record already in the member's form ledger is left out, exactly
 // as the routine's `bgez` skip does.
-export function treeCandidatesFor(evolutionTrees, digimonDB: { [k: string]: DigimonRecord; }, member) {
+export function treeCandidatesFor(evolutionTrees: EvolutionTrees | null | undefined, digimonDB: { [k: string]: DigimonRecord; }, member: { slot: number; stats: PartnerStats; } | null | undefined) {
   if (!member?.stats || !evolutionTrees) return [];
   const stats = member.stats;
   const formLevels = Object.fromEntries((stats.formLedger ?? [])
-    .map((record) => [Number(record.id), Number(record.formLevel ?? 1)]));
+    .map((record: FormLedgerEntry) => [Number(record.id), Number(record.formLevel ?? 1)]));
   return unlockedTreeRecords(evolutionTrees, member.slot, {
     formLevels, level: stats.level ?? 1, stats,
   }).map(({ record, index }) => ({
@@ -90,10 +94,10 @@ export function treeCandidatesFor(evolutionTrees, digimonDB: { [k: string]: Digi
 
 // The one form this line learns after this battle: the routine's FIRST passing
 // record, and nothing else. Returns the record's target or null.
-export function nextUnlockedEvolution(trees, slot, stats) {
+export function nextUnlockedEvolution(trees: EvolutionTrees | null | undefined, slot: number, stats: PartnerStats | null | undefined) {
   if (!stats) return null;
   const formLevels = Object.fromEntries((stats.formLedger ?? [])
-    .map((record) => [Number(record.id), Number(record.formLevel ?? 1)]));
+    .map((record: FormLedgerEntry) => [Number(record.id), Number(record.formLevel ?? 1)]));
   const hit = firstUnlockedTreeRecord(trees, slot, {
     formLevels, level: stats.level ?? 1, stats,
   });
@@ -129,7 +133,7 @@ export function nextUnlockedEvolution(trees, slot, stats) {
 // gated at four acquired forms) is how the player puts it in a slot afterwards.
 export const EQUIP_SLOTS = 3;
 
-export function autoEquipForm(equipped, formId) {
+export function autoEquipForm(equipped: readonly number[] | null | undefined, formId: number) {
   const current = Array.isArray(equipped) ? equipped : [];
   // get_equipped's view of the line: the entries its ids resolve to (id >= 3),
   // in slot order, then -1 padding.
@@ -153,7 +157,7 @@ export const EXPADAPTER_ID = 321; // accessory: +20% EXP  (stfgtrep 0x1dd0 check
 export const BITADAPTER_ID = 322; // accessory: +20% Bits (stfgtrep 0x26c0 check)
 
 // Total EXP that must be EXCEEDED (strict >) to reach `nextLevel`.
-export function levelUpThreshold(growthXp: number, nextLevel: number, lu) {
+export function levelUpThreshold(growthXp: number, nextLevel: number, lu: Pick<LevelUpTable, "exp_tier_bounds" | "exp_tier_const">) {
   if (nextLevel >= 100) return Infinity;
   const bounds = lu.exp_tier_bounds; // [5, 20, 40, 100]
   let tier = bounds.length - 1;
@@ -216,8 +220,8 @@ export function dvexpGain(base: number, partnerLevel: number, participants: numb
 // One level-up's random stat gains (rolled at the NEW level). The shipped game applies
 // these to stored current stats, and so does the walker's stored-stat model below
 // (applyLevelUpGains) — joined to stfgtrep 0x80085e3c in STAT-Q002-LEVELUP-STATROLL-JOIN-001.
-export function rollLevelUpGains(profile, newLevel: number, lu, rng = RAND_U16) {
-  const g = profile.growth ?? {};
+export function rollLevelUpGains(profile: DigimonRecord, newLevel: number, lu: LevelUpTable, rng = RAND_U16) {
+  const g: Record<string, number> = profile.growth ?? {};
   const tier4 = newLevel < 5 ? 0 : newLevel < 20 ? 1 : newLevel < 40 ? 2 : 3;
   const hpmp = (growth: number) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng()! % 9];
   const bounds = lu.core_tier_bounds; // [5, 20, 40, 60, 80]
@@ -236,10 +240,10 @@ export function rollLevelUpGains(profile, newLevel: number, lu, rng = RAND_U16) 
   const coreRows = (lu.core_table ?? []).flat();
   const stride = lu.core_table?.[0]?.length ?? 9;
   const block = coreRows.concat(lu.elem_table ?? []);
-  const core = {};
+  const core: Record<string, number> = {};
   for (const k of ["str", "def", "spt", "wis", "spd", "chr"])
     core[k] = block[tier6 * stride + (g[k] ?? 0) + rng()! % 5] ?? 0;
-  const elems = {};
+  const elems: Record<string, number> = {};
   if (newLevel < (lu.elem_level_limit ?? 41)) {
     for (const k of ["fire", "water", "ice", "wind", "thunder", "machine", "dark"]) {
       const idx = coreRows.length + (profile.resistance_growth?.[k] ?? 0) + rng()! % 4;
@@ -275,7 +279,7 @@ export function ensureStoredStats(ps: PartnerStats, profile: DigimonRecord | und
 
 // Apply one level-up's rolled gains in place (fn 0x80085e3c store semantics: plain adds,
 // clamp maxHP/maxMP at 9999 and core/elems at 999; there is NO lower clamp).
-export function applyLevelUpGains(ps: PartnerStats, gains, lu: { hpmp_cap: number; stat_cap: number; }) {
+export function applyLevelUpGains(ps: PartnerStats, gains: ReturnType<typeof rollLevelUpGains>, lu: { hpmp_cap: number; stat_cap: number; }) {
   const hpmpCap = lu?.hpmp_cap ?? 9999;
   const statCap = lu?.stat_cap ?? 999;
   ps.maxHp = Math.min((ps.maxHp ?? 0) + gains.hp, hpmpCap);
@@ -303,7 +307,7 @@ export function applyLevelUpGains(ps: PartnerStats, gains, lu: { hpmp_cap: numbe
 // `growthProfile` is the row the disc's rolls read: the member's STARTER species'
 // (levelUpGrowthProfile), never the active form's. `prof` stays the active form only
 // for the no-progression-table branch, which has no disc counterpart.
-export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel: number, lu: { exp_tier_bounds: number[]; exp_tier_const: number[]; hpmp_tier_adj: number[]; hpmp_rand9: number[]; core_tier_bounds: number[]; core_table: number[][]; elem_level_limit: number; elem_table: number[]; exp_cap: number; level_cap: number; hpmp_cap: number; stat_cap: number; tp_per_level: number; tp_cap: number; dvexp_cap?: number; } | undefined, growthProfile = prof) {
+export function applyLevelUp(ps: PartnerStats, prof: DigimonRecord, oldLevel: number, newLevel: number, lu: { exp_tier_bounds: number[]; exp_tier_const: number[]; hpmp_tier_adj: number[]; hpmp_rand9: number[]; core_tier_bounds: number[]; core_table: number[][]; elem_level_limit: number; elem_table: number[]; exp_cap: number; level_cap: number; hpmp_cap: number; stat_cap: number; tp_per_level: number; tp_cap: number; dvexp_cap?: number; } | undefined, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
     ensureStoredStats(ps, growthProfile);
@@ -335,7 +339,7 @@ export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel:
 // partner fighting as a digivolution therefore keeps the starter's curve and rolls:
 // the slot1_ram RAM dump (slot0 standing in Dinohumon, exp 2985 -> level 15) only
 // fits the starter's growth_xp 8, not the form's 1.
-export function levelUpGrowthProfile(player, profiles: { [k: string]: DigimonRecord; }) {
+export function levelUpGrowthProfile(player: { rookieId?: number; profile?: DigimonRecord; } | null | undefined, profiles: { [k: string]: DigimonRecord; }) {
   const rookie = profiles?.[Number(player?.rookieId)];
   return rookie ?? player?.profile ?? null;
 }

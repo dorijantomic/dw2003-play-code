@@ -1,4 +1,13 @@
-import type { OwnClipRec } from './types.js';
+import type { FightVec3 } from './types.js';
+
+/** One keyframe of a layer track: [frame, x, y, z]. */
+type TrackKey = [number, number, number, number];
+
+/** A flight pack's compiled clip: runs of consecutive frames [first, count], and the terminator frame. */
+export interface ProjClip { segments?: [number, number][]; end?: number; }
+
+/** One program layer of a flight pack: its 1-based parent (0 = the root) and its scale/translation/rotation tracks. */
+export interface ProjLayer { parent: number; tracks?: { s?: TrackKey[]; t?: TrackKey[]; r?: TrackKey[]; } | null; }
 // op6 projectile-mesh layer transforms — the 3D mesh effect path (MEFT packs).
 //
 // This is the port of the original's per-frame layer builder. The chain, all read from
@@ -51,7 +60,7 @@ export function mat4Mul(a: number[] | Float32Array<ArrayBuffer>, b: number[] | F
   return out;
 }
 
-export function mat4Translate(tx: number, ty: number | undefined, tz: number) {
+export function mat4Translate(tx: number, ty: number, tz: number) {
   const m = mat4Identity();
   m[12]=tx; m[13]=ty; m[14]=tz;
   return m;
@@ -104,12 +113,12 @@ export function mat4RotPSX(ax: number, ay: number, az: number) {
  * held past the last one. Tracks terminate with a frame-30000 sentinel that repeats the
  * final value, so holding and interpolating into the sentinel agree.
  */
-export function sampleTrack(keys, t: number, dflt: number[]) {
+export function sampleTrack(keys: TrackKey[] | undefined, t: number, dflt: FightVec3): FightVec3 {
   if (!keys || !keys.length) return dflt;
-  let prev = keys[0];
+  let prev = keys[0]!;
   if (t <= prev[0]) return [prev[1], prev[2], prev[3]];
   for (let i = 1; i < keys.length; i++) {
-    const k = keys[i];
+    const k = keys[i]!;
     if (t <= k[0]) {
       const f = (t - prev[0]) / (k[0] - prev[0]);
       return [prev[1] + (k[1]-prev[1])*f, prev[2] + (k[2]-prev[2])*f, prev[3] + (k[3]-prev[3])*f];
@@ -208,19 +217,19 @@ export function meshAbrMode(n: number) {
 // every effect's speed uniformly.
 
 /** Total compiled stream length, terminator included - the original's animator+0xa0. */
-export function clipStreamLength(clip) {
+export function clipStreamLength(clip: ProjClip | null | undefined) {
   if (!clip || !clip.segments) return 0;
   return clip.segments.reduce((n, [, count]) => n + count, 0) + 1;
 }
 
 /** Frame held at stream index `i`, or the terminator value past the end. */
-function clipEntry(clip, i: number) {
+function clipEntry(clip: ProjClip, i: number) {
   let k = i;
-  for (const [first, count] of clip.segments) {
+  for (const [first, count] of clip.segments!) {
     if (k < count) return first + k;
     k -= count;
   }
-  return clip.end;
+  return clip.end!;
 }
 
 /**
@@ -228,7 +237,7 @@ function clipEntry(clip, i: number) {
  * on the tick after the cursor reaches the terminator, so this is two less than the stream
  * length.
  */
-export function clipTicks(clip: OwnClipRec) {
+export function clipTicks(clip: ProjClip) {
   const n = clipStreamLength(clip);
   return n > 2 ? n - 2 : 0;
 }
@@ -238,14 +247,14 @@ export function clipTicks(clip: OwnClipRec) {
  * last frame once the stream is exhausted rather than running off it, so a caller that
  * over-runs the lifetime degrades to a freeze instead of to garbage.
  */
-export function clipFrameAt(clip, t: number) {
+export function clipFrameAt(clip: ProjClip | null | undefined, t: number) {
   if (!clip || !clip.segments || !clip.segments.length) return t;   // undecoded clip: 1:1
   const last = clipStreamLength(clip) - 2;                          // index of the final frame
   const i = Math.min(Math.max(0, Math.floor(t)) + 1, Math.max(0, last));
   return clipEntry(clip, i);
 }
 
-function localMatrix(layer, t: number) {
+function localMatrix(layer: ProjLayer, t: number) {
   const tr = layer.tracks || {};
   const sc = sampleTrack(tr.s, t, [0x1000, 0x1000, 0x1000]);
   const tl = sampleTrack(tr.t, t, [0, 0, 0]);
@@ -278,7 +287,7 @@ function localMatrix(layer, t: number) {
  * reproduced here as a pure function of `t` — a hidden layer resolves to the most recent
  * earlier tick at which it was visible — so the result does not depend on frame pacing.
  */
-export function projLayerWorlds(layers, t: number, root: Float32Array<ArrayBuffer>) {
+export function projLayerWorlds(layers: ProjLayer[], t: number, root: Float32Array<ArrayBuffer>) {
   const n = layers.length;
   const world = new Array(n + 1);
   const shown = new Array(n + 1);
@@ -287,15 +296,15 @@ export function projLayerWorlds(layers, t: number, root: Float32Array<ArrayBuffe
 
   const tick = Math.max(0, Math.floor(t));
   const visibleAt = (i: number, k: number) =>
-    layerVisible(sampleTrack((layers[i].tracks || {}).s, k, [0x1000, 0x1000, 0x1000]));
+    layerVisible(sampleTrack((layers[i]!.tracks || {}).s, k, [0x1000, 0x1000, 0x1000]));
 
   // Matrix of layer index `idx` (1-based; 0 = root) as of tick `k`, following the stale
   // rule for any hidden layer on the way up. Parents always precede their children in the
   // table (verified: 0 forward references across all 572 shipped rows), so a plain
   // walk up the chain terminates.
-  const matrixAt = (idx: number, k: number) => {
+  const matrixAt = (idx: number, k: number): Float32Array<ArrayBuffer> => {
     if (idx === 0) return root;
-    const L = layers[idx - 1];
+    const L = layers[idx - 1]!;
     let eff = k;
     while (eff > 0 && !visibleAt(idx - 1, eff)) eff--;
     // `eff` is now the last tick at which this layer was written, or 0 if it was never
@@ -306,7 +315,7 @@ export function projLayerWorlds(layers, t: number, root: Float32Array<ArrayBuffe
   };
 
   for (let i = 0; i < n; i++) {
-    const L = layers[i];
+    const L = layers[i]!;
     const sc = sampleTrack((L.tracks || {}).s, tick, [0x1000, 0x1000, 0x1000]);
     shown[i + 1] = layerVisible(sc);
     const p = (L.parent > 0 && L.parent < i + 1) ? L.parent : 0;

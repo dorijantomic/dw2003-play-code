@@ -55,18 +55,18 @@ void main() {
     o = vec4(clamp(c, 0.0, 1.0), 1.0);
 }`;
 
-export function installPost2d(stageEl, gameCanvas) {
+export function installPost2d(stageEl: HTMLElement | null, gameCanvas: HTMLCanvasElement | null) {
     if (!stageEl || !gameCanvas) return;
     const ov = document.createElement("canvas");
     ov.id = "post2d";
     ov.style.cssText = "position:absolute;pointer-events:none;display:none;image-rendering:pixelated;border:none;border-radius:0;background:transparent;max-width:none;max-height:none;z-index:2";
     stageEl.appendChild(ov);
-    let gl = null, prog = null, tex: WebGLTexture | null = null, loc = null, failed = false;
+    let gl: WebGL2RenderingContext | null = null, prog: WebGLProgram | null = null, tex: WebGLTexture | null = null, loc: Record<string, WebGLUniformLocation | null> | null = null, failed = false;
 
     function init() {
         gl = ov.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false });
         if (!gl) { failed = true; return false; }
-        const sh = (type: number, src: string) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        const sh = (type: number, src: string) => { const s = gl!.createShader(type); gl!.shaderSource(s!, src); gl!.compileShader(s!); if (!gl!.getShaderParameter(s!, gl!.COMPILE_STATUS)) throw new Error(gl!.getShaderInfoLog(s!)!); return s!; };
         try {
             prog = gl.createProgram();
             gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
@@ -87,29 +87,30 @@ export function installPost2d(stageEl, gameCanvas) {
         return true;
     }
 
+    // ETS item 9: past the guard at the top of installPost2d and init()'s success, gameCanvas, stageEl, gl and loc are set (and loc holds every uniform name); TS cannot see across the function boundary.
     function frame() {
         requestAnimationFrame(frame);
-        const on = fx.hd2d && !failed && !gameCanvas.hidden && gameCanvas.width > 0;
+        const on = fx.hd2d && !failed && !gameCanvas!.hidden && gameCanvas!.width > 0;
         setFlatReader("hd2d", !!on);        // a battle's 3D layer is not in the game canvas unless the frame is flat
         if (!on) { if (ov.style.display !== "none") ov.style.display = "none"; return; }
         if (!gl && !init()) { ov.style.display = "none"; return; }
         // sit exactly on the game canvas's content box (inside its border), whatever the page does to it
-        const s = stageEl.getBoundingClientRect(), r = gameCanvas.getBoundingClientRect();
-        ov.style.left = (r.left - s.left + gameCanvas.clientLeft) + "px"; ov.style.top = (r.top - s.top + gameCanvas.clientTop) + "px";
-        ov.style.width = gameCanvas.clientWidth + "px"; ov.style.height = gameCanvas.clientHeight + "px";
-        if (ov.width !== gameCanvas.width || ov.height !== gameCanvas.height) { ov.width = gameCanvas.width; ov.height = gameCanvas.height; }
+        const s = stageEl!.getBoundingClientRect(), r = gameCanvas!.getBoundingClientRect();
+        ov.style.left = (r.left - s.left + gameCanvas!.clientLeft) + "px"; ov.style.top = (r.top - s.top + gameCanvas!.clientTop) + "px";
+        ov.style.width = gameCanvas!.clientWidth + "px"; ov.style.height = gameCanvas!.clientHeight + "px";
+        if (ov.width !== gameCanvas!.width || ov.height !== gameCanvas!.height) { ov.width = gameCanvas!.width; ov.height = gameCanvas!.height; }
         ov.style.display = "block";
         const t = Object.assign({}, DEFAULTS, window.__hd2d || {});
         const k = typeof fx.hd2dStrength === "number" ? fx.hd2dStrength : 1;      // the F2 slider scales every part of the look
         t.blur *= k; t.bloom *= k; t.vig *= k; t.sat = 1 + (t.sat - 1) * k; t.con = 1 + (t.con - 1) * k;
-        gl.viewport(0, 0, ov.width, ov.height);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pixelFilteredFrame() ?? gameCanvas);   // the F2 pixel filter's frame when it is on
-        gl.generateMipmap(gl.TEXTURE_2D);
-        gl.uniform1i(loc.uTex, 0); gl.uniform2f(loc.uSize, ov.width, ov.height);
-        gl.uniform1f(loc.uBlur, t.blur); gl.uniform1f(loc.uFocus, t.focus); gl.uniform1f(loc.uBloom, t.bloom);
-        gl.uniform1f(loc.uThr, t.thr); gl.uniform1f(loc.uSat, t.sat); gl.uniform1f(loc.uCon, t.con); gl.uniform1f(loc.uVig, t.vig);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl!.viewport(0, 0, ov.width, ov.height);
+        gl!.bindTexture(gl!.TEXTURE_2D, tex);
+        gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, pixelFilteredFrame() ?? gameCanvas!);   // the F2 pixel filter's frame when it is on
+        gl!.generateMipmap(gl!.TEXTURE_2D);
+        gl!.uniform1i(loc!.uTex!, 0); gl!.uniform2f(loc!.uSize!, ov.width, ov.height);
+        gl!.uniform1f(loc!.uBlur!, t.blur); gl!.uniform1f(loc!.uFocus!, t.focus); gl!.uniform1f(loc!.uBloom!, t.bloom);
+        gl!.uniform1f(loc!.uThr!, t.thr); gl!.uniform1f(loc!.uSat!, t.sat); gl!.uniform1f(loc!.uCon!, t.con); gl!.uniform1f(loc!.uVig!, t.vig);
+        gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
     requestAnimationFrame(frame);
 }

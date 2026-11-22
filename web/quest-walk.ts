@@ -1,8 +1,5 @@
-interface QuestReachGrid {
-    cols: number;
-    rows: number;
-    cell: number;
-}
+import type { QuestWalkGrid } from "./types/quest-editor.js";
+import type { QuestGridSource, QuestRouteResult, QuestStandInPost, QuestWalkPoint } from "./types/quest-walk.js";
 // Quest scenes: walkable ground.
 //
 // A scripted walk hands the game's cutscene VM a target point, and the VM's walk driver steps the character toward it in
@@ -25,21 +22,22 @@ export const FOOT_HALF = 6;
 export const FOOT_DEPTH = 8;
 
 /** The cell of a grid the point falls in. */
-const cellOf = (grid: QuestReachGrid, x: number | undefined, y: number | undefined) => [Math.floor(x / grid.cell), Math.floor(y / grid.cell)];
+const cellOf = (grid: { cell: number; }, x: number, y: number): QuestWalkPoint => [Math.floor(x / grid.cell), Math.floor(y / grid.cell)];
 
 /**
  * A grid in the shape this module works on: `{ cell, cols, rows, cells }` with `cells` a per-cell 0/1 array. Accepts the
  * engine's own grid (already in that shape) and the JSON one (`{ blocked: ["0101...", ...] }`, one string per row).
  */
-export function questGrid(src) {
+export function questGrid(src: QuestGridSource): QuestWalkGrid | null {
     if (!src || !Number.isFinite(src.cols) || !Number.isFinite(src.rows)) return null;
     const cell = src.cell || 8;
     if (src.cells && typeof src.cells.length === "number" && src.cells.length >= src.cols * src.rows) {
-        return src.cells instanceof Uint8Array ? src : { cell, cols: src.cols, rows: src.rows, cells: Uint8Array.from(src.cells) };
+        // ETS item 9: instanceof proved src.cells is a Uint8Array, so src already is a QuestWalkGrid; TS cannot narrow an object by the class of one property.
+        return src.cells instanceof Uint8Array ? src as QuestWalkGrid : { cell, cols: src.cols, rows: src.rows, cells: Uint8Array.from(src.cells) };
     }
     if (!Array.isArray(src.blocked)) return null;
     const cells = new Uint8Array(src.cols * src.rows);
-    src.blocked.forEach((row, r: number) => {
+    src.blocked.forEach((row, r) => {
         const s = String(row);
         for (let c = 0; c < src.cols; c++) if (s[c] === "1") cells[r * src.cols + c] = 1;
     });
@@ -47,33 +45,33 @@ export function questGrid(src) {
 }
 
 /** Whether any blocked cell lies in the rectangle (x0,y0)-(x1,y1); off the grid counts as blocked. */
-export function questRectBlocked(grid, x0: number, y0: number, x1: number, y1: number | undefined) {
+export function questRectBlocked(grid: QuestWalkGrid | null | undefined, x0: number, y0: number, x1: number, y1: number) {
     if (!grid) return true;
     const [c0, r0] = cellOf(grid, x0, y0), [c1, r1] = cellOf(grid, x1, y1);
-    for (let r = r0; r! <= r1!; r++)
-        for (let c = c0; c! <= c1!; c++) {
-            if (c! < 0 || r! < 0 || c! >= grid.cols || r! >= grid.rows) return true;
-            if (grid.cells[r! * grid.cols + c!]) return true;
+    for (let r = r0; r <= r1; r++)
+        for (let c = c0; c <= c1; c++) {
+            if (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows) return true;
+            if (grid.cells[r * grid.cols + c]) return true;
         }
     return false;
 }
 
 /** Whether a character standing with its feet at (x, y) is on walkable ground. */
-export function questStandFree(grid, x: number | undefined, y: number | undefined) {
-    return !questRectBlocked(grid, x! - FOOT_HALF, y! - FOOT_DEPTH, x! + FOOT_HALF, y);
+export function questStandFree(grid: QuestWalkGrid | null | undefined, x: number, y: number) {
+    return !questRectBlocked(grid, x - FOOT_HALF, y - FOOT_DEPTH, x + FOOT_HALF, y);
 }
 
 /** Whether a character can walk the straight line a->b without its foot box touching a wall (sampled every `step` px). */
-export function questLineClear(grid, ax: number, ay: number, bx: number | undefined, by: number | undefined, step = 4, skip = 0) {
+export function questLineClear(grid: QuestWalkGrid | null | undefined, ax: number, ay: number, bx: number, by: number, step = 4, skip = 0) {
     if (!grid) return true;
-    const len = Math.hypot(bx! - ax, by! - ay);
+    const len = Math.hypot(bx - ax, by - ay);
     // `skip` px at the start are not sampled: a character the scene did not place (an NPC on its own post) may already
     // be standing with its foot box clipped, and walking away from that is not the scene's fault
     const from = skip > 0 && len > skip ? skip / len : 0;
     const n = Math.max(1, Math.ceil((len * (1 - from)) / step));
     for (let i = 0; i <= n; i++) {
         const t = from + (1 - from) * (i / n);
-        if (!questStandFree(grid, ax + (bx! - ax) * t, ay + (by! - ay) * t)) return false;
+        if (!questStandFree(grid, ax + (bx - ax) * t, ay + (by - ay) * t)) return false;
     }
     return true;
 }
@@ -83,26 +81,26 @@ export function questLineClear(grid, ax: number, ay: number, bx: number | undefi
 // diagonal step is only allowed when both cells it passes between are standable too (no cutting a wall corner).
 
 /** The standable point of a cell: its lower middle (where the feet of a character standing in it would be). */
-const cellPoint = (grid: { cell: number; }, c: number | undefined, r: number | undefined) => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
+const cellPoint = (grid: { cell: number; }, c: number, r: number): QuestWalkPoint => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
 
 /** Whether a cell can be stood in. */
-export function questCellFree(grid: QuestReachGrid, c: number | undefined, r: number | undefined) {
+export function questCellFree(grid: QuestWalkGrid | null | undefined, c: number, r: number) {
     if (!grid || c < 0 || r < 0 || c >= grid.cols || r >= grid.rows) return false;
     const [x, y] = cellPoint(grid, c, r);
     return questStandFree(grid, x, y);
 }
 
 /** The nearest standable cell to a point, searched in rings out to `limit` cells; null when there is none. */
-export function questFreeCellNear(grid: QuestReachGrid, x: number | undefined, y: number | undefined, limit = 6) {
+export function questFreeCellNear(grid: QuestWalkGrid, x: number, y: number, limit = 6): QuestWalkPoint | null {
     const [c0, r0] = cellOf(grid, x, y);
     if (questCellFree(grid, c0, r0)) return [c0, r0];
     for (let d = 1; d <= limit; d++) {
-        let best = null, bestD = Infinity;
-        for (let r = r0! - d; r <= r0! + d; r++)
-            for (let c = c0! - d; c <= c0! + d; c++) {
-                if (Math.max(Math.abs(c - c0!), Math.abs(r - r0!)) !== d) continue;      // the ring only
+        let best: QuestWalkPoint | null = null, bestD = Infinity;
+        for (let r = r0 - d; r <= r0 + d; r++)
+            for (let c = c0 - d; c <= c0 + d; c++) {
+                if (Math.max(Math.abs(c - c0), Math.abs(r - r0)) !== d) continue;      // the ring only
                 if (!questCellFree(grid, c, r)) continue;
-                const dd = Math.hypot(c - c0!, r - r0!);
+                const dd = Math.hypot(c - c0, r - r0);
                 if (dd < bestD) { best = [c, r]; bestD = dd; }
             }
         if (best) return best;
@@ -111,18 +109,18 @@ export function questFreeCellNear(grid: QuestReachGrid, x: number | undefined, y
 }
 
 /** Breadth-first search over standable cells; returns the cell path (inclusive) or null when the goal is unreachable. */
-export function questCellPath(grid, from: (number | undefined)[], to) {
+export function questCellPath(grid: QuestWalkGrid | null | undefined, from: QuestWalkPoint, to: QuestWalkPoint): QuestWalkPoint[] | null {
     if (!grid || !from || !to) return null;
     const { cols, rows } = grid;
     const key = (c: number, r: number) => r * cols + c;
     const prev = new Int32Array(cols * rows).fill(-1);
     const seen = new Uint8Array(cols * rows);
-    const start = key(from[0]!, from[1]!);
+    const start = key(from[0], from[1]);
     seen[start] = 1;
     const queue = [from];
-    const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const STEP: QuestWalkPoint[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let head = 0; head < queue.length; head++) {
-        const [c, r] = queue[head];
+        const [c, r] = queue[head]!;
         if (c === to[0] && r === to[1]) break;
         for (const [dc, dr] of STEP) {
             const nc = c + dc, nr = r + dr;
@@ -137,8 +135,8 @@ export function questCellPath(grid, from: (number | undefined)[], to) {
     }
     const goal = key(to[0], to[1]);
     if (!seen[goal]) return null;
-    const path = [];
-    for (let k = goal; k !== -1; k = prev[k]) path.push([k % cols, Math.floor(k / cols)]);
+    const path: QuestWalkPoint[] = [];
+    for (let k = goal; k !== -1; k = prev[k]!) path.push([k % cols, Math.floor(k / cols)]);
     return path.reverse();
 }
 
@@ -149,10 +147,10 @@ export function questCellPath(grid, from: (number | undefined)[], to) {
  * that is already clear is a single leg (the common case: no routing at all). Returns null only when there is no grid or
  * the walker stands nowhere standable at all.
  */
-export function questRoute(grid, ax: number, ay: number, bx: number, by: number) {
+export function questRoute(grid: QuestWalkGrid | null | undefined, ax: number, ay: number, bx: number, by: number): QuestRouteResult | null {
     if (!grid) return null;
-    const target = [Math.round(bx), Math.round(by)];
-    const len = Math.hypot(target[0]! - ax, target[1]! - ay);
+    const target: QuestWalkPoint = [Math.round(bx), Math.round(by)];
+    const len = Math.hypot(target[0] - ax, target[1] - ay);
     const exact = questStandFree(grid, target[0], target[1]);
     // the walker's own first 12 px are not checked: it may already stand with a clipped foot box on its own post
     if (questLineClear(grid, ax, ay, target[0], target[1], 4, 12)) {
@@ -166,7 +164,7 @@ export function questRoute(grid, ax: number, ay: number, bx: number, by: number)
     // the goal: the destination's own cell when it can be stood in, else the closest standable one to it
     const goal = exact ? cellOf(grid, target[0], target[1]) : questFreeCellNear(grid, target[0], target[1], 8);
     let cells = goal && questCellFree(grid, goal[0], goal[1]) ? questCellPath(grid, start, goal) : null;
-    let end = exact ? target : (goal ? cellPoint(grid, goal[0], goal[1]) : null);
+    let end: QuestWalkPoint | null = exact ? target : (goal ? cellPoint(grid, goal[0], goal[1]) : null);
     let stopsShort = !exact;
     if (!cells) {
         // nowhere near the destination is reachable: stop on the closest ground the walker can walk to instead, so the
@@ -178,14 +176,14 @@ export function questRoute(grid, ax: number, ay: number, bx: number, by: number)
         end = cellPoint(grid, stop[0], stop[1]);
         stopsShort = true;
     }
-    const points = [[ax, ay], ...cells.map(([c, r]) => cellPoint(grid, c, r)), end];
+    const points: QuestWalkPoint[] = [[ax, ay], ...cells.map(([c, r]) => cellPoint(grid, c, r)), end!];
     // string-pull: keep only the corners a straight walk can actually take
-    const legs = [];
+    const legs: QuestWalkPoint[] = [];
     let i = 0;
     while (i < points.length - 1) {
         let j = points.length - 1;
-        while (j > i + 1 && !questLineClear(grid, points[i]![0]!, points[i]![1]!, points[j]![0], points[j]![1])) j--;
-        legs.push([Math.round(points[j]![0]!), Math.round(points[j]![1]!)]);
+        while (j > i + 1 && !questLineClear(grid, points[i]![0], points[i]![1], points[j]![0], points[j]![1])) j--;
+        legs.push([Math.round(points[j]![0]), Math.round(points[j]![1])]);
         i = j;
     }
     // the last leg is the destination itself (or its standable stand-in), never a cell centre short of it
@@ -195,18 +193,18 @@ export function questRoute(grid, ax: number, ay: number, bx: number, by: number)
 }
 
 /** The cell closest to `target` that a character standing on `start`'s own piece of ground can walk to. */
-export function questClosestCell(grid, start: (number | undefined)[], target: number[]) {
+export function questClosestCell(grid: QuestWalkGrid | null | undefined, start: QuestWalkPoint, target: QuestWalkPoint): QuestWalkPoint | null {
     if (!grid || !start) return null;
     const { cols, rows } = grid;
     const seen = new Uint8Array(cols * rows);
     const queue = [start];
-    seen[start[1]! * cols + start[0]!] = 1;
-    let best = null, bestD = Infinity;
-    const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    seen[start[1] * cols + start[0]] = 1;
+    let best: QuestWalkPoint | null = null, bestD = Infinity;
+    const STEP: QuestWalkPoint[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let head = 0; head < queue.length; head++) {
-        const [c, r] = queue[head];
+        const [c, r] = queue[head]!;
         const [x, y] = cellPoint(grid, c, r);
-        const d = Math.hypot(x! - target[0]!, y! - target[1]!);
+        const d = Math.hypot(x - target[0], y - target[1]);
         if (d < bestD) { best = [c, r]; bestD = d; }
         for (const [dc, dr] of STEP) {
             const nc = c + dc, nr = r + dr;
@@ -225,8 +223,8 @@ export function questClosestCell(grid, start: (number | undefined)[], target: nu
  * The legs a quest scene's walk should take: one leg when the straight line is clear, a routed few when it is not (so
  * the character goes around the wall instead of through it), and null when there is nothing to route over.
  */
-export function questWalkLegs(grid, ax: number | undefined, ay: number | undefined, bx: number | undefined, by: number | undefined) {
-    const r = questRoute(grid, ax!, ay!, bx!, by!);
+export function questWalkLegs(grid: QuestWalkGrid | null | undefined, ax: number, ay: number, bx: number, by: number): QuestWalkPoint[] | null {
+    const r = questRoute(grid, ax, ay, bx, by);
     if (!r) return null;
     if (r.exact && r.legs.length === 1) return r.legs;
     if (!r.legs.length) return null;                  // the destination is inside a wall and nowhere near ground
@@ -239,22 +237,22 @@ export function questWalkLegs(grid, ax: number | undefined, ay: number | undefin
  * Connected components of standable cells (8-connected, no cutting a wall corner): `labels` is one int per cell (-1 =
  * not standable) and two cells share a label exactly when a character can walk between them.
  */
-export function questComponents(grid: QuestReachGrid) {
+export function questComponents(grid: QuestWalkGrid | null | undefined) {
     if (!grid) return { labels: new Int32Array(0), sizes: [] };
     const { cols, rows } = grid;
     const labels = new Int32Array(cols * rows).fill(-1);
-    const sizes = [];
-    const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const sizes: number[] = [];
+    const STEP: QuestWalkPoint[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let r = 0; r < rows; r++)
         for (let c = 0; c < cols; c++) {
             const k = r * cols + c;
             if (labels[k] !== -1 || !questCellFree(grid, c, r)) continue;
             const label = sizes.length;
             let size = 0;
-            const queue = [[c, r]];
+            const queue: QuestWalkPoint[] = [[c, r]];
             labels[k] = label;
             for (let head = 0; head < queue.length; head++) {
-                const [qc, qr] = queue[head];
+                const [qc, qr] = queue[head]!;
                 size++;
                 for (const [dc, dr] of STEP) {
                     const nc = qc + dc, nr = qr + dr;
@@ -278,12 +276,12 @@ export function questComponents(grid: QuestReachGrid) {
  * Everything else is a sealed pocket — ground drawn on the map that nothing can walk to. `reach` is one byte per cell,
  * 1 = reachable.
  */
-export function questReachArea(grid: QuestReachGrid, seeds = [], links = []) {
+export function questReachArea(grid: QuestWalkGrid, seeds: QuestWalkPoint[] = [], links: [QuestWalkPoint, QuestWalkPoint][] = []) {
     const { cols, rows } = grid || { cols: 0, rows: 0 };
     const { labels, sizes } = questComponents(grid);
     const parent = sizes.map((_, i) => i);
-    const find = (i: number | undefined) => {
-        while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    const find = (i: number): number => {
+        while (parent[i] !== i) { parent[i] = parent[parent[i]!]!; i = parent[i]!; }
         return i;
     };
     const unite = (a: number | null | undefined, b: number | null | undefined) => {
@@ -291,14 +289,14 @@ export function questReachArea(grid: QuestReachGrid, seeds = [], links = []) {
         const ra = find(a), rb = find(b);
         if (ra !== rb) parent[rb] = ra;
     };
-    const labelOf = (x, y) => {
+    const labelOf = (x: number, y: number) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) return -1;
         const c = Math.floor(x / grid.cell), r = Math.floor(y / grid.cell);
         if (c < 0 || r < 0 || c >= cols || r >= rows) return -1;
-        return labels[r * cols + c];
+        return labels[r * cols + c]!;
     };
     for (const [a, b] of links) unite(labelOf(a[0], a[1]), labelOf(b[0], b[1]));
-    const on = new Set();
+    const on = new Set<number>();
     for (const [x, y] of seeds) {
         const label = labelOf(x, y);
         if (label !== -1) on.add(find(label));
@@ -307,23 +305,23 @@ export function questReachArea(grid: QuestReachGrid, seeds = [], links = []) {
     for (let i = 0; i < sizes.length; i++) if (biggest === -1 || sizes[i]! > sizes[biggest]!) biggest = i;
     if (biggest !== -1) on.add(find(biggest));
     const reach = new Uint8Array(cols * rows);
-    for (let k = 0; k < labels.length; k++) if (labels[k] !== -1 && on.has(find(labels[k]))) reach[k] = 1;
+    for (let k = 0; k < labels.length; k++) if (labels[k] !== -1 && on.has(find(labels[k]!))) reach[k] = 1;
     return reach;
 }
 
 /** Whether a point is in that reachable area (its own cell, or the nearest standable cell within a few). */
-export function questReachable(grid: QuestReachGrid | undefined, reach: Uint8Array | undefined, x: number, y: number, limit = 4) {
+export function questReachable(grid: QuestWalkGrid | undefined, reach: Uint8Array | undefined, x: number, y: number, limit = 4) {
     if (!grid || !reach) return true;
     const [c0, r0] = cellOf(grid, x, y);
-    if (questCellFree(grid, c0, r0)) return !!reach[r0! * grid.cols + c0!];
+    if (questCellFree(grid, c0, r0)) return !!reach[r0 * grid.cols + c0];
     const near = questFreeCellNear(grid, x, y, limit);
-    return near ? !!reach[near[1]! * grid.cols + near[0]!] : false;
+    return near ? !!reach[near[1] * grid.cols + near[0]] : false;
 }
 
 // --- where a stand-in may stand ------------------------------------------------------------------------------------
 
 /** The sideways nudges a quest stand-in tries before it gives up and stands on the post itself. */
-export const STAND_IN_OFFSETS = [
+export const STAND_IN_OFFSETS: QuestWalkPoint[] = [
     [28, 0], [-28, 0], [28, -8], [-28, -8], [0, -10], [0, 10],
     [56, 0], [-56, 0], [56, -8], [-56, -8], [0, -20], [0, 20],
 ];
@@ -333,9 +331,9 @@ export const STAND_IN_OFFSETS = [
  * around it that is, else the post (a stand-in on the post is better than no stand-in at all: the quest still needs
  * someone to talk to). `clear(x, y)` answers "walkable ground and no other character there".
  */
-export function standInSpot(post, clear, offsets = STAND_IN_OFFSETS) {
+export function standInSpot(post: QuestStandInPost | null | undefined, clear: ((x: number, y: number) => boolean) | null | undefined, offsets = STAND_IN_OFFSETS) {
     const x = Math.round(Number(post?.x) || 0), y = Math.round(Number(post?.y) || 0);
     if (typeof clear !== "function" || clear(x, y)) return { x, y };
-    for (const [dx, dy] of offsets) if (clear(x + dx!, y + dy!)) return { x: x + dx!, y: y + dy! };
+    for (const [dx, dy] of offsets) if (clear(x + dx, y + dy)) return { x: x + dx, y: y + dy };
     return { x, y };
 }

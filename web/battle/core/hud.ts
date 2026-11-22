@@ -142,9 +142,9 @@ function drawBattleHud(b: BattleState) {
     if (uiC.capturing()) {
       const act = b.activePlayerIndex ?? 0;
       const roster = b.playerRoster ?? [];
-      const nameOf = (i: string | number) => roster[i]?.name ?? b.playerRecords?.[i]?.profile?.name ?? "";
-      const others = [];
-      (b.playerRecords ?? []).slice(0, 3).forEach((rec, i: string | number) => {
+      const nameOf = (i: number) => roster[i]?.name ?? b.playerRecords?.[i]?.profile?.name ?? "";
+      const others: { name: string; hp: number; maxHp: number; mp: number; maxMp: number; }[] = [];
+      (b.playerRecords ?? []).slice(0, 3).forEach((rec, i: number) => {
         if (i !== act && rec) others.push({ name: nameOf(i), hp: rec.hp, maxHp: rec.maxHp, mp: rec.mp, maxMp: rec.maxMp });
       });
       uiCPart(B.ctx, { part: "battleData", x: 0, y: 0, w: 0, h: 0,
@@ -169,7 +169,7 @@ function drawBattleHud(b: BattleState) {
       // Colour and length read the *displayed* HP (HUD +0x60), so a hit that
       // crosses the quarter slumps the fighter immediately while the bar is
       // still sliding through green.
-      for (const [plate, cur, max] of [[enemy, eDisp, b.enemy.maxHp], [player, pDisp, b.player.maxHp]]) {
+      for (const [plate, cur, max] of [[enemy, eDisp, b.enemy.maxHp], [player, pDisp, b.player.maxHp]] satisfies [typeof enemy, number, number][]) {
         B.ctx!.fillStyle = "#05060a";
         B.ctx!.fillRect(plate.barX + 3, plate.barY + 3, plate.barW - 6, plate.barH - 6);
         B.fillHpBar(plate.barX + 3, plate.barY + 3, plate.barW - 6, plate.barH - 6, cur, max);
@@ -309,7 +309,7 @@ function drawListSelector(x: number, y: number, selected: boolean) {
     B.nativeText("L1", hint.l1.x, hint.l1.y, { kind: hint.kind, clut: hint.clut });
     B.nativeText("R1", hint.r1.x, hint.r1.y, { kind: hint.kind, clut: hint.clut });
   }
-function drawDescription(text: string, mp: number = null) {
+function drawDescription(text: string, mp: number | null = null) {
     const D = BATTLE_UI_LAYOUT.description;
     B.drawFightPane(D.x, D.y, D.w, D.h);
     B.nativeText(text ?? "", D.x + 5, D.y + 7, { kind: 1 });
@@ -318,7 +318,7 @@ function drawDescription(text: string, mp: number = null) {
       B.nativeText(String(mp), 300, 211, { kind: 3, alignRight: true });
     }
   }
-function visibleList(rows, selected: number) {
+function visibleList(rows: ArrayLike<unknown>, selected: number) {
     const visible = 6;
     const top = Math.max(0, Math.min(selected - visible + 1, rows.length - visible));
     return { visible, top };

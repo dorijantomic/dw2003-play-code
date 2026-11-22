@@ -31,8 +31,9 @@
 // limbs, so a projectile always has a real bone to leave from.
 
 import { firingPart } from "./digimon-anatomy.js";
+import type { BoneMapRec } from "./types.js";
 
-export const BONEMAP = {
+export const BONEMAP: Record<string, BoneMapRec> = {
   "m003agum":{"r":0,"ro":[0,9],"t":1,"h":2,"m":2,"e":2,"aL":[10,11,12,13],"aR":[14,15,16,17],"lL":[3,4,5],"lR":[6,7,8],"wL":[],"wR":[],"tl":[],"loc":[6,7,8,3,4,5],"f":{"left-arm":13,"right-arm":17,"both-arms":17,"mouth":2,"head":2,"eyes":2,"chest":1,"back":1,"whole-body":0},"dom":"both","sy":0.006,"sc":"high","fb":[13,17]},
   "m004beta":{"r":0,"ro":[0,2],"t":0,"h":9,"m":9,"e":9,"aL":[],"aR":[],"lL":[7,8],"lR":[5,6],"wL":[],"wR":[],"tl":[],"loc":[5,6,3,4,7,8,12,13],"f":{"mouth":9,"head":9,"eyes":9,"chest":0,"back":0,"whole-body":0},"dom":null,"sy":0,"sc":"low","lL2":[[12,13]],"lR2":[[3,4]]},
   "m005grey":{"r":0,"ro":[0,10],"t":2,"h":2,"m":2,"e":2,"aL":[4,5,6],"aR":[7,8,9],"lL":[11,12,13,14],"lR":[18,19,20,21],"wL":[],"wR":[],"tl":[15,16,17],"loc":[18,19,20,21,11,12,13,14],"f":{"left-arm":6,"right-arm":9,"both-arms":9,"mouth":2,"head":2,"eyes":2,"chest":2,"back":2,"tail":17,"whole-body":0},"dom":"both","sy":0.002,"sc":"high","fb":[6,9]},
@@ -289,8 +290,8 @@ export function sideConfidence(folder: string | number) { return (BONEMAP[folder
 export function roleBone(folder: string | number, role: string | number) {
   const m = BONEMAP[folder];
   if (!m) return null;
-  const key = { root: "r", torso: "t", head: "h", mouth: "m", eyes: "e", chest: "t", back: "t" }[role];
-  return key && m[key] != null ? m[key] : null;
+  const key = { root: "r", torso: "t", head: "h", mouth: "m", eyes: "e", chest: "t", back: "t" }[role as "root"];
+  return key && m[key as keyof BoneMapRec] != null ? m[key as keyof BoneMapRec] : null;
 }
 
 export function armChain(folder: string | number, side: string, n = 0) {
@@ -316,8 +317,8 @@ export function legChains(folder: string | number) {
   const m = BONEMAP[folder];
   if (!m) return [];
   const out = [];
-  for (const k of ["lL", "lR"]) if (m[k] && m[k].length) out.push({ side: k === "lL" ? "left" : "right", chain: m[k].slice() });
-  for (const k of ["lL2", "lR2"]) for (const c of m[k] || []) out.push({ side: k === "lL2" ? "left" : "right", chain: c.slice() });
+  for (const k of ["lL", "lR"] as const) if (m[k] && m[k].length) out.push({ side: k === "lL" ? "left" : "right", chain: m[k].slice() });
+  for (const k of ["lL2", "lR2"] as const) for (const c of m[k] || []) out.push({ side: k === "lL2" ? "left" : "right", chain: c.slice() });
   return out;
 }
 
@@ -330,7 +331,7 @@ export function wingChains(folder: string | number) {
   return out;
 }
 
-export function tailChain(folder: string | number): string[] | null {
+export function tailChain(folder: string | number): number[] | null {
   const m = BONEMAP[folder];
   return m && m.tl && m.tl.length ? m.tl.slice() : null;
 }
@@ -384,7 +385,7 @@ export function roleOfBone(folder: string | number, index: number) {
 //   side (dom), then its right arm, then its left arm;
 //   any other missing emitter (no mouth/tail/wing bone) -> the whole body (root), then the torso.
 // `null` only for a `self` move (no launcher) or an unknown model.
-export function launchBone(folder: string | number, techName: string): { mode: string; bone: string | null; source: string } | null {
+export function launchBone(folder: string | number, techName: string): { mode: string; bone: number | null; source: string } | null {
   const m = BONEMAP[folder];
   if (!m) return null;
   const p = firingPart(folder, techName);
@@ -395,18 +396,18 @@ export function launchBone(folder: string | number, techName: string): { mode: s
   const armish = p.mode === "arms-unspecified" || p.mode === "unknown" || p.mode === "other" ||
                  p.mode === "left-arm" || p.mode === "right-arm" || p.mode === "both-arms";
   if (armish) {
-    const order = [];
+    const order: string[] = [];
     if (p.mode === "left-arm" || p.mode === "right-arm") order.push(p.mode.slice(0, -4));
     const dom = p.side || m.dom;
     if ((dom === "left" || dom === "right") && order.indexOf(dom) < 0) order.push(dom);
     for (const s of ["right", "left"]) if (order.indexOf(s) < 0) order.push(s);
-    const src = (s) => (s === m.dom && s !== order[0] ? "dominant-side" : "first-arm");
+    const src = (s: string) => (s === m.dom && s !== order[0] ? "dominant-side" : "first-arm");
     for (const s of order) {
       const b = one(s + "-arm");
       if (b != null) return { mode: p.mode, bone: b, source: src(s) };
     }
-    if (m.aR && m.aR.length) return { mode: p.mode, bone: m.aR[m.aR.length - 1], source: "first-arm" };
-    if (m.aL && m.aL.length) return { mode: p.mode, bone: m.aL[m.aL.length - 1], source: "first-arm" };
+    if (m.aR && m.aR.length) return { mode: p.mode, bone: m.aR[m.aR.length - 1]!, source: "first-arm" };
+    if (m.aL && m.aL.length) return { mode: p.mode, bone: m.aL[m.aL.length - 1]!, source: "first-arm" };
   }
   if (m.f && m.f["whole-body"] != null) return { mode: p.mode, bone: m.f["whole-body"], source: "fallback-body" };
   if (m.t != null) return { mode: p.mode, bone: m.t, source: "fallback-torso" };

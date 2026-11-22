@@ -11,7 +11,7 @@ import { ST } from "./messages.js";
 import { battleKindOf } from "./form-blast.js";
 import { BATTLE_UI_LAYOUT } from "../battle.js";
 import { DV_GAUGE_MAX, normalizeDvGauge } from "./layout.js";
-import type { EnemyBattleRecord } from "../types/battle.js";
+import type { EnemyBattleRecord, EngineUi } from "../types/battle.js";
 
 import type { BattleState } from "../types/battle.js";
 import type { PlayerRecord } from "../types/battle.js";
@@ -50,10 +50,10 @@ export function partyPipCels(b: BattleState) {
  * the id stays null and the port takes the original's null-record path: the element is
  * still created, the text is left empty, and the walker draws its own species name.
  */
-let hudLabelsCache = null;
+let hudLabelsCache: { key: string; labels: ReturnType<typeof battleHudPlateLabels>; } | null = null;
 
 /** The leading `u16` of record `index` — the word F0x8009b864's scan matches. */
-function enemyStatReadId(index: string | number) {
+function enemyStatReadId(index: number) {
   const r = S.enemyStatRecords?.[index];
   return r ? (r.id & 0xffff) : 0;
 }
@@ -140,7 +140,7 @@ export function battleHudPlateLabelsFor(b: BattleState) {
  * own "No techs!"/"No items!" lines, `web/battle.js` confirmCommand). The timed action phases
  * are held by `msgHoldsTurn` instead.
  */
-export function commandPhaseWaitsForLine(line, state: number) {
+export function commandPhaseWaitsForLine(line: { active?: boolean; finished?: boolean; } | null | undefined, state: number) {
   if (!line?.active || line.finished) return false;
   return state === ST.INTRO || state === ST.PLAYER_MENU;
 }
@@ -193,7 +193,8 @@ export const HUD_CLOCK_HZ = 30;
 // FIGHTSTG_F0x8009328c's 30-frame sine tween) lives in the engine next to the rest of
 // the battle HUD's ports; web/battle.js only supplies the live members and the
 // displayed frame's delta.
-export const { createHpPlateState, hpPlateShown, hpPlateTick } = ui;
+// ETS item 9: the bundle (web/vendor/engine.js) lost the types of its `ui` export; engine/dw3/ui/index.ts is its source.
+export const { createHpPlateState, hpPlateShown, hpPlateTick } = ui as EngineUi;
 
 /** Bar length in 128ths of the full bar. @returns {number} */
 export function hpBarLength(cur: number, max: number) {

@@ -7,37 +7,8 @@ import { darkness, setReveal } from "./scenery.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
-import type { AmbienceSettings } from "./types/ambience.js";
-import type { AmbienceConditions } from "./types/ambience.js";
-
-
-interface GustScene {
-    map: { id: string };
-    fx: { gusts?: boolean };
-    p: { open?: boolean };
-    now: number;
-    camX: number;
-}
-
-interface LampPixels { w: number; h: number; data: Uint8ClampedArray; }
-
-interface LampSprite { x: number; y: number; size: number; ph: number; }
-
-interface LampWindow { x: number; y: number; w: number; h: number; ph: number; }
-
-interface Scenery2Size {
-    DWB: number;
-    DHB: number;
-}
-
-interface RevealScene {
-    p: AmbienceSettings;
-    fx: AmbienceConditions;
-    now: number;
-    fade: number;
-    camX: number;
-    camY: number;
-}
+import type { SceneryFx, SceneryScene } from "./types/scenery.js";
+import type { GameLamp, GustScene, LampLayer, LampWindow, Scenery2MapState, SceneryBloom, SceneryBreath, SceneryCritter, SceneryDevil, SceneryFish, SceneryGust, SceneryLampList, SceneryRing2, SceneryWeed, StageLightPoint, StageLightRecord } from "./types/scenery2.js";
 
 const VIEW_H = 240;
 
@@ -50,15 +21,16 @@ function rng(seed: number) {
 const isGrassPx = (r: number, g: number, b: number) => g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
 const isWaterPx = (r: number, g: number, b: number) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
 
-let sc2 = null;
+// ETS item 9: sc2 is empty until resetScenery2() runs; every draw function returns on `!sc2` first, and the helpers they call only run after that.
+let sc2: Scenery2MapState = null!;
 let frost: HTMLCanvasElement | null = null;                       // pre-rendered frost canvas (made once)
-let breath = [], rings = [], fishes = [], critters = [], glints = [];
-let gust = null, nextGust = 0;
-let devil = null, nextDevil = 0, weed = null, nextWeed = 0;
+let breath: SceneryBreath[] = [], rings: SceneryRing2[] = [], fishes: SceneryFish[] = [], critters: SceneryCritter[] = [], glints: unknown[] = [];
+let gust: SceneryGust | null = null, nextGust = 0;
+let devil: SceneryDevil | null = null, nextDevil = 0, weed: SceneryWeed | null = null, nextWeed = 0;
 let nextFish = 0, nextCritter = 0, wasMoving = false, nextBreath = [0, 0, 0, 0, 0];
 
 // light sources read from the game own ambient-prop records (tools/gen_lights.py)
-let stageLights = null;
+let stageLights: Record<string, StageLightRecord> | null = null;
 fetch("assets/data/lights.json").then((r) => r.json()).then((j) => { stageLights = j; }).catch(() => { stageLights = {}; });
 const imgs: Record<string, HTMLImageElement> = {};
 function loadImg(src: string) {
@@ -68,20 +40,20 @@ function loadImg(src: string) {
 // the game's own glow sprite for one light, drawn at night over the darkness: the plain layer at
 // full brightness, the additive layer on top (its real palette variants cycle like the game's), and
 // a blurred copy of that same picture as the bloom. Nothing here is invented colour.
-const bloomCache = new Map();
-function bloomFor(sc, key: string, layers) {
+const bloomCache = new Map<string, SceneryBloom>();
+function bloomFor(sc: Scenery2MapState, key: string, layers: LampLayer[]) {
     let c = bloomCache.get(key);
     if (c) return c;
     const K = 3, pad = 10;
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const [, , w, h, dx, dy] of layers) { x0 = Math.min(x0, dx); y0 = Math.min(y0, dy); x1 = Math.max(x1, dx + w); y1 = Math.max(y1, dy + h); }
     c = document.createElement("canvas"); c.width = (x1 - x0 + pad * 2) * K; c.height = (y1 - y0 + pad * 2) * K;
-    const g = c.getContext("2d");
+    const g = c.getContext("2d")!;
     g.filter = "blur(" + 5 * K / 3 + "px)";
     for (const [sx, sy, w, h, dx, dy] of layers) {
-        g.drawImage(sc.sheetP, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
+        g.drawImage(sc.sheetP!, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
         g.globalCompositeOperation = "lighter";
-        g.drawImage(sc.sheetS, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
+        g.drawImage(sc.sheetS!, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
         g.globalCompositeOperation = "source-over";
     }
     g.filter = "none"; g.globalCompositeOperation = "lighter"; g.drawImage(c, 0, 0);   // doubled once here, so it is drawn once per frame
@@ -91,34 +63,35 @@ function bloomFor(sc, key: string, layers) {
         const d = g.getImageData(0, 0, c.width, c.height).data;
         let r = 0, gg = 0, b = 0, wsum = 0;
         for (let i = 0; i < d.length; i += 4) {
-            const l = Math.max(d[i], d[i + 1], d[i + 2]);
-            if (l < 90 || d[i + 3] < 128) continue;
-            r += d[i] * l; gg += d[i + 1] * l; b += d[i + 2] * l; wsum += l;
+            const l = Math.max(d[i]!, d[i + 1]!, d[i + 2]!);
+            if (l < 90 || d[i + 3]! < 128) continue;
+            r += d[i]! * l; gg += d[i + 1]! * l; b += d[i + 2]! * l; wsum += l;
         }
         if (wsum) { const m = Math.max(r, gg, b) / wsum || 1; c.col = [Math.round(r / wsum * 255 / m), Math.round(gg / wsum * 255 / m), Math.round(b / wsum * 255 / m)]; }
     } catch (e) { /* tainted canvas: keep white */ }
     bloomCache.set(key, c);
     return c;
 }
-const poolSprites = new Map();
+const poolSprites = new Map<number, HTMLCanvasElement>();
 function poolSprite(r: number, g: number, b: number) {
     const k = (r << 16) | (g << 8) | b;
     let c = poolSprites.get(k);
     if (c) return c;
     c = document.createElement("canvas"); c.width = c.height = 64;
-    const x = c.getContext("2d"), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    const x = c.getContext("2d")!, gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
     gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(0.35, `rgba(${r},${g},${b},0.47)`); gr.addColorStop(0.7, `rgba(${r},${g},${b},0.17)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
     x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
     poolSprites.set(k, c);
     return c;
 }
-function drawGameLight(ctx, sc, m, camX: number, camY: number, a: number, now: number, fxo) {
-    if (!(sc.sheetP.complete && sc.sheetP.naturalWidth && sc.sheetS.complete && sc.sheetS.naturalWidth)) return;
-    const vi = ((now / 1000 * 60 / m.per) | 0) % m.v.length, layers = m.v[vi];
+function drawGameLight(ctx: CanvasRenderingContext2D, sc: Scenery2MapState, m: GameLamp, camX: number, camY: number, a: number, now: number, fxo: SceneryFx) {
+    // ETS item 9: sheetP and sheetS are set together with the lamps this is called for (build() loads both before it makes a game lamp).
+    if (!(sc.sheetP!.complete && sc.sheetP!.naturalWidth && sc.sheetS!.complete && sc.sheetS!.naturalWidth)) return;
+    const vi = ((now / 1000 * 60 / m.per) | 0) % m.v.length, layers = m.v[vi]!;
     const bx = Math.round(m.ox - camX), by = Math.round(m.oy - camY);
-    const bl = bloomFor(sc, (m.key || (m.key = sc.id + ":" + m.v[0][0].join(","))) + ":" + vi, layers);
-    const f0 = layers[0], cx = bx + f0[4] + f0[2] / 2, cy = by + f0[5] + f0[3] / 2, size = Math.max(f0[2], f0[3]);
-    const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, rad = 14 + size * 2.4, small = 0.45 + 0.55 * clamp01(size / 24), [cr, cg, cb] = bl.col, flick = 0.88 + 0.12 * Math.sin(now / 1000 * 9 + m.ph);
+    const bl = bloomFor(sc, (m.key || (m.key = sc.id + ":" + m.v[0]![0]!.join(","))) + ":" + vi, layers);
+    const f0 = layers[0]!, cx = bx + f0[4] + f0[2] / 2, cy = by + f0[5] + f0[3] / 2, size = Math.max(f0[2], f0[3]);
+    const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, rad = 14 + size * 2.4, small = 0.45 + 0.55 * clamp01(size / 24), [cr, cg, cb] = bl.col!, flick = 0.88 + 0.12 * Math.sin(now / 1000 * 9 + m.ph);
     ctx.globalCompositeOperation = "lighter";
     if (fxo.lightpool) {
         const sprite = poolSprite(cr, cg, cb);
@@ -128,18 +101,18 @@ function drawGameLight(ctx, sc, m, camX: number, camY: number, a: number, now: n
     // a big glow sprite is already a soft wide light: it gets far less bloom than a small bright lamp, or it saturates to a white disc
     const bloomGain = Math.max(0.15, Math.min(1, 1.5 - size / 26));
     ctx.globalAlpha = Math.min(1, a * bloomGain * gain);
-    ctx.drawImage(bl, bx + bl.ox, by + bl.oy, bl.width / bl.K, bl.height / bl.K);   // stacked: additive, so it brightens in the sprite own colours
+    ctx.drawImage(bl, bx + bl.ox!, by + bl.oy!, bl.width / bl.K!, bl.height / bl.K!);   // stacked: additive, so it brightens in the sprite own colours
     const redraw = size >= 32 ? 0.4 : size >= 24 ? 0.7 : 1;            // restoring a big glow to full brightness over the dark makes it a white disc
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = Math.min(1, a * redraw);
-    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetP, sx, sy, w, h, bx + dx, by + dy, w, h);
+    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetP!, sx, sy, w, h, bx + dx, by + dy, w, h);
     ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, a * redraw);
-    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetS, sx, sy, w, h, bx + dx, by + dy, w, h);
+    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetS!, sx, sy, w, h, bx + dx, by + dy, w, h);
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
 }
 
 // Put the real, untinted colours back around each light. The mask is the same flattened ellipse as the
 // pool; the snapshot is the frame as drawn just before the night tint.
-let rvMask: HTMLCanvasElement | null = null, rvTmp = null, rvSprite: HTMLCanvasElement | null = null;
+let rvMask: HTMLCanvasElement | null = null, rvTmp: HTMLCanvasElement | null = null, rvSprite: HTMLCanvasElement | null = null;
 function revealSprite() {
     if (rvSprite) return rvSprite;
     rvSprite = document.createElement("canvas"); rvSprite.width = rvSprite.height = 64;
@@ -149,8 +122,8 @@ function revealSprite() {
     return rvSprite;
 }
 setReveal({
-    wants(S: { map: { id: string }; fx: AmbienceConditions & { lightreveal?: boolean }; p: AmbienceSettings }) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
-    draw(ctx: CanvasRenderingContext2D, snap: HTMLCanvasElement, S: RevealScene) {
+    wants(S: SceneryScene) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
+    draw(ctx: CanvasRenderingContext2D, snap: HTMLCanvasElement, S: SceneryScene) {
         const dark = darkness(S.p, S.fx, S.now);
         if (dark < 0.04) return;
         const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, a = clamp01(0.85 * gain * dark * S.fade);
@@ -160,7 +133,7 @@ setReveal({
         mx!.setTransform(1, 0, 0, 1, 0, 0); mx!.globalCompositeOperation = "source-over"; mx!.clearRect(0, 0, VIEW_W, VIEW_H);
         mx!.globalCompositeOperation = "lighter";
         let any = false;
-        for (const m of sc2.lamps) {
+        for (const m of sc2.lamps!) {
             if (!m.rec) continue;
             const rad = 12 + m.sz * 2.0, small = 0.5 + 0.5 * clamp01(m.sz / 24), x = m.x - S.camX, y = m.y - S.camY + (m.wall ? rad * 0.2 : 0);
             if (x < -rad || x > VIEW_W + rad || y < -rad || y > VIEW_H + rad) continue;
@@ -170,7 +143,7 @@ setReveal({
         }
         if (!any) return;
         mx!.globalAlpha = 1;
-        const tx = rvTmp.getContext("2d");
+        const tx = rvTmp.getContext("2d")!;
         tx.setTransform(1, 0, 0, 1, 0, 0); tx.globalCompositeOperation = "copy"; tx.drawImage(snap, 0, 0);
         tx.globalCompositeOperation = "destination-in"; tx.drawImage(rvMask, 0, 0, rvTmp.width, rvTmp.height);
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
@@ -180,7 +153,7 @@ setReveal({
 
 export const hasLights = (id: string | number) => !!(stageLights && stageLights[id]);
 
-export function resetScenery2(map: { id: string | number }, p: { seed: number; }, S: Scenery2Size) {
+export function resetScenery2(map: { id: string | number }, p: { seed: number; }, S: { DWB: number; DHB: number; }) {
     const r = rng(p.seed ^ 0x7f4a7c15);
     sc2 = { id: map.id, rand: r, built: false };
     const W = S.DWB, H = S.DHB;
@@ -199,19 +172,19 @@ export function resetScenery2(map: { id: string | number }, p: { seed: number; }
 }
 
 // ----------------------------------------------------------------- scatter
-function scatterOn(S, count: number, test, tries = 80) {
+function scatterOn(S: SceneryScene, count: number, test: (r: number, g: number, b: number) => boolean, tries = 80) {
     const px = S.pix();
     if (!px) return [];
-    const out = [], r = sc2.rand;
+    const out: [number, number][] = [], r = sc2.rand;
     for (let n = 0; out.length < count && n < count * tries; n++) {
         const x = r() * px.w, y = r() * px.h, o = ((y | 0) * px.w + (x | 0)) * 4;
-        if (px.data[o + 3] < 128) continue;
-        if (test(px.data[o], px.data[o + 1], px.data[o + 2])) out.push([x, y]);
+        if (px.data[o + 3]! < 128) continue;
+        if (test(px.data[o]!, px.data[o + 1]!, px.data[o + 2]!)) out.push([x, y]);
     }
     return out;
 }
 // lit lamps and windows: small clusters of bright, saturated warm pixels in the picture itself
-function findLamps(S): (LampSprite[] & { windows?: LampWindow[] }) | null {
+function findLamps(S: SceneryScene): SceneryLampList | null {
     const px = S.pixMap();
     if (!px) return null;
     const CELL = 6, cols = Math.ceil(px.w / CELL), rows = Math.ceil(px.h / CELL);
@@ -219,12 +192,12 @@ function findLamps(S): (LampSprite[] & { windows?: LampWindow[] }) | null {
     let warm = 0;
     for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++) {
         const o = (y * px.w + x) * 4;
-        if (d[o + 3] < 128) continue;
-        const r = d[o], g = d[o + 1], b = d[o + 2];
-        if (r >= 232 && g >= 185 && b >= 70 && b <= 165 && r >= g && r - b > 70) { cnt[((y / CELL) | 0) * cols + ((x / CELL) | 0)]++; warm++; }
+        if (d[o + 3]! < 128) continue;
+        const r = d[o]!, g = d[o + 1]!, b = d[o + 2]!;
+        if (r >= 232 && g >= 185 && b >= 70 && b <= 165 && r >= g && r - b > 70) { cnt[((y / CELL) | 0) * cols + ((x / CELL) | 0)]!++; warm++; }
     }
     if (warm > px.w * px.h * 0.03) return [];          // sand or a lit floor, not lamps
-    const seen = new Uint8Array(cols * rows), out: any = [], windows = [];
+    const seen = new Uint8Array(cols * rows), out: SceneryLampList = [], windows: LampWindow[] = [];
     let bx0 = 0, bx1 = 0, by0 = 0, by1 = 0;
     for (let i = 0; i < cnt.length; i++) {
         if (cnt[i]! < 3 || seen[i]) continue;
@@ -233,7 +206,7 @@ function findLamps(S): (LampSprite[] & { windows?: LampWindow[] }) | null {
         const stack = [i]; seen[i] = 1;
         while (stack.length) {
             const c = stack.pop(), cx = c! % cols, cy = (c! / cols) | 0;
-            sx += (cx + 0.5) * cnt[c]; sy += (cy + 0.5) * cnt[c]; sw += cnt[c]; n++;
+            sx += (cx + 0.5) * cnt[c!]!; sy += (cy + 0.5) * cnt[c!]!; sw += cnt[c!]!; n++;
             bx0 = Math.min(bx0, cx); bx1 = Math.max(bx1, cx); by0 = Math.min(by0, cy); by1 = Math.max(by1, cy);
             for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
                 const nx = cx + dx, ny = cy + dy;
@@ -255,7 +228,7 @@ function findLamps(S): (LampSprite[] & { windows?: LampWindow[] }) | null {
     out.windows = windows;
     return out;
 }
-function build(S) {
+function build(S: SceneryScene) {
     const { p } = S;
     if (!S.pix() || !stageLights) return;
     sc2.built = true;
@@ -266,16 +239,16 @@ function build(S) {
     const rec = stageLights[sc2.id];
     if (rec) {                                      // the game says where its lights are: use that, not the picture scan
         sc2.sheetP = loadImg(`assets/effects/${sc2.id}.png`); sc2.sheetS = loadImg(`assets/effects/${sc2.id}_semi.png`);
-        const win = [];
-        sc2.lamps = rec.lights.map((l) => {
-            const v = rec.sprites[l.s], f = v[0][0];
+        const win: LampWindow[] = [];
+        sc2.lamps = rec.lights.map((l: StageLightPoint): GameLamp => {
+            const v = rec.sprites[l.s]!, f = v[0]![0]!;
             return { x: l.x + f[4] + f[2] / 2, y: l.y + f[5] + f[3] / 2, size: clamp01(f[2] / 40), ph: sc2.rand() * 6.28, rec: true, sz: Math.max(f[2], f[3]), wall: l.z >= 6, v, ox: l.x, oy: l.y, per: l.p + 1 };
         });
         sc2.lamps.windows = win; sc2.windows = win;
     }
     const r = sc2.rand;
     sc2.dragonflies = sc2.waterPts.length >= 12 && p.open && !p.night
-        ? sc2.waterPts.slice(0, 6).map(([x, y]) => ({ hx: x, hy: y, x, y, tx: x, ty: y, until: 0, ph: r() * 6.28, col: ["#3fd0e0", "#4a8cff", "#7be08a"][(r() * 3) | 0] })) : [];
+        ? sc2.waterPts.slice(0, 6).map(([x, y]) => ({ hx: x, hy: y, x, y, tx: x, ty: y, until: 0, ph: r() * 6.28, col: ["#3fd0e0", "#4a8cff", "#7be08a"][(r() * 3) | 0]! })) : [];
     window.__ambLamps = sc2.lamps.length;
 }
 
@@ -333,7 +306,7 @@ export function gustLevel(S: GustScene) {
 }
 
 // ----------------------------------------------------------------- overlay
-export function drawScenery2(ctx, S) {
+export function drawScenery2(ctx: CanvasRenderingContext2D, S: SceneryScene) {
     if (!sc2 || sc2.id !== S.map.id) return;
     const { fx, p, L, t, dt, fade, camX, camY, Q, now } = S;
     if (!sc2.built) build(S);
@@ -351,7 +324,7 @@ export function drawScenery2(ctx, S) {
     if (fx.clouds && p.clouds) {
         const day = 1 - darkness(p, fx, now);
         const a = fade * day * (1 - L.rain * 0.7) * (0.8 + 0.2 * Q);
-        if (a > 0.02) for (const c of sc2.clouds) {
+        if (a > 0.02) for (const c of sc2.clouds!) {
             c.x += c.vx * dt; c.y += c.vy * dt;
             for (const q of c.parts) {
                 const bx = S.wrapXB(c.x + q.dx, camX), by = S.wrapYB(c.y + q.dy, camY);
@@ -395,7 +368,7 @@ export function drawScenery2(ctx, S) {
         for (const s of gust.streaks) {
             const x = fs - s.o - s.l * 0.3;
             if (x < -60 || x > VIEW_W + 60) continue;
-            ctx.globalAlpha = 0.34 * gust.s * fade; ctx.strokeStyle = `rgb(${col})`;
+            ctx.globalAlpha = 0.34 * gust.s! * fade; ctx.strokeStyle = `rgb(${col})`;
             ctx.beginPath(); ctx.moveTo(x - s.l, s.y); ctx.quadraticCurveTo(x - s.l * 0.4, s.y - 3, x, s.y + 1); ctx.stroke();
         }
     }
@@ -404,7 +377,7 @@ export function drawScenery2(ctx, S) {
     if (fx.dragonflies && sc2.dragonflies && sc2.dragonflies.length && L.rain < 0.2 && L.blizzard < 0.2) {
         const n = Math.max(1, Math.round(sc2.dragonflies.length * Q)), vis = fade * (1 - L.rain * 5);
         for (let i = 0; i < n; i++) {
-            const d = sc2.dragonflies[i];
+            const d = sc2.dragonflies[i]!;
             if (now >= d.until) { d.tx = d.hx + (sc2.rand() - 0.5) * 120; d.ty = d.hy + (sc2.rand() - 0.5) * 70; d.until = now + 900 + sc2.rand() * 2200; }
             const dx = d.tx - d.x, dy = d.ty - d.y, dist = Math.hypot(dx, dy);
             if (dist > 1) { const v = Math.min(dist, 95 * dt * (dist > 18 ? 1 : 0.15)); d.x += dx / dist * v; d.y += dy / dist * v; }
@@ -429,13 +402,13 @@ export function drawScenery2(ctx, S) {
             nextFish = now + 4500 + sc2.rand() * 7500;
             const vis = sc2.waterPts.filter(([x, y]) => x - camX > 10 && x - camX < VIEW_W - 10 && y - camY > 20 && y - camY < VIEW_H - 10);
             if (vis.length && fishes.length < 2) {
-                const [x, y] = vis[(sc2.rand() * vis.length) | 0];
+                const [x, y] = vis[(sc2.rand() * vis.length) | 0]!;
                 fishes.push({ x, y, born: now, dir: sc2.rand() < 0.5 ? -1 : 1 });
                 rings.push({ x, y, born: now, life: 1100 });
             }
         }
         for (let i = fishes.length - 1; i >= 0; i--) {
-            const f = fishes[i], k = (now - f.born) / 750;
+            const f = fishes[i]!, k = (now - f.born) / 750;
             if (k >= 1) { rings.push({ x: f.x + f.dir * 14, y: f.y, born: now, life: 1100 }); fishes.splice(i, 1); continue; }
             const fx2 = f.x + f.dir * 14 * k - camX, fy = f.y - camY - 15 * 4 * k * (1 - k);
             const slope = f.dir * (1 - 2 * k) * -1.0;
@@ -452,7 +425,7 @@ export function drawScenery2(ctx, S) {
     if (rings.length) {
         ctx.strokeStyle = "#e6f2ff"; ctx.lineWidth = 0.6;
         for (let i = rings.length - 1; i >= 0; i--) {
-            const r = rings[i], k = (now - r.born) / r.life;
+            const r = rings[i]!, k = (now - r.born) / r.life;
             if (k >= 1) { rings.splice(i, 1); continue; }
             ctx.globalAlpha = (1 - k) * 0.7 * fade;
             ctx.beginPath(); ctx.ellipse(r.x - camX, r.y - camY, 2 + k * 14, 0.9 + k * 5.5, 0, 0, 6.2832); ctx.stroke();
@@ -465,12 +438,12 @@ export function drawScenery2(ctx, S) {
             nextCritter = now + 5000 + sc2.rand() * 9000;
             const vis = sc2.meadow.filter(([x, y]) => x - camX > 20 && x - camX < VIEW_W - 20 && y - camY > 40 && y - camY < VIEW_H - 10);
             if (vis.length && critters.length < 2) {
-                const [x, y] = vis[(sc2.rand() * vis.length) | 0], a = sc2.rand() * 6.283;
-                critters.push({ x, y, born: now, vx: Math.cos(a) * 30, vy: Math.sin(a) * 18, col: ["#8a6a4a", "#7d7f86", "#b08b5a"][(sc2.rand() * 3) | 0], hops: 4 });
+                const [x, y] = vis[(sc2.rand() * vis.length) | 0]!, a = sc2.rand() * 6.283;
+                critters.push({ x, y, born: now, vx: Math.cos(a) * 30, vy: Math.sin(a) * 18, col: ["#8a6a4a", "#7d7f86", "#b08b5a"][(sc2.rand() * 3) | 0]!, hops: 4 });
             }
         }
         for (let i = critters.length - 1; i >= 0; i--) {
-            const c = critters[i], age = (now - c.born) / 1000, life = c.hops * 0.42;
+            const c = critters[i]!, age = (now - c.born) / 1000, life = c.hops * 0.42;
             if (age >= life + 0.5) { critters.splice(i, 1); continue; }
             const ph = (age / 0.42) % 1, hop = 4 * ph * (1 - ph) * 7;
             const x = c.x + c.vx * Math.min(age, life) - camX, y = c.y + c.vy * Math.min(age, life) - camY;
@@ -543,7 +516,7 @@ export function drawScenery2(ctx, S) {
     if (fx.breath && p.snowy) {
         const feet = S.feet || [];
         for (let i = 0; i < Math.min(feet.length, 3); i++) {
-            const f = feet[i];
+            const f = feet[i]!;
             const moving = i === 0 ? S.moving : S.moving;
             if (now >= nextBreath[i]! || (i === 0 && wasMoving && !S.moving && now >= nextBreath[i]! - 1500)) {
                 const left = /left/.test(S.dir || ""), right = /right/.test(S.dir || "");
@@ -554,7 +527,7 @@ export function drawScenery2(ctx, S) {
         wasMoving = S.moving;
         if (breath.length > 40) breath.splice(0, breath.length - 40);
         for (let i = breath.length - 1; i >= 0; i--) {
-            const b = breath[i], k = (now - b.born) / b.life;
+            const b = breath[i]!, k = (now - b.born) / b.life;
             if (k >= 1) { breath.splice(i, 1); continue; }
             const sx = b.x + b.vx * k * 4 + S.wind * 0.18 * k - camX, sy = b.y - 9 * k - camY;
             const rad = (b.big ? 3.4 : 2.4) + k * (b.big ? 8.5 : 6);

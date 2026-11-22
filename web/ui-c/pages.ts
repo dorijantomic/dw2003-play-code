@@ -17,12 +17,12 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 import type { UiRect } from "./types.js";
-import type { UiPart, UiRun, UiMatrix, UiFooterRel, UiClaimedPart } from "./types.js";
+import type { UiPart, UiRun, UiMatrix, UiFooterRel, UiClaimedPart, UiScreenContext } from "./types.js";
 /** The footer page transform: an identity matrix (only translation-free placements accepted by applyRel). */
 type FooterRel = UiFooterRel;
 
 /** A footer page part: a drawable part plus its page transform. */
-type FooterPart = UiPart & { rel: FooterRel };
+type FooterPart = UiClaimedPart;
 
 /** A text run as these composers read it: the game's string at its pen, with the optional right anchor and face colour. */
 type PageRun = UiRun;
@@ -30,17 +30,8 @@ type PageRun = UiRun;
 /** A claimed capture clip (position, size, layers, row) with its page transform and the part name the claim gave it. */
 type PagePart = UiClaimedPart;
 
-/** What the screens hand over (screens.ts ScreenContext): the claimed parts and the runs. The parts are typed as drawable parts there, though at run time they are capture clips. */
-interface ScreenParts {
-    parts: PagePart[];
-    runs: UiRun[];
-}
-
 /** Anything that carries a page transform (and the layer its claim gave it). */
-interface RelClip {
-    rel: FooterRel;
-    layer?: string;
-}
+type RelClip = UiClaimedPart;
 
 /** One game line of the footer: its pen y and its runs (never empty). */
 interface FootLine {
@@ -397,7 +388,7 @@ export function composeSpinner(p: RelClip, i: string | number, runs: PageRun[], 
 }
 
 /** The spinner's up / down arrows: the game draws them while the count can change; the C triangles on its x, centred on the spinner box. */
-export function composeSpinArrows(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i: string | number, parts: { part: string; }[], out: UiPart[]) {
+export function composeSpinArrows(p: UiClaimedPart, i: string | number, parts: UiClaimedPart[], out: UiPart[]) {
     const r = clipRect(p), box = parts.filter((q) => q.part === "spinner").map(clipRect).find((b) => r.x >= b.x - 4 && r.x < b.x + b.w + 4 && r.y >= b.y - 4 && r.y < b.y + b.h + 4);
     out.push(spinArrows(`spin${i}.arrows`, r.x + r.w / 2, box ? box.y + box.h / 2 : r.y + r.h / 2, p.rel));
 }
@@ -416,12 +407,13 @@ export const LOCKED_ROW = 8;
  * The state of every card from the highlight parts: "on" (the cursor), "locked" (SORT holds this partner) or "normal". The palette
  * row of the draw call decides (row 8 = locked); a highlight without a row is the cursor.
  */
-export function cardStates(cards: { y: number; }[], highlights: { y: number; row: number; }[]) {
+export function cardStates(cards: { y: number; }[], highlights: { y: number; row?: number; }[]) {
     const st: CardState[] = cards.map(() => "normal");
     for (const h of highlights) {
         const i = cards.findIndex((c) => Math.abs(c.y - h.y) < 3);
+        // ETS item 9: a highlight without a row is the cursor; the | 0 turns undefined into 0
         if (i < 0) continue;
-        st[i] = (h.row | 0) === LOCKED_ROW ? "locked" : "on";
+        st[i] = (h.row! | 0) === LOCKED_ROW ? "locked" : "on";
     }
     return st;
 }
@@ -449,7 +441,7 @@ function composePickerCard(i: number, card: PagePart, namePart: PagePart | null,
     partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker, c);
     if (portrait) {
         out.push(plate(`${k}.portrait`, "portrait", f(469, 3, 128, 128), rel, { edge: c.edge }));
-        if (state !== "normal") out.push(corners(`${k}.corners`, f(469 + 4, 3 + 4, 120, 120), state === "on" && hl ? cyclePulse(hl.row) : c.edge, rel));
+        if (state !== "normal") out.push(corners(`${k}.corners`, f(469 + 4, 3 + 4, 120, 120), state === "on" && hl ? cyclePulse(hl.row!) : c.edge, rel));
     }
     if (state === "on") out.push({ key: `${k}.cursor`, kind: "chevron", part: "cursor", layer: "over", rect: f(0, 54, 30, 20), fill: "var(--c-orange)", sx: rel.a, sy: rel.d });
 }
@@ -466,7 +458,7 @@ function composePageHeader(part: PagePart, runs: PageRun[], used: Set<unknown>, 
  * (the screen's own parts, composed right after the backdrop: the status sheets, sheets.js) }. The right part follows the clips the game draws: the 5-row list (cmfont panel) gets the home list,
  * the folders page its title + rows window, the partner pickers the big wall and the faint word.
  */
-export function composePausePage({ parts, runs }: ScreenParts, cfg: PausePageOpts = {}): UiPart[] {
+export function composePausePage({ parts, runs }: UiScreenContext, cfg: PausePageOpts = {}): UiPart[] {
     const out: UiPart[] = [], used: Set<UiRun> = cfg.used ?? new Set();
     const of = (n: string): PagePart[] => parts.filter((p) => p.part === n);
     const back = of("backdrop")[0], panel = of("panel")[0], folder = of("folderWin")[0], header = of("header")[0], money = of("money")[0], foot = of("footer")[0];
@@ -481,7 +473,8 @@ export function composePausePage({ parts, runs }: ScreenParts, cfg: PausePageOpt
     if (folder) composeRows(folder, 0, runs, used, out, { titleH: 17 });
     if (header) composePageHeader(header, runs, used, out);
     const highlights = of("highlight"), states = cardStates(cards, highlights);
-    cards.forEach((c, i) => composePickerCard(i, c, names.find((n) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i], runs, used, out,
+    // ETS item 9: cardStates makes one entry per card, and i is the card index
+    cards.forEach((c, i) => composePickerCard(i, c, names.find((n) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i]!, runs, used, out,
         highlights.find((h) => Math.abs(h.y - c.y) < 3) ?? null));
     for (const b of of("bracket")) composeBracket(b, out);
     for (const d of of("detail")) composeDetail(d, runs, used, out);
@@ -494,7 +487,7 @@ export function composePausePage({ parts, runs }: ScreenParts, cfg: PausePageOpt
 
 // ------------------------------------------------------------------------------------------------ one window + plates (lab, shop, inn, help, demo)
 /** Parts by claim: header / hint / name / money plates with their text, the window of rows, any other claimed plate plain. */
-export function composeWindowPage({ parts, runs }: ScreenParts, cfg: WindowPageCfg = {}): UiPart[] {
+export function composeWindowPage({ parts, runs }: UiScreenContext, cfg: WindowPageCfg = {}): UiPart[] {
     const out: UiPart[] = [], used = new Set<unknown>();
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
     const lists = parts.filter((p: PagePart) => p.part === "listWin").map(clipRect);
@@ -543,7 +536,7 @@ function composeFolderPlate(p: PagePart, i: number, out: UiPart[]) {
 }
 
 /** The ITEMS bag (C3): stripes, the full-width list window with the faint word, the tab, item cells, pager, detail line, footer. */
-export const composeListPage = (c: ScreenParts, cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
+export const composeListPage = (c: UiScreenContext, cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
 
 /**
  * The shop item line on "Equip who?" (one clip): name plate | Equip / Items plate, and the price plate under the right end. The split
@@ -574,8 +567,8 @@ function composeShopDetail(p: PagePart, i: number, runs: PageRun[], used: Set<un
 }
 
 /** The shop partner-card cursor frame: C corner brackets in the cursor's colour cycle (the game's palette row). */
-function composePickHighlight(p: { row: number; rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i: number, out: UiPart[]) {
-    out.push(corners(`p${i}.pick`, clipRect(p), cyclePulse(p.row), p.rel));
+function composePickHighlight(p: UiClaimedPart, i: number, out: UiPart[]) {
+    out.push(corners(`p${i}.pick`, clipRect(p), cyclePulse(p.row!), p.rel));
 }
 
 /** The game's stat-change arrow token ("48 [arrow-right] 62") as a small orange chevron at the token's pen position. */
@@ -601,6 +594,6 @@ function composeMoneyPlate(p: PagePart, i: number, runs: PageRun[], used: Set<un
 }
 
 /** The lab / gym partner pickers: plates by claim (info card, hints, header, window, stat window, TP plate) and all their text; capsules are art. */
-export function composeCapsule({ parts, runs }: ScreenParts) {
+export function composeCapsule({ parts, runs }: UiScreenContext) {
     return composeWindowPage({ parts, runs }, {});
 }

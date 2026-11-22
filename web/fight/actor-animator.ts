@@ -28,7 +28,7 @@ import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // (`resetAnimSlotLiveToHome`). This file consumes those instead of hand-writing them.
 import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from "../vendor/engine.js";
 import { smoothAnimEnabled } from "./smooth-anim.js";
-import type { FightActionHooks, FightMoveRec } from "./types.js";
+import type { FightActionHooks, FightChanRow, FightModel, FightMoveRec, FightTimelineRow } from "./types.js";
 
 import type { DnaScriptOp } from "../battle/core/types.js";
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
@@ -50,14 +50,14 @@ const HANDOFF_TICKS = 10;
 // play-table records (op2[mode=0, slot, table]) in script order; table 0 (idle/rest) is excluded
 // by the `> 0` test. Exported as the SINGLE source of truth so the renderer (_clipTableSeq) and the
 // Fight Action Lab cross-check both derive the script's sequence the exact same way.
-export function clipTableSeq(model, clip: string | number) {
-  const ops = model?.actions?.[clip]?.ops;
+export function clipTableSeq(model: FightModel | null | undefined, clip: string | number) {
+  const ops = model?.actions?.[clip as number]?.ops;
   if (!Array.isArray(ops)) return [];
   const seq = [];
   for (const o of ops) {
     // > 1: word 0 is the done-wait and word 1 is "return to the actor's base idle" (see
     // action-vm.js _dispatchOp2) — neither names a table.
-    if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) seq.push(o.words[2] | 0);
+    if (o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1) seq.push(o.words[2]! | 0);
   }
   return seq;
 }
@@ -74,7 +74,7 @@ export function clipTableSeq(model, clip: string | number) {
 const _idleHiddenCache = new WeakMap();
 
 /** Linear read of a ch3 scale channel ([x,y,z,frame] keys, 4096 = 1.0) at `frame`. */
-function interpCh(ch, frame: number) {
+function interpCh(ch: FightChanRow[] | undefined, frame: number): number[] {
   if (!Array.isArray(ch) || !ch.length) return [4096, 4096, 4096];
   let prev = null;
   for (const k of ch) {
@@ -90,7 +90,7 @@ function interpCh(ch, frame: number) {
 }
 
 /** Mesh parts (bone indices) the model's own IDLE never shows: ch3 scale < 0.05 at every idle frame. */
-export function idleHiddenParts(model) {
+export function idleHiddenParts(model: FightModel | null | undefined) {
   if (!model || !model.bones) return [];
   if (_idleHiddenCache.has(model)) return _idleHiddenCache.get(model);
   const tab = model.timeline?.[0]?.table ?? [];
@@ -103,7 +103,7 @@ export function idleHiddenParts(model) {
     let hi = 0;
     for (const f of at) {
       const s = interpCh(bone.anim.ch3, f);
-      hi = Math.max(hi, Math.abs(s[0]), Math.abs(s[1]), Math.abs(s[2]));
+      hi = Math.max(hi, Math.abs(s[0]!), Math.abs(s[1]!), Math.abs(s[2]!));
     }
     if (hi / 4096 < 0.05) out.push(b);
   }
@@ -112,14 +112,14 @@ export function idleHiddenParts(model) {
 }
 
 /** Does the model's OWN action for `clip` draw `bone` (ch3 scale >= 0.05 anywhere in its tables)? */
-function ownClipShowsPart(model, clip: string | number, bone: string | number) {
-  const act = model?.actions?.[clip];
+function ownClipShowsPart(model: FightModel, clip: string | number, bone: string | number) {
+  const act = model?.actions?.[clip as number];
   const ops = act?.ops;
   if (!Array.isArray(ops)) return false;
-  const ch3 = model.bones?.[bone]?.anim?.ch3;
+  const ch3 = model.bones?.[bone as number]?.anim?.ch3;
   if (!ch3) return false;
   const tables = new Set<number>();
-  for (const o of ops) if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tables.add(o.words[2] | 0);
+  for (const o of ops) if (o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1) tables.add(o.words[2]! | 0);
   for (const t of tables) {
     const tab = model.timeline?.[t]?.table;
     if (!Array.isArray(tab)) continue;
@@ -127,30 +127,30 @@ function ownClipShowsPart(model, clip: string | number, bone: string | number) {
       const v = e.value | 0;
       if (v & 0x8000) continue;
       const s = interpCh(ch3, v);
-      if (Math.max(Math.abs(s[0]), Math.abs(s[1]), Math.abs(s[2])) / 4096 >= 0.05) return true;
+      if (Math.max(Math.abs(s[0]!), Math.abs(s[1]!), Math.abs(s[2]!)) / 4096 >= 0.05) return true;
     }
   }
   return false;
 }
 
 /** The idle-hidden parts a synthesized `clip` must not draw, or null when there are none to hide. */
-export function hiddenPartsFor(model, clip: string | number | null) {
+export function hiddenPartsFor(model: FightModel | null | undefined, clip: string | number | null) {
   const hid = idleHiddenParts(model);
   if (!hid.length) return null;
-  const out = hid.filter((b: string | number) => !ownClipShowsPart(model, clip!, b));
+  const out = hid.filter((b: string | number) => !ownClipShowsPart(model!, clip!, b));
   return out.length ? out : null;
 }
 
 export class ActorAnimator {
   declare _camFromDonor: boolean;
   declare _clip: any;
-  declare _cut: { from: any; k: number; };
+  declare _cut: { from: any; k: number; } | null;
   declare _dbgLoop: any;
   declare _handoffFrom: any;
   declare _handoffT: number;
   declare _heldPose: boolean;
   declare _hidden: any;
-  declare _hold: { frame: any; next: any; run: any; k: number; };
+  declare _hold: { frame: any; next: any; run: any; k: number; } | null;
   declare _holdFinalPose: boolean;
   declare _move: { cur: number[]; from: any; target: any; t: number; ticks: number; };
   declare _prevBlend: any;
@@ -163,10 +163,10 @@ export class ActorAnimator {
   declare blend: any;
   declare frame: any;
   declare homeSlot: any;
-  declare idle: (TimelinePlayer | PlaylistPlayer) & { looped?: boolean };
+  declare idle: ((TimelinePlayer | PlaylistPlayer) & { looped?: boolean }) | null;
   declare model: any;
   declare rotationBase: number;
-  declare vm: ActionVM;
+  declare vm: ActionVM | null;
   constructor(model: { clips: { start_frame: number; }[]; }) {
     this.model = model;
     this.vm = null;                          // active ActionVM, or null while idle
@@ -254,7 +254,7 @@ export class ActorAnimator {
     return {
       get sideSign() { return this.owner.homeSlot?.side === "enemy" ? -1 : 1; },
       owner: this,
-      getY: () => m.cur[1], getZ: () => m.cur[2],
+      getY: () => m.cur[1]!, getZ: () => m.cur[2]!,
     // A motion object owns the slot outright — cancel any mode-3 tween still running into it.
       setY: (v: number) => { m.cur[1] = v; m.target = null; },
       setZ: (v: number) => { m.cur[2] = v; m.target = null; },
@@ -285,7 +285,7 @@ export class ActorAnimator {
     // as a DELTA from home, so that write is a zero delta; route it through the ported rule so
     // there is one copy of it.
     const slot = {
-      live: { x: this._move.cur[0], y: this._move.cur[1], z: this._move.cur[2], rotX: 0, rotY: 0, rotZ: 0 },
+      live: { x: this._move.cur[0]!, y: this._move.cur[1]!, z: this._move.cur[2]!, rotX: 0, rotY: 0, rotZ: 0 },
       home: { x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0 },
     };
     resetAnimSlotLiveToHome(slot);
@@ -322,7 +322,7 @@ export class ActorAnimator {
     // an action (no vm.player yet) eases from the current idle frame, so the windup blends in from idle
     // instead of snapping. (Action tables like Renamon 14 lead with an aux=0xffff ease-in.)
     const prev = this.vm?.player ? this.vm.player.currentFrame() : this.frame;
-    const t = tl?.[i]?.table;
+    const t = tl?.[i!]?.table;
     if (t && t.length) return new TimelinePlayer(t, prev);
     const t0 = tl?.[0]?.table;
     return (i !== 0 && t0 && t0.length) ? new TimelinePlayer(t0, prev) : null;
@@ -337,14 +337,14 @@ export class ActorAnimator {
 
   // Debug: play an arbitrary timeline table on loop (motion browser, to identify which table
   // is which motion). Not used by the game; drives the same `idle` slot tick() reads.
-  debugPlayTable(table) {
+  debugPlayTable(table: FightTimelineRow[] | null | undefined) {
     this.playTimelineTable(table);
   }
 
   // Play one raw authored timeline table.  Its own sentinel controls whether it loops or freezes.
   // Production battle presentation uses this for the verified victory table; the motion browser
   // uses the same path.
-  playTimelineTable(table) {
+  playTimelineTable(table: FightTimelineRow[] | null | undefined) {
     this.vm = null;
     this._dbgLoop = null;
     this._heldPose = false;
@@ -384,7 +384,7 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip: number | null, hooks: FightActionHooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+  setAction(clip: number | null, hooks: FightActionHooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null }: { currentEffect?: number | null; currentMotion?: number | null; holdFinalPose?: boolean; element?: number; target?: string; hits?: number | null; planted?: boolean; tech?: string | null; } = {}) {
     // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js);
     // a heal/support technique or an item use (target "self") gets the calm self-cast build instead of an attack body
     const script = (clip != null) ? resolveClipScript(this.model, clip, { element, target, hits, planted, tech }) : null;
@@ -431,14 +431,14 @@ export class ActorAnimator {
   /** Run a verified external action stream against this model.  DNA/Jogress
    *  result clip 12 is supplied by the battle presentation actor rather than
    *  the result model's own action directory; op4 motion 30 selects table 30. */
-  setScript(script: { ops: DnaScriptOp[]; }, hooks: FightActionHooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
+  setScript(script: { ops: DnaScriptOp[]; }, hooks: FightActionHooks = {}, { currentEffect = null, initialTable = null, motionTables = {} as Record<number, number> } = {}) {
     if (!script || !Array.isArray(script.ops) || !script.ops.length) return false;
     this._clip = -1;
     this._hidden = null;
     const h2 = {
       ...hooks,
       onMove: (rec: FightMoveRec) => { this._onMove(rec); hooks.onMove?.(rec); },
-      onRotate: (rec) => {
+      onRotate: (rec: Parameters<NonNullable<FightActionHooks["onRotate"]>>[0]) => {
         this._rotation = [rec.x, rec.y, rec.z];
         hooks.onRotate?.(rec);
       },

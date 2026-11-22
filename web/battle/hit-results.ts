@@ -20,6 +20,17 @@ import { S } from "./state.js";
 import { MSG, MSG_KIND } from "./messages.js";
 
 import type { FightTechRow } from "../types/battle.js";
+import type { Combatant, Skill } from "../../engine/dw3/battle-combat.js";
+
+/** What noteHit reads off a blow's result. */
+interface HitNoteSource {
+  hit: boolean;
+  dmg: number;
+  heal: number;
+  /** a miss carries neither */
+  crit?: boolean | undefined;
+  eff?: number | undefined;
+}
 // ── Combat resolvers (module-level so they are headless-portable + unit-testable).
 // Closure-independent combat helpers. Ailment application and turn-start lifecycle delegate
 // to engine/dw3/battle-combat.ts so the browser does not carry a second implementation.
@@ -28,13 +39,13 @@ export const foldElemBonuses = engineFoldElemBonuses;
 
 export const effStats = engineEffStats;
 
-export const noteHit = (kind: string, r) => { S.hitNote = { seq: ++S.hitSeq, kind, hit: !!r.hit, dmg: r.dmg | 0, heal: r.heal | 0, crit: !!r.crit, eff: Number.isFinite(r.eff) ? r.eff : 1 }; return r; };
+export const noteHit = <T extends HitNoteSource>(kind: string, r: T): T => { S.hitNote = { seq: ++S.hitSeq, kind, hit: !!r.hit, dmg: r.dmg | 0, heal: r.heal | 0, crit: !!r.crit, eff: Number.isFinite(r.eff) ? r.eff : 1 }; return r; };
 
 export const lastHitNote = () => S.hitNote;
 
-export const resolveAttack = (...a) => noteHit("hit", engineResolveAttack(...a));
+export const resolveAttack = (...a: Parameters<typeof engineResolveAttack>) => noteHit("hit", engineResolveAttack(...a));
 
-export const resolveMultiHit = (...a) => noteHit("hit", engineResolveMultiHit(...a));
+export const resolveMultiHit = (...a: Parameters<typeof engineResolveMultiHit>) => noteHit("hit", engineResolveMultiHit(...a));
 
 export const weaponSecondaryProc = engineWeaponSecondaryProc;
 
@@ -51,9 +62,19 @@ export const applyAilment = engineApplyAilment;
  * `text` is only the walker's own fragment for instant death, which is not one of the
  * four ailments and has no ailment page.
  */
-export function tryInflict(skill, defender, defenderName: string, attacker) {
+export function tryInflict(skill: Skill | null | undefined, defender: Combatant, defenderName: string, attacker: Combatant) {
   const ail = engineTryInflict(skill, defender, defenderName, attacker);
   return { text: engineTryInstantDeath(skill, defender, defenderName, attacker), ail };
+}
+
+/** What chooseResultLine is handed (every field has a default). */
+interface ResultLineArgs {
+  record?: FightTechRow | null;
+  multiHit?: boolean;
+  instantDeath?: boolean;
+  landed?: boolean;
+  name?: string | null;
+  damage?: number;
 }
 
 /**
@@ -83,7 +104,7 @@ export function tryInflict(skill, defender, defenderName: string, attacker) {
  * exactly when the original prints nothing.
  */
 export function chooseResultLine({ record = null, multiHit = false, instantDeath = false,
-  landed = true, name = null, damage = 0 }) {
+  landed = true, name = null, damage = 0 }: ResultLineArgs) {
   const choice = engineChooseResultPage({
     dispatch: record?.dispatch ?? null,
     multiHit: !!multiHit,
@@ -138,7 +159,7 @@ export function ailmentBoxPage(name: string, ail: string | null) {
  * for the legacy box, and `ail` is the ailment key that landed, which the caller puts up
  * as its own page the way a skill's ailment is (`ailmentBoxPage`).
  */
-export function applyWeaponSecondary(attacker, defender: { hp: number; }, defenderName: string, damage = 0, attackerName = "") {
+export function applyWeaponSecondary(attacker: Combatant, defender: Combatant, defenderName: string, damage = 0, attackerName = "") {
   const sec = engineWeaponSecondaryProc(attacker, defender, attacker.rightWeapon, RAND_U16);
   const drain = sec ? 0 : engineWeaponDrainHeal(attacker, attacker.rightWeapon, damage, RAND_U16);
   if (drain > 0) {

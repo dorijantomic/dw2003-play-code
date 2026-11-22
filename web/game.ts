@@ -190,7 +190,7 @@ if (HD_MAPS) loadTileIndex();
 // F2 Pixel filter (default off): EPX / MMPX / xBR. Authentic: the whole finished frame; HD Remaster:
 // each native image (sprites, effects, menus) before it is drawn (gpu-pixel-filter.js)
 installPixelFilter(document.getElementById("stage"), document.getElementById("game"), () => assetMode() === ASSET_MODE_HD);
-installPost2d(document.getElementById("stage"), document.getElementById("game"));
+installPost2d(document.getElementById("stage"), document.getElementById("game") as HTMLCanvasElement | null);   // ETS item 9: the element with id "game" is the game canvas
 installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () => state.playerName || "Tamer" });
 // EXPERIMENT (multiplayer): the many-vs-many fight screen and what it needs from the game.
 installMpBattle({

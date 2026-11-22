@@ -20,15 +20,20 @@ import {
 } from "../vendor/engine.js";
 import { activeSlotOf, encounterGateBytes, setStatModifier, statModifier, statValue } from "./plans.js";
 import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
-import type { FightTechRow } from "../types/battle.js";
+import type { FightTechRow, BattleRecord, BattleLineSpec } from "../types/battle.js";
+
+/** The restore plan as the engine builds it; the engine's own page word is untyped there, so it is named here. */
+type Category4RestoreView = Omit<NonNullable<ReturnType<typeof category4RestorePlan>>, "page"> & { page: BattleLineSpec | null; healed?: number[] };
 
 import type { BattleState } from "../types/battle.js";
-interface BattleRestoreState {
+export interface BattleRestoreState {
   player: BattleState["player"];
   enemy: BattleState["enemy"];
   playerRecords: BattleState["playerRecords"];
   statusEvents: BattleState["statusEvents"];
   activePlayerIndex?: number;
+  /** the 14 bytes the battle setup copies out of the screen record (start.ts) */
+  encounterGateBytes?: readonly number[] | null | undefined;
 }
 
 export function battleRestoreParty(b: BattleRestoreState, side: number) {
@@ -48,7 +53,7 @@ export function battleRestoreParty(b: BattleRestoreState, side: number) {
 }
 
 /** The walker's own records for one side, in the original's slot order. */
-export function battleRestoreTargets(b, side: number) {
+export function battleRestoreTargets(b: BattleRestoreState, side: number): (BattleRecord | null)[] {
   if ((side | 0) < 1) {
     const records = b?.playerRecords ?? [];
     return [0, 1, 2].map((i) => records[i] ?? null);
@@ -65,7 +70,7 @@ export function battleRestoreTargets(b, side: number) {
  * walker keeps ailments by name AND, when a record carries them, the raw `+0x1c` byte in
  * `statusBits` — so both are cleared here, or the two representations would drift apart.
  */
-function clearRestoreAilments(rec, mask: number) {
+function clearRestoreAilments(rec: BattleRecord | null, mask: number) {
   if (!rec || !mask) return;
   const a = rec.ailments;
   if (a) {
@@ -83,7 +88,7 @@ function clearRestoreAilments(rec, mask: number) {
  * The plan is the port's, so this only translates the port's per-slot numbers back into
  * the walker's records. Returns the slot indices whose HP actually rose.
  */
-export function applyBattleRestorePlan(b: BattleRestoreState, side: number, plan) {
+export function applyBattleRestorePlan(b: BattleRestoreState, side: number, plan: Category4RestoreView) {
   const targets = battleRestoreTargets(b, side);
   const healed = [];
   const pool = b?.statusEvents;
@@ -152,7 +157,7 @@ export function applyBattleRestorePlan(b: BattleRestoreState, side: number, plan
 /** The pool stagers take a draw in [0,1) (they scale it to 16 bits); RAND_U16 is the integer draw itself (battle-combat.ts:637 wraps it the same way). */
 export const RAND_FRAC = () => (RAND_U16()! % 0x10000) / 0x10000;
 
-function startAutoRecover(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, side: number, rec: { autoRecover: boolean; }) {
+function startAutoRecover(b: BattleRestoreState, side: number, rec: BattleRecord | null) {
   if (!rec) return;
   const pool = b.statusEvents ?? (b.statusEvents = emptyStatusEventPool());
   const sideDir = (side | 0) < 1 ? 0 : 0x10;
@@ -189,7 +194,7 @@ export function castFieldTechnique(b: BattleState, side: number, record: { crit:
  * skipped when the PLAYER acts and encounter gate byte 0x80042b62 is non-zero (`:27840`-`:27850`).
  * Returns the change or null.
  */
-export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, actingSide: number, record: FightTechRow | null, names: StatDebuffNames = {}) {
+export function applyStatDebuffDispatch(b: BattleRestoreState, actingSide: number, record: FightTechRow | null, names: StatDebuffNames = {}) {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch !== 26 && dispatch !== 27) return null;
   const stat = dispatch === 26 ? 0 : 1;
@@ -264,7 +269,7 @@ export function battleRestorePlanFor(b: BattleRestoreState, side: number, record
   };
   const activeSlot = (side | 0) < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
   const actor = battleRestoreTargets(b, side)[activeSlot];
-  const plan = category4RestorePlan(record, techniqueId | 0, {
+  const plan: Category4RestoreView | null = category4RestorePlan(record, techniqueId | 0, {
     side: side | 0,
     wisdom: Number(options.wisdom ?? actor?.wis ?? 0),
     activeSlot,

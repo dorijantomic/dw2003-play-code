@@ -3,13 +3,16 @@
 // (sheets.js composeVictory) hands it read-only data (the battle's progress records, the session's text lines); nothing here feeds back into the game.
 // CSS animations only (vic.css, reduced motion honoured); the part is built once per signature, so animations run once per page.
 import { fitRun, measureText, FACE } from "./text.js";
+import type { PartGeom } from "./parts.js";
+import type { UiSheetDef } from "./types.js";
 
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// ETS item 9: the regex matches exactly the four characters the table has
+const esc = (s: string | null | undefined) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const el = (cls: string, parent: HTMLElement, tag = "div") => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
 const F_LABEL = FACE.label;
 
 /** A text element with its fit rule (the same fitRun the other parts use); `max` = widest allowed px. */
-function txt(parent: HTMLElement, cls: string, text: string, sizePx: number, max: number, family = F_LABEL, weight = 400, spacing = 0) {
+function txt(parent: HTMLElement, cls: string, text: string | number, sizePx: number, max: number, family = F_LABEL, weight = 400, spacing = 0) {
     const e = el(cls, parent, "span");
     const fit = fitRun((s: number, sp: number) => measureText(String(text), family, weight, s, sp), sizePx, spacing, max);
     e.textContent = String(text);
@@ -50,7 +53,7 @@ function learnLine(root: HTMLElement, text: string, digi: boolean, D: number, x:
 }
 
 /** Build / rebuild the page for `desc` (descriptor from sheets.js composeVictory). */
-export function fillVic(root: HTMLElement, desc, g) {
+export function fillVic(root: HTMLElement, desc: UiSheetDef, g: PartGeom) {
     const r = g.rect, W = r.width, H = r.height, k = Math.min(W / 1280, H / 720);
     root.className = "uic-part uic-vic";
     root.dataset.uicPart = desc.part;
@@ -60,11 +63,12 @@ export function fillVic(root: HTMLElement, desc, g) {
     el("vic-bg", root);
     const px = (n: number) => n * k;
     if (desc.page === "exp") {
-        const n = Math.max(1, desc.rings.length), D = Math.min(H * 0.4, W / (n * 1.3), 340 * k * 1.15), gap = Math.min(D * 0.45, (W - n * D) / (n + 1));
+        // ETS item 9: the "exp" page always carries its rings (sheets.ts composeVictory)
+        const n = Math.max(1, desc.rings!.length), D = Math.min(H * 0.4, W / (n * 1.3), 340 * k * 1.15), gap = Math.min(D * 0.45, (W - n * D) / (n + 1));
         const x0 = (W - (n * D + (n - 1) * gap)) / 2, y0 = H * 0.2;
         const title = el("vic-ttl", root); line(title, desc.up ? "LEVEL UP" : "EXPERIENCE", px(desc.up ? 70 : 26), W * 0.5);
         title.style.top = `${Math.round(H * (desc.up ? 0.045 : 0.06))}px`;
-        desc.rings.forEach((p, i: number) => {
+        desc.rings!.forEach((p, i: number) => {
             const rg = el(`vr${p.up ? " k" : ""}${p.gain > 0 || p.up ? "" : " z"}`, root);       // z = nothing gained: calmer ring, the name stays bright
             rg.style.cssText = `left:${Math.round(x0 + i * (D + gap))}px;top:${Math.round(y0)}px;width:${Math.round(D)}px;height:${Math.round(D)}px;--i:${i}`;
             rg.innerHTML = ringSvg(Math.round(p.a * 100), Math.round(p.b * 100));
@@ -84,7 +88,7 @@ export function fillVic(root: HTMLElement, desc, g) {
     } else if (desc.page === "bit") {
         const bx = el("vbit", root); bx.style.top = `${Math.round(H * 0.12)}px`;
         txt(bx, "vt", "BIT GAINED", px(24), W * 0.8, F_LABEL, 400, px(10));
-        count(bx, "bn", desc.num, px(200), W * 0.9);
+        count(bx, "bn", desc.num!, px(200), W * 0.9);     // ETS item 9: the "bit" page always carries its number
         txt(bx, "bl", "BIT", px(34), W * 0.4, F_LABEL, 400, px(8));
         if (desc.item) {
             const it = el("vitem", root); it.style.top = `${Math.round(H * 0.66)}px`;

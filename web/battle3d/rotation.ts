@@ -2,6 +2,12 @@ import { smoothAnimEnabled } from "../fight/smooth-anim.js";
 import { mat4Identity } from "../fight/proj-layers.js";
 import { ps1AnglesToMat3 } from "./math.js";
 import { S } from "./state.js";
+/** a unit quaternion as [x, y, z, w] */
+type Quat = [number, number, number, number];
+
+/** one keyframe of a rotation/translation channel: x, y, z, then the frame it is set at (30000 ends the channel) */
+type ChannelKey = readonly [number, number, number, number];
+
 interface Bone {
   anim?: {
     ch2?: Array<[number, number, number]>;
@@ -12,7 +18,7 @@ interface Bone {
 const PS1_UNIT_RAD = (Math.PI * 2) / 4096;   // 4096 units = one turn
 
 /** A ch2 triple (raw units c0,c1,c2) as the quaternion of Rz(c2)*Ry(c1)*Rx(c0), [x,y,z,w]. */
-export function ch2ToQuat(c0, c1, c2) {
+export function ch2ToQuat(c0: number, c1: number, c2: number): Quat {
   const ax = c0 * PS1_UNIT_RAD * 0.5, ay = c1 * PS1_UNIT_RAD * 0.5, az = c2 * PS1_UNIT_RAD * 0.5;
   const sx = Math.sin(ax), cx = Math.cos(ax);
   const sy = Math.sin(ay), cy = Math.cos(ay);
@@ -26,14 +32,14 @@ export function ch2ToQuat(c0, c1, c2) {
   ];
 }
 
-function quatNormalize(q) {
+function quatNormalize(q: Quat): Quat {
   const l = Math.sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]) || 1;
   return [q[0]/l, q[1]/l, q[2]/l, q[3]/l];
 }
 
 /** Shortest-path slerp. dot < 0 negates one side (the two quaternions are the same rotation);
  *  nearly parallel pairs (dot > 0.9995) use nlerp, where slerp is ill-conditioned. */
-export function quatSlerp(a, b, t) {
+export function quatSlerp(a: Quat, b: Quat, t: number): Quat {
   let d = a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3];
   let bx = b[0], by = b[1], bz = b[2], bw = b[3];
   if (d < 0) { d = -d; bx = -bx; by = -by; bz = -bz; bw = -bw; }
@@ -51,7 +57,7 @@ export function quatSlerp(a, b, t) {
 }
 
 /** Quaternion -> column-major mat3, the same storage convention as ps1AnglesToMat3. */
-export function quatToMat3(q: number[]) {
+export function quatToMat3(q: Quat) {
   const [x, y, z, w] = quatNormalize(q);
   const xx = x!*x!, yy = y!*y!, zz = z!*z!;
   const xy = x!*y!, xz = x!*z!, yz = y!*z!;
@@ -98,7 +104,7 @@ const SMOOTH_SLOPE_MAX = 1.5;        // <= 1.5 keeps the cubic monotone (Fritsch
 const SMOOTH_MAX_SHIFT_DEG = 20;     // how far the re-timed pose may run ahead/behind at the SAME frame
 
 /** Angle in degrees between two unit quaternions, [0,180]; uses |dot| (q and -q are one rotation). */
-function quatAngleDeg(a, b) {
+function quatAngleDeg(a: Quat, b: Quat) {
   let d = Math.abs(a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3]);
   if (d > 1) d = 1;
   return 2 * Math.acos(d) * 180 / Math.PI;
@@ -107,7 +113,7 @@ function quatAngleDeg(a, b) {
 /** The authored sweep of one key pair: sum of the quaternion steps along the per-component ramp.
  *  Substeps stay <=90 deg so a full turn is measured as a turn (a quaternion ends a turn back at
  *  itself, so the endpoints alone cannot see it). */
-export function ch2AuthoredTurnDeg(a, b) {
+export function ch2AuthoredTurnDeg(a: ChannelKey, b: ChannelKey) {
   const d0 = b[0] - a[0], d1 = b[1] - a[1], d2 = b[2] - a[2];
   const m = Math.max(Math.abs(d0), Math.abs(d1), Math.abs(d2));
   const K = Math.max(1, Math.min(64, Math.ceil(m / 1024)));
@@ -124,7 +130,7 @@ export function ch2AuthoredTurnDeg(a, b) {
 
 /** The authored rotation at t in [0,1] along the lo->hi span, as a quaternion: the per-component
  *  ramp cut into substeps, slerped inside a substep. Endpoints are the keys themselves. */
-export function ch2QuatAlongSpan(lo, hi, t: number) {
+export function ch2QuatAlongSpan(lo: ChannelKey, hi: ChannelKey, t: number) {
   if (t <= 0) return ch2ToQuat(lo[0], lo[1], lo[2]);
   if (t >= 1) return ch2ToQuat(hi[0], hi[1], hi[2]);
   const d0 = hi[0] - lo[0], d1 = hi[1] - lo[1], d2 = hi[2] - lo[2];
@@ -203,7 +209,7 @@ export function smoothTimeWarp(channel, i: number, t: number, angle = false) {
 }
 
 /** Smooth-mode ch2 rotation at `frame` as {q, m}: authored path (quaternion substeps), re-timed. */
-function ch2SmoothRotationAt(channel: [number, number, number][] | undefined, frame: number) {
+function ch2SmoothRotationAt(channel: [number, number, number][] | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
   const s = spanIndexAt(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
   if (!s.hi || s.t <= 0) return { q: ch2ToQuat(s.lo[0], s.lo[1], s.lo[2]), m: ps1AnglesToMat3(s.lo[2], s.lo[1], s.lo[0]) };
@@ -274,10 +280,10 @@ export function interpChannel(channel, frame) {
 // A ch2 rotation at `frame` as {q, m}: the quaternion of the SAME rotation the matrix carries.
 // At a key both come straight from the key (m is ps1AnglesToMat3, bit-identical to the linear
 // path); between keys the quaternion is the shortest-path slerp and m its matrix.
-function ch2RotationAt(channel: [number, number, number][] | undefined, frame: number) {
+function ch2RotationAt(channel: [number, number, number][] | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
   const s = channelSpan(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
-  const keyAt = (k) => ({ q: ch2ToQuat(k[0], k[1], k[2]), m: ps1AnglesToMat3(k[2], k[1], k[0]) });
+  const keyAt = (k: ChannelKey) => ({ q: ch2ToQuat(k[0], k[1], k[2]), m: ps1AnglesToMat3(k[2], k[1], k[0]) });
   if (!s.hi || s.t <= 0) return keyAt(s.lo);
   if (s.t >= 1) return keyAt(s.hi);
   const q = quatSlerp(ch2ToQuat(s.lo[0], s.lo[1], s.lo[2]), ch2ToQuat(s.hi[0], s.hi[1], s.hi[2]), s.t);
@@ -296,7 +302,7 @@ function ch2RotationAt(channel: [number, number, number][] | undefined, frame: n
 // pack's own ch3 would show it. The disc hides prop meshes exactly this way (ch3 = 0), so a built action
 // that reuses a body authored for another clip can keep a part the model's idle never shows (the thrown
 // axe carried beside the held one) hidden without changing the pose. Set or array of indices.
-export function buildBoneWorldMatrices(model, frame, blend = null, hide = null) {
+export function buildBoneWorldMatrices(model, frame: number, blend: { from: number | null; t: number; } | null = null, hide: Set<number> | null = null) {
     const hidden = hide == null ? null : (typeof hide.has === "function" ? hide : new Set(hide));
     const smooth = smoothAnimEnabled();          // F2 → Battle → Smooth battle animation (default OFF)
     const n = model.num_bones;

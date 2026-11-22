@@ -70,7 +70,7 @@ function mat3Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
 // Verified against sstate1 dump (all 21 Renamon bones within 5 units, RMS 1.99).
 // Call with ps1AnglesToMat3(c2[2], c2[1], c2[0]) — args are REVERSED from ch2 storage.
 // Computes: Rz(ax) × Ry(ay) × Rx(az), column-major.
-export function ps1AnglesToMat3(ax, ay, az) {
+export function ps1AnglesToMat3(ax: number, ay: number, az: number) {
     const scale = (Math.PI * 2) / 4096;
     const cx = Math.cos(ax * scale), sx = Math.sin(ax * scale);
     const cy = Math.cos(ay * scale), sy = Math.sin(ay * scale);
@@ -151,7 +151,7 @@ export const TEXELS_PER_PATCH_UNIT = 4;
  * strip-relative, so the copy's VRAM strip origin is zero; the port's rect is then scaled from
  * VRAM units into the page's texels (four texels across per unit, one row down).
  */
-export function texturePatchRect(entry, scale: number) {
+export function texturePatchRect(entry: Parameters<typeof patchCopyRect>[0] & { src: readonly (readonly number[] | undefined)[]; variant: number; }, scale: number) {
   const u = TEXELS_PER_PATCH_UNIT * scale;
   const variant = entry.src[entry.variant] ? entry.variant : 0;
   const r = patchCopyRect(entry, variant, 0, 0);

@@ -1,5 +1,49 @@
 
-import type { DigimonRecord } from "../types/battle.js";
+import type { DigimonRecord, RosterMember, PlayerRecord } from "../types/battle.js";
+import type { FormLedgerEntry, PartnerStats } from "../game/types.js";
+/** What the report pages read off one partner's payout (a ParticipantProgress carries all of it; a duel's summary only some). */
+export interface FightReportEvent {
+  index?: number;
+  xp?: number;
+  oldXp?: number;
+  name?: string;
+  oldLevel?: number;
+  newLevel?: number;
+  formLevels?: { name: string; level: number; }[];
+  learnedTechs?: string[];
+  loadableTechs?: string[];
+  unlocked?: { name: string; slotFull?: boolean | undefined; }[];
+}
+
+/** One equipped form on a report row. */
+export interface FightReportForm {
+  id: number;
+  name: string;
+  level: number;
+}
+
+/** One partner's row on the fight report. */
+export interface FightReportRow {
+  index: number;
+  rookieId: number;
+  name: string;
+  level: number;
+  xp: number;
+  forms: FightReportForm[];
+}
+
+/** One page of the report: what the box says and the row/form it is about. */
+export interface FightReportPage {
+  kind: string;
+  index?: number | undefined;
+  value: string | number;
+  startXp?: number;
+  targetXp?: number;
+  /** the form the page marks, when it marks one */
+  form?: string;
+  message: string;
+  jingle?: string;
+}
 interface FightReportGeomPoint {
   x: number;
   yOff: number;
@@ -12,7 +56,8 @@ interface FightReportGeomClip extends FightReportGeomPoint {
 
 
 interface FightReportGeomPortrait extends FightReportGeomPoint {
-  frames: number;
+  /** per rookie id (a string key), the clip ids the portrait cycles through */
+  frames: Record<string, (string | number)[]>;
   stepVsync: number;
 }
 
@@ -29,7 +74,8 @@ interface FightReportGeomHighlight extends FightReportGeomClip {
 
 
 interface FightReportGeomLevelArrow extends FightReportGeomClip {
-  pages: number;
+  /** the page kinds the arrow shows on */
+  pages: string[];
   rampSteps: number;
   stepVsync: number;
 }
@@ -53,6 +99,8 @@ interface FightReportFormSlotLayout {
 
 
 interface FightReportGroupLayout {
+  /** how many partner groups the page can show */
+  count?: number;
   stepY: number;
   plate: FightReportGeomClip;
   portrait: FightReportGeomPortrait;
@@ -73,14 +121,25 @@ interface FightReportMessageLayout {
 }
 
 
-interface FightReportLayout {
+/** assets/data/stfgtrep_ui.json: the fight report's own layout */
+export interface FightReportLayout {
   group?: FightReportGroupLayout | null;
   form_slot?: FightReportFormSlotLayout | null;
   message: FightReportMessageLayout;
+  ambient_bg: { clip: string; animated: { stepMs: number; max: number; }; };
+  corner_badge: {
+    clip: string; x: number; y: number;
+    /** the page kinds the badge shows on */
+    pages?: string[];
+    value: { x: number; y: number; kind: number; };
+    label: { str: string; x: number; y: number; kind: number; };
+  };
+  message_bar: { clip: string; x: number; y: number; };
+  blink_cursor: { pack: string; clip: string; x: number; y: number; };
 }
 
 
-interface FightReportSlotGeom {
+export interface FightReportSlotGeom {
   barClip: string;
   barX: number;
   barY: number;
@@ -98,15 +157,15 @@ interface FightReportSlotGeom {
 }
 
 
-interface FightReportPortraitGeom {
+export interface FightReportPortraitGeom {
   x: number;
   y: number;
-  frames: number;
+  frames: Record<string, (string | number)[]>;
   stepVsync: number;
 }
 
 
-interface FightReportHighlightGeom {
+export interface FightReportHighlightGeom {
   clip: string;
   frames: number;
   stepVsync: number;
@@ -115,9 +174,9 @@ interface FightReportHighlightGeom {
 }
 
 
-interface FightReportLevelArrowGeom {
+export interface FightReportLevelArrowGeom {
   clip: string;
-  pages: number;
+  pages: string[];
   rampSteps: number;
   stepVsync: number;
   x: number;
@@ -125,7 +184,7 @@ interface FightReportLevelArrowGeom {
 }
 
 
-interface FightReportGroupGeom {
+export interface FightReportGroupGeom {
   base: number;
   plate: { clip: string; x: number; y: number };
   portrait: FightReportPortraitGeom;
@@ -142,9 +201,9 @@ interface FightReportGroupGeom {
 // Materialize the persistent three-row fight report. The native screen shows
 // the whole pack (not only Digimon that were tagged into the fight), while EXP
 // is added only to the participants selected by the reward resolver.
-export function buildFightReportRows(roster, records, profiles: { [k: string]: DigimonRecord; }, rewardXpByIndex = {}) {
-  return (roster ?? []).slice(0, 3).map((member, index: string | number) => {
-    const stats = member?.stats ?? records?.[index]?.statsRecord ?? {};
+export function buildFightReportRows(roster: readonly RosterMember[] | null | undefined, records: readonly PlayerRecord[] | null | undefined, profiles: { [k: string]: DigimonRecord; }, rewardXpByIndex: Record<number, number> = {}): FightReportRow[] {
+  return (roster ?? []).slice(0, 3).map((member, index: number) => {
+    const stats: Partial<PartnerStats> = member?.stats ?? records?.[index]?.statsRecord ?? {};
     const rookieId = Number(member?.rookieId ?? records?.[index]?.rookieId ?? 0);
     const rewardXp = Number(rewardXpByIndex[index] ?? 0);
     const ledger = stats.formLedger ?? [];
@@ -154,8 +213,8 @@ export function buildFightReportRows(roster, records, profiles: { [k: string]: D
     // so it has to be dropped here or it takes a bar as well.
     const formIds = (stats.equippedForms?.length
       ? stats.equippedForms
-      : ledger.map((entry) => entry.id))
-      .filter((id) => Number(id) !== rookieId)
+      : ledger.map((entry: FormLedgerEntry) => entry.id))
+      .filter((id: number) => Number(id) !== rookieId)
       .slice(0, 3);
     return {
       index,
@@ -163,8 +222,8 @@ export function buildFightReportRows(roster, records, profiles: { [k: string]: D
       name: member?.name ?? records?.[index]?.profile?.name ?? "",
       level: Number(stats.level ?? records?.[index]?.level ?? 1),
       xp: Math.min(999999, Number(stats.xp ?? 0) + rewardXp),
-      forms: formIds.map((id) => {
-        const record = ledger.find((entry) => Number(entry.id) === Number(id));
+      forms: formIds.map((id: number) => {
+        const record = ledger.find((entry: FormLedgerEntry) => Number(entry.id) === Number(id));
         return {
           id: Number(id),
           name: profiles?.[Number(id)]?.name ?? "",
@@ -195,7 +254,7 @@ export function expCountStep(displayed: number, target: number) {
   return next;
 }
 
-export function expCountDisplayed(start, target, frames: number) {
+export function expCountDisplayed(start: number | null | undefined, target: number | null | undefined, frames: number) {
   const from = Number(start) || 0;
   const to = Number(target) || 0;
   if (frames >= 10 || from === to) return to;
@@ -211,8 +270,8 @@ export function buildFightReportPages({
   bits = 0,
   droppedItem = null,
   events = [],
-} = {}) {
-  const pages = [];
+}: { xp?: number; bits?: number; droppedItem?: string | null; events?: FightReportEvent[]; } = {}) {
+  const pages: FightReportPage[] = [];
   for (const ev of events) {
     const share = Number(ev.xp) || 0;
     if (share > 0) {
@@ -331,16 +390,16 @@ export function fightReportGroupGeom(layout: FightReportLayout | null | undefine
 // The portrait's frame. One step every 13 vsyncs, then back to the start --
 // the table's own -1 marks where each rookie's loop ends, and the sequences are
 // already trimmed to it. PAL runs at 50 Hz.
-export function fightReportPortraitClip(portrait, rookieId, seconds: number) {
+export function fightReportPortraitClip(portrait: Pick<FightReportPortraitGeom, "frames"> & { stepVsync?: number | undefined; } | null | undefined, rookieId: number, seconds: number) {
   const seq = portrait?.frames?.[String(rookieId)];
   if (!seq?.length) return null;
-  const step = (portrait.stepVsync ?? 13) / 50;
+  const step = (portrait!.stepVsync ?? 13) / 50;
   return seq[Math.floor(Math.max(0, seconds) / step) % seq.length];
 }
 
 // The mark over the partner the page is about: four colours, one step every
 // five vsyncs, looping. PAL runs at 50 Hz.
-export function fightReportCycleRow(entry, seconds: number) {
+export function fightReportCycleRow(entry: { frames?: number; stepVsync?: number; } | null | undefined, seconds: number) {
   const n = entry?.frames ?? 4;
   const step = (entry?.stepVsync ?? 5) / 50;
   return Math.floor(Math.max(0, seconds) / step) % n;
@@ -348,7 +407,7 @@ export function fightReportCycleRow(entry, seconds: number) {
 
 // The level arrow, and the plate under it: the colour RAMPS and then STOPS.
 // It does not loop back to the start.
-export function fightReportRampRow(entry, seconds: number) {
+export function fightReportRampRow(entry: { rampSteps?: number; stepVsync?: number; } | null | undefined, seconds: number) {
   const n = entry?.rampSteps ?? 11;
   const step = (entry?.stepVsync ?? 3) / 50;
   return Math.min(n - 1, Math.floor(Math.max(0, seconds) / step));
@@ -359,14 +418,14 @@ export const FORM_PAGE_KINDS = new Set(["form-level", "digivolve", "slot-full"])
 
 // Which of a partner's three bars a page is about, or null when the page is
 // about the partner itself.
-export function fightReportMarkedSlot(page, row) {
+export function fightReportMarkedSlot(page: FightReportPage | null | undefined, row: FightReportRow | null | undefined) {
   if (!page || !row || !FORM_PAGE_KINDS.has(page.kind)) return null;
   const want = page.form ?? page.value;
-  const j = (row.forms ?? []).findIndex((f) => f?.name && f.name === want);
+  const j = (row.forms ?? []).findIndex((f: FightReportForm) => f?.name && f.name === want);
   return j >= 0 ? j : null;
 }
 
 // How many groups the page holds -- three party slots.
-export function fightReportGroupCount(layout) {
+export function fightReportGroupCount(layout: FightReportLayout | null | undefined) {
   return layout?.group?.count ?? 0;
 }

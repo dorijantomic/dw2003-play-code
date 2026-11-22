@@ -19,7 +19,7 @@
 // Pure: no DOM and no fs (the CLI does the reading and the printing, the lab does the drawing). The words in a row
 // are the data's own; where a branch has no words at all the row says that in plain tool words.
 import { paginate } from "./dialogue-pack.js";
-import type { QuestEndingsOpts } from "./types/quest-endings.js";
+import type { QuestEndingAskStep, QuestEndingDef, QuestEndingItem, QuestEndingPay, QuestEndingReward, QuestEndingRow, QuestEndingSkipAsk, QuestEndingSlot, QuestEndingStep, QuestEndingsOpts, QuestEndingsTotals } from "./types/quest-endings.js";
 
 const DEFAULT_ASK = "Take the job?";                       // web/quests.js:433
 const DEFAULT_OPTIONS = ["I will do it", "Not now"];       // web/quests.js:433
@@ -27,25 +27,25 @@ const DEFAULT_OPTIONS = ["I will do it", "Not now"];       // web/quests.js:433
 export const VERDICT_OPTION_MAX = 28;
 const CHASE_LOST = "the chase is lost; the rest of the scene does not play";   // web/quests.js:378
 
-const isStep = (s) => !!s && typeof s === "object" && !Array.isArray(s);
-const isAskStep = (s) => isStep(s) && "ask" in s && Array.isArray(s.options) && s.options.length > 0;
-const isChaseStep = (s) => isStep(s) && "chase" in s;
-const isBattleStep = (s) => isStep(s) && "battle" in s;
-const sayLines = (steps) => (Array.isArray(steps) ? steps : [])
+const isStep = (s: QuestEndingStep | null | undefined): s is QuestEndingStep => !!s && typeof s === "object" && !Array.isArray(s);
+const isAskStep = (s: QuestEndingStep | null | undefined): s is QuestEndingAskStep => isStep(s) && "ask" in s && Array.isArray(s.options) && s.options.length > 0;
+const isChaseStep = (s: QuestEndingStep | null | undefined) => isStep(s) && "chase" in s;
+const isBattleStep = (s: QuestEndingStep | null | undefined) => isStep(s) && "battle" in s;
+const sayLines = (steps: QuestEndingStep[] | null | undefined) => (Array.isArray(steps) ? steps : [])
     .filter((s) => isStep(s) && "say" in s && typeof s.text === "string" && s.text.trim())
-    .map((s) => s.text);
-const payOf = (rw) => ({ bits: Math.max(0, Number(rw?.bits) || 0), items: Array.isArray(rw?.items) ? rw.items : [] });
-const itemsText = (items) => items.map((it) => `${it?.count ?? 1} x ${it?.name ?? "?"}`);
-const payText = (pay) => [pay.bits ? `${pay.bits} BIT` : "", ...itemsText(pay.items)].filter(Boolean).join(", ") || "nothing";
+    .map((s) => s.text!);
+const payOf = (rw: QuestEndingReward | null | undefined): QuestEndingPay => ({ bits: Math.max(0, Number(rw?.bits) || 0), items: Array.isArray(rw?.items) ? rw.items : [] });
+const itemsText = (items: QuestEndingItem[]) => items.map((it) => `${it?.count ?? 1} x ${it?.name ?? "?"}`);
+const payText = (pay: QuestEndingPay) => [pay.bits ? `${pay.bits} BIT` : "", ...itemsText(pay.items)].filter(Boolean).join(", ") || "nothing";
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Every scene a def can play, in play order, with the slot name tools/scene_readback.mjs also uses:
  * offer, accept, done, turnin and objective-<n>. Only slots that actually hold steps are returned.
  */
-function sceneSlots(def) {
-    const out = [];
-    const push = (slot: string, steps) => { if (Array.isArray(steps) && steps.length) out.push({ slot, steps }); };
+function sceneSlots(def: QuestEndingDef | null | undefined): QuestEndingSlot[] {
+    const out: QuestEndingSlot[] = [];
+    const push = (slot: string, steps: QuestEndingStep[] | undefined) => { if (Array.isArray(steps) && steps.length) out.push({ slot, steps }); };
     push("offer", def?.offer?.scene);
     push("accept", def?.acceptScene);
     push("done", def?.doneScene);
@@ -55,13 +55,13 @@ function sceneSlots(def) {
 }
 
 /** The two offer rows: the scene's own ask and its two answers; when there is no scene, the ask happens at runtime. */
-function offerRows(def) {
+function offerRows(def: QuestEndingDef): { rows: QuestEndingRow[]; skipAsk: QuestEndingSkipAsk | null } {
     if (!def?.offer) return { rows: [], skipAsk: null };
     const scene = sceneSlots(def).find((x) => x.slot === "offer") ?? null;
     // the scene's answer is the last ask answered (web/game.js playQuestScene: `answer = i` on every ask)
     const askIndexes = (scene?.steps ?? []).map((s, i) => (isAskStep(s) ? i : -1)).filter((i: number) => i >= 0);
-    const pick = askIndexes.length ? askIndexes[askIndexes.length - 1] : -1;
-    const askStep = pick >= 0 ? scene.steps[pick] : null;
+    const pick = askIndexes.length ? askIndexes[askIndexes.length - 1]! : -1;
+    const askStep = pick >= 0 ? scene!.steps[pick] : null;
     const ask = String(askStep?.ask ?? def.offer.ask ?? DEFAULT_ASK);
     const options = askStep?.options?.length ? askStep.options : DEFAULT_OPTIONS;
     const accept = String(options[0] ?? DEFAULT_OPTIONS[0]);
@@ -81,8 +81,8 @@ function offerRows(def) {
 }
 
 /** Every other ask step: one row per option, with the question it answers. */
-function askRows(def, skipAsk) {
-    const rows = [];
+function askRows(def: QuestEndingDef, skipAsk: QuestEndingSkipAsk | null): QuestEndingRow[] {
+    const rows: QuestEndingRow[] = [];
     for (const { slot, steps } of sceneSlots(def)) {
         const chase = steps.some(isChaseStep);
         steps.forEach((step, index) => {
@@ -101,13 +101,13 @@ function askRows(def, skipAsk) {
 }
 
 /** One row per hand-in option: the words after it and the whole pay (base reward plus this option's own pay). */
-function verdictRows(def) {
+function verdictRows(def: QuestEndingDef): QuestEndingRow[] {
     const v = def?.verdict;
     if (!v || !Array.isArray(v.options) || !v.options.length) return [];
     const base = payOf(def.reward);
     const pays = Array.isArray(v.pay) ? v.pay : [];
     const after = Array.isArray(v.after) ? v.after : [];
-    return v.options.map((option, i: string | number) => {
+    return v.options.map((option, i: number) => {
         const own = payOf(pays[i]);
         const pay = { bits: base.bits + own.bits, items: [...base.items, ...own.items] };
         const lines = Array.isArray(after[i]) ? after[i].map(String) : [];
@@ -122,8 +122,8 @@ function verdictRows(def) {
 }
 
 /** A scene with a chase: kept up, or lost (the rest of the scene does not play). */
-function chaseRows(def) {
-    const rows = [];
+function chaseRows(def: QuestEndingDef): QuestEndingRow[] {
+    const rows: QuestEndingRow[] = [];
     for (const { slot, steps } of sceneSlots(def)) {
         steps.forEach((step, index: number) => {
             if (!isChaseStep(step)) return;
@@ -136,8 +136,8 @@ function chaseRows(def) {
 }
 
 /** A scene with a battle: a win or a flee go on, a loss ends the scene at the title. */
-function battleRows(def) {
-    const rows = [];
+function battleRows(def: QuestEndingDef): QuestEndingRow[] {
+    const rows: QuestEndingRow[] = [];
     for (const { slot, steps } of sceneSlots(def)) {
         steps.forEach((step, index: number) => {
             if (!isBattleStep(step)) return;
@@ -150,7 +150,7 @@ function battleRows(def) {
 }
 
 /** The warning row the rejected Ending Card owned: a job that has neither a hand-in scene nor hand-in lines. */
-function closingRow(def) {
+function closingRow(def: QuestEndingDef | null | undefined): QuestEndingRow | null {
     if (!def) return null;
     if (Array.isArray(def.doneScene) && def.doneScene.length) return null;
     const ref = def.turnIn ?? def.offer ?? null;
@@ -160,7 +160,7 @@ function closingRow(def) {
 }
 
 /** A job no character hands out: the quest log (or an acceptAt place) takes it. */
-function noGiverRow(def) {
+function noGiverRow(def: QuestEndingDef | null | undefined): QuestEndingRow | null {
     if (!def || def.offer) return null;
     const places = Array.isArray(def.acceptAt) && def.acceptAt.length ? `taken from ${def.acceptAt.join(", ")}` : "taken from the quest log";
     const note = `no giver; ${places}`;
@@ -174,9 +174,9 @@ function noGiverRow(def) {
  * `lines` are the exact words the player hears on that way (never empty: a branch with no words says so);
  * `pay` is the whole pay of a verdict row, `{ bits, items }`; `note` is the plain fact about the way.
  */
-export function endingsOf(def) {
+export function endingsOf(def: QuestEndingDef | null | undefined): QuestEndingRow[] {
     if (!def || typeof def !== "object") return [];
-    const rows = [];
+    const rows: QuestEndingRow[] = [];
     const noGiver = noGiverRow(def);
     if (noGiver) rows.push(noGiver);
     const offer = offerRows(def);
@@ -192,17 +192,17 @@ export function endingsOf(def) {
  * closing words (that last one is informational: the data has twelve, and the tool says so but does not fail).
  * Returns plain strings, like web/quest-readback.js's problems.
  */
-export function endingsProblem(def) {
+export function endingsProblem(def: QuestEndingDef | null | undefined): string[] {
     if (!def || typeof def !== "object") return ["no quest definition"];
-    const problems = [];
+    const problems: string[] = [];
     const v = def.verdict;
     if (v) {
         const options = Array.isArray(v.options) ? v.options : [];
         const after = Array.isArray(v.after) ? v.after : [];
-        const missing = options.map((_, i) => i).filter((i: string | number) => !Array.isArray(after[i]) || !after[i].length);
+        const missing = options.map((_, i) => i).filter((i: number) => !Array.isArray(after[i]) || !after[i].length);
         if (missing.length) {
             problems.push(missing.length === 1
-                ? `verdict: option ${missing[0] + 1} has no after lines`
+                ? `verdict: option ${missing[0]! + 1} has no after lines`
                 : `verdict: options ${missing.map((i: number) => i + 1).join(", ")} have no after lines`);
         }
         const pays = Array.isArray(v.pay) ? v.pay : [];
@@ -229,8 +229,8 @@ export function endingsProblem(def) {
  * choicePoints counts every question put to the player (an ask step or a verdict); optionRows counts every spoken
  * answer to one (the offer's own yes/no is its two offer rows, but it is still one ask step with two options).
  */
-export function endingsTable(defs) {
-    const t = { quests: 0, offers: 0, askSteps: 0, askRows: 0, verdicts: 0, verdictRows: 0, choicePoints: 0, optionRows: 0, chases: 0, battles: 0, closingless: 0 };
+export function endingsTable(defs: (QuestEndingDef | null | undefined)[] | null | undefined): QuestEndingsTotals {
+    const t: QuestEndingsTotals = { quests: 0, offers: 0, askSteps: 0, askRows: 0, verdicts: 0, verdictRows: 0, choicePoints: 0, optionRows: 0, chases: 0, battles: 0, closingless: 0 };
     for (const def of Array.isArray(defs) ? defs : []) {
         t.quests++;
         if (def?.offer) t.offers++;
@@ -253,12 +253,12 @@ export function endingsTable(defs) {
  * One plain page for one quest (or a markdown one with `{ markdown: true }`): a heading, one line per row, and
  * that row's own words under it. This is the same text the CLI prints and the lab shows.
  */
-export function endingsBlock(def, opts: QuestEndingsOpts = {}) {
+export function endingsBlock(def: QuestEndingDef | null | undefined, opts: QuestEndingsOpts = {}) {
     const md = opts.markdown === true;
     const rows = endingsOf(def);
     const problems = endingsProblem(def);
     const title = `## ${def?.id ?? "?"}  ${def?.title ?? ""}`.trim();
-    const wordsOf = (row) => (row.lines.length === 1 && row.lines[0] === row.note ? [] : row.lines);
+    const wordsOf = (row: QuestEndingRow) => (row.lines.length === 1 && row.lines[0] === row.note ? [] : row.lines);
     const out = [title];
     if (md) {
         out.push("", "| kind | slot | choice | pay | note |", "| --- | --- | --- | --- | --- |");

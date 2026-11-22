@@ -11,6 +11,11 @@ import {
 } from "../vendor/engine.js";
 
 import type { DigimonRecord } from "../types/battle.js";
+
+/** assets/data/jogress_scripts.json: the ten DNA actions' decoded director scripts */
+interface JogressScripts {
+  actions?: Record<string, { fusedModel: number; partnerModels: number[]; clip: number; }>;
+}
 // ---------------------------------------------------------------------------
 // The battle message line's own words.
 //
@@ -154,7 +159,7 @@ export function faceBoxHudEvents(b: { state: number; }, lineUp: boolean) {
   };
 }
 
-const PROFILE_NAME_ALIASES = Object.freeze({
+const PROFILE_NAME_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   BKWarGreymon: "BK WarGreymon",
   ImperialdramonFM: "Imperialdramon-F",
   ImperialdramonPM: "Imperialdramon-P",
@@ -185,7 +190,7 @@ export function canonicalProfileName(name: string | number) { return PROFILE_NAM
 // `.L0x8008bac0`, `[+0x184](manager, slot, model, 0)`). The anchor is action 374:
 // Stingmon's copy decodes op-for-op onto the 94 operations captured from RAM
 // (docs/research/battle/captures/dna-2026-07-14/clip12-full-script.md).
-export function dnaFusedForm(scripts, profiles, actionId: number, digimon: { [k: string]: DigimonRecord; }) {
+export function dnaFusedForm(scripts: JogressScripts | null | undefined, profiles: ArrayLike<number> | null | undefined, actionId: number, digimon: { [k: string]: DigimonRecord; }) {
   const row = scripts?.actions?.[String(actionId)];
   if (!row) return null;
   let profile = null;
@@ -213,7 +218,7 @@ export function dnaFusedForm(scripts, profiles, actionId: number, digimon: { [k:
  * own arms — and it states no number the game never shows. What the arm changed is on
  * `plan` for the tests to read.
  */
-export function scriptedWalkerSentence(plan, skill, who: string) {
+export function scriptedWalkerSentence(plan, skill: { name?: string | number } | null | undefined, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   const statName = ["attack", "defense", "speed"][
     (plan?.stats?.[0]?.stat ?? 0) | 0] ?? "stat";
@@ -251,7 +256,7 @@ export function scriptedWalkerSentence(plan, skill, who: string) {
  * 2026-10-04 reading: it states no number the game never shows, and the byte and the
  * multiplier it buys are on the plan for the tests to read.
  */
-export function chargeWalkerSentence(charge, skill, who: string) {
+export function chargeWalkerSentence(charge: { charged?: boolean } | null | undefined, skill: { name?: string | number } | null | undefined, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   if (!charge?.charged) return `${name} No effect!`;
   return `${name} The next attack hits harder!`;
@@ -270,14 +275,14 @@ export function chargeWalkerSentence(charge, skill, who: string) {
  * read that way: `li $s0, 0x8` (:13579) and `li $s0, 0x9` (:13553) are branch DELAY slots,
  * which run whether or not the branch is taken.
  */
-export function restoreWalkerSentence(plan, skill, who: string) {
+export function restoreWalkerSentence(plan: { heal?: number[]; cure?: number[]; regen?: boolean; page?: { payload?: readonly number[] } | null | undefined; }, skill: { name?: string | number } | null | undefined, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
-  const parts = [];
+  const parts: string[] = [];
   const noEffect = (plan?.page?.payload?.[0] | 0) === DAMAGE_TERM_NO_EFFECT_WORD;
   if (!noEffect) {
     const healed = (plan.heal || []).reduce((a: number, v: number) => a + (v | 0), 0);
     if (healed > 0) parts.push(`${healed} HP restored`);
-    const cured = (plan.cure || []).reduce((a, v) => a + ((v & 0x07) ? 1 : 0), 0);
+    const cured = (plan.cure || []).reduce((a: number, v: number) => a + ((v & 0x07) ? 1 : 0), 0);
     if (cured > 0) parts.push(cured > 1 ? "ailments cured" : "ailment cured");
     if (plan.regen) parts.push("HP will recover gradually");
   }

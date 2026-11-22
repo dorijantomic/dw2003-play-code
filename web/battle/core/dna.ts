@@ -23,6 +23,7 @@ import { battleRestorePlanFor, applyStatDebuffDispatch } from "../restore.js";
 import { enemyMsgName } from "../hud.js";
 import { finalizePlayerDamage } from "../../battle.js";
 import type { BattleDnaPresentation } from "./types.js";
+import type { FormLedgerEntry } from "../../game/types.js";
 import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState } from "../../types/battle.js";
@@ -116,7 +117,7 @@ function formOptionsFor(rosterIndex: number, bb = B.battle) {
   }
 function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
     const member = bb?.playerRoster?.[rosterIndex];
-    const record = member?.stats?.formLedger?.find((r) => Number(r.id) === Number(formId));
+    const record = member?.stats?.formLedger?.find((r: FormLedgerEntry) => Number(r.id) === Number(formId));
     return Number(record?.formLevel ?? (Number(formId) === B.liveFormId(bb, rosterIndex)
       ? member?.stats?.level : 0)) || 0;
   }
@@ -129,15 +130,15 @@ function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
    * table rather than two copies of two. `techniques` is left out by the one
    * caller that only asks which profile row a form sits in.
    */
-  function dnaTableReader(species, techniques?: any) {
-    const ranges = [
+  function dnaTableReader(species: ArrayLike<number>, techniques?: ArrayLike<number>) {
+    const ranges: [number, ArrayLike<number>][] = [
       [DNA_SPECIES_TABLE, species],
-      ...(techniques ? [[DNA_PRICES, techniques]] : []),
+      ...(techniques ? [[DNA_PRICES, techniques]] satisfies [number, ArrayLike<number>][] : []),
     ];
     const byte = (addr: number) => {
       for (const [base, bytes] of ranges) {
         const at = addr - base;
-        if (at >= 0 && at < bytes.length) return bytes[at];
+        if (at >= 0 && at < bytes.length) return bytes[at]!;
       }
       return 0;
     };
@@ -175,7 +176,7 @@ function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
    * roster row carrying it is found by reading the same table the pairing rule
    * uses — no name table, no transcription.
    */
-  function jogressFused(actionId: number, profiles) {
+  function jogressFused(actionId: number, profiles: ArrayLike<number>) {
     return dnaFusedForm(B.jogressDB, profiles, actionId, B.digimonDB);
   }
 /**
@@ -380,7 +381,7 @@ function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
     return true;
   }
 /** A category-4 DNA result (375): the record machine's restore arm on the player's own party, no hit. */
-  function commitDnaRestore(b: BattleState, dna) {
+  function commitDnaRestore(b: BattleState, dna: BattleDnaPresentation) {
     if (dna.committed) return;
     dna.committed = true;
     const who = b.player.profile.name;

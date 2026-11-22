@@ -12,15 +12,20 @@ import { applyRel } from "./geometry.js";
 import { isCursorToken } from "./icons.js";
 import { clipRect } from "./generic.js";
 import { N, ID, textPart, plate, rule, rowPlate, cursor, corners, chip, typeWord, tabPlate, PAGE_KEY } from "./base.js";
-import type { UiRect } from "./types.js";
+import type { UiClaimedPart, UiPart, UiRect, UiRun } from "./types.js";
+
+/** The slots of one list page (pageSlots): its columns, its row count, the first row's y and the positions with no item. */
+interface PageSlots { cols: number[]; rows: number; y0: number; empty: { x: number; y: number; }[]; }
+/** The page counter found in the runs (findPager). */
+interface Pager { a: UiRun; slash: UiRun; b: UiRun | null | undefined; total: string; y: number; cx: number; }
 
 /** List sizes (native, C3): row pitch 14, columns 131 apart, cell 120 x 12 (C3 360 x 36 dp) starting 14 dp left of the icon, cursor row pushed out 12. */
 export const LIST = Object.freeze({ pitch: 14, colPitch: 131, cellW: 120, cellH: 12, lead: N(14), push: 12 });
-const isNum = (t) => /^[0-9][0-9,]*$/.test(String(t).trim());
+const isNum = (t: string) => /^[0-9][0-9,]*$/.test(String(t).trim());
 
 // ------------------------------------------------------------------------------------------------ window + tab
 /** The list window. Full width (>= 300 native) = the C3 band; narrower = the chamfered frame. `cfg.word` = the faint word inside it. */
-export function composeListWin(p, i, out, cfg: { word?: string | null | undefined; } = {}) {
+export function composeListWin(p: UiClaimedPart, i: number | string, out: UiPart[], cfg: { word?: string | null | undefined; } = {}) {
     const rel = p.rel, r = clipRect(p);
     const band = (p.w ?? r.w) >= 300;
     out.push(plate(`lw${i}.plate`, "listWindow", r, rel, { shape: band ? "bandCh" : "ch" }));
@@ -28,7 +33,7 @@ export function composeListWin(p, i, out, cfg: { word?: string | null | undefine
 }
 
 /** The orange title tab (C3 "Items"): the tab at the game's clip rect, the game's title run in Russo One 26, dark ink. */
-export function composeTabHeader(p, i, runs, used: Set<unknown>, out) {
+export function composeTabHeader(p: UiClaimedPart, i: number | string, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p);
     out.push(tabPlate(`tab${i}.plate`, r, rel, { edge: "var(--c-orange)" }));
     for (const m of runs) {
@@ -47,20 +52,20 @@ export function cellRect(x: number, y: number, on = false) {
 }
 
 /** The cursor run that points at the row underline `u` (same row, just left of its icon). */
-export const cursorFor = (runs, u: { y: number; x: number; }) => runs.find((r) => isCursorToken(r.text) && Math.abs(r.y - u.y) <= 2 && r.x < u.x && r.x >= u.x - 18) ?? null;
+export const cursorFor = (runs: UiRun[], u: { y: number; x: number; }) => runs.find((r) => isCursorToken(r.text) && Math.abs(r.y - u.y) <= 2 && r.x < u.x && r.x >= u.x - 18) ?? null;
 
 /**
  * The slots of one list page: `lines` = the row underline parts (one per item the game shows), `pagerY` = the page counter's pen y (the
  * rows of a page end above it). Returns { cols, rows, y0, empty: [{ x, y }] } -- the positions of the page with no item.
  */
-export function pageSlots(lines: { x: number; y: number; }[], pagerY: number | null = null, twoCols: boolean = true) {
+export function pageSlots(lines: { x: number; y: number; }[], pagerY: number | null = null, twoCols: boolean = true): PageSlots {
     if (!lines.length) return { cols: [], rows: 0, y0: 0, empty: [] };
     const x0 = Math.min(...lines.map((u) => u.x)), y0 = Math.min(...lines.map((u) => u.y));
     const cols = twoCols ? [x0, x0 + LIST.colPitch] : [...new Set(lines.map((u) => u.x))].sort((a, b) => a - b);
     const rowOf = (y: number) => Math.round((y - y0) / LIST.pitch);
     const have = new Set(lines.map((u) => `${Math.round(u.x)},${rowOf(u.y)}`));
     const rows = pagerY != null && pagerY > y0 ? Math.max(1, Math.floor((pagerY - y0) / LIST.pitch)) : Math.max(...lines.map((u) => rowOf(u.y))) + 1;
-    const empty = [];
+    const empty: { x: number; y: number; }[] = [];
     for (let r = 0; r < rows; r++) for (const cx of cols) if (!have.has(`${Math.round(cx)},${r}`)) empty.push({ x: cx, y: y0 + r * LIST.pitch });
     return { cols, rows, y0, empty };
 }
@@ -69,9 +74,9 @@ export function pageSlots(lines: { x: number; y: number; }[], pagerY: number | n
  * The item cells (C3). `lines` = row underline parts; the runs on a row become its name (Russo One 22) and right-anchored numbers.
  * Returns the set of `on` cell rects (native) so the icon highlight can take the dark ink on orange.
  */
-export function composeItemCells(lines, runs, used, out, o: { pagerY?: number | null; twoCols?: boolean; } = {}) {
+export function composeItemCells(lines: UiClaimedPart[], runs: UiRun[], used: Set<unknown>, out: UiPart[], o: { pagerY?: number | null; twoCols?: boolean; } = {}) {
     if (!lines.length) return [];
-    const rel = lines[0].rel, ons: { x: number; y: number; w: number; h: 12; }[] = [];
+    const rel = lines[0]!.rel, ons: { x: number; y: number; w: number; h: 12; }[] = [];
     const slots = pageSlots(lines, o.pagerY ?? null, o.twoCols !== false);
     slots.empty.forEach((s, k) => out.push(emptyPlate(`cell.empty${k}`, applyRel(cellRect(s.x, s.y), rel), rel, "row")));
     const sorted = [...lines].sort((a, b) => a.y - b.y || a.x - b.x);
@@ -99,7 +104,7 @@ export function composeItemCells(lines, runs, used, out, o: { pagerY?: number | 
 }
 
 /** The icon highlight the game draws around the cursor row's icon: thin corner brackets, dark on the orange row, orange elsewhere. */
-export function composeIconHl(p, i, ons: { x: number; y: number; w: number; h: 12; }[], out) {
+export function composeIconHl(p: UiClaimedPart, i: number | string, ons: { x: number; y: number; w: number; h: 12; }[], out: UiPart[]) {
     const r = clipRect(p), inOn = ons.some((c) => r.x + r.w / 2 >= c.x && r.x + r.w / 2 < c.x + c.w && r.y + r.h / 2 >= c.y - 2 && r.y + r.h / 2 < c.y + c.h + 2);
     out.push(corners(`ihl${i}`, r, inOn ? "var(--c-orange-ink)" : "var(--c-orange)", p.rel, "iconHl"));
 }
@@ -109,16 +114,17 @@ export function composeIconHl(p, i, ons: { x: number; y: number; w: number; h: 1
  * The page counter in the runs: a "/" run with a number run just left of it and a number just right (or one "/m" run). Runs already
  * used (card HP / MP pairs) are never taken. Returns { a, slash, b, total, y, cx } or null.
  */
-export function findPager(runs, used = new Set()) {
+export function findPager(runs: UiRun[], used: Set<unknown> = new Set()): Pager | null {
     const free = runs.filter((r) => !used.has(r));
     for (const s of free) {
         const m = /^\/\s*([0-9]+)?$/.exec(String(s.text).trim());
         if (!m) continue;
-        const endOf = (r) => r.right ?? r.x + (r.w ?? 0);
+        const endOf = (r: UiRun) => r.right ?? r.x + (r.w ?? 0);
         const a = free.find((r) => r !== s && isNum(r.text) && Math.abs(r.y - s.y) <= 1 && endOf(r) <= s.x + 1 && s.x - endOf(r) < 12);
         const b = m[1] ? null : free.find((r) => r !== s && isNum(r.text) && Math.abs(r.y - s.y) <= 1 && r.x >= s.x && r.x - (s.x + (s.w ?? 0)) < 16);
         if (!a || (!m[1] && !b)) continue;
-        return { a, slash: s, b, total: m[1] ?? b.text.trim(), y: s.y, cx: s.x + (s.w ?? 0) / 2 };
+        // ETS item 9: with no "/m" in the slash run, the check above made sure `b` was found
+        return { a, slash: s, b, total: m[1] ?? b!.text.trim(), y: s.y, cx: s.x + (s.w ?? 0) / 2 };
     }
     return null;
 }
@@ -127,7 +133,7 @@ export function findPager(runs, used = new Set()) {
  * "n / m" centred on the game's slash, Chakra Petch 700 28, white (C3). When the game draws the counter on a page plate (`plates` = native
  * rects, e.g. the album's), it is centred in that plate. Returns the pager or null.
  */
-export function composePager(runs, used: Set<unknown> | undefined, out, rel = ID, plates = []) {
+export function composePager(runs: UiRun[], used: Set<unknown> | undefined, out: UiPart[], rel = ID, plates: UiRect[] = []) {
     const pg = findPager(runs, used);
     if (!pg) return null;
     for (const r of [pg.a, pg.slash, pg.b]) if (r) used!.add(r);
@@ -139,7 +145,7 @@ export function composePager(runs, used: Set<unknown> | undefined, out, rel = ID
 }
 
 /** An L1 / R1 page chip, only where the game draws its page arrow: the chip sits on the game's "L1" / "R1" run near the clip. */
-export function composePageChip(p, i, runs, used, out) {
+export function composePageChip(p: UiClaimedPart, i: number | string, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), mx = r.x + r.w / 2, my = r.y + r.h / 2;
     const run = runs.filter((m) => !used.has(m) && PAGE_KEY.test(String(m.text).trim()))
         .map((m) => ({ m, d: Math.hypot(m.x + (m.w ?? 14) / 2 - mx, m.y + 4.5 - my) })).filter((o: { d: number; }) => o.d < 26).sort((a: { d: number; }, b: { d: number; }) => a.d - b.d)[0]?.m ?? null;
@@ -155,18 +161,18 @@ export function composePageChip(p, i, runs, used, out) {
 
 // ------------------------------------------------------------------------------------------------ grids
 /** A frame under a picture of a grid (card face, drill picture, form portrait): the art itself stays the game's pixels on the art canvas. */
-export function composeArtFrame(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, out) {
+export function composeArtFrame(p: UiClaimedPart, i: number | string, out: UiPart[]) {
     const r = clipRect(p), g = 2;
-    out.push(plate(`gf${i}`, "gridFrame", { x: r.x - g * p.rel!.a, y: r.y - g * p.rel!.d, w: r.w + 2 * g * p.rel!.a, h: r.h + 2 * g * p.rel!.d }, p.rel, { shape: "chip", edge: "var(--c-under)", shadow: 4 }));
+    out.push(plate(`gf${i}`, "gridFrame", { x: r.x - g * p.rel.a, y: r.y - g * p.rel.d, w: r.w + 2 * g * p.rel.a, h: r.h + 2 * g * p.rel.d }, p.rel, { shape: "chip", edge: "var(--c-under)", shadow: 4 }));
 }
 
 /** An empty grid slot (no card there): the dim C empty plate at the game's slot rect; nothing moves into it. */
-export function composeEmptyCell(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, out) {
+export function composeEmptyCell(p: UiClaimedPart, i: number | string, out: UiPart[]) {
     out.push(emptyPlate(`ge${i}`, clipRect(p), p.rel, "chip"));
 }
 
 /** The dim C3 plate of a slot with nothing in it (list cell or grid slot). */
-export function emptyPlate(key: string, rect: UiRect, rel = ID, shape = "row") {
+export function emptyPlate(key: string, rect: UiRect, rel = ID, shape = "row"): UiPart {
     return plate(key, "cellEmpty", rect, rel, { shape, edge: "var(--c-empty-edge)", body: "var(--c-empty-body)", shadow: 0 });
 }
 
@@ -174,19 +180,19 @@ export function emptyPlate(key: string, rect: UiRect, rel = ID, shape = "row") {
  * A grid cell frame (the chart's portrait cells). With sheet layers, the biggest piece is the cell and the thin pieces left of it are its
  * connector stub; without, the clip rect is the cell.
  */
-export function composeCellFrame(p, i, out) {
+export function composeCellFrame(p: UiClaimedPart, i: number | string, out: UiPart[]) {
     const rel = p.rel, L = p.layers ?? [];
-    const big = L.length ? L.reduce((a: { w: number; h: number; }, b: { w: number; h: number; }) => (b.w * b.h > a.w * a.h ? b : a), L[0]) : null;
+    const big = L.length ? L.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a), L[0]!) : null;
     const cell = big ? applyRel({ x: p.x + big.x, y: p.y + big.y, w: big.w, h: big.h }, rel) : clipRect(p);
     out.push(plate(`gc${i}`, "gridFrame", cell, rel, { shape: "chip", shadow: 4 }));
     for (const [k, l] of L.entries()) if (l !== big) out.push(connector(`gc${i}.c${k}`, applyRel({ x: p.x + l.x, y: p.y + l.y, w: l.w, h: l.h }, rel), rel));
 }
 
 /** A connector line: a 2 native bar centred in the game's piece. */
-export const connector = (key: string, r: UiRect, rel = ID) => rule(key, { x: r.x, y: r.y + r.h / 2 - rel.d, w: r.w, h: 2 * rel.d }, "var(--c-under)", rel, "under", "connector");
+export const connector = (key: string, r: UiRect, rel = ID): UiPart => rule(key, { x: r.x, y: r.y + r.h / 2 - rel.d, w: r.w, h: 2 * rel.d }, "var(--c-under)", rel, "under", "connector");
 
 /** The cursor box of a grid: orange corner brackets (the palette row's colour cycle when the call carries one). */
-export function composeCursorBox(p, i, out: { key: string; kind: string; part: string; layer: string; rect: UiRect; color: string; sx: 1; sy: 1; }[], pulse = null) {
+export function composeCursorBox(p: UiClaimedPart, i: number | string, out: UiPart[], pulse: ((row: number) => string) | null | undefined = null) {
     out.push(corners(`cb${i}`, clipRect(p), p.row && pulse ? pulse(p.row) : "var(--c-orange)", p.rel));
 }
 
@@ -197,15 +203,15 @@ export const LIST_PARTS = Object.freeze(["rowLine", "iconHl", "pageChip", "gridA
  * Everything list-like on a screen, after its plates: item cells (rows not inside `skip` windows), icon highlights, the pager, page chips,
  * grid frames, empty slots, cursor boxes, connectors. `o.pulse` = the colour cycle for palette rows.
  */
-export function composeLists(parts, runs, used, out, o: { skip?: UiRect[]; twoCols?: boolean; pulse?: (row: number) => string; } = {}) {
+export function composeLists(parts: UiClaimedPart[], runs: UiRun[], used: Set<unknown>, out: UiPart[], o: { skip?: UiRect[]; twoCols?: boolean; pulse?: (row: number) => string; } = {}) {
     const skip = o.skip ?? [];
-    const inSkip = (p) => skip.some((s) => p.x >= s.x && p.x < s.x + s.w && p.y >= s.y && p.y < s.y + s.h);
-    let pagerRuns = null;
+    const inSkip = (p: UiClaimedPart) => skip.some((s) => p.x >= s.x && p.x < s.x + s.w && p.y >= s.y && p.y < s.y + s.h);
+    let pagerRuns: Pager | null = null;
     const pg = findPager(runs, used);
     if (pg) pagerRuns = pg;
     const lines = parts.filter((p) => p.part === "rowLine" && !inSkip(p));
     const ons = composeItemCells(lines, runs, used, out, { pagerY: pagerRuns?.y ?? null, twoCols: o.twoCols !== false });
-    parts.forEach((p: { part: string; rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i) => {
+    parts.forEach((p, i) => {
         if (p.part === "gridArt") composeArtFrame(p, i, out);
         else if (p.part === "gridCell") composeEmptyCell(p, i, out);
         else if (p.part === "cellFrame") composeCellFrame(p, i, out);
@@ -213,8 +219,8 @@ export function composeLists(parts, runs, used, out, o: { skip?: UiRect[]; twoCo
     });
     parts.forEach((p, i) => {
         if (p.part === "iconHl") composeIconHl(p, i, ons, out);
-        else if (p.part === "cursorBox") composeCursorBox(p, i, out, o.pulse!);
+        else if (p.part === "cursorBox") composeCursorBox(p, i, out, o.pulse);
         else if (p.part === "pageChip") composePageChip(p, i, runs, used, out);
     });
-    composePager(runs, used, out, ID, parts.filter((p: { part: string; }) => p.part === "pagePlate").map(clipRect));
+    composePager(runs, used, out, ID, parts.filter((p) => p.part === "pagePlate").map(clipRect));
 }

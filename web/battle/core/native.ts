@@ -44,7 +44,7 @@ export function makeNative(B: BattleContext) {
   }
 // ── Draw ──
 
-  function nativeText(text, x: number, y: number, opts: NativeTextOptions = {}) {
+  function nativeText(text: string | number, x: number, y: number, opts: NativeTextOptions = {}) {
     if (uiFontReady()) return uiDrawText(B.ctx, String(text), x, y, opts);
     B.ctx!.fillStyle = opts.color ?? "#f2f2f2";
     B.ctx!.font = `${opts.kind === 3 ? 8 : 10}px monospace`;
@@ -102,7 +102,7 @@ function drawPips(def: { count: number; x: number; step: number; y: number; }, a
 function chromeReady() {
     return !!fightUiAtlas;
   }
-function drawChrome(name: string | number, x: number, y: number, w: number = null, h: number = null) {
+function drawChrome(name: keyof typeof FIGHT_UI_CLIPS, x: number, y: number, w: number | null = null, h: number | null = null) {
     const clip = FIGHT_UI_CLIPS[name];
     if (!fightUiAtlas || !clip) return false;
     const [sx, sy, sw, sh] = clip;
@@ -136,7 +136,7 @@ function paintHpBar(x: number, y: number, w: number, h: number, cur: number, max
     B.ctx!.fillRect(x, y, w, h);
   }
 /** Draw a cel of the battle chrome pack and record it for the frame read-out. */
-  function hudClip(cel, x: number, y: number) {
+  function hudClip(cel: string | number, x: number, y: number) {
     B.hudCels!.push({ cel: Number(cel), x, y, known: B.HUD_CELS_DECODED!.has(Number(cel)),
                    size: clipSize(pgfgc00, String(cel)) });
     return drawClip(B.ctx, pgfgc00, String(cel), x, y);

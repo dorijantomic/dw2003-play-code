@@ -18,6 +18,7 @@
 import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit, mountRenderInfo, probeFramebuffer, renderSelfTest, sceneProbe } from "./mount3d.js";
 import type { GameState } from "./game/types.js";
 import type { MountAsset } from "./mount3d.js";
+import type { MountDef, MountDrawable, MountHost, MountMover, MountNpc, MountProbe, MountRiderLayout, MountSeatCfg, MountSeatTable, MountSpot, MountState } from "./types/mount.js";
 
 
 /**
@@ -35,7 +36,7 @@ import type { MountAsset } from "./mount3d.js";
  *   size    pixels tall the rendered model is (a person is ~35 px)
  *   unlock  the quest id whose completion grants this mount (web/quests.js done state — never a story flag)
  */
-export const MOUNTS = [
+export const MOUNTS: MountDef[] = [
   {
     id: "unimon",
     name: "Unimon",
@@ -72,7 +73,7 @@ const MOUNT_SECS = 19 / 60;             // the disc's own mount-onto-the-rail cl
 const DISMOUNT_SECS = 13 / 60;          // ... and its step-off (DISMOUNT_SECS_BOTTOM)
 const MOUNT_CLIP = 28, DISMOUNT_CLIP = 31;   // p002plyl: mode 0x43 step-on, mode 0x46 step-off
 
-const S = {
+const S: MountState = {
   mode: "idle",            // idle | summoning | mounting | riding | dismounting
   def: null,
   animT: 0,
@@ -82,8 +83,7 @@ const S = {
   dir: "down",
   moving: false,
   granted: new Set(),      // mount ids unlocked by a quest (filled from the quest layer each tick)
-  // ETS item 9: a bare null types the field as null only; the asset is a MountAsset once loaded
-  asset: null as MountAsset | null,
+  asset: null,
   loading: false,
   rendererFailed: false,
   lastRender: 0,
@@ -92,10 +92,10 @@ const S = {
   models: new Map(),       // mount id -> true | false once the host has checked that its DW2 files exist (absent = not asked yet)
 };
 
-let host = null;
+let host: MountHost | null = null;
 
 /** Install the game-side hooks. `host.canStand(x,y)` is the game's own foot-box test. */
-export function installMount(hooks) {
+export function installMount(hooks: MountHost) {
   host = hooks;
   loadSeats();             // the saved rider settings (web/mount-seats.json); missing file = the measured defaults
   S.granted = new Set();
@@ -115,12 +115,12 @@ function probeModels() {
   const run = host;
   for (const def of MOUNTS) {
     const urls = [def.model, def.actor?.hurt?.model].filter(Boolean);
-    Promise.all(urls.map((u) => Promise.resolve(run.hasModel(u)).then(Boolean, () => false)))
+    Promise.all(urls.map((u) => Promise.resolve(run.hasModel!(u!)).then(Boolean, () => false)))
       .then((oks) => { if (host === run) S.models.set(def.id, oks.every(Boolean)); });
   }
 }
 /** This mount's DW2 models are installed (always true without a host check; false until the check has said yes). */
-export function mountModelReady(def) {
+export function mountModelReady(def: MountDef) {
   if (typeof host?.hasModel !== "function") return true;
   return S.models.get(def.id) === true;
 }
@@ -134,12 +134,12 @@ export function mountState() {
 }
 
 /** The mount whose quest character is this npc id, or null. */
-export function mountActorDef(npcId) {
+export function mountActorDef(npcId: number | undefined) {
   return MOUNTS.find((m) => m.actor?.npc === npcId) ?? null;
 }
 
 /** A mount's quest character is off the map while the layer is off, and while the player rides it. */
-export function mountActorHidden(npc) {
+export function mountActorHidden(npc: MountNpc) {
   const def = mountActorDef(npc?.npc_id);
   if (!def) return false;
   if (!enabled() || !mountModelReady(def)) return true;       // no switch / no DW2 models: the quest character is not on the map
@@ -147,7 +147,7 @@ export function mountActorHidden(npc) {
 }
 
 const actorAssets = new Map<string, MountAsset | null>();   // url -> asset | null (loading or missing)
-function actorAsset(key: string, url: string): MountAsset | null {
+function actorAsset(key: string, url: string): MountAsset | null | undefined {
   if (actorAssets.has(url)) return actorAssets.get(url);
   actorAssets.set(url, null);
   loadMountAsset(key, url).then((a) => actorAssets.set(url, a)).catch(() => {});
@@ -156,11 +156,12 @@ function actorAsset(key: string, url: string): MountAsset | null {
 
 /** Draw a mount's quest character at its post: hurt before its quest is done, standing after. Draws nothing while
  * the model is loading or missing. Renders and paints in one go (the renderer's canvas is shared). */
-export function mountActorDraw(ctx: CanvasRenderingContext2D | null, npc, camX: number, camY: number, timeSec = 0) {
+export function mountActorDraw(ctx: CanvasRenderingContext2D | null, npc: MountNpc, camX: number, camY: number, timeSec = 0) {
   const def = mountActorDef(npc?.npc_id);
   if (!def || mountActorHidden(npc)) return false;
   const healed = !!host?.questDone?.(def.unlock);
-  const hurt = def.actor.hurt;
+  // ETS item 9: mountActorDef() found this row by its actor, so the actor is there
+  const hurt = def.actor!.hurt;
   const asset = healed ? actorAsset(def.id, def.model) : actorAsset(def.id + "-hurt", hurt.model);
   if (!asset) return false;
   const canvas = renderMount(asset, {
@@ -197,7 +198,7 @@ export const mountFreezesInput = () => S.mode === "summoning" || S.mode === "mou
 export function mountSpeedFactor() { return S.mode === "riding" ? (S.def?.speed ?? MOUNT_SPEED) : 1; }
 
 // verifier-only switches (tools/verify_mount_seat.mjs): hold the idle clock, leave the mount or the rider out of a frame
-const PROBE = { timeSec: null, hideMount: false, hideRider: false, hideNodes: null };
+const PROBE: MountProbe = { timeSec: null, hideMount: false, hideRider: false, hideNodes: null };
 
 /** The saddle split is on (its own switch, off by default) and this mount has a measured seat. */
 const seatOn = () => typeof window !== "undefined" && window.__fx?.mountseat === true && !!S.def?.seat;
@@ -210,14 +211,14 @@ const seatOn = () => typeof window !== "undefined" && window.__fx?.mountseat ===
 // web/mount-seats.json is the saved file; the editor's unsaved work sits in localStorage and wins while it is there.
 export const SEAT_DIRS = ["down", "down-right", "right", "up-right", "up", "up-left", "left", "down-left"];
 export const SEAT_STORE = "dw.mountSeats.v1";
-export const seatDefault = () => ({ dx: 0, dy: 0, cut: 0, layer: "auto" });
-let seatFile = {};
+export const seatDefault = (): MountSeatCfg => ({ dx: 0, dy: 0, cut: 0, layer: "auto" });
+let seatFile: MountSeatTable = {};
 export function loadSeats(url = "mount-seats.json") {
   return fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
-    .then((j: any) => { seatFile = j && typeof j === "object" ? j.seats ?? j : {}; return seatFile; });
+    .then((j: (MountSeatTable & { seats?: MountSeatTable | undefined }) | null) => { seatFile = j && typeof j === "object" ? j.seats ?? j : {}; return seatFile; });
 }
-export function seatSettings(id, dir: string) {
-  let local = null;
+export function seatSettings(id: string, dir: string): MountSeatCfg {
+  let local: MountSeatTable | null = null;
   try { local = JSON.parse(localStorage.getItem(SEAT_STORE) || "null"); } catch { local = null; }
   return { ...seatDefault(), ...(seatFile[id]?.[dir] ?? {}), ...(local?.[id]?.[dir] ?? {}) };
 }
@@ -226,7 +227,7 @@ export function seatSettings(id, dir: string) {
  * Where the rider goes in the mount's cell (cell px; the ground point is (w/2, h-8)), from the saddle point the split
  * measured this frame and the facing's settings. The game and the editor both place the rider with this.
  */
-export function seatLayout(def, split: { back: HTMLCanvasElement; front: HTMLCanvasElement; seatX: number; seatY: number; }, cfg) {
+export function seatLayout(def: MountDef, split: { back: HTMLCanvasElement; front: HTMLCanvasElement; seatX: number; seatY: number; }, cfg: MountSeatCfg): MountRiderLayout {
   const dx = Math.round(split.seatX - MOUNT_VIEW.w / 2 + cfg.dx);
   const feetY = Math.round(split.seatY + (def.seat?.drop ?? 0) + cfg.dy);
   return {
@@ -281,7 +282,7 @@ export function mountSubSteps(dx: number, dy: number, baseStep: number) {
 }
 
 /** Move through `n` sub-steps of a collision mover, so a 3x step cannot tunnel a 16 px wall. */
-export function moveWithSubSteps(moveFn, x: number, y: number, dx: number, dy: number, baseStep: number) {
+export function moveWithSubSteps(moveFn: MountMover | null | undefined, x: number, y: number, dx: number, dy: number, baseStep: number) {
   if (typeof moveFn !== "function") return { x, y };
   const n = mountSubSteps(dx, dy, baseStep);
   let px = x, py = y;
@@ -297,7 +298,7 @@ export function moveWithSubSteps(moveFn, x: number, y: number, dx: number, dy: n
  * The first spot around (x,y) a 12x8 foot box can stand on, searching a ring of 4-24 px. Returns null when
  * the mount is standing somewhere with no free cell at all (then the player stays where they are).
  */
-export function findDismountSpot(canStand, x: number, y: number, { ring = 24, step = 4 } = {}) {
+export function findDismountSpot(canStand: ((x: number, y: number) => boolean) | null | undefined, x: number, y: number, { ring = 24, step = 4 } = {}): MountSpot | null {
   if (typeof canStand !== "function") return null;
   if (canStand(x, y)) return { x, y };
   for (let r = step; r <= ring; r += step) {
@@ -312,8 +313,8 @@ export function findDismountSpot(canStand, x: number, y: number, { ring = 24, st
 }
 
 /** Up to `n` free spots behind the player for the party, nearest first (they are placed, never snapped). */
-export function followerSpots(canStand, x: number, y: number, n = 3, { ring = 28, step = 5 } = {}) {
-  const out: { x: number; y: number; }[] = [];
+export function followerSpots(canStand: ((x: number, y: number) => boolean) | null | undefined, x: number, y: number, n = 3, { ring = 28, step = 5 } = {}) {
+  const out: MountSpot[] = [];
   if (typeof canStand !== "function") return out;
   for (let r = step; r <= ring && out.length < n; r += step) {
     for (let a = 0; a < 8 && out.length < n; a++) {
@@ -343,7 +344,7 @@ async function ensureAsset() {
 }
 
 /** Tests and verifiers: hand the layer an already-loaded asset (a node test has no WebGL to load the model with). */
-export function mountUseAsset(asset) { S.asset = asset; S.rendererFailed = false; }
+export function mountUseAsset(asset: MountAsset | null) { S.asset = asset; S.rendererFailed = false; }
 
 /** The line shown when the ride button is pressed on an indoor map. */
 export const NO_ROOM_LINE = "No room to ride in here.";
@@ -398,7 +399,7 @@ export function mountPress(state: GameState) {
  * Per-frame step. Returns true when the field's own input must be frozen for this frame (the climb on /
  * step off animation); false while riding, because the player keeps walking (faster) and the mount follows.
  */
-export function mountTick(dt: number, state: GameState, { mapId = null } = {}) {
+export function mountTick(dt: number, state: GameState, { mapId = null }: { mapId?: string | number | null } = {}) {
   if (!enabled()) {
     if (S.mode !== "idle") mountForceDismount();
     return false;
@@ -440,19 +441,19 @@ export function mountTick(dt: number, state: GameState, { mapId = null } = {}) {
 }
 
 /** Push the mount into the field's y-sorted draw list (before the player, so the rider lands on top). */
-export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
+export function mountDrawable(ctx: CanvasRenderingContext2D, drawables: MountDrawable[], camX: number, camY: number, timeSec = 0) {
   if (S.mode !== "summoning" && S.mode !== "riding" && S.mode !== "mounting" && S.mode !== "dismounting") return false;
   if (!S.asset) return false;
   if (PROBE.timeSec != null) timeSec = PROBE.timeSec;
   const useSeat = seatOn() && (S.mode === "riding" || S.mode === "mounting");
   const canvas = renderMount(S.asset, {
     x: S.x, y: S.y, dir: S.dir, phase: S.phase, moving: S.mode === "riding" && S.moving,
-    size: S.def?.size ?? 68, timeSec, walk: S.def?.walk ?? null, seat: useSeat ? S.def!.seat : null, hide: PROBE.hideNodes,
+    size: S.def?.size ?? 68, timeSec, walk: S.def?.walk ?? null, seat: useSeat ? S.def!.seat! : null, hide: PROBE.hideNodes,
   });
   if (!canvas) return false;
   const split = useSeat ? mountSplit() : null;
   // the rider's place from the saddle point measured this frame and this facing's saved settings (seatLayout)
-  S.rider = split ? { ...seatLayout(S.def, split, seatSettings(S.def!.id, S.dir)), seatX: split.seatX, seatY: split.seatY } : null;
+  S.rider = split ? { ...seatLayout(S.def!, split, seatSettings(S.def!.id, S.dir)), seatX: split.seatX, seatY: split.seatY } : null;
   S.renders += 1;
   const dx = Math.round(S.x - MOUNT_VIEW.w / 2 - camX);
   const dy = Math.round(S.y - MOUNT_VIEW.h + 8 - camY);
@@ -467,7 +468,7 @@ export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
     const across = side ? sh.length : ahead ? sh.width : (sh.length + sh.width) / 2;
     const deep = (side ? sh.width : ahead ? sh.length : (sh.length + sh.width) / 2) * SIN;
     const gx = S.x - camX, gy = S.y - camY;
-    drawables.push({ y: S.y - 1, mountShadow: true, draw: () => host.groundShadow(ctx, gx, gy, across, deep, alpha) });
+    drawables.push({ y: S.y - 1, mountShadow: true, draw: () => host!.groundShadow!(ctx, gx, gy, across, deep, alpha) });
   }
   if (PROBE.hideMount) return true;
   if (split && S.mode === "riding") {
@@ -510,7 +511,7 @@ function spriteStats(opts: SpriteStatsOpts = {}) {
     x: MOUNT_VIEW.w / 2, y: MOUNT_VIEW.h - 10, dir: opts.dir ?? "down", phase,
     moving: opts.moving ?? true, size: S.def?.size ?? 68, timeSec: 0, walk: S.def?.walk ?? null,
   });
-  const px = (c: HTMLCanvasElement) => c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
+  const px = (c: HTMLCanvasElement) => c.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height).data;
   // renderMount returns ONE shared scratch canvas, so each frame's pixels are copied out before the next draw
   const a = draw(opts.phaseA ?? 0.1);
   if (!a) return null;
@@ -518,9 +519,9 @@ function spriteStats(opts: SpriteStatsOpts = {}) {
   const b = draw(opts.phaseB ?? 0.6);
   const db = b ? px(b).slice() : null;
   let solid = 0, changed = 0;
-  const colors = new Set();
+  const colors = new Set<string>();
   for (let i = 0; i < da.length; i += 4) {
-    if (da[i + 3] > 0) { solid++; colors.add(`${da[i]},${da[i + 1]},${da[i + 2]}`); }
+    if (da[i + 3]! > 0) { solid++; colors.add(`${da[i]},${da[i + 1]},${da[i + 2]}`); }
     if (db && (da[i] !== db[i] || da[i + 1] !== db[i + 1] || da[i + 2] !== db[i + 2] || da[i + 3] !== db[i + 3])) changed++;
   }
   return { w: a.width, h: a.height, solid, changed, colors: colors.size,
@@ -533,9 +534,9 @@ if (typeof window !== "undefined") {
     table: () => MOUNTS.map((m) => ({ ...m })),
     press: () => { const used = mountPress(host?.state?.()); return used; },
     force: () => mountForceDismount(),
-    canStand: (x, y) => !!host?.canStand?.(x, y),
+    canStand: (x: number, y: number) => !!host?.canStand?.(x, y),
     assetLoaded: () => !!S.asset,
-    sprite: (opts) => spriteStats(opts),
+    sprite: (opts: SpriteStatsOpts) => spriteStats(opts),
     selfTest: () => renderSelfTest(),
     sceneProbe: () => sceneProbe(),
     framebuffer: () => probeFramebuffer(),

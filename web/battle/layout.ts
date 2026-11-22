@@ -1,6 +1,7 @@
 import { shuffleJokeMenu, RAND_U16 } from "../vendor/engine.js";
 import { BATTLE_UI_LAYOUT } from "../battle.js";
-import type { BattleDnaPresentation } from "./core/types.js";
+import type { BattleDnaPresentation, DnaScriptOp } from "./core/types.js";
+import type { FormLedgerEntry } from "../game/types.js";
 
 import type { BattleState } from "../types/battle.js";
 interface JokeMenuRow {
@@ -10,7 +11,8 @@ interface JokeMenuRow {
 
 // Atlas source rects = PGFGTC00.BIN frame u,v,w,h (LBA 1109/1110). Cel 0xA is
 // the 104×64 face bezel (frame 4); cel 0x22 is the command row (frames 1+2).
-export const FIGHT_UI_CLIPS = Object.freeze({
+type UiClip = readonly [number, number, number, number];
+export const FIGHT_UI_CLIPS: Readonly<Record<"hpFrame" | "hpFrameAlt" | "angledFrame" | "square" | "portraitFrame" | "commandIcon" | "commandPlate", UiClip>> = Object.freeze({
   hpFrame: [104, 0, 96, 16],
   hpFrameAlt: [104, 16, 96, 16],
   angledFrame: [104, 32, 82, 16],
@@ -46,9 +48,9 @@ export const COLS = 1;
 // What battleTechWords() is handed: the partner's form ledger (one record per equipped form),
 // the active form's id and the two signature words the TECH list marks.
 export interface BattleTechWordsArgs {
-  ledger?: any;
+  ledger?: readonly FormLedgerEntry[] | null | undefined;
   currentId?: number;
-  equippedForms?: any;
+  equippedForms?: readonly number[] | null | undefined;
   signatureTech?: number;
   blastSignature?: number;
 }
@@ -122,10 +124,10 @@ export const TAG_PRESENTATION = Object.freeze({
 // the whole result reveal pose and Desperado volley, and it plays the SAME actor the chunk
 // before it staged at the world origin with `op2 [3,3,0,0,0,0]`. So the slot's staged position
 // has to survive the boundary — see ActorAnimator._move.
-export function dnaClip12Chunks(segs, dna: BattleDnaPresentation) {
+export function dnaClip12Chunks(segs: DnaScriptOp[][] | null | undefined, dna: BattleDnaPresentation) {
   if (!Array.isArray(segs) || segs.length !== 5) return null;
-  const s2 = segs[2];
-  const cut = s2.findIndex((r: { op: number; words: number[]; }) => r.op === 2 && (r.words?.[0]! | 0) === 2 && (r.words?.[1]! | 0) === 2);
+  const s2 = segs[2]!;
+  const cut = s2.findIndex((r) => r.op === 2 && (r.words?.[0]! | 0) === 2 && (r.words?.[1]! | 0) === 2);
   if (cut < 0) return null;
   // Runtime replay (2026-07-15, state-9, orbtrace/orb4 frames): each flight segment OPENS
   // with its parent model in close-up (op2 [1,slot] show + mode-3 teleport near the staging

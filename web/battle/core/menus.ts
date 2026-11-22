@@ -18,6 +18,7 @@ import { releaseBattleLayer } from "../../battle-layer.js";
 import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState } from "../../types/battle.js";
+import type { PartnerStats } from "../../game/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeMenus(B: BattleContext) {
 // ── Input ──
@@ -99,11 +100,11 @@ export function makeMenus(B: BattleContext) {
    * the cell behind self+0x54 without a clamp, and fightstg.s:21312 writes the
    * confirmed row back into that cell.
    */
-  function tagListSeed(b) {
+  function tagListSeed(b: BattleState) {
     const members = [0, 1, 2].map((slot) => {
       const member = b.playerRoster?.[slot];
       const record = b.playerRecords?.[slot];
-      const stats = member?.stats ?? record?.statsRecord ?? {};
+      const stats: Partial<PartnerStats> = member?.stats ?? record?.statsRecord ?? {};
       const formId = B.liveFormId(b, slot);
       return {
         digimonId: formId,

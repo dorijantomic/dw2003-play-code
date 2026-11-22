@@ -479,8 +479,8 @@ function applyPlayerAction() {
           userIndex: b.activePlayerIndex ?? 0,
           effectGates: b.effectGates,
           specialMode: b.specialMode,
-          setField: (element, power) => { b.field = { element, power }; },
-          magicalHit: (power, element) => {
+          setField: (element: string, power: number) => { b.field = { element, power }; },
+          magicalHit: (power: number, element: string) => {
             const atk = effStats(b.player), def = effStats(b.enemy);
             return Math.max(1, resolveDamage(magicalBase(atk, def, power), atk, def,
               { power, element, base_acc: 128, crit_bonus: 0, magical: true }, RAND_U16, b.field));

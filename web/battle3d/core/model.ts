@@ -14,7 +14,10 @@ import type { Battle3DContext } from "../../types/battle3d.js";
 import type { BattleSide } from "../../types/audio.js";
 import type { SkelBufs } from "../../types/battle3d.js";
 interface EffectSpawnRecord {
-  type: string;
+  type: number | string;
+  x: number;
+  y: number;
+  z: number;
 }
 
 // moved by tools/rewrite/split-closure.mjs
