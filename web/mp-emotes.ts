@@ -25,7 +25,7 @@
 export const EMOTE_BUBBLE = { 1: 0, 3: 3 };
 
 /** The FIELDCOM glyph row for emote index `i`, or null when the disc has no mark for it. */
-export function bubbleFor(i) {
+export function bubbleFor(i: number | null) {
     if (typeof i !== "number" || !Number.isInteger(i)) return null;
     return Object.prototype.hasOwnProperty.call(EMOTE_BUBBLE, i) ? EMOTE_BUBBLE[i] : null;
 }

@@ -238,7 +238,7 @@ export const BLAST_NOTES = [
   "The form itself is the starter's own blasts[tier] (profile byte +0x50+tier).",
 ];
 
-function drawMessage(ctx, W: number, H: number, message: string) {
+function drawMessage(ctx: CanvasRenderingContext2D, W: number, H: number, message: string) {
   ctx.save();
   ctx.fillStyle = "rgba(4,6,12,0.96)";
   ctx.fillRect(0, 0, W, H);

@@ -25,7 +25,7 @@ type FooterPart = UiPart & { rel: FooterRel };
 
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
-export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
+export const runIn = (r: { x: number; y: number; }, rc: UiRect, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
 const lbl = (key: string, str: string | undefined, rect: UiRect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
 export const takeIn = (runs, rc, used: Set<unknown>, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
@@ -97,7 +97,7 @@ export function composeDetail(p, runs: UiRun[], used: Set<unknown>, out: UiPart[
  * the cell labels ("Equip", "Items") dim Russo 18, the item name Russo 22; all centred on `mid` (native). `isCellLabel(run)` says which
  * plain runs are cell labels (the rest is the name).
  */
-export function detailTexts(mine, mid: number, rel, out, k: string, isCellLabel: ((m: { x: number; }) => boolean) | ((m: { x: number; }) => boolean)) {
+export function detailTexts(mine, mid: number, rel: UiMatrix, out, k: string, isCellLabel: ((m: { x: number; }) => boolean) | ((m: { x: number; }) => boolean)) {
     for (const m of [...mine].sort((a, b) => a.x - b.x)) {
         const isNum = m.right != null || /^[0-9]+$/.test(m.text);
         if (isNum) {
@@ -250,7 +250,7 @@ export const WIN_TITLE = Object.freeze({ bodyDy: 9, tabDx: N(18) });
  * The window of rows: the window plate, one plate per label (pitch read from the labels), the cursor row orange and pushed out, the
  * chevron in the pose the game's cursor glyph says. `win` is the claimed window part; labels = the runs inside it below `titleH`.
  */
-export function composeRows(win, i: string | number, runs, used: Set<unknown>, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
+export function composeRows(win, i: string | number, runs: UiRun[], used: Set<unknown>, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
     const rel = win.rel, wr = clipRect(win), titleH = opt.titleH ?? 0;
     const body = { x: wr.x, y: wr.y + titleH, w: wr.w, h: wr.h - titleH };
     // a titled window (CARD FOLDERS, the techniques list, the equipment item grid) = the C4 tab panel: the window from WIN_TITLE.bodyDy below
@@ -401,7 +401,7 @@ export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
     if (panel) {
         const mine = runs.filter((r: { x: number; y: number; }) => r.x >= panel.x && r.y >= panel.y && r.y < 160);
         composePanel(panel, mine, out, cfg.word ?? "MENU");
-        mine.forEach((r) => used.add(r));
+        mine.forEach((r: UiRun) => used.add(r));
     }
     if (folder) composeRows(folder, 0, runs, used, out, { titleH: 17 });
     if (header) composePageHeader(header, runs, used, out);
@@ -410,7 +410,7 @@ export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
         highlights.find((h: { y: number; }) => Math.abs(h.y - c.y) < 3) ?? null));
     for (const b of of("bracket")) composeBracket(b, out);
     for (const d of of("detail")) composeDetail(d, runs, used, out);
-    if (money) { composeMoney(money, runs, out); runs.filter((r: { x: number; y: number; }) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r) => used.add(r)); }
+    if (money) { composeMoney(money, runs, out); runs.filter((r: { x: number; y: number; }) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r: UiRun) => used.add(r)); }
     if (foot) composeFooter(foot, runs, used, out);
     composeLists(parts, runs, used, out, { skip: folder ? [clipRect(folder)] : [], pulse: cyclePulse });
     restOfRuns(runs, used, ID, out, "page");

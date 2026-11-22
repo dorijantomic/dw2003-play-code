@@ -76,7 +76,7 @@ export const k16tr = (A: number[][]): number[][] => A[0].map((_, j) => A.map((r)
 
 export const k16mv = (A, v) => A.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
 
-export const k16dot = (a, b: number[] | (number | undefined)[]) => a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!;
+export const k16dot = (a: number[] | K16Vec3, b: number[] | (number | undefined)[]) => a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!;
 
 export const k16sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
@@ -427,7 +427,7 @@ function k16TwoBone(S0: K16Vec3, H: K16Vec3, a: number, b: number, hint: K16Vec3
   }
   const cosA = Math.max(-1, Math.min(1, angle));
   const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-  const perpOf = (src) => (src ? k16sub(src, k16scale(u, k16dot(src, u))) : [0, 0, 0]);
+  const perpOf = (src: K16Vec3 | null) => (src ? k16sub(src, k16scale(u, k16dot(src, u))) : [0, 0, 0]);
   let v = perpOf(hint);
   if (k16norm(v) < 0.25 * Math.max(1e-6, k16norm(hint || [0, 0, 0]))) v = perpOf(plane);
   if (k16norm(v) < 1e-6) v = k16perp(u);

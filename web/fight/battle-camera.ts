@@ -448,7 +448,7 @@ export function applyScreenRoll(up: number[] | undefined, eye, target, rollDeg: 
  * indexes a 4096-unit table, so roll 15 becomes 170 units = 14.941 deg, not 15. What is NOT
  * reproduced is the table's own 1/4096 fixed-point rounding of the sine, worth about 0.014 deg.
  */
-export function rollRadians(rollDeg) {
+export function rollRadians(rollDeg: number) {
   const units = Math.trunc((rollDeg * ROT_UNIT) / 360);
   return units * 2 * Math.PI / ROT_UNIT;
 }
@@ -541,14 +541,14 @@ export function lerpFields(from, to, t: number) {
 export const CAMERA_FRAME_DELTA = 1;
 
 /** cam+0xf4: the per-frame step the updater shifts right by 8 before adding. */
-export function op5GlideRate(duration) {
+export function op5GlideRate(duration: number) {
   const D = duration | 0;
   return D ? (Math.trunc(0x100000 / D) >> 8) : 0x1000;
 }
 
 /** One frame of the tween: `t += rate * delta`, clamped at 0x1000. `delta` is the raw
  *  per-frame delta, NOT the walker's slow-motion-published animation delta. */
-export function op5GlideT(t, rate, delta) {
+export function op5GlideT(t, rate, delta: number) {
   return Math.min(0x1000, (t | 0) + rate * delta);
 }
 

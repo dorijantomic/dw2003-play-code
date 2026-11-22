@@ -51,7 +51,7 @@ function rowFor(enemies: { [k: string]: EnemyRecord; }, name: string | number) {
  * @param {object} enemies   enemiesDB (name -> enemies.json row)
  * @returns {{item: string, rate: number}[]}
  */
-export function fusionDrops(halves, body, enemies: { [k: string]: EnemyRecord; }) {
+export function fusionDrops(halves: string[], body: string, enemies: { [k: string]: EnemyRecord; }) {
   const rows = [];
   const byItem = new Map();
   for (const name of Array.isArray(halves) ? halves : []) {

@@ -60,7 +60,7 @@ const v2On = () => typeof window !== "undefined" && window.__fx?.stageselect ===
 // The full mover is ported in engine/dw3/ui/native/stage-select.ts
 // (`stageSelectMoveCursor`) and proved against the original by
 // tests/lane-b/stage-select-move-cursor.test.js.
-export function cursorStep(cursor: number, count, delta: number) {
+export function cursorStep(cursor: number, count: number, delta: number) {
   if (!(count > 0)) return 0;
   return Math.max(0, Math.min(count - 1, (cursor | 0) + (delta | 0)));
 }

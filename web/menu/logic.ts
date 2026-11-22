@@ -157,7 +157,7 @@ export function techBadgeClip(tech) {
 // highlighted. The signature technique sits in the LAST slot: capture
 // 03-choose-digivolve.png shows Kotemon's only technique, "Hot Head", on row 5,
 // and the decoded form-ledger record marks slot 5 with 0x8000.
-export function ownTechSlots(profile) {
+export function ownTechSlots(profile: DigimonRecord | undefined) {
   return profileTechSlots(profile);
 }
 

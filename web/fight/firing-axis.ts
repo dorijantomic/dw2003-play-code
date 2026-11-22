@@ -251,7 +251,7 @@ export function subtree(model, root: string | number) {
 }
 
 /** The posed mesh of a set of bones: [x,y,z] per vertex, in the pose frame. */
-export function pointsOf(model, bones, pose) {
+export function pointsOf(model: FightSkeleton, bones, pose) {
   const out = [];
   for (const b of bones) for (const v of model.bones[b]?.verts || []) out.push(vertexWorld(model, b, v, pose));
   return out;
@@ -498,7 +498,7 @@ function handAxes(model, bone: string | number, pose, arm) {
  * `variant` picks the hand-class candidate ('push' | 'palm'); the class default comes from the
  * calibration (HAND_DEFAULT). Returns null when the site has no geometry to read.
  */
-export function firingAxis(model, folder: string | number, emitterId, pose, { rest = null, variant = null } = {}) {
+export function firingAxis(model: FightSkeleton, folder: string | number, emitterId: string, pose, { rest = null, variant = null } = {}) {
   const info = emitterClass(folder, emitterId);
   if (!info.cls || info.bone == null) return null;
   const bone = info.bone;

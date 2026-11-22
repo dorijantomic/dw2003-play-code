@@ -12,7 +12,7 @@ let picks: {} | null = null;              // folder -> { slot: "dw2"|"dw3" }, nu
 let loading: Promise<{}> | null = null;
 
 /** Keep only well-formed rows (a hand-edited or old file can never break a fight). */
-export function cleanPicks(raw) {
+export function cleanPicks(raw: string[]) {
   const out = {};
   const src = raw && typeof raw === "object" ? raw : {};
   for (const [folder, slots] of Object.entries(src)) {

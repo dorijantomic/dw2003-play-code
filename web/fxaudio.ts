@@ -64,7 +64,7 @@ function arm() {
 }
 arm();
 
-const ease = (param, v: number, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
+const ease = (param: AudioParam, v: number, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
 
 /** OPTIONS sound volume, 0..1 (1 = today). Takes effect on the next setSound call, which runs every frame. */
 export function setWeatherVolume(v: number) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }

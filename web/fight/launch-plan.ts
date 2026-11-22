@@ -22,6 +22,7 @@ import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
 import type { LaunchOpsSpec } from "./types.js";
+import type { Dw2LoadedModel } from "../types/anim-viewer-dw2.js";
 interface PoseSample {
   frame: number;
   pos: ReturnType<typeof restPose>["pos"];
@@ -50,7 +51,7 @@ export const ARENA_HALF = 5120;
  * +z (its victim line is +ARENA_HALF); an enemy-authored one the other way round. (clip-fallback's
  * victimAnchor is the mirror of this.)
  */
-export function homeLine(model) {
+export function homeLine(model: TipPointModel) {
   return authoredSide(model) === "enemy" ? ARENA_HALF : -ARENA_HALF;
 }
 
@@ -93,7 +94,7 @@ export function bodyEmitterBone(folder: string | number) { return BONEMAP[folder
  *     that arm would be a guess: the shot leaves from the body's centre emitter instead.
  *   * no arm chain - 23 rigs have no arm chain to fire from: the body emitter is the honest site.
  */
-export function emitterBone(folder: string | number, id) {
+export function emitterBone(folder: string | number, id: string) {
   const m = BONEMAP[folder];
   if (!m || !id) return null;
   const part = String(id).replace(/-\d+$/, "");
@@ -202,7 +203,7 @@ export function tipOf(pos, model, bone: string | number, prevBone = null) {
 }
 
 /** The bone before `bone` in the anatomy's own limb chain for emitter `id`, or null. */
-export function chainPrevBone(folder: string | number, id, bone) {
+export function chainPrevBone(folder: string | number, id: string, bone: string) {
   const part = String(id ?? "").replace(/-\d+$/, "");
   const side = part === "left-arm" ? "left" : part === "right-arm" ? "right"
     : part === "both-arms" ? "left" : null;
@@ -241,7 +242,7 @@ export function boneTip(model, bone: string | number | null, { table = null, win
 /**
  * The side an emitter id names, or null for a site that is not an arm ("mouth", "chest", ...).
  */
-export function emitterSide(id) {
+export function emitterSide(id: string) {
   const part = String(id ?? "").replace(/-\d+$/, "");
   if (part === "left-arm" || part === "both-arms") return "left";
   if (part === "right-arm") return "right";
@@ -405,7 +406,7 @@ export function launchPointsFor(model, { folder = model?.folder, tech = null, vo
   return { mode, shots: points.length, points, limbs: [], basis: rule.basis };
 }
 
-function modelHeight(model, window) {
+function modelHeight(model, window: PoseSample[]) {
   let lo = Infinity, hi = -Infinity;
   for (const p of window) for (const v of p.pos) { if (!v) continue; if (v[1] < lo) lo = v[1]; if (v[1] > hi) hi = v[1]; }
   return isFinite(lo) && hi > lo ? hi - lo : 1;

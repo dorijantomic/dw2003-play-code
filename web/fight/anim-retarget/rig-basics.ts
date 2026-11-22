@@ -34,7 +34,7 @@ function ps1Mat3(ax: number, ay: number, az: number) {
   return mat3Mul(Rz, mat3Mul(Ry, Rx));
 }
 
-function compose(a: number[], b) {
+function compose(a: number[], b: number[]) {
   const o = new Array(9).fill(0);
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
     let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j]! * b[i * 3 + k];
@@ -146,7 +146,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
   const maxY = Math.max(...chains.map(tipY));
   const topY = Math.min(...pose.pos.map((p) => p[1]));
   // a limb-rooted chain starts on the body's centre line, so its side/reach are the TIP's
-  const sideX = (ch) => (ch.limbRoot ? pose.pos[ch.tip][0] : pose.pos[ch.from][0]);
+  const sideX = (ch: ReachChain) => (ch.limbRoot ? pose.pos[ch.tip][0] : pose.pos[ch.from][0]);
   const reachX = (ch: ReachChain) => Math.abs(sideX(ch));
   const feet = chains.filter((ch) => tipY(ch) > maxY - 0.12 * H
     && (ch.limbRoot ? reachX(ch) > 0.03 * W : Math.abs(pose.pos[ch.from][0]) > 0.03 * W));

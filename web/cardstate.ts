@@ -211,7 +211,7 @@ export function boosters() { return BOOSTERS; }
 /** Cards per pack: six, one drawn from each of the set's six ordered pools. */
 export const BOOSTER_SIZE = CARDS_PER_PACK;
 
-function poolsOf(setId) {
+function poolsOf(setId: string) {
   const set = BOOSTERS?.sets?.find((s) => s.setId === setId);
   return set ? set.pools.map((p) => p.cards) : null;
 }

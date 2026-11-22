@@ -79,7 +79,7 @@ function loadTables() {
     return tablesPromise;
 }
 
-function rosterSlotFor(charId) {
+function rosterSlotFor(charId: string | null | undefined) {
     return rosterSlotOfCharId(String(charId)) ?? EMPTY_SLOT;
 }
 

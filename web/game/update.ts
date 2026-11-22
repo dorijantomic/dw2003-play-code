@@ -180,7 +180,7 @@ export function frame(t: number) {
     requestAnimationFrame(frame);
 }
 
-function fpsTick(t) {
+function fpsTick(t: number) {
     if (!window.__fx?.showfps) {
         if (S.fpsBox) { S.fpsBox.remove(); S.fpsBox = null; }
         fpsGaps.length = 0; S.fpsLast = 0;

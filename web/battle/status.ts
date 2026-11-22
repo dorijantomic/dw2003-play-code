@@ -149,7 +149,7 @@ export function battleStatusEventAdvance(b: BattleState, playerSpd: number | und
 }
 
 /** The combatant a pool entry names, or null when the walker's one-per-side model has none. */
-function battleAilmentTarget(b, side: number, slot: number) {
+function battleAilmentTarget(b: BattleState, side: number, slot: number) {
   void slot;
   if ((side | 0) < 1) return b?.player ?? null;
   return b?.enemy ?? null;

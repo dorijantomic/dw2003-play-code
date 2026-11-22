@@ -186,7 +186,7 @@ export function composeCellFrame(p, i, out) {
 export const connector = (key: string, r: UiRect, rel = ID) => rule(key, { x: r.x, y: r.y + r.h / 2 - rel.d, w: r.w, h: 2 * rel.d }, "var(--c-under)", rel, "under", "connector");
 
 /** The cursor box of a grid: orange corner brackets (the palette row's colour cycle when the call carries one). */
-export function composeCursorBox(p, i, out, pulse = null) {
+export function composeCursorBox(p, i, out: { key: string; kind: string; part: string; layer: string; rect: UiRect; color: string; sx: 1; sy: 1; }[], pulse = null) {
     out.push(corners(`cb${i}`, clipRect(p), p.row && pulse ? pulse(p.row) : "var(--c-orange)", p.rel));
 }
 

@@ -478,7 +478,7 @@ export function measureRig(model) {
  * This is measured, not assumed: the DW2 rigs bind their bones with non-identity rotations, so "rotate
  * about X" is wrong for some of them.
  */
-export function calibrateGait(model, rig, swingDeg = 14) {
+export function calibrateGait(model: Dw2Model, rig, swingDeg = 14) {
   const bind = rig.bind;
   const legs = rig.legs.map((L) => {
     const hip = L.hip;
@@ -514,7 +514,7 @@ function worldVecToLocal(m, v) {
   ];
 }
 
-function rotateJoint(pose, node, axis, angle: number) {
+function rotateJoint(pose, node, axis: string | number[], angle: number) {
   const q = quatFromAxis(axis, angle);
   const off = node * 4;
   const b = [pose.r[off], pose.r[off + 1], pose.r[off + 2], pose.r[off + 3]];
@@ -634,7 +634,7 @@ export function clipWalkStats(model: Dw2Model, clipIndex: number, rig = null): C
 }
 
 /** The clip index the table names, or -1 (the procedural gait is used then). */
-export function walkClipIndex(model, walk) {
+export function walkClipIndex(model, walk: Walk | null) {
   if (!walk || walk.kind !== "clip") return -1;
   const i = model.anims.findIndex((a) => a.name === walk.name);
   return i;

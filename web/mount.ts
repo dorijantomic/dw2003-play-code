@@ -473,7 +473,7 @@ export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
     // "auto": the part behind the saddle plane draws before the rider, the part in front of it after;
     // "front": the whole mount before the rider; "behind": the whole mount after him
     const layer = S.rider!.layer;
-    const blit = (c) => () => ctx.drawImage(c, dx, dy);
+    const blit = (c: HTMLCanvasElement) => () => ctx.drawImage(c, dx, dy);
     if (layer === "front") drawables.push({ y: S.y - 0.5, mount: true, draw: blit(canvas) });
     else if (layer === "behind") drawables.push({ y: S.y + 0.5, mount: true, draw: blit(canvas) });
     else {
@@ -509,7 +509,7 @@ function spriteStats(opts: SpriteStatsOpts = {}) {
     x: MOUNT_VIEW.w / 2, y: MOUNT_VIEW.h - 10, dir: opts.dir ?? "down", phase,
     moving: opts.moving ?? true, size: S.def?.size ?? 68, timeSec: 0, walk: S.def?.walk ?? null,
   });
-  const px = (c) => c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
+  const px = (c: HTMLCanvasElement) => c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
   // renderMount returns ONE shared scratch canvas, so each frame's pixels are copied out before the next draw
   const a = draw(opts.phaseA ?? 0.1);
   if (!a) return null;

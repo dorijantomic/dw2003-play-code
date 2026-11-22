@@ -125,7 +125,7 @@ export class Arena {
     forcedTag() { return this.P.find((p) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
     waveFoes() { return this.E.filter((e: { i: number; }) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
     aliveFoes(): MpBattleFoe[] { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
-    byKey(key: string) { return this.P.find((p) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
+    byKey(key: string) { return this.P.find((p: { key: string; }) => p.key === key) ?? this.E.find((e: { key: string; }) => e.key === key) ?? null; }
     recAt(side: number, slot: number) { return ((side | 0) < 1 ? this.P[slot | 0] : this.E[slot | 0])?.rec ?? null; }
     waves() { return Math.ceil(this.E.length / this.waveSize); }
     /** "play" | "won" | "lost" | "fled" */
@@ -166,14 +166,14 @@ export class Arena {
 
     // ---------------------------------------------------------- a turn
     /** Sleep, frozen and confusion take a turn away; poison etc. are ticks on the timeline instead. */
-    turnStart(key) {
+    turnStart(key: string) {
         const a = this.byKey(key);
         const ts = processTurnStart(a.rec, a.name, true, true);
         return ts.skipped ? { skipped: true, lines: [ts.prefix || `${a.name} can't move!`] } : { skipped: false, lines: [] };
     }
 
     /** After an action: put the actor back on the timeline and let the status-event pool tick once. */
-    finish(key, res: { lines: string[]; }, target = null) {
+    finish(key: string, res: { lines: string[]; }, target = null) {
         const a = this.byKey(key);
         if (a && !a.fled) {
             const foes = a.key[0] === "p" ? this.aliveFoes() : this.alivePlayers();
@@ -337,7 +337,7 @@ export class Arena {
      * cmd: { k: "fight", t: foeIndex } | { k: "tech", sk, tw, t: foeIndex | allyKey } | { k: "item", item, to: key } | { k: "run" }
      * Returns { lines, rows, a, sk, kind } (kind "atk" | "self" | "item" | "run"); `fled` when the player left.
      */
-    playerAction(key, cmd) {
+    playerAction(key: string, cmd) {
         const me = this.byKey(key);
         const A = me.rec, foes = this.aliveFoes();
         if (me.needTag) return this.#tag(me, cmd);
@@ -370,7 +370,7 @@ export class Arena {
     }
 
     // heals, cures and buffs: the game's category-4 and category-5 plans, on whoever the player picked
-    #support(me, skill: { name: number | undefined; id: number; }, record: { category: number; }, cmd) {
+    #support(me, skill: { name: number | undefined; id: number; }, record: { category: number; }, cmd: { t: string; }) {
         const allies = this.alivePlayers();
         const wanted = allies.find((p) => p.key === cmd.t) ?? me;
         const ordered = [wanted, ...allies.filter((p) => p !== wanted)].slice(0, 3);
@@ -490,7 +490,7 @@ export class Arena {
         return alive[alive.length - 1];
     }
 
-    foeAction(key) {
+    foeAction(key: string) {
         const foe = this.byKey(key), en = foe.rec;
         const alive = this.aliveFoes();
         const target = this.#pickTarget(foe);

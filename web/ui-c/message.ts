@@ -51,10 +51,10 @@ export function bandRects(parts) {
     return out;
 }
 
-const centreIn = (r, rc) => r.y + 4.5 >= rc.y && r.y + 4.5 < rc.y + rc.h;
+const centreIn = (r: UiRun | TalkCaptureRun, rc) => r.y + 4.5 >= rc.y && r.y + 4.5 < rc.y + rc.h;
 
 /** The balloon body from its two pieces (cmfont 0 / 2): their union less the 2 px drop line on the right and the bottom. */
-export function balloonBody(parts) {
+export function balloonBody(parts: TalkCapturePart[]) {
     const caps = parts.filter((p: { part: string; }) => p.part === "balloonCap").map(clipRect);
     if (!caps.length) return null;
     const x0 = Math.min(...caps.map((c) => c.x)), x1 = Math.max(...caps.map((c) => c.x + c.w));

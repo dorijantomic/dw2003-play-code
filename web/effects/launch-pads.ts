@@ -83,7 +83,7 @@ function tickPadIdle(stageId: string | number, pads, launch) {
     return out;
 }
 
-export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], launch) {
+export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], launch) {
     if (!padsEnabled) return;
     const pads = launchPads(stageId);
     if (!pads.length) return;

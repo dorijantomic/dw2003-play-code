@@ -97,7 +97,7 @@ export const THEMES = {
 export const DEFAULT_THEME = "lake";
 
 /** Theme id of a stage from the extras table (fishing_extras.json), falling back to the default. */
-export function themeIdFor(extrasData, stage: string | number) {
+export function themeIdFor(extrasData: ExtrasData | undefined, stage: string | number) {
     const rec = extrasData?.stages?.[stage];
     const area = rec ? (extrasData.areas ?? []).find((a) => a.id === rec.area) : null;
     return area && THEMES[area.theme] ? area.theme : DEFAULT_THEME;

@@ -206,7 +206,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Frame an AABB: pivot to its centre, distance to fit it. Animated unless immediate. */
-  function frameBounds(bounds, aspect = 4 / 3, { immediate = false, padding = cam.padding } = {}) {
+  function frameBounds(bounds: CameraBounds | { min: number[]; max: number[]; }, aspect = 4 / 3, { immediate = false, padding = cam.padding } = {}) {
     const box = boxOf(bounds);
     if (!box) return false;
     cam.targetPivot = box.center.slice();
@@ -432,7 +432,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
   function setState(s: CameraUrlState | null | undefined) {
     if (!s) return false;
-    const num = (v) => (v == null || v === "" ? null : +v);
+    const num = (v: string | number) => (v == null || v === "" ? null : +v);
     if (num(s.yaw) != null) cam.yaw = cam.targetYaw = num(s.yaw)! * DEG;
     if (num(s.pitch) != null) cam.pitch = cam.targetPitch = clampPitch(num(s.pitch)! * DEG);
     if (num(s.dist) != null) cam.dist = cam.targetDist = clamp(num(s.dist), cam.minDist, cam.maxDist);

@@ -379,7 +379,7 @@ export function dropIndex(enemies, stageIndex = null) {
 }
 
 /** The item names the index holds, alphabetically. Pure. */
-export function dropItems(index) {
+export function dropItems(index: DropIndex) {
   const names = index?.byItem instanceof Map ? [...index.byItem.keys()] : [];
   return names.sort(nameOrder);
 }
@@ -388,7 +388,7 @@ export function dropItems(index) {
  * One item's entry as the tab lists it: `{item, droppers, stages}`, or null for a name the
  * index does not hold. The lookup ignores case and surrounding spaces. Pure.
  */
-export function dropEntry(index, item) {
+export function dropEntry(index: DropIndex, item) {
   if (!(index?.byItem instanceof Map)) return null;
   const wanted = String(item ?? "").trim();
   if (!wanted) return null;

@@ -125,7 +125,7 @@ export function elementChip(key: string, rect: UiRect, cap = null, rel = ID) {
 }
 
 /** The scrolling diamond field over the whole limit; `scroll` = the game's own counter (the call's x). */
-export const stripes = (scroll, key = "backdrop.stripes", o: { light?: string; dark?: string } = {}) => ({ key, kind: "stripes", part: "backdrop", layer: "under", full: true, scroll, ...(o.light ? { light: o.light, dark: o.dark } : {}) });
+export const stripes = (scroll: number, key = "backdrop.stripes", o: { light?: string; dark?: string } = {}) => ({ key, kind: "stripes", part: "backdrop", layer: "under", full: true, scroll, ...(o.light ? { light: o.light, dark: o.dark } : {}) });
 
 /** The big faint word behind a page (Russo One, `sizeDp` tall). `color` = a C variant (C3 bag uses a darker ink). */
 export const typeWord = (key: string, text: string, rect, rel = ID, sizeDp = 140, color = null, vertical = false, fit = false) => ({ key, kind: "type", part: "typeWord", layer: "under", text, rect, sizeDp, spacingDp: 6, sx: rel.a, sy: rel.d, ...(color ? { color } : {}), ...(vertical ? { vertical: true } : {}), ...(fit ? { fit: true } : {}) });
@@ -154,7 +154,7 @@ export const moreArrow = (key: string, box: UiRect | { x: number; y: number; w: 
  * The message band (C9 9) on native `rect` (already through its matrix): edge top and bottom, navy body, drop shadow down. A band that
  * starts at the left screen edge also gets the orange tab on its top edge and the slanted slab left of the text (both bleed left).
  */
-export function messageBand(key: string, rect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
+export function messageBand(key: string, rect: UiRect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
     out.push({ key, kind: "band", part: "msgBand", layer: "under", rect, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel!.a, sy: rel!.d });
     if (rect.x > 0.5 || rect.w < 1) return;
     out.push(plate(`${key}.slab`, "msgSlab", { x: 0, y: rect.y + MSG.slabTop * rel!.d, w: 0, h: Math.max(0, Math.min(MSG.slabH * rel!.d, rect.h - 2 * MSG.slabTop * rel!.d)) }, rel, { shape: "sr", edge: "var(--c-wall)", body: null, shadow: 0 }));
@@ -258,7 +258,7 @@ export const rowChevron = (key: string, x, y, rel = ID, fill = "var(--c-orange-i
  * `hole` (native, inside `rect`), which stays open so whatever is under the overlay (the live 3D face) shows through. Two svg rings with
  * the even-odd rule; the hole gets chamfers just big enough to sit inside the body's inner chamfers.
  */
-export function ringFrame(key: string, rect, hole, rel, out: UiPart[]) {
+export function ringFrame(key: string, rect: UiRect, hole, rel, out: UiPart[]) {
     const W = rect.w, H = rect.h, c = N(24), e = N(4), ci = N(22);
     const hx = hole.x - rect.x, hy = hole.y - rect.y, hw = hole.w, hh = hole.h;
     const need = 2 * e + ci + 1.5;
@@ -274,7 +274,7 @@ export function ringFrame(key: string, rect, hole, rel, out: UiPart[]) {
 }
 
 /** A C8 HP bar: the track (12 dp slant on the right end) with the fill at `ratio`; dir "rtl" keeps the right end (the enemy's bar). */
-export const hudBar = (key: string, rect, ratio: number, color: string, rel = ID, dir = "ltr") => ({
+export const hudBar = (key: string, rect: UiRect, ratio: number, color: string, rel = ID, dir = "ltr") => ({
     key, kind: "bar", part: "hpBar", layer: "over", rect: applyRel(rect, rel), track: HUD.track, color, ratio, slant: 12, dir, sx: rel.a, sy: rel.d,
 });
 

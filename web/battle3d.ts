@@ -234,7 +234,7 @@ export { ARENA_BASE_Z };
  * hook calls it with the live contact state.
  */
 export const CONTACT_EVADE_TYPE = 56;   // 0x38, COMEX102 0x8004413e
-export function resolveContactSoundType(type, contactType: number | null, evaded: boolean) {
+export function resolveContactSoundType(type: number, contactType: number | null, evaded: boolean) {
   if (type !== 98 && type !== 99) return type;
   return evaded ? CONTACT_EVADE_TYPE : contactType;
 }

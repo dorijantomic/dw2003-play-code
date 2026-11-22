@@ -119,7 +119,7 @@ export function closeWindow(frame: number, centerX: number | undefined, centerY:
 // 0x7CD8 -- whereas the close's rect goes on a 0x1002 object (0x7B44/0x7B4C),
 // which is why there the rect is the window the field shows through. See
 // `paintWipeCoverBand` / `paintWipeCoverAround` in web/game.js.
-export function openFrame(frame) {
+export function openFrame(frame: number) {
     const n = Math.max(0, Math.floor(frame));
     const w = WIPE_OPEN_STEP * n;
     return {
@@ -307,7 +307,7 @@ export function createCheckerboard() {
 //    counter (asm 0x7684-0x76D0); no cell word moves.  (The captured schedule is
 //    all non-zero modes; the zero terminator the 2026-09-13 note names is not in
 //    this live read.)
-export function stepCheckerboard(cb, delta, held = false) {
+export function stepCheckerboard(cb, delta: number, held = false) {
     if (cb.done) return { stepped: false, crossed: false, record: null };
     cb.calls += 1;
     if (held) return { stepped: false, crossed: false, record: cb.index };

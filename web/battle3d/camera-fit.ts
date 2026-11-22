@@ -333,7 +333,7 @@ export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number
  *  the reference framing holds is untouched. */
 export function fitGiantNearCamera(cam: GiantNearCameraInput | null, slot: { x: number; y: number; z: number }, rest: { h: number; w: number; } | null, target = null, opts = {}): GiantNearCameraFitResult {
   if (!cam?.eye?.length) return { cam, shots: [], changed: false };
-  const shots = [];
+  const shots: (GiantShotFit | null)[] = [];
   let changed = false;
   for (let i = 0; i < cam.eye.length; i++) {
     const eye = cam.eye[i], look = cam.look?.[i], H = cam.view?.[i];

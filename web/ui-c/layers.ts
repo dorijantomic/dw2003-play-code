@@ -123,7 +123,7 @@ function tick() {
 }
 
 /** Remove a scope now (its owner is drawing pixels again). */
-export function hide(key) {
+export function hide(key: string) {
     const s = scopes.get(key);
     if (!s) return;
     s.el.remove();

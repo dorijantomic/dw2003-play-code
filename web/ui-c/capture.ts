@@ -18,7 +18,7 @@ let cur = null;
 export const capturing = () => cur !== null && !cur.inArt;
 
 /** Pixel bounds of clip `id` in pack `p` (from the loaded sheet record), or null. */
-export function clipBounds(p, id: string | number) {
+export function clipBounds(p: UiCapturePackDef, id: string | number) {
     const clip = p?.ids?.[String(id)];
     if (!clip || !Array.isArray(clip.layers) || !clip.layers.length) return null;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -107,7 +107,7 @@ function drawPieces(s, m, p, id: string | number, x: number, y: number, sizes) {
 export const insetRect = (x: number, y: number, w: number, h: number, [l, t, r, b]) => ({ x: x + l, y: y + t, w: Math.max(0, w - l - r), h: Math.max(0, h - t - b) });
 
 /** Draw a clip on the art canvas cut to its inner rect (a button's word): the frame around it is the C plate, the word stays pixels. */
-function drawInset(s, m, x: number, y: number, w: number, h: number, inset, draw) {
+function drawInset(s, m: DOMMatrix, x: number, y: number, w: number, h: number, inset, draw) {
     const art = s.getArt();
     if (!art) return;
     const r = insetRect(x, y, w, h, inset);

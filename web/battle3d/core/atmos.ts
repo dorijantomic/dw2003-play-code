@@ -60,7 +60,7 @@ function _atmosArena(atm: AtmosSky | null, world: Float32Array, eye: number[], l
     B$.gl!.uniform4fv(B$.texP!.uSky, [B$.ATM_HORIZON! * k, nightK * clear, B$.atmMoon!.dir ? nightK * clear : 0, performance.now() / 1000 % 3600]);
     B$.gl!.uniform2fv(B$.texP!.uWater, _atmosWaterU(atm, scale));
   }
-function _atmosWaterU(atm, scale) { return [B$.ARENA_WATER!.has(B$.activeArena?.name!) ? 1 - 0.6 * atm.night : 0, B$.ATM_GROUND! * MODEL_SCALE * scale / 1000]; }
+function _atmosWaterU(atm: AtmosSky, scale: number) { return [B$.ARENA_WATER!.has(B$.activeArena?.name!) ? 1 - 0.6 * atm.night : 0, B$.ATM_GROUND! * MODEL_SCALE * scale / 1000]; }
 // Where the moon can be seen: directions over the upper part of this shot (9 x 7 screen points); a ray from the eye
   // along each one (and 4 more at the moon's own edge) must first hit an arena triangle above the horizon whose texel is
   // sky-blue by the shader's own rule. Of those, the one nearest a little right of centre, two thirds up. None: no moon.

@@ -95,7 +95,7 @@ export const MAX_TAMERS = 8;
 export const DEFAULT_BEST_OF = 3;
 
 const isTamer = (id) => Number.isInteger(id) && id > 0;
-const has = (list, id) => Array.isArray(list) && list.includes(id);
+const has = (list, id: string) => Array.isArray(list) && list.includes(id);
 
 /** A new night: the first round drawn (with the byes the bracket needs) and the folder closed until its first fight. */
 export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; bestOf?: number } = {}) {
@@ -128,7 +128,7 @@ export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; b
     };
 }
 
-const out = (lg, id) => id == null || has(lg.dropped, id);
+const out = (lg: MpForfeitLeague, id: string | null) => id == null || has(lg.dropped, id);
 
 /** Mark the round complete, or the whole night when it was the last one. Called after every decided fight. */
 function settle(lg) {

@@ -256,7 +256,7 @@ export const PAGES = Object.freeze([
  */
 export function createOptionsModel(store, pixelFilters) {
     const rows = buildRows(pixelFilters);
-    const lockedRow = (r) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
+    const lockedRow = (r: OptionsRow) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
     const backRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
     let page = 0, row = 0, top = 0, open: null | { index: number; cat: number; } | null = null;          // open = the EFFECTS category that is showing its switches, or null
     const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];

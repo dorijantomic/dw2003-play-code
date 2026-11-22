@@ -78,7 +78,7 @@ function drawSprite(meta, sheet: HTMLImageElement | undefined, x: number, y: num
 // X needs nothing: build_assets bakes each frame's registered offset into the sheet
 // (content left = cellW/2 + DC), which also makes the mirrored right-hand rows land on
 // `screenX - (E4 + DC)` for free.
-function spriteBottomShift(meta, dir, row, frameIdx) {
+function spriteBottomShift(meta, dir: number, row, frameIdx: number | undefined) {
     const byDir = meta.frameBottomShift;
     if (!byDir) return 0;
     const shifts = byDir[dir] ?? byDir[meta.rows[row]];
@@ -167,7 +167,7 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, al
 // game-wide, see docs/research/field/field-actor-anim-engine.md's clip-directory decode —
 // clip 1 = idle for every checked sprite). Used as the default "just standing there" clip
 // when nothing scripted (SETANIM) is overriding this entity.
-function _idleClipId(meta) {
+function _idleClipId(meta: SpriteMeta) {
     return meta.clips && meta.clips[String(FIELD_IDLE_CLIP)]
         ? String(FIELD_IDLE_CLIP)
         : null;

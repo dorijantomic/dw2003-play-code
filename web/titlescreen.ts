@@ -201,7 +201,7 @@ const NATIVE_W = 320, NATIVE_H = 240;
 /** How the 320x240 screen maps into a view of the given size: fit inside it
  *  without distortion and centre the remainder. The draw and the mouse hit
  *  test both go through this, so they cannot drift apart. */
-export function titleViewTransform(viewW, viewH) {
+export function titleViewTransform(viewW: number, viewH: number) {
   const scale = Math.min(viewW / NATIVE_W, viewH / NATIVE_H);
   return {
     scale,

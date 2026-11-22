@@ -434,7 +434,7 @@ function wrapText(text, cols: number) {
   return out;
 }
 
-function drawPage(ctx, W: number, H: number, message: string) {
+function drawPage(ctx: CanvasRenderingContext2D, W: number, H: number, message: string) {
   ctx.save();
   ctx.fillStyle = "rgba(4,6,12,0.96)";
   ctx.fillRect(0, 0, W, H);

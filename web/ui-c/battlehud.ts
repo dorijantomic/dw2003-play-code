@@ -143,7 +143,7 @@ const runAt = (m) => ({ x: (m.right != null ? m.right - (m.w ?? 0) / 2 : m.x + (
 const raw = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
 
 /** The free runs whose centre lies in `r` (raw native), taken out of the pool. */
-function take(runs, used: Set<unknown>, r) {
+function take(runs, used: Set<unknown>, r: UiRect) {
     const got = [];
     for (const m of runs) {
         if (used.has(m) || m.text === "") continue;
@@ -217,7 +217,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
 
     const cmds = [];
     const oldRow = (p, r, on: boolean, k: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined) => {
-        const R = (q) => applyRel(q, rel!);
+        const R = (q: UiRect) => applyRel(q, rel!);
         const row = { x: r.x, y: r.y, w: r.w, h: BATTLE.rowH };
         keyBox(`${k}.key`, R({ x: r.x, y: r.y, w: BATTLE.keyW, h: BATTLE.rowH }), on, rel, out);
         const px = r.x + BATTLE.plateIn + (on ? BATTLE.plateOn : 0), pw = r.w - 18;
@@ -226,7 +226,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         take(runs, used, r).forEach((m, j) => out.push(rowLabel(`${k}.l${j}`, m, px + (on ? BATTLE.labelOn : BATTLE.labelIn), row, px + pw - N(20), rel, on)));
     };
     parts.forEach((p, i) => {
-        const rel = p.rel ?? ID, R = (r) => applyRel(r, rel), k = `b${i}`;
+        const rel = p.rel ?? ID, R = (r: UiRect) => applyRel(r, rel), k = `b${i}`;
         switch (p.part) {
         case "battleData": break;
         case "hudPlate": {

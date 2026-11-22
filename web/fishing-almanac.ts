@@ -46,7 +46,7 @@ const CARDMON_SLOT = "4";
 const WATER_SLOT = "7";
 
 /** A stage id → name lookup from manifest.maps (array or id → name object). */
-function mapNameLookup(maps) {
+function mapNameLookup(maps: Record<string, string>) {
     if (Array.isArray(maps)) {
         const byId = new Map();
         for (const map of maps) {
@@ -143,7 +143,7 @@ export function castsLeft(budget: number) {
  * indexed by screen id, each record `[dvexp, exp, bits]`; an index past the
  * end (or no table at all) is unknown, never zero.
  */
-export function rewardFor(rewards, screenId) {
+export function rewardFor(rewards: Record<string, AlmanacReward>, screenId) {
     if (screenId == null) return null;
     const id = Number(screenId);
     if (!Number.isInteger(id) || id < 0) return null;

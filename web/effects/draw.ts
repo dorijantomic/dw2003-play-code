@@ -44,7 +44,7 @@ function tick(records, rt, f: {} | undefined) {
 // per TEXEL, not per sprite: the plain pass writes every non-STP texel opaque
 // (that is what stops the cars looking like glass), and only the STP texels
 // are re-drawn under the clip's blend mode. semi == -1 means no blend at all.
-export function drawSprite(ctx, sheet: HTMLImageElement, layers, x: number, y: number, semiSheet) {
+export function drawSprite(ctx: CanvasRenderingContext2D | null, sheet: HTMLImageElement, layers, x: number, y: number, semiSheet: string | HTMLImageElement | null) {
     for (const l of layers) {
         ctx.drawImage(sheet, l.x, l.y, l.w, l.h,
             x + l.dx, y + l.dy, l.w, l.h);
@@ -231,11 +231,11 @@ function viewRect(camX: number, camY: number, viewW: number, viewH: number, pad 
 // buckets 8 and above. Call this immediately BEFORE the base map is drawn; the
 // map art then covers them, which is what the console does. It also ticks the
 // frame, so drawEffects must follow it on the same frame.
-export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, viewW: number, viewH: number, pad = 0) {
+export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, viewW: number, viewH: number, pad = 0) {
     const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad)!);
     preparedFrame = f;
     if (!f) return;
-    eachRecord(f, ctx, camX, camY, (r, draw: () => void) => {
+    eachRecord(f, ctx, camX, camY, (r: { layer: number; }, draw: () => void) => {
         if (bucketPass(r.layer) === "under-map") draw();
     });
 }
@@ -246,13 +246,13 @@ export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageI
 // them. Coordinates are map-space; ctx is already camera-translated by the
 // caller passing camX/camY. Records at UNDER_MAP_BUCKET and above were already
 // painted by drawEffectsUnderMap and are skipped here.
-export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], viewW: number, viewH: number, pad = 0) {
+export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], viewW: number, viewH: number, pad = 0) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
         : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad)!);
     preparedFrame = null; // one frame's preparation is good for one frame
     if (!f) return;
-    eachRecord(f, ctx, camX, camY, (r, draw: () => void, py, pysort) => {
+    eachRecord(f, ctx, camX, camY, (r: { layer: number; }, draw: () => void, py, pysort) => {
         // The record's `layer` byte (record byte+3) is the GPU ordering-table
         // BUCKET the draw is submitted to, and LOWER means NEARER the camera.
         //
@@ -347,7 +347,7 @@ function eachRecord(f, ctx: CanvasRenderingContext2D | null, camX: number, camY:
 // are y-sorted, not painted flat: the controller gives each component its own
 // baseline offset — one 240px ABOVE the Digimon, so it sorts behind everything,
 // and one +20 below, so it sorts in front. See engine/systems/fire-trap.ts.
-export function drawFireTrapBursts(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], trap) {
+export function drawFireTrapBursts(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], trap) {
     const s = S.data?.[stageId];
     if (!s || !trap) return;
     const sheet = ensureSheet(stageId);
@@ -372,7 +372,7 @@ export function drawFireTrapBursts(ctx: CanvasRenderingContext2D | null, stageId
 // stage atlas the point records use, so a rock is blitted with the same blend
 // handling and y-sorts at its own y exactly as the native drawSprite path did.
 // `entries` are {clip, x, y} in map coordinates.
-export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], entries) {
+export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], entries) {
     const s = S.data?.[stageId];
     if (!s || !entries?.length) return;
     const sheet = Object.keys(s.sprites).length ? ensureSheet(stageId) : null;

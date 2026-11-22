@@ -401,7 +401,7 @@ export function damageLabOpen() {
 }
 
 /** The loaded rows of one picker: "forms", "enemies" or "techniques". */
-export function damageLabTable(kind) {
+export function damageLabTable(kind: string) {
   if (kind === "forms") return S.forms;
   if (kind === "enemies") return S.enemies;
   if (kind === "techniques") return S.techniques;
@@ -409,7 +409,7 @@ export function damageLabTable(kind) {
 }
 
 /** One row by id, or null when the id is not in that table. */
-export function damageLabRow(kind, id) {
+export function damageLabRow(kind: string, id: string) {
   const key = String(id);
   return damageLabTable(kind).find((row) => String(row.id) === key) ?? null;
 }

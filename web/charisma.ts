@@ -56,7 +56,7 @@ export function charismaDbReady() { return !!DB; }
  * Equipment is read from `state.equipment[i]` for all three positions rather than from
  * `partnerStats.equipBonuses`, because the menu only syncs that cached block for the lead.
  */
-export function charismaMemberFor(entry, slots) {
+export function charismaMemberFor(entry, slots: Record<string, number> | Record<string, number>[] | undefined) {
   const stored = entry?.stats?.chr;
   const chip = entry?.bonuses?.chr ?? 0;
   return {

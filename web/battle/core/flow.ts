@@ -310,7 +310,7 @@ function elementNameForElem1(elem1: number) {
    * technique record: the browser's own port (`magicalBase` + `resolveDamage`) on the
    * disc's record for `slotTechId`.
    */
-  function slotDamage(slotTechId: number, atk, def, rng: () => number | undefined, field) {
+  function slotDamage(slotTechId: number, atk, def, rng: () => number | undefined, field: number) {
     const rec = B.fightTechDB?.[String(slotTechId | 0)];
     if (!rec) return 0;
     const sk = {

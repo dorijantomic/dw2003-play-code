@@ -163,7 +163,7 @@ function accept(id, viaNpc = false) {
     return true;
 }
 
-function claim(id, viaNpc = false, pick = null) {
+function claim(id: string | undefined, viaNpc = false, pick = null) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "ready") return false;
     if (turnInRef(d) && !viaNpc) return false;               // report to the character instead
@@ -199,7 +199,7 @@ async function enemyParty(o) {
 }
 const challengeIndex = (d) => d.objectives.findIndex((o, i) => o.type === "challenge" && (st.active[d.id]?.p[i] || 0) < 1);
 const canBegin = (d) => !!api?.startBattle && !challengeBusy && (!d.objectives[challengeIndex(d)]?.startAt || (lastMap != null && d.objectives[challengeIndex(d)].startAt.some((m) => sameMapId(m, lastMap))));
-async function beginChallenge(id) {
+async function beginChallenge(id: string | undefined) {
     const d = defOf(id), i = d ? challengeIndex(d) : -1;
     if (!enabled() || i < 0 || statusOf(d) !== "active" || !canBegin(d)) return false;
     const o = d.objectives[i];
@@ -557,7 +557,7 @@ function objectiveText(d, i) {
     return "?";
 }
 const MARK = { ready: "!", active: ">", available: "*", done: "x" };
-const clip = (s, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 const logEntries = () => ["ready", "active", "available", "done"].flatMap((s) => allDefs().filter((d) => statusOf(d) === s).map((d) => ({ d, s })));
 
 function detailText(d, s: string) {
@@ -586,7 +586,7 @@ const isHere = (d) => !!lastMap && (d.offer ? d.offer.maps : d.acceptAt ?? []).s
 const placeOf = (d) => (d.offer ? mapLabel(d.offer.maps[0]) : d.acceptAt ? mapLabel(d.acceptAt[0]) : "Wanted board");
 
 /** The game's choice list over any number of labels, four at a time. Returns the index picked, or -1 for Back. */
-async function pagedPick(prompt: string, labels) {
+async function pagedPick(prompt: string, labels: string[]) {
     const PER = 4, pages = Math.max(1, Math.ceil(labels.length / PER));
     let page = 0;
     for (;;) {

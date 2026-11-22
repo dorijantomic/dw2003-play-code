@@ -138,7 +138,7 @@ export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
 //   challengeWon = null (no bonus rep) | true (won → +1 ultra roll) | false (lost → nothing)
 export function gymSessionResult(drillEntry: GymDrillEntry, tpChoice: number, repResults: boolean[], challengeWon: boolean, dig: DigimonRecord, gym: GymRecord, rng = RAND_U16): { tpCost: number; effects: { stat: string; delta: number }[] } {
   const totals = new Map();
-  const add = (fx) => { for (const { stat, delta } of fx) totals.set(stat, (totals.get(stat) ?? 0) + delta); };
+  const add = (fx: GymTrainingEffect[]) => { for (const { stat, delta } of fx) totals.set(stat, (totals.get(stat) ?? 0) + delta); };
   for (const ok of repResults) if (ok) add(gymTrainingResult(drillEntry, tpChoice, false, dig, gym, rng).effects);
   if (challengeWon === true) add(gymTrainingResult(drillEntry, tpChoice, true, dig, gym, rng).effects);
   return { tpCost: gym.tp_costs[tpChoice], effects: [...totals].map(([stat, delta]) => ({ stat, delta })) };

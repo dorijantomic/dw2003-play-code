@@ -193,7 +193,7 @@ const CASES = [
     { id: 11, d: "case 2 + save, clip rect whole view, 150 sprites, restore", f: (c: { save: () => void; beginPath: () => void; rect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; clip: () => void; restore: () => void; }) => { big(c); c.save(); c.beginPath(); c.rect(0, 0, LW, LH); c.clip(); sprites(c); c.restore(); } },
     { id: 12, d: "case 2 + 60 small solid arc fills (r=3 logical)", f: (c: { fillStyle: string; beginPath: () => void; arc: (arg0: number, arg1: number, arg2: number, arg3: number, arg4: number) => void; fill: () => void; }) => { big(c); c.fillStyle = "#ffd34d"; for (const p of APOS) { c.beginPath(); c.arc(p.x, p.y, 3, 0, Math.PI * 2); c.fill(); } } },
     { id: 13, d: "case 2 + 30 drawImage strips 8px tall from a second 640x480 2D canvas", f: (c: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number) => void; }) => { big(c); for (let i = 0; i < 30; i++) { const y = i * 16; c.drawImage(strips, 0, y, LW, 8, 0, y, LW, 8); } } },
-    { id: 14, d: "case 2 + 1 drawImage of 640x480 WebGL canvas (cleared each frame) covering view", f: (c) => {
+    { id: 14, d: "case 2 + 1 drawImage of 640x480 WebGL canvas (cleared each frame) covering view", f: (c: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number) => void; }) => {
         big(c);
         const gl = glc.gl;
         if (gl) { glFrame++; gl.clearColor((glFrame % 60) / 120, 0.3, 0.5, 0.5); gl.clear(gl.COLOR_BUFFER_BIT); }

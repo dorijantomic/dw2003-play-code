@@ -33,17 +33,17 @@ interface SheetRun {
 export const SHEET = Object.freeze({
     headerX: dx(616), tabW: TAB.w, tabH: TAB.h, bodyDx: N(18), bodyDy: 9, rowDx: N(40), rowDy: 17, pitch: 14, rowH: 12, push: 12, lead: 8,
 });
-const isNum = (t) => /^[0-9]+$/.test(String(t).trim());
+const isNum = (t: string | undefined) => /^[0-9]+$/.test(String(t).trim());
 const mid = (r: SheetRun) => r.y + 4.5;
 /** The native rect of a claimed clip before its matrix (the game's draw position + the clip's pixel bounds). */
 export const localRect = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
 /** A rect that runs on to the right screen edge (the C panels bleed right). */
 const toRight = (x: number, y, h: number, right = 320) => ({ x, y, w: Math.max(right, 320) - x, h });
-const inside = (r: SheetRun, rc) => r.x >= rc.x - 1 && r.x < rc.x + rc.w && mid(r) >= rc.y && mid(r) < rc.y + rc.h;
+const inside = (r: SheetRun, rc: UiRect) => r.x >= rc.x - 1 && r.x < rc.x + rc.w && mid(r) >= rc.y && mid(r) < rc.y + rc.h;
 const take = (runs: SheetRun[], used: Set<unknown>, rc: UiRect): SheetRun[] => runs.filter((r) => !used.has(r) && inside(r, rc));
 
 // ------------------------------------------------------------------------------------------------ text helpers
-const label = (key: string, m, rect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) => textPart(key, "label", m.text, applyRel(rect, rel), o.sizeDp ?? 24, o.lineDp ?? 36, { color: o.color ?? m.face ?? null, rel, maxDp: o.maxDp ?? 0 });
+const label = (key: string, m, rect: UiRect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) => textPart(key, "label", m.text, applyRel(rect, rel), o.sizeDp ?? 24, o.lineDp ?? 36, { color: o.color ?? m.face ?? null, rel, maxDp: o.maxDp ?? 0 });
 const number = (key: string, m, right: number, y: number, h: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) => textPart(key, "number", m.text, applyRel({ x: right - N(o.wDp ?? 90), y, w: N(o.wDp ?? 90), h }, rel), o.sizeDp ?? 22, o.lineDp ?? Math.round(h * 3), { align: "right", color: o.color ?? m.face ?? "var(--c-ink)", rel, maxDp: o.wDp ?? 90 });
 
 /** One text run placed in a row of `top` / `h` (native): numbers right-anchored at the game's right edge, the rest a label at the pen x. */
@@ -54,8 +54,8 @@ function rowText(key: string, m: RowRun, top: number, h: number, right: number, 
 
 // ------------------------------------------------------------------------------------------------ lined window
 /** Row tops for the text lines inside `win` (one row per pen line; cursor tokens do not make a row). */
-export function rowsFromRuns(runs, used: Set<unknown>, win: UiRect) {
-    const ys = [];
+export function rowsFromRuns(runs: SheetRun[], used: Set<unknown>, win: UiRect) {
+    const ys: number[] = [];
     for (const r of take(runs, used, win)) if (!isCursorToken(r.text) && !ys.some((y) => Math.abs(y - r.y) <= 2)) ys.push(r.y);
     return ys.sort((a, b) => a - b).map((y) => y - 1);
 }
@@ -65,7 +65,7 @@ export function rowsFromRuns(runs, used: Set<unknown>, win: UiRect) {
  * edge, under(k) (under-edge colour of plain row k), push (how far the cursor row is pushed out) }. The row holding the game's cursor glyph
  * is orange with the chevron in the glyph's pose. Takes the runs it draws.
  */
-export function linedWindow(key: string, win: UiRect, tops, runs, used: Set<unknown>, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
+export function linedWindow(key: string, win: UiRect, tops, runs: SheetRun[], used: Set<unknown>, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
     out.push(plate(`${key}.plate`, "window", applyRel(win, rel), rel, { shape: o.shape ?? "ch", edge: o.edge }));
     const mine = take(runs, used, win);
     const right = win.x + win.w, h = o.rowH ?? SHEET.rowH, push = o.push ?? SHEET.push;
@@ -86,7 +86,7 @@ export function linedWindow(key: string, win: UiRect, tops, runs, used: Set<unkn
 }
 
 /** A lined window whose rows are its own text lines (row x = 8 native left of the leftmost text). */
-export function textWindow(key: string, win: UiRect, runs, used: Set<unknown>, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
+export function textWindow(key: string, win: UiRect, runs: SheetRun[], used: Set<unknown>, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
     const tops = rowsFromRuns(runs, used, win);
     const texts = take(runs, used, win).filter((m) => !isCursorToken(m.text));
     const x0 = texts.length ? Math.min(...texts.map((m) => m.x)) : win.x + 16;
@@ -98,7 +98,7 @@ export function textWindow(key: string, win: UiRect, runs, used: Set<unknown>, o
 export const panelRows = (h: number) => Math.max(0, Math.floor((h - 21) / SHEET.pitch));
 
 /** The C4 tab panel ("Digivolve", "Equip"): tab plate (C4 #2c2c8a) with the game's title, the lined body window bleeding right. */
-export function composeTabPanel(p, i, runs, used: Set<unknown>, out) {
+export function composeTabPanel(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, b = localRect(p), k = `tp${i}`;
     const tab = { x: b.x, y: b.y, w: SHEET.tabW, h: SHEET.tabH };
     const titles = take(runs, used, tab).filter((m) => !isCursorToken(m.text) && mid(m) < b.y + SHEET.bodyDy + 6);
@@ -115,9 +115,9 @@ export function composeTabPanel(p, i, runs, used: Set<unknown>, out) {
  * The stat / resistance columns inside `win`: the number runs grouped by their right edge; one chip per number (the game's icon sits on
  * the chip as art), the second column of seven rows gets the element colour caps (fire .. dark, top to bottom).
  */
-export function statChips(key: string, win: UiRect, runs, used: Set<unknown>, out, rel = ID) {
+export function statChips(key: string, win: UiRect, runs: SheetRun[], used: Set<unknown>, out: UiPart[], rel = ID) {
     const nums = take(runs, used, win).filter((m) => m.right != null && isNum(m.text));
-    const cols = [];
+    const cols: { right: number | undefined; runs: SheetRun[]; }[] = [];
     for (const m of nums) { const c = cols.find((c) => Math.abs(c.right - m.right) <= 2); if (c) c.runs.push(m); else cols.push({ right: m.right, runs: [m] }); }
     cols.sort((a, b) => a.right - b.right);
     cols.forEach((c, ci) => {
@@ -133,7 +133,7 @@ export function statChips(key: string, win: UiRect, runs, used: Set<unknown>, ou
 }
 
 /** The solid orange EXP plate (C4): slanted right end, the game's number right-anchored and its label in dark ink. */
-export function expPlate(p, i, runs, used: Set<unknown>, out, o: { edge?: string; } = {}) {
+export function expPlate(p, i, runs: SheetRun[], used: Set<unknown>, out, o: { edge?: string; } = {}) {
     const rel = p.rel, r = localRect(p), k = `exp${i}`;
     out.push(plate(`${k}.plate`, "expPlate", applyRel(r, rel), rel, { shape: "sr", edge: o.edge ?? "var(--c-orange)", body: null }));
     const lineN = N(40), top = r.y + (r.h - lineN) / 2;
@@ -145,13 +145,13 @@ export function expPlate(p, i, runs, used: Set<unknown>, out, o: { edge?: string
 }
 
 /** The TP plate's own runs: its number and the label on the same pen line left of it (not the footer lines drawn over the same strip). */
-export function tpRuns(runs, used: Set<unknown>, r: UiRect) {
+export function tpRuns(runs: SheetRun[], used: Set<unknown>, r: UiRect) {
     const mine = take(runs, used, r), nums = mine.filter((m) => m.right != null && isNum(m.text));
     return mine.filter((m: { y: number; x: number; }) => nums.includes(m) || nums.some((n: { y: number; x: number; }) => Math.abs(m.y - n.y) <= 1 && m.x < n.x));
 }
 
 /** The TP plate (C4): slanted right end, "TP" dim, the number amber and big, right-anchored where the game ends it. */
-export function tpPlate(p, i, runs, used: Set<unknown>, out) {
+export function tpPlate(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, r = localRect(p), k = `tp${i}p`;
     out.push(plate(`${k}.plate`, "tpPlate", applyRel(r, rel), rel, { shape: "sr" }));
     const lineN = N(44), top = r.y + (r.h - lineN) / 2;
@@ -181,7 +181,7 @@ export function composeStatWin(p, i, runs, used: Set<unknown>, out) {
  * technique panel (88.. x 22..130) with five technique rows 14 apart from 37 and the skill row at 107 (orange under-edge).
  */
 export const FORM_SHEET = Object.freeze({ nameW: 124, tabH: 21, skillX: 154, statW: 88, top: 22, techRowX: 110, techRow0: 37, rows: 5, skillRow: 107 });
-export function composeFormSheet(p, i, runs, used: Set<unknown>, out) {
+export function composeFormSheet(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, b = localRect(p), F = FORM_SHEET, k = `fs${i}`, bottom = b.y + b.h - 2;
     // the two windows first (their tabs sit over their top edge)
     const statWin = { x: b.x, y: b.y + F.top, w: F.statW, h: bottom - (b.y + F.top) };
@@ -223,7 +223,7 @@ export const SHEET_PARTS = Object.freeze(["expPlate", "tpPlate", "statWin", "tab
  * Every sheet part of a pause page, in draw order. The TP plate is left out (and its text with it) when the footer band overlaps it
  * (the equipment item list draws both in the same place; the band's own text owns that strip).
  */
-export function composeSheetParts(parts, runs, used: Set<unknown>, out) {
+export function composeSheetParts(parts, runs, used: Set<unknown>, out: UiPart[]) {
     const foot = parts.find((p: { part: string; }) => p.part === "footer");
     parts.forEach((p, i) => {
         switch (p.part) {
@@ -250,7 +250,7 @@ export const REPORT = Object.freeze({ portraitW: 39, nameX: 38, nameW: 68, nameH
 const CYAN = "var(--c-cyan)";
 
 /** One partner group: card plate, portrait frame, name tab, LV tab (orange), EXP in amber. */
-export function composeReportCard(p, i, runs, used: Set<unknown>, out) {
+export function composeReportCard(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, b = localRect(p), R = REPORT, k = `rc${i}`;
     out.push(plate(`${k}.plate`, "card", applyRel(b, rel), rel, { shape: "sr", edge: CYAN }));
     out.push(plate(`${k}.portrait`, "portrait", applyRel({ x: b.x, y: b.y, w: R.portraitW, h: b.h }, rel), rel, { shape: "ch", edge: CYAN, shadow: 0 }));
@@ -270,7 +270,7 @@ export function composeReportCard(p, i, runs, used: Set<unknown>, out) {
 }
 
 /** A form bar: slanted plate, the form name, the form level right-anchored behind a divider. */
-export function composeFormBar(p, i, runs, used: Set<unknown>, out) {
+export function composeFormBar(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, b = localRect(p), R = REPORT, k = `fb${i}`, bar = { x: b.x, y: b.y, w: b.w, h: R.barH };
     out.push(plate(`${k}.plate`, "formBar", applyRel(bar, rel), rel, { shape: "sr", edge: CYAN, shadow: 4 }));
     out.push(rule(`${k}.div`, applyRel({ x: b.x + R.barLv, y: b.y + 1, w: 1, h: R.barH - 2 }, rel), CYAN, rel));
@@ -289,7 +289,7 @@ export function composeReportHl(p, i, out, pulse = null) {
 }
 
 /** The message band: a chamfered window, the game's lines in body text. */
-export function composeMsgBand(p, i, runs, used: Set<unknown>, out) {
+export function composeMsgBand(p, i, runs: SheetRun[], used: Set<unknown>, out) {
     const rel = p.rel, b = localRect(p), k = `mb${i}`;
     out.push(plate(`${k}.plate`, "msgBand", applyRel(b, rel), rel, { shape: "ch", edge: CYAN }));
     for (const m of take(runs, used, b).sort((a: { y: number; }, c: { y: number; }) => a.y - c.y)) {

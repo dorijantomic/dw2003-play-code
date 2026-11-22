@@ -25,7 +25,7 @@ export const FOOT_HALF = 6;
 export const FOOT_DEPTH = 8;
 
 /** The cell of a grid the point falls in. */
-const cellOf = (grid, x, y) => [Math.floor(x / grid.cell), Math.floor(y / grid.cell)];
+const cellOf = (grid: QuestReachGrid, x: number | undefined, y: number | undefined) => [Math.floor(x / grid.cell), Math.floor(y / grid.cell)];
 
 /**
  * A grid in the shape this module works on: `{ cell, cols, rows, cells }` with `cells` a per-cell 0/1 array. Accepts the
@@ -83,17 +83,17 @@ export function questLineClear(grid, ax: number, ay: number, bx: number | undefi
 // diagonal step is only allowed when both cells it passes between are standable too (no cutting a wall corner).
 
 /** The standable point of a cell: its lower middle (where the feet of a character standing in it would be). */
-const cellPoint = (grid, c, r) => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
+const cellPoint = (grid: { cell: number; }, c: number | undefined, r: number | undefined) => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
 
 /** Whether a cell can be stood in. */
-export function questCellFree(grid, c, r) {
+export function questCellFree(grid: QuestReachGrid, c: number | undefined, r: number | undefined) {
     if (!grid || c < 0 || r < 0 || c >= grid.cols || r >= grid.rows) return false;
     const [x, y] = cellPoint(grid, c, r);
     return questStandFree(grid, x, y);
 }
 
 /** The nearest standable cell to a point, searched in rings out to `limit` cells; null when there is none. */
-export function questFreeCellNear(grid, x: number | undefined, y: number | undefined, limit = 6) {
+export function questFreeCellNear(grid: QuestReachGrid, x: number | undefined, y: number | undefined, limit = 6) {
     const [c0, r0] = cellOf(grid, x, y);
     if (questCellFree(grid, c0, r0)) return [c0, r0];
     for (let d = 1; d <= limit; d++) {

@@ -767,7 +767,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     // the native pro/stfgtrep screen, and calls finishNativeReport() when the
     // player leaves it, which returns to the field exactly like the inline
     // report's final confirm.
-    setReportHandoff: (h) => { B.reportHandoff = h ?? null; },
+    setReportHandoff: (h: { open: (b: BattleState) => boolean; }) => { B.reportHandoff = h ?? null; },
     // The finale's win exit hand-off: the host registers how to play the ending
     // chain (movie row 10 MOVIEE01_STR, then its return selector 0xE0C = row 11
     // MOVIEE02_STR, then 0x2d7 = screen 727 = stage 780) and calls
@@ -841,7 +841,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
  * shared point the three player→enemy damage sites now call — never a per-battle special
  * case. Its regression test is tests/battle-special-mode.test.js.
  */
-export function finalizePlayerDamage(b: BattleState, total) {
+export function finalizePlayerDamage(b: BattleState, total: number) {
   const mode = b.specialMode ?? 0;
   if (!mode) return total;
   return specialModeDamage(mode, true, b.enemy.hp, b.enemy.maxHp, total, 1);

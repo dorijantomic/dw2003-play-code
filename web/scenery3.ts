@@ -133,7 +133,7 @@ function drawNightLight(ctx: CanvasRenderingContext2D, S: DrawNightLightState) {
     ctx.drawImage(nl, 0, 0);
 }
 
-function drawWindows(ctx, S) {
+function drawWindows(ctx: CanvasRenderingContext2D, S: Scenery3State) {
     const { p, fx, now, t, fade, camX, camY } = S;
     const dark = darkness(p, fx, now);
     if (dark < 0.05) return;
@@ -159,7 +159,7 @@ function drawWindows(ctx, S) {
 }
 
 // ------------------------------------------------------------- the lens
-function drawLens(ctx, S) {
+function drawLens(ctx: CanvasRenderingContext2D, S: Scenery3State) {
     const { fx, L, t, dt, now, fade } = S;
     const storm = Math.max(L.rain, L.blizzard), cold = L.blizzard, grit = L.sand;
     if (storm > 0.05 || grit > 0.05) {

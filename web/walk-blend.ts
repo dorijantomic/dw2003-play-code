@@ -29,7 +29,7 @@ const OUT = { col: 0, mirror: false, bottom: 0, w: 0 };
  * of a frame). subTick = seconds into the current field tick (0 for clocks that advance by dt). Same lookup and same time arithmetic as engine clipFrame, so the current frame is the
  * one clipFrame returns. Returns one shared scratch object: read it at once, do not keep it.
  */
-export function walkBlendNext(clips, clipId, dir: string | number, elapsedSeconds: number, subTick = 0) {
+export function walkBlendNext(clips, clipId: (string | number) | null, dir: string | number, elapsedSeconds: number, subTick = 0) {
     if (!clips || clipId == null) return null;
     const entry = clips[String(clipId)];
     if (!entry) return null;

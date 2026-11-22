@@ -155,7 +155,7 @@ export function classifyOwnScript(model, script) {
 const INV = new WeakMap();     // model -> inventory (rebuilt only when the model object is new)
 
 /** Every own action script of a model, classified, plus the flag this rule needs. */
-export function ownClipInventory(model): OwnClipInventory {
+export function ownClipInventory(model: OwnClipModel): OwnClipInventory {
   if (!model) return { slots: {}, height: 0, throws: false, throwsWhy: [] };
   if (INV.has(model)) return INV.get(model);
   const slots: Record<string, OwnClipRec> = {};

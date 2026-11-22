@@ -53,7 +53,7 @@ const read = (v): QuestSnapshot => (typeof v === "function" ? v() : v);
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the trigger to play, or null
  */
-export function enterTrigger(triggers, mapId, prev, now, state, ctx: QuestTriggerContext) {
+export function enterTrigger(triggers, mapId: string, prev: { x: number; y: number; }, now: { x: number; y: number; }, state: QuestSnapshot, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId || !prev || !now) return null;
     if (!Number.isFinite(prev.x) || !Number.isFinite(prev.y) || !Number.isFinite(now.x) || !Number.isFinite(now.y)) return null;
@@ -91,7 +91,7 @@ export function enterTrigger(triggers, mapId, prev, now, state, ctx: QuestTrigge
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the arrival row to play, or null
  */
-export function arrivalTrigger(triggers, mapId, state, ctx: QuestTriggerContext) {
+export function arrivalTrigger(triggers, mapId: string, state: QuestSnapshot, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId) return null;
     if (!read(ctx.idle)) return null;                            // a battle, a cutscene, a menu, a fade
@@ -131,7 +131,7 @@ export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
     }
     const prevAt = { x: 0, y: 0 }, nowAt = { x: 0, y: 0 };   // one pair, refilled: a frame allocates nothing
     let playing = false;                                     // a scene is running: no second trigger on top of it
-    let arrivalMap = null;                                   // a fresh field load whose on:"enter" rows are still to be asked
+    let arrivalMap: string | null = null;                                   // a fresh field load whose on:"enter" rows are still to be asked
     /** Start one trigger's scene and, when it really ran, keep its fired mark. Both arms end here. */
     function fire(t) {
         playing = true;

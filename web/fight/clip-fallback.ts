@@ -215,7 +215,7 @@ const CLIP_CONTACT_VARIANTS = {
  * shape that covers the hits, or the widest when the hits exceed every authored shape. 0 for a clip the
  * disc presents with no contact (15).
  */
-export function clipContacts(clip, hits = null) {
+export function clipContacts(clip: number, hits = null) {
   const variants = (CLIP_CONTACT_VARIANTS[clip] ?? [1]).filter((n: number) => n > 0);
   if (!variants.length) return 0;
   const h = hits != null ? hits | 0 : 0;
@@ -596,7 +596,7 @@ function hasLocomotion(script) {
 }
 
 /** The donor's cast, aimed with this model's own spell sprite: its op6 spawn record, or null. */
-function donorShot(donorOps, model, element: string | number) {
+function donorShot(donorOps, model: DonorScriptModel, element: string | number) {
   const o = donorOps.find((x) => x.op === 6 && x.words?.[0] === 0 && x.words.length >= 8);
   if (!o) return null;
   const shot = cloneOp(o);
@@ -995,8 +995,8 @@ function buildEnemyScript(model, clip: number, row: { m: string; d: string; t: n
 // matching kind: its body tables, its waits, its travel arms and its own strike beats. The
 // technique contributes what the own body cannot carry - its projectile sprite, its effect on the
 // victim, and its own contact count placed on the body's strike moments.
-const strikeBeat = (model) => [{ op: 10, words: [CONTACT_TYPE, 0] }, strikeFx(model, SPARK_TYPE), { op: 1, words: [5] }];
-const finalBeat = (model) => [
+const strikeBeat = (model: ClipScriptModel) => [{ op: 10, words: [CONTACT_TYPE, 0] }, strikeFx(model, SPARK_TYPE), { op: 1, words: [5] }];
+const finalBeat = (model: ClipScriptModel) => [
   { op: 10, words: [STRIKE_TYPE, 0] }, strikeFx(model, SPARK_TYPE), strikeFx(model, EFFECT_CURRENT), { op: 1, words: [0] },
 ];
 

@@ -239,7 +239,7 @@ export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time:
  *
  * Returns the byte that was cleared, exactly as `consumeAffinity` does.
  */
-export function clearActionAffinity(b, side: number) {
+export function clearActionAffinity(b: BattleRestoreState, side: number) {
   const s = (side | 0) < 1 ? 0 : 1;
   const activeSlot = s < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
   const rec = battleRestoreTargets(b, s)[activeSlot];

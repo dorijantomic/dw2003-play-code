@@ -277,7 +277,7 @@ export function fightReportGroupGeom(layout: FightReportLayout | null | undefine
   const f = layout?.form_slot;
   if (!g || !f) return null;
   const base = groupIndex * g.stepY;
-  const at = (e) => ({ x: e.x, y: base + e.yOff });
+  const at = (e: FightReportGeomPoint) => ({ x: e.x, y: base + e.yOff });
   const slots = [];
   for (let j = 0; j < f.count; j++) {
     const dy = base + f.stepY * j;

@@ -154,7 +154,7 @@ function cross(a: [number[], number[]], b: [number[], number[]]) {
     const t = ((q[0]! - p[0]!) * s[1]! - (q[1]! - p[1]!) * s[0]!) / den;
     return [p[0]! + t * r[0]!, p[1]! + t * r[1]!];
 }
-const atY = ([p, d], y) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * d[0] / d[1], y]);
+const atY = ([p, d], y: number) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * d[0] / d[1], y]);
 
 /**
  * The balloon silhouette in page px (C6): body box `b` = { l, t, w, h } with the 24 dp chamfer top-left and bottom-right (`c`), an edge of

@@ -167,7 +167,7 @@ export function composeNameEntry({ parts, runs }: { parts: { part: string }[]; r
  * The partner chooser rows (stdgnm 30): a family C row plate, the portrait frame inside it, the name (Russo) with the game's underline;
  * the row under the game's cursor frame (32) gets the orange edge, corners and the chevron left of it.
  */
-function composeChooser(parts, runs, used: Set<unknown>, out) {
+function composeChooser(parts, runs: UiRun[], used: Set<unknown>, out) {
     const pick = of(parts, "pickCursor")[0];
     of(parts, "pickRow").forEach((p: { x: number; y: number; }, i) => {
         const row = { x: p.x - 4, y: p.y - 4, w: 160, h: 40 }, on = !!pick && Math.abs(pick.y - row.y) < 3 && Math.abs(pick.x - row.x) < 3, rl = rel(p);
@@ -188,7 +188,7 @@ function composeChooser(parts, runs, used: Set<unknown>, out) {
 
 // ------------------------------------------------------------------------------------------------ SAVE / LOAD (memory card)
 /** The thin pieces of a clip's line art (dividers, outlines: one side 8 native or less), merged along a row; the other pieces = boxes. */
-export function lineArt(p, skipSizes = []) {
+export function lineArt(p: PackWinBox, skipSizes = []) {
     const L = (p.layers ?? []).filter((l) => !skipSizes.some(([w, h]) => l.w === w && l.h === h));
     const thin = L.filter((l: { w: number; h: number; }) => Math.min(l.w, l.h) <= 8 && Math.max(l.w, l.h) >= 12);
     const boxes = L.filter((l: { w: number; h: number; }) => Math.min(l.w, l.h) > 8 && Math.min(l.w, l.h) < 30);
@@ -280,7 +280,7 @@ export function composeMemcard({ parts, runs }: { parts: Record<string, UiCaptur
  * focus colour, a short rule between them. Positions are the clip's own pieces (its 96 x 28 piece holds the three: pitch 28, 16 wide).
  * Returns the chips: the caller adds them AFTER the title plate (plates stack in the order they are pushed).
  */
-function composeSteps(p, i, parts: { part: string; }[], runs, used: Set<unknown>, out) {
+function composeSteps(p, i, parts: { part: string; }[], runs: UiRun[], used: Set<unknown>, out) {
     const step = (p.base ?? Number(p.id)) - 12, big = (p.layers ?? []).find((l: { w: number; h: number; }) => l.w === 96 && l.h === 28), chips = [];
     if (!big) return chips;
     const ox = p.x + big.x, oy = p.y + big.y, rl = rel(p);
@@ -312,7 +312,7 @@ function composePackWin(p: PackWinBox, i: number, parts: { part: string }[], run
 }
 
 /** The confirm page's name window (stnmet 2 + its portrait frame 6) and pack window (9). */
-function composeConfirmBoxes(parts, out) {
+function composeConfirmBoxes(parts: { part: string; }[], out) {
     of(parts, "cfPortrait").forEach((p, i) => out.push(plate(`cf${i}.portrait`, "portrait", R({ x: p.x, y: p.y, w: 36, h: 36 }, p), rel(p), { shape: "key", underEdge: "all", edge: FAMILY_C.edge, body: FAMILY_C.body, shadow: 0 })));
     of(parts, "cfName").forEach((p: { x: number; y: number; }, i) => out.push(cWindow(`cfn${i}`, R({ x: p.x + 36, y: p.y + 15, w: 176, h: 21 }, p), rel(p), { shape: "frame" })));
     of(parts, "cfPack").forEach((p: { x: number; y: number; }, i) => {
@@ -331,7 +331,7 @@ export function composeNet({ parts, runs }: { parts: { part: string }[]; runs: U
     const chips = of(parts, "wizSteps").flatMap((p, i) => composeSteps(p, i, parts, runs, used, out));
     of(parts, "nameHdr").forEach((p: { x: number; y: number; }, i: string) => composeTitle(p, i, runs, used, out));
     out.push(...chips);
-    of(parts, "packWin").forEach((p, i) => composePackWin(p, i, parts, runs, used, out));
+    of(parts, "packWin").forEach((p: PackWinBox, i: number) => composePackWin(p, i, parts, runs, used, out));
     composeConfirmBoxes(parts, out);
     of(parts, "netWin").forEach((p, i) => {
         // stnmet 15 (the message window): every piece but the 56 wide wires; stnmet 1 (the wire band holding the Register box): the 54 tall
@@ -403,4 +403,4 @@ export function composeLanguage({ parts, runs }: { parts: Record<string, { x: nu
 }
 
 /** The END card: its only clip is the END logo, a picture (kept in its own pixels by the scope). */
-export const composeEnd = ({ runs }: { runs: UiRun[] }): UiPart[] => { const out = []; restOfRuns(runs, null, ID, out, "end"); return out; };
+export const composeEnd = ({ runs }: { runs: UiRun[] }): UiPart[] => { const out: UiPart[] = []; restOfRuns(runs, null, ID, out, "end"); return out; };

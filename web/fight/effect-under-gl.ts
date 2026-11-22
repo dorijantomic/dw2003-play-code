@@ -82,7 +82,7 @@ function resources(gl: WebGLRenderingContext): UnderGlResources {
   return r;
 }
 
-function textureFor(gl: WebGLRenderingContext, r, img: TexImageSource) {
+function textureFor(gl: WebGLRenderingContext, r: UnderGlResources, img: TexImageSource) {
   let t = r.tex.get(img);
   if (t) return t;
   t = gl.createTexture();

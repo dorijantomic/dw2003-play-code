@@ -137,7 +137,7 @@ function collectRelations(places, memberOf, scenes, byKey) {
     return rel;
 }
 
-function freeAt(rect, placed, ignore, tol: number | undefined) {
+function freeAt(rect: Rect, placed, ignore, tol: number | undefined) {
     for (const r of placed) if (r !== ignore && overlaps(rect, r, tol)) return false;
     return true;
 }
@@ -320,7 +320,7 @@ export function buildWorld({ maps, scenes, variants = {} }) {
         moveComp(c, Math.round(tx - c.box.x), Math.round(ty - c.box.y));
         const clear = () => {
             const others = settled.flatMap(compRects);
-            return compRects(c).every((r) => others.every((o) => !overlaps(r, { x: o.x - COMPONENT_GAP / 2, y: o.y - COMPONENT_GAP / 2, w: o.w + COMPONENT_GAP, h: o.h + COMPONENT_GAP }, 0)));
+            return compRects(c).every((r: Rect) => others.every((o) => !overlaps(r, { x: o.x - COMPONENT_GAP / 2, y: o.y - COMPONENT_GAP / 2, w: o.w + COMPONENT_GAP, h: o.h + COMPONENT_GAP }, 0)));
         };
         const ddx = dir === "E" || !dir ? 1 : dir === "W" ? -1 : 0, ddy = dir === "S" || !dir ? 1 : dir === "N" ? -1 : 0;
         for (let i = 0; i < 400 && !clear(); i++) moveComp(c, ddx * SLIDE_STEP, ddy * SLIDE_STEP);

@@ -167,7 +167,7 @@ function programStep(program, tick: number) {
     return program[0].id;
 }
 
-export function drawIndicatorBubble(ctx, x: number, y, kind, tick: number) {
+export function drawIndicatorBubble(ctx: CanvasRenderingContext2D | null, x: number, y: number, kind, tick: number) {
     const program = manifest?.programs?.[kind];
     if (!program?.length) return;
     drawFieldcomIcon(ctx, 0, BALLOON, x, y);

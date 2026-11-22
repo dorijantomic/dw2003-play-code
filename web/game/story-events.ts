@@ -315,7 +315,7 @@ function despawnDefeatedBoss(actor) {
 // event 1450 ("walk back to the middle of the room"), share flag_key 012e000a, so a
 // flag_key-first lookup hands bit 97 the wrong record and sends the player downstairs.
 // flag_key stays the fallback, for a stage whose wstag ids disagree with the step table's.
-function playTalkEvent(bit) {
+function playTalkEvent(bit: number) {
     const mapId = currentMap().id;
     // The shipped binding table is the authority on what this bit means HERE; the resident
     // event-id array (state.talkEventIds) is the fallback for a stage the bindings file does

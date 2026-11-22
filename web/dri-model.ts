@@ -161,7 +161,7 @@ export function swapDriFormation(state: DriFormationState, a: string | number, b
   if (a === b) return false;
   if (!state.partyStats) state.partyStats = (state.party ?? []).map(() => null);
   state.partyStats[0] = state.partnerStats;
-  const swap = (array) => {
+  const swap = (array: (string | number)[] | (string | number | null)[] | (DriFormationStats | null)[] | undefined) => {
     if (!Array.isArray(array)) return;
     [array[a], array[b]] = [array[b], array[a]];
   };

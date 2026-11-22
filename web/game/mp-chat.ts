@@ -59,7 +59,7 @@ export async function warpToMap(mapId, x, y, idle: (() => boolean) | (() => bool
     return "ok";
 }
 
-export function chatSay(text) {
+export function chatSay(text: string) {
     chatBox.close!();
     S.chatShownAt = performance.now() / 1000;
     S.chatPresses = 0;

@@ -107,7 +107,7 @@ export function createSaveTranslated(sfx = null) {
     }
 
     /** Walker state -> the session's seed (the RAM contract of the disc's screen). */
-    function buildSeed(language) {
+    function buildSeed(language: number) {
         const state = r._state ?? {};
         const party = Array.isArray(state.party) ? state.party : [];
         const slots = r._opts?.partySlots ?? party.map((id) => rosterSlotOfCharId(id) ?? 0xffffffff);

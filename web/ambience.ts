@@ -203,7 +203,7 @@ const SHAFTY = [
 export { isOpenAirMapName };
 const profiles = new Map(); // stageId -> profile
 
-function scan(img) {
+function scan(img: HTMLImageElement) {
     // 64-wide downsample: mean luminance and grass share are all we need.
     const w = 64, h = Math.max(1, Math.round(64 * img.naturalHeight / img.naturalWidth));
     const cv = document.createElement("canvas");
@@ -343,7 +343,7 @@ const S = {
     onThunder: (ms) => thunder(fx.sound!, ms, (Math.random() * 2 - 1) * 0.85),
     onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps!, type, vol); },
 };
-function fillS(map, p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo = fx) {
+function fillS(map, p: SceneAmbienceProfile, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo = fx) {
     S.img = img ?? S.img;
     S.feet = window.__feet || [];
     S.moving = !!(S.feet[0] && S.feet[0].moving); S.dir = S.feet[0]?.dir ?? "down";

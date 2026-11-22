@@ -73,7 +73,7 @@ let actorData = null; // point_record_actors.json -- the ONE table
 
 let parentData = null; // child_pool_parents.json -- the child-array parents
 
-let playStageSound = null; // (packedWord) => void, wired once by the game loop
+let playStageSound: ((arg0: number, arg1: string | number) => void) | null = null; // (packedWord) => void, wired once by the game loop
 
 const sheets = {}; // stageId -> Image | "loading"
 
@@ -536,7 +536,7 @@ export function ensureScreenAtlas(stageId: string) {
 }
 
 /** Warm one stage's ambient atlas before a field transition completes. */
-export function preloadPointSpriteStage(stageId) {
+export function preloadPointSpriteStage(stageId: string) {
     const stage = S.data?.[stageId];
     if (!stage || !Object.keys(stage.sprites ?? {}).length) return Promise.resolve();
     const sheet = ensureSheet(stageId);

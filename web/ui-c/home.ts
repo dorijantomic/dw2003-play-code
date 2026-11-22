@@ -48,7 +48,7 @@ export const CARD_VARIANTS = Object.freeze({
 });
 export const CARD_PLAIN = Object.freeze({ edge: "var(--c-edge)", tabBody: "var(--c-name-body)", tabInk: null });
 
-export function partyCard(i: number, part, namePart, card, out, v = CARD_VARIANTS.home, c = CARD_PLAIN) {
+export function partyCard(i: number, part, namePart: HomeClip | null, card, out, v = CARD_VARIANTS.home, c = CARD_PLAIN) {
     const Y = part.y, rel = part.rel, ox = part.x, f = inCard(rel, ox, Y), k = `card${i}`;
     const plateRect = v.abs ? applyRel({ x: dx(v.plate[0]!) + ox, y: Y, w: N(v.plate[1]), h: N(126) }, rel) : f(v.plate[0], 0, v.plate[1], 126);
     out.push(plate(`${k}.plate`, "card", plateRect, rel, { shape: "sr", edge: c.edge }));
@@ -82,7 +82,7 @@ function composeHeader(part: HomeClip, runs: UiRun[], out) {
     out.push(text("header.text", "label", label.trim(), f(634, 56, 600, 36), 26, 36, { rel }));
 }
 
-function composeMoney(part, runs, out) {
+function composeMoney(part: HomeClip, runs, out) {
     const rel = part.rel, ox = part.x - STD.money.x, oy = part.y - STD.money.y, f = at(rel, ox, oy);
     out.push({ key: "money.plate", kind: "plate", part: "money", layer: "under", rect: f(0, 474, 484, 64), shape: "sr", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     const mine = runs.filter((r: { x: number; y: number; }) => inRegion(r, 0, 110, part.y, part.y + 22));
