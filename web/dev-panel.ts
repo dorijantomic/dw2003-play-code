@@ -8,6 +8,7 @@
 // data attributes they always had, so web/ambience.js still owns every handler that changes a setting.
 import { DEV_TABS, DEV_FILTERS, DEV_OPEN, tabCounts, selectRows, groupRows } from "./dev-panel-model.js";
 import { shipClass } from "./ship-list.js";
+import type { AmbienceSettings } from "./types/ambience.js";
 interface DevPanelField extends Element {
     value?: string;
     disabled?: boolean;
@@ -85,7 +86,7 @@ export const DEV_PANEL_CSS = `
         #fx-panel .ctl > span:first-child { flex:1 1 100%; }
       }`;
 
-const CONTROLS_HTML = (spriteFilters) => `
+const CONTROLS_HTML = (spriteFilters: [string, string][]) => `
     <h4>Mood</h4>
     <div class="ctl"><span>Preset</span><select data-preset><option value="">choose...</option><option value="cinematic">Cinematic</option><option value="clear">Clear day</option><option value="cozyrain">Cozy rain</option><option value="storm">Storm</option><option value="night">Night</option></select></div>
     <div class="row"><button type="button" data-act="save:1">Save 1</button><button type="button" data-act="save:2">Save 2</button><button type="button" data-act="save:3">Save 3</button></div>
@@ -113,7 +114,21 @@ const CONTROLS_HTML = (spriteFilters) => `
  * panel: the (empty, hidden) #fx-panel element. api: { fx, spriteFilters: [[id, label]...], dialMode(), onFirstOpen(view), shipOf }.
  * Returns { show(), sync(), setNa(Set), setNote(html), isBuilt() }.
  */
-export function createDevView(panel, api) {
+/** What the F2 page needs from the host (web/ambience.ts hands it in). */
+export interface DevPanelApi {
+    fx: AmbienceSettings & { [key: string]: unknown };   // the same bag as ambience.ts FxBag
+    /** how a key is shipped: its badge class (default: ship-list's shipClass) */
+    shipOf?: (key: string) => string;
+    /** [id, label] of each pixel filter the GPU offers */
+    spriteFilters: [string, string][];
+    dialMode: () => string | undefined;
+    /** multiplayer: the host decides this key (web/host-rules.js) */
+    locked?: (key: string) => boolean;
+    close?: () => void;
+    onFirstOpen?: (view: { setNote: (html: string) => void }) => void;
+}
+
+export function createDevView(panel, api: DevPanelApi) {
     const shipOf = api.shipOf || shipClass;
     const st = { tab: "world", query: "", filter: "all", na: new Set(), note: "" };
     let built = false, main = null, tabsEl = null, searchEl = null, counts = null;

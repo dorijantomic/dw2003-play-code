@@ -94,8 +94,8 @@ type QuestSceneEvent =
     | { kind: "bucket"; value: number }
     | { kind: "fade"; to: number; frames: number }
     | { kind: "shake" }
-    | { kind: "weather" }
-    | { kind: "time" }
+    | { kind: "weather"; weather: string; strength: number; frames: number; force?: boolean }
+    | { kind: "time"; time: string; frames: number; force?: boolean }
     | { kind: "lightning"; count: number; force?: boolean }
     | { kind: "sfx"; name: string }
     | { kind: "placecard"; area: string; place: string }
@@ -256,7 +256,7 @@ export function questSpeak(npcId, name, text) {
     });
 }
 
-export async function playQuestScene(steps) {
+export async function playQuestScene(steps): Promise<{ answer: number | null; failed: boolean } | null> {
     const mapId = currentMap()?.id;
     const scene = state.scenes[mapId];
     if (!scene || cutscene.isActive() || textbox.isOpen!() || battle.isActive()) {
@@ -282,10 +282,10 @@ export async function playQuestScene(steps) {
     // our own effect sheets, before the first frame that could use one; a missing sheet only makes its step skip
     const sheets = events.filter((e) => e?.kind === "fx").map((e) => e.sheet).filter(Boolean);
     if (sheets.length) { try { await loadQuestFxSheets(sheets); } catch { /* a sheet that will not load is skipped */ } }
-    return new Promise((resolve) => {
+    return new Promise<{ answer: number | null; failed: boolean }>((resolve) => {
         for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
         const hooks = { afterSay: {}, sceneEvent: (index, resume) => runQuestSceneEvent(S.questSceneEvents[index], resume) };
-        let answer = null;
+        let answer: number | null = null;
         for (const [n, s] of Object.entries(speech) as [string, SpeechBeat][]) {
             hooks.afterSay[n] = s.ask
                 ? (resume: () => void) => choice.open!(s.ask!, s.options!, (i) => { answer = i; resume(); })

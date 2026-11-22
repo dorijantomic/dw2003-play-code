@@ -14,7 +14,7 @@ interface AnimDebugRow {
 
 interface Window {
   __activeFollowerCount: () => number;
-  __ambienceProfile: (id: string) => { tone: string; key: string; };
+  __ambienceProfile: (id: string) => import("../ambience.js").MapProfileView | undefined;
   __ambienceSceneAllows: (kind: string) => boolean;
   __ambLamps: number;
   __animReport: () => unknown;

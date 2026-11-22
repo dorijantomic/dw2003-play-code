@@ -23,22 +23,129 @@ import { textWidth } from "./uifont.js";
 import { validateScene } from "./quest-scenes.js";
 import { installTriggers } from "./quest-triggers.js";
 import { offersAt, offerLabels } from "./quest-offers.js";
-interface QuestTurnInRef { name?: string; maps?: string[]; npc?: string; doneScene?: string; doneLines?: string[]; }
+import type { QuestProp } from "./types/quest-props.js";
+type MapId = string;                                         // a stage id such as "s330"
+type NonEmptyMaps = [MapId, ...MapId[]];                     // a giver or a notice board stands in at least one place
+/** A scene: the steps in web/quest-scenes.ts's vocabulary. */
+// ETS item 42: scene steps come from quests.json; validateScene (and compileScene when it plays) check them before use
+type QuestScene = unknown[];
+interface QuestPoint { x: number; y: number; r: number; }
 
-interface Quest {
+interface QuestObjectiveBase {
+    scene?: QuestScene;
+    label?: string;
+    startAt?: MapId[];                                       // a challenge's starting places (canBegin and detailText read it on any objective)
+}
+interface DefeatObjective extends QuestObjectiveBase { type: "defeat"; species: string[]; count: number; maps?: MapId[]; }
+interface VisitObjective extends QuestObjectiveBase { type: "visit"; map: MapId; }
+interface ChallengeObjective extends QuestObjectiveBase { type: "challenge"; screen?: number; screens?: number[]; scale?: number; hpMult?: number; }
+interface VisitSetObjective extends QuestObjectiveBase { type: "visitSet"; maps: MapId[]; count: number; }
+interface DuelWinObjective extends QuestObjectiveBase { type: "duelWin"; count: number; }
+interface TalkObjective extends QuestObjectiveBase { type: "talk"; npc: number; maps: MapId[]; lines: string[]; name?: string; retryLines?: string[]; }
+interface BringObjective extends QuestObjectiveBase { type: "bring"; item: string; count: number; }
+interface LevelObjective extends QuestObjectiveBase { type: "level"; level: number; }
+interface OwnFormObjective extends QuestObjectiveBase { type: "ownForm"; species: string; }
+interface ReachObjective extends QuestObjectiveBase { type: "reach"; map: MapId; from: QuestPoint; to: QuestPoint; startLabel?: string; }
+type QuestObjective = DefeatObjective | VisitObjective | ChallengeObjective | VisitSetObjective | DuelWinObjective | TalkObjective | BringObjective | LevelObjective | OwnFormObjective | ReachObjective;
+type ObjectiveType = QuestObjective["type"];
+type ObjectiveOf<T extends ObjectiveType> = Extract<QuestObjective, { type: T }>;
+
+/** A character a finished quest is reported to (and the base of the one that hands the quest out). */
+interface QuestTurnInRef { name: string; maps: NonEmptyMaps; npc: number; scene?: QuestScene; doneScene?: QuestScene; doneLines?: string[]; }
+interface QuestOffer extends QuestTurnInRef { lines?: string[]; ask?: string; acceptLines?: string[]; remindLines?: string[]; }
+interface QuestReward { bits?: number; items?: { name: string; count?: number }[]; }
+interface QuestVerdict { ask: string; options: string[]; pay?: QuestReward[]; after?: string[][]; }
+interface QuestUnlock { visited?: MapId[]; done?: string; flag?: number; duelWins?: number; level?: number; partner?: string; met?: { npc: number; map: MapId }[]; }
+interface QuestPropDef { map: MapId; sheet: string; at: number[]; after?: string; clip?: string; layer?: "entity" | "behind" | "front"; solid?: boolean; }
+
+/** One quest as quests.json (or generateBounty) writes it. */
+export interface QuestDef {
+    id: string;
     title: string;
-    id?: string;
-    offer?: { name: string; maps: string[] };
+    short?: string;
+    giver?: string;
+    text?: string;
+    generated?: boolean;
+    objectives: QuestObjective[];
+    reward?: QuestReward;
+    requires?: { done?: string; flag?: number };
+    unlock?: QuestUnlock;
+    offer?: QuestOffer;
+    turnIn?: QuestTurnInRef;
+    acceptAt?: NonEmptyMaps;
+    acceptScene?: QuestScene;
+    doneScene?: QuestScene;
+    ordered?: boolean;
+    verdict?: QuestVerdict;
+    props?: QuestPropDef[];
 }
+// ETS item 42: the trigger rows come from quests.json; installTriggers checks each one (id and map) before it keeps it
+interface QuestsFile { quests?: QuestDef[]; triggers?: unknown; }
+interface ManifestMaps { maps?: { id: string; name: string }[]; }
 
-interface QuestDef {
-    offer?: boolean;
-    acceptAt?: string[];
+/** Progress of one running quest: count per objective, the places a visitSet has seen, when it was taken. */
+interface QuestActive { p: number[]; seen: string[][]; at: number; }
+/** The quest layer's own store (the "dw.quests.v1" key). */
+interface QuestState {
+    v: number;
+    active: Record<string, QuestActive>;
+    done: Record<string, number>;
+    visited: string[];
+    met: string[];
+    duelWins: number;
+    announced: Record<string, number>;
+    seen: Record<string, number>;
+    triggers: Record<string, number>;
+    gen: { n: number; def: QuestDef | null; completed?: number };
 }
+type QuestStatus = "done" | "ready" | "active" | "available" | "locked";
+
+/** One wild enemy of a field screen (assets/data/field_encounters.json), also the shape a quest fight is started with. */
+interface QuestFoe { name: string; level: number; hp: number; mp: number; stat_scale?: number; }
+interface FieldEncountersFile { screens: Record<string, QuestFoe[]>; }
+interface StageEncountersFile { stages: Record<string, { zones?: { rate_level?: number; slots?: number[] }[] }>; }
+interface SpeciesFile { digimon: { id: number; name: string }[]; }
+/** A wild single enemy met while walking (a bounty hunts these). */
+interface RoamEnemy { name: string; screen: number; level: number; }
+type RoamTable = Record<string, RoamEnemy[]>;
+
+interface QuestBattleResult { enemyFled?: boolean; won?: boolean; fled?: boolean; }   // a field fight reports enemyFled, a co-op fight won and fled
+interface QuestBattleOpts {
+    screenId?: number | undefined;
+    challenge?: (number | undefined)[];
+    onWin: (res: QuestBattleResult | undefined) => void;
+    onFlee: () => void;
+    onLose: () => void;
+}
+interface QuestSceneResult { answer: number | null; failed: boolean; }
+/** What game.ts hands the quest layer: the game's own helpers (rewards, battles, speech, choices). */
+interface QuestHost {
+    giveItem: (name: string, count?: number) => boolean;
+    giveBits: (n: number) => void;
+    startBattle: (party: QuestFoe[], opts: QuestBattleOpts) => boolean;
+    readFlag: (id: number) => number | undefined;
+    partyLevel: () => number;
+    partnerIds: () => string[];
+    npcsHere: () => number[];
+    speak: (npcId: number | null, name: string, text: string) => Promise<void>;
+    ask: (prompt: string, options: string[]) => Promise<number>;
+    idle: () => boolean;
+    onDone: (title: string) => void;
+    scene: (steps: QuestScene) => Promise<QuestSceneResult | null>;
+    ownsForm: (id: number) => boolean;
+    countItem: (name: string) => number;
+    takeItem: (name: string, n: number) => boolean;
+}
+interface QuestInstall extends QuestHost { stageEl: HTMLElement | null; }
+interface ObjectiveRule { target: (o: RawObjective) => number; valid: (o: RawObjective) => boolean; }
+// ETS item 38: an objective in quests.json is untrusted until its valid() has passed, so the rules read it field by field; the any stays in these two rules' parameters, which are never returned.
+type RawObjective = Record<string, any>;
+interface QuestBattleEvent { enemies?: string[]; mapId: MapId; }
+interface QuestDuelEvent { won?: boolean; }
    // the offer loop's filters, written once (F2: pick which job)
 
 const KEY = "dw.quests.v1";
-const OBJECTIVES = {
+const OBJECTIVES: Record<ObjectiveType, ObjectiveRule> = {
     defeat: { target: (o) => Math.max(1, o.count | 0), valid: (o) => Array.isArray(o.species) && o.species.length > 0 },
     visit: { target: () => 1, valid: (o) => typeof o.map === "string" },
     // a fight the quest layer launches itself: real encounter screens (a boss, or two roaming fights back to back),
@@ -61,20 +168,21 @@ const OBJECTIVES = {
     reach: { target: () => 2, valid: (o) => typeof o.map === "string" && o.from && o.to && [o.from.x, o.from.y, o.from.r, o.to.x, o.to.y, o.to.r].every(Number.isFinite) },
 };
 
-let defs = [];
-let speciesIds = null;                                       // name -> species id, for "ownForm" (digimon.json, extras included)
+let defs: QuestDef[] = [];
+let speciesIds: Record<string, number> | null = null;                                       // name -> species id, for "ownForm" (digimon.json, extras included)
 let st = loadState();
-let api = null, fieldEnc = null, challengeBusy = false;
-let triggerRunner = null;                                    // walk-in quest triggers (web/quest-triggers.js), built from quests.json
-let variants = {};
-let mapNames = {};
-let lastMap = null, lastX = 0, lastY = 0;
+let api: QuestHost | null = null, fieldEnc: Record<string, QuestFoe[]> | null = null, challengeBusy = false;
+let triggerRunner: ReturnType<typeof installTriggers> | null = null;                                    // walk-in quest triggers (web/quest-triggers.js), built from quests.json
+let variants: Record<string, string> = {};
+let mapNames: Record<string, string> = {};
+let lastMap: MapId | null = null, lastX = 0, lastY = 0;
 let toastEl: HTMLDivElement | null = null, toastTimer: number | ReturnType<typeof setTimeout> = 0;
 
-function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, triggers: {}, gen: { n: 0, def: null } }; }
-function loadState() {
+function freshState(): QuestState { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, triggers: {}, gen: { n: 0, def: null } }; }
+function loadState(): QuestState {
     try {
-        const j = JSON.parse(localStorage.getItem(KEY) || "null");
+        // ETS item 42: our own saved key; the checks on v, active and done follow, and the newer fields an older save lacks are filled in below
+        const j: QuestState | null = JSON.parse(localStorage.getItem(KEY) || "null");
         if (j && j.v === 1 && j.active && j.done) {      // older saves lack the newer fields
             j.visited ??= []; j.met ??= []; j.duelWins ??= 0; j.announced ??= {}; j.seen ??= {}; j.triggers ??= {}; j.gen ??= { n: 0, def: null };
             return j;
@@ -87,13 +195,14 @@ function saveState() { try { localStorage.setItem(KEY, JSON.stringify(st)); } ca
 const enabled = () => !fx || fx.quests !== false;
 /** Is the quest layer on? (F2 -> Extras -> Quests; the scene layer and the props follow the same switch.) */
 export const questsEnabled = enabled;
-const atGiver = (d) => !d.acceptAt || (lastMap != null && d.acceptAt.some((m) => sameMapId(m, lastMap)));
-function sameMapId(a, b) { return canon(a) === canon(b); }
-const canon = (id) => variants[id] ?? id;
-const sameMap = (a, b) => canon(a) === canon(b);
-const mapLabel = (id) => (mapNames[id] ?? mapNames[canon(id)] ?? id).replace(/^.*— /, "");
+// ETS item 9: lastMap != null was tested and the callback runs at once (a callback loses the narrowing of a module variable)
+const atGiver = (d: QuestDef) => !d.acceptAt || (lastMap != null && d.acceptAt.some((m) => sameMapId(m, lastMap!)));
+function sameMapId(a: MapId, b: MapId) { return canon(a) === canon(b); }
+const canon = (id: MapId): MapId => variants[id] ?? id;
+const sameMap = (a: MapId, b: MapId) => canon(a) === canon(b);
+const mapLabel = (id: MapId) => (mapNames[id] ?? mapNames[canon(id)] ?? id).replace(/^.*— /, "");
 
-function validate(d) {
+function validate(d: QuestDef): string | null {
     if (!d || typeof d.id !== "string" || !Array.isArray(d.objectives) || !d.objectives.length) return "needs an id and objectives";
     for (const o of d.objectives) { const t = OBJECTIVES[o.type]; if (!t || !t.valid(o)) return `bad objective ${JSON.stringify(o)}`; }
     // props: our own art a quest leaves on a map once it is accepted or done (docs/quests-fx-brief.md section 6,
@@ -112,15 +221,16 @@ function validate(d) {
 }
 
 // ------------------------------------------------------------ quest state
-const targetOf = (d, i) => OBJECTIVES[d.objectives[i].type].target(d.objectives[i]);
-const allDefs = () => (st.gen.def ? [...defs, st.gen.def] : defs);
-const defOf = (id) => allDefs().find((d) => d.id === id);
-function isReady(id) {
+// ETS item 9: i is an index into d.objectives that every caller took from d.objectives itself
+const targetOf = (d: QuestDef, i: number) => OBJECTIVES[d.objectives[i]!.type].target(d.objectives[i]!);
+const allDefs = (): QuestDef[] => (st.gen.def ? [...defs, st.gen.def] : defs);
+const defOf = (id: string) => allDefs().find((d) => d.id === id);
+function isReady(id: string) {
     const a = st.active[id], d = defOf(id);
     return !!(a && d && d.objectives.every((_, i) => (a.p[i] || 0) >= targetOf(d, i)));
 }
-const hasVisited = (maps) => maps.some((m) => st.visited.includes(canon(m)));
-function unlocked(d) {
+const hasVisited = (maps: MapId[]) => maps.some((m) => st.visited.includes(canon(m)));
+function unlocked(d: QuestDef) {
     if (d.requires?.done && !st.done[d.requires.done]) return false;
     if (d.requires?.flag != null && api?.readFlag?.(d.requires.flag) !== 1) return false;   // read-only: needs a story beat
     const u = d.unlock;
@@ -134,14 +244,14 @@ function unlocked(d) {
     if (u.met && !u.met.every((r) => st.met.includes(`${r.npc}@${canon(r.map)}`))) return false;      // "you have seen this character there"
     return true;
 }
-function statusOf(d) {
+function statusOf(d: QuestDef): QuestStatus {
     if (st.done[d.id]) return "done";
     if (st.active[d.id]) return isReady(d.id) ? "ready" : "active";
     return unlocked(d) ? "available" : "locked";
 }
 // tell the player once when something new opens up
 function announceUnlocks() {
-    const fresh = [];
+    const fresh: QuestDef[] = [];
     for (const d of allDefs()) {
         if (st.announced[d.id] || statusOf(d) !== "available") continue;
         st.announced[d.id] = 1; fresh.push(d);
@@ -149,12 +259,13 @@ function announceUnlocks() {
     if (!fresh.length) return;
     saveState();
     // one notice per moment, however many givers came into view at once (a busy room can show a dozen)
-    toast(fresh.length === 1 ? `New quest: ${fresh[0].title}` : `${fresh.length} new quests nearby  (look for the red ?, or press F3)`);
+    // ETS item 9: the ternary tests fresh.length === 1 first
+    toast(fresh.length === 1 ? `New quest: ${fresh[0]!.title}` : `${fresh.length} new quests nearby  (look for the red ?, or press F3)`);
 }
 
-const placesOf = (maps) => [...new Set(maps.map(mapLabel))].join(" / ");
-const turnInRef = (d): QuestTurnInRef | null => d.turnIn ?? d.offer ?? null;      // the NPC a finished quest is reported to, if any
-function accept(id, viaNpc = false) {
+const placesOf = (maps: MapId[]) => [...new Set(maps.map(mapLabel))].join(" / ");
+const turnInRef = (d: QuestDef): QuestTurnInRef | null => d.turnIn ?? d.offer ?? null;      // the NPC a finished quest is reported to, if any
+function accept(id: string, viaNpc = false) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "available" || !atGiver(d)) return false;
     if (d.offer && !viaNpc) return false;                    // this one is handed out by a character, not by the log
@@ -163,7 +274,7 @@ function accept(id, viaNpc = false) {
     return true;
 }
 
-function claim(id: string | undefined, viaNpc = false, pick = null) {
+function claim(id: string, viaNpc = false, pick: number | null = null) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "ready") return false;
     if (turnInRef(d) && !viaNpc) return false;               // report to the character instead
@@ -171,25 +282,30 @@ function claim(id: string | undefined, viaNpc = false, pick = null) {
     if (statusOf(d) !== "ready") { toast("You no longer have everything this job needs."); return false; }
     // mark done and save FIRST, so a reload can never pay the reward twice
     delete st.active[id]; st.done[id] = Date.now(); saveState();
-    for (const o of d.objectives) if (o.type === "bring") api.takeItem?.(o.item, o.count | 0);   // handed over
-    const got = [];
+    // ETS item 9: defs load only after installQuests set api, and claim() returned above unless defOf found one
+    for (const o of d.objectives) if (o.type === "bring") api!.takeItem?.(o.item, o.count | 0);   // handed over
+    const got: string[] = [];
     const extra = pick != null ? d.verdict?.pay?.[pick] : null;           // what the choice made at the hand-in adds
     const pays = [d.reward ?? {}, extra ?? {}];
     for (const rw of pays) {
-        if (rw.bits) { api.giveBits(rw.bits); got.push(`${rw.bits} BIT`); }
+        // ETS item 9: api is set (see above)
+        if (rw.bits) { api!.giveBits(rw.bits); got.push(`${rw.bits} BIT`); }
         for (const it of rw.items ?? []) {
-            if (api.giveItem(it.name, it.count ?? 1)) got.push(`${it.count ?? 1} x ${it.name}`);
+            // ETS item 9: api is set (see above)
+            if (api!.giveItem(it.name, it.count ?? 1)) got.push(`${it.count ?? 1} x ${it.name}`);
             else console.warn(`[quests] reward item "${it.name}" is not in the game's item table; skipped`);
         }
     }
     toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`);
-    try { api.onDone?.(d.title); } catch { /* a listener must never break the reward */ }
+    // ETS item 9: api is set (see above)
+    try { api!.onDone?.(d.title); } catch { /* a listener must never break the reward */ }
     return true;
 }
 
-async function enemyParty(o) {
-    if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r) => r.json())).screens;
-    const party = [];
+async function enemyParty(o: ChallengeObjective) {
+    // ETS item 42: our own shipped data file, typed by the shape it is written in
+    if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r): Promise<FieldEncountersFile> => r.json())).screens;
+    const party: QuestFoe[] = [];
     for (const scr of o.screens ?? [o.screen]) {
         for (const p of fieldEnc[String(scr)] ?? []) {
             party.push({ name: p.name, level: p.level, hp: Math.round(p.hp * (o.hpMult ?? 1)), mp: p.mp, stat_scale: Math.round((p.stat_scale ?? 16) * ((o.scale ?? 16) / 16)) });
@@ -197,19 +313,23 @@ async function enemyParty(o) {
     }
     return party;
 }
-const challengeIndex = (d) => d.objectives.findIndex((o, i) => o.type === "challenge" && (st.active[d.id]?.p[i] || 0) < 1);
-const canBegin = (d) => !!api?.startBattle && !challengeBusy && (!d.objectives[challengeIndex(d)]?.startAt || (lastMap != null && d.objectives[challengeIndex(d)].startAt.some((m) => sameMapId(m, lastMap))));
-async function beginChallenge(id: string | undefined) {
+const challengeIndex = (d: QuestDef) => d.objectives.findIndex((o, i) => o.type === "challenge" && (st.active[d.id]?.p[i] || 0) < 1);
+// ETS item 9: the `!...?.startAt ||` test makes the later reads of the same objective safe
+const canBegin = (d: QuestDef) => !!api?.startBattle && !challengeBusy && (!d.objectives[challengeIndex(d)]?.startAt || (lastMap != null && d.objectives[challengeIndex(d)]!.startAt!.some((m) => sameMapId(m, lastMap!))));
+async function beginChallenge(id: string) {
     const d = defOf(id), i = d ? challengeIndex(d) : -1;
-    if (!enabled() || i < 0 || statusOf(d) !== "active" || !canBegin(d)) return false;
-    const o = d.objectives[i];
+    // ETS item 9: i >= 0 only when defOf found d
+    if (!enabled() || i < 0 || statusOf(d!) !== "active" || !canBegin(d!)) return false;
+    // ETS item 9: challengeIndex() found a "challenge" objective at i
+    const o = d!.objectives[i] as ChallengeObjective;
     const party = await enemyParty(o);
     if (!party.length) { console.warn(`[quests] challenge for "${id}" has no enemies`); return false; }
     challengeBusy = true;
-    const started = api.startBattle(party, {
+    // ETS item 9: defs load only after installQuests set api, and canBegin() needed api.startBattle
+    const started = api!.startBattle(party, {
         screenId: (o.screens ?? [o.screen])[0],
         challenge: o.screens ?? [o.screen],     // lets a co-op partner be credited for the same challenge
-        onWin: (res) => { challengeBusy = false; if (res?.enemyFled) toast("They got away. Try again."); else { bump("challenge", (x) => x === o); } },
+        onWin: (res: QuestBattleResult | undefined) => { challengeBusy = false; if (res?.enemyFled) toast("They got away. Try again."); else { bump("challenge", (x) => x === o); } },
         onFlee: () => { challengeBusy = false; toast("You ran away. The challenge is still open."); },
         onLose: () => { challengeBusy = false; toast("You were beaten. The challenge is still open."); },
     });
@@ -217,20 +337,22 @@ async function beginChallenge(id: string | undefined) {
     return started;
 }
 
-function markVisited(mapId) {
+function markVisited(mapId: MapId) {
     if (!enabled()) return;
     let changed = false;
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         const wasReady = isReady(id);
         d.objectives.forEach((o, i) => {
             if (o.type !== "visitSet" || !o.maps.some((m) => sameMap(m, mapId))) return;
             a.seen = a.seen ?? d.objectives.map(() => []);
             const key = canon(mapId);
-            if (a.seen[i].includes(key)) return;
-            a.seen[i].push(key);
-            a.p[i] = Math.min(targetOf(d, i), a.seen[i].length);
+            // ETS item 9: a.seen has one list per objective (accept() and the line above make them)
+            if (a.seen[i]!.includes(key)) return;
+            a.seen[i]!.push(key);
+            a.p[i] = Math.min(targetOf(d, i), a.seen[i]!.length);
             changed = true;
         });
         if (!wasReady && isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
@@ -238,11 +360,13 @@ function markVisited(mapId) {
     if (changed) saveState();
 }
 
-function bump(type: string, match) {
+function bump<T extends ObjectiveType>(type: T, match: (o: ObjectiveOf<T>) => boolean): void;
+function bump(type: ObjectiveType, match: (o: QuestObjective) => boolean) {
     if (!enabled()) return;
     let changed = false;
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         const wasReady = isReady(id);
         d.objectives.forEach((o, i) => {
@@ -256,15 +380,16 @@ function bump(type: string, match) {
 }
 
 // ------------------------------------------------------------ what the game tells us
-on("cardDuelEnded", (e) => { if (e.won) { st.duelWins += 1; saveState(); bump("duelWin", () => true); announceUnlocks(); } });
-on("battleWon", (e) => {
+on("cardDuelEnded", (e: QuestDuelEvent) => { if (e.won) { st.duelWins += 1; saveState(); bump("duelWin", () => true); announceUnlocks(); } });
+on("battleWon", (e: QuestBattleEvent) => {
     for (const sp of e.enemies ?? []) bump("defeat", (o) => o.species.includes(sp) && (!o.maps || o.maps.some((m) => sameMap(m, e.mapId))));
 });
-const near = (p, r) => Math.hypot(lastX - p.x, lastY - p.y) <= p.r;
-function resetRoutes(why: string, onlyMap) {
+const near = (p: QuestPoint, r: number) => Math.hypot(lastX - p.x, lastY - p.y) <= p.r;
+function resetRoutes(why: string, onlyMap: MapId | null) {
     let changed = false;
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         d.objectives.forEach((o, i) => {
             if (o.type === "reach" && (a.p[i] || 0) === 1 && (!onlyMap || !sameMap(o.map, onlyMap))) { a.p[i] = 0; changed = true; toast(why); }
@@ -272,11 +397,11 @@ function resetRoutes(why: string, onlyMap) {
     }
     if (changed) saveState();
 }
-on("battleStarted", (e) => { if (enabled()) resetRoutes("A fight broke out. Start the route again.", null); });
+on("battleStarted", (e: QuestBattleEvent) => { if (enabled()) resetRoutes("A fight broke out. Start the route again.", null); });
 // A quest about a character unlocks once you have actually seen that character where the quest says (story-gated
 // characters only appear at certain points of the story, so the quest waits for you to meet them).
 let metTick = 0, lastFormScan = 0;
-function scanMet(mapId) {
+function scanMet(mapId: MapId | null) {
     if (!api?.npcsHere || !mapId) return;
     const here = api.npcsHere();
     if (!here.length) return;
@@ -293,7 +418,8 @@ function scanMet(mapId) {
 function syncCounts() {
     let changed = false;
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         const wasReady = isReady(id);
         d.objectives.forEach((o, i) => {
@@ -312,14 +438,17 @@ async function scanForms() {
     syncCounts();
     if (!api?.ownsForm || !Object.keys(st.active).some((id) => defOf(id)?.objectives.some((o) => o.type === "ownForm"))) return;
     if (!speciesIds) {
-        try { speciesIds = Object.fromEntries((await fetch("assets/data/digimon.json").then((r) => r.json())).digimon.map((d) => [d.name, d.id])); }
+        // ETS item 42: our own shipped data file, typed by the shape it is written in
+        try { speciesIds = Object.fromEntries((await fetch("assets/data/digimon.json").then((r): Promise<SpeciesFile> => r.json())).digimon.map((d) => [d.name, d.id])); }
         catch { speciesIds = {}; return; }
     }
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         d.objectives.forEach((o, i) => {
-            if (o.type !== "ownForm" || (a.p[i] || 0) >= 1 || speciesIds[o.species] == null || !api.ownsForm(speciesIds[o.species])) return;
+            // ETS item 9: speciesIds was filled above, api was tested at the top, and the == null test comes first
+            if (o.type !== "ownForm" || (a.p[i] || 0) >= 1 || speciesIds![o.species] == null || !api!.ownsForm(speciesIds![o.species]!)) return;
             const was = isReady(id);
             a.p[i] = 1; saveState();
             toast(`You learned the ${o.species} form!`);
@@ -327,7 +456,7 @@ async function scanForms() {
         });
     }
 }
-export function questsTick(mapId, x: number, y: number) {
+export function questsTick(mapId: MapId | null, x: number, y: number) {
     const prevX = lastX, prevY = lastY, prevMap = lastMap;   // walk-in triggers need the previous tick's place
     lastX = x ?? lastX; lastY = y ?? lastY;
     if (++metTick % 45 === 0) scanMet(mapId);
@@ -341,7 +470,7 @@ export function questsTick(mapId, x: number, y: number) {
             if (!st.visited.includes(key)) { st.visited.push(key); saveState(); }
             bump("visit", (o) => sameMap(o.map, mapId)); markVisited(mapId);
             ensureGenerated(); announceUnlocks();
-            const posted = allDefs().find((d): boolean => !d.offer && d.acceptAt && statusOf(d) === "available" && d.acceptAt.some((m) => sameMap(m, mapId)));
+            const posted = allDefs().find((d): boolean | undefined => !d.offer && d.acceptAt && statusOf(d) === "available" && d.acceptAt.some((m) => sameMap(m, mapId)));
             if (posted) toast(`A job is posted here: ${posted.title}  (press F3)`);
         }
     }
@@ -352,7 +481,8 @@ export function questsTick(mapId, x: number, y: number) {
     // warp still does not count as walking into a patch.
     triggerRunner?.tick(mapId, prevMap === mapId ? prevX : null, prevMap === mapId ? prevY : null, lastX, lastY);
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         d.objectives.forEach((o, i) => {
             if (o.type !== "reach" || !sameMap(o.map, mapId)) return;
@@ -370,45 +500,47 @@ export function questsTick(mapId, x: number, y: number) {
 // game.js calls questTalk() when you press confirm on an NPC, AFTER the game's own story check, so a quest can never
 // replace a story scene: if the story or a scripted battle takes the conversation, this is never reached.
 let dialogBusy = false, logOpen = false;
-const declined = new Set();                                  // offers you said "not now" to, until you reload
+const declined = new Set<string>();                                  // offers you said "not now" to, until you reload
 // Speech goes through the game's own conversation box (web/dialogue-pack.js builds the line, game.js shows it), so it
 // looks and sounds like any other NPC; a blank line in the text starts a new page.
-const say = (name, lines, npcId = null) => (api?.speak ? api.speak(npcId, name, Array.isArray(lines) ? lines.join("\n\n") : lines) : Promise.resolve());
-const ask = (prompt, options) => (api?.ask ? api.ask(prompt, options) : Promise.resolve(options.length - 1));
+const say = (name: string, lines: string | (string | undefined)[], npcId: number | null = null) => (api?.speak ? api.speak(npcId, name, Array.isArray(lines) ? lines.join("\n\n") : lines) : Promise.resolve());
+const ask = (prompt: string, options: string[]) => (api?.ask ? api.ask(prompt, options) : Promise.resolve(options.length - 1));
 // A step of a quest may carry a scripted scene (web/quest-scenes.js): characters walk and talk on the game's own cutscene
 // engine. Without one, or when it cannot run here (a character is not on this map), the plain lines are spoken instead.
 // Returns { ran, answer }: whether the scene ran, and the choice made inside it (null when it had none).
-async function perform(scene, name, lines, npcId) {
-    const r = scene && api?.scene ? await api.scene(scene) : null;
+async function perform(scene: QuestScene | undefined, name: string, lines: string[] | undefined, npcId: number | null) {
+    const r: QuestSceneResult | null = scene && api?.scene ? await api.scene(scene) : null;
     // `failed`: the scene ended on a lost fight (the title screen), so the quest step it was is not done and nothing it
     // would have paid out may be paid (web/game.js playQuestScene).
     if (r) return { ran: true, answer: r.answer, failed: !!r.failed };
     if (lines?.length) await say(name, lines, npcId);
     return { ran: false, answer: null, failed: false };
 }
-async function busy(fn) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
-const atNpc = (ref, npcId, mapId) => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
-const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
+async function busy(fn: () => Promise<void>) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
+const atNpc = (ref: { npc: number; maps: MapId[] } | null | undefined, npcId: number, mapId: MapId): ref is { npc: number; maps: MapId[] } => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
+const talksDone = (d: QuestDef, a: QuestActive, upTo: number) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
 // A scene that carries a `chase` step answers 1 when the player lost the target (web/quest-scenes.js). A lost chase never
 // fails a quest, so it must not complete the step it sits in either: the step stays open and the player can talk again and
 // retake it. No quest had a chase before this rule, so nothing that shipped changes.
-const chaseLost = (o, r) => r?.answer === 1 && Array.isArray(o?.scene) && o.scene.some((s) => s && typeof s === "object" && "chase" in s);
+const chaseLost = (o: QuestObjective, r: QuestSceneResult) => r?.answer === 1 && Array.isArray(o?.scene) && o.scene.some((s) => s && typeof s === "object" && "chase" in s);
 
 /** Returns true when a quest took this conversation (the game then skips the character's normal line). */
-const chatted = new Set();   // characters whose ordinary words you have already heard this session
+const chatted = new Set<number>();   // characters whose ordinary words you have already heard this session
 // The quest lab's own focus (lab.prepare): a test panel picks ONE quest to try, but several quests can share a giver (the
 // demo packs all put Cipher on the Bridge), and the offer loop would otherwise always hand out the first one in file order.
 // A real player never sets this; with it set, only that quest may be offered, and only at its own giver.
-let labFocus = null;
-export function questTalk(npcId, mapId, hasChat = false) {
+let labFocus: string | null = null;
+export function questTalk(npcId: number, mapId: MapId | null, hasChat = false) {
     if (!enabled() || dialogBusy || logOpen || !mapId) return false;
     syncCounts();                                            // what the player carries and their level right now
     // 1. a "talk" step of a running quest
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         for (let i = 0; i < d.objectives.length; i++) {
-            const o = d.objectives[i];
+            // ETS item 9: i < d.objectives.length is the loop test
+            const o = d.objectives[i]!;
             if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !atNpc(o, npcId, mapId)) continue;
             if (d.ordered && !talksDone(d, a, i)) continue;
             busy(async () => {
@@ -430,10 +562,11 @@ export function questTalk(npcId, mapId, hasChat = false) {
         busy(async () => {
             const r = await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId);
             if (r.failed) return;                                    // the hand-in scene was lost as a fight: pay nothing
-            let pick = null;
+            let pick: number | null = null;
             if (d.verdict) pick = r.answer ?? await ask(d.verdict.ask, d.verdict.options);
             claim(id, true, pick);
-            if (pick != null && d.verdict.after?.[pick]?.length) await say(ref.name, d.verdict.after[pick], npcId);
+            // ETS item 9: a pick exists only when d.verdict does, and the ?.length test makes after[pick] a real list
+            if (pick != null && d.verdict!.after?.[pick]?.length) await say(ref.name, d.verdict!.after[pick]!, npcId);
         });
         return true;
     }
@@ -475,20 +608,22 @@ export function questTalk(npcId, mapId, hasChat = false) {
 }
 
 // ------------------------------------------------------------ generated bounties (they scale with the party)
-let roam = null;                                             // stage id -> [{ name, screen, level }] wild single enemies met while walking
+let roam: RoamTable | null = null;                                             // stage id -> [{ name, screen, level }] wild single enemies met while walking
 async function loadRoam() {
     try {
-        if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r) => r.json())).screens;
-        const se = (await fetch("assets/data/stage_encounters.json").then((r) => r.json())).stages;
+        // ETS item 42: our own shipped data files, typed by the shapes they are written in
+        if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r): Promise<FieldEncountersFile> => r.json())).screens;
+        const se = (await fetch("assets/data/stage_encounters.json").then((r): Promise<StageEncountersFile> => r.json())).stages;
         roam = {};
-        for (const [stage, v] of Object.entries(se) as [string, any][]) {
+        for (const [stage, v] of Object.entries(se)) {
             for (const z of v.zones ?? []) {
                 if (!((z.rate_level ?? 0) > 0)) continue;
                 for (const scr of z.slots ?? []) {
                     const party = scr ? fieldEnc[String(scr)] : null;
                     if (!party || party.length !== 1) continue;
                     const list = (roam["s" + stage] ??= []);
-                    if (!list.some((e) => e.name === party[0].name)) list.push({ name: party[0].name, screen: scr, level: party[0].level });
+                    // ETS item 9: party.length === 1 was tested above
+                    if (!list.some((e) => e.name === party[0]!.name)) list.push({ name: party[0]!.name, screen: scr, level: party[0]!.level });
                 }
             }
         }
@@ -498,16 +633,18 @@ function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b7
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const round10 = (v: number) => Math.round(v / 10) * 10;
 /** Pure: builds the next wanted-board job from where you have been and how strong your party is. */
-export function generateBounty(visited, level, n, table) {
+export function generateBounty(visited: MapId[], level: number, n: number, table: RoamTable): QuestDef | null {
     const places = visited.filter((m) => table[m] && table[m].length);
     if (places.length < 2) return null;                       // there must be somewhere to hunt
     const rand = rng(Math.imul(n + 1, 2654435761) ^ Math.imul(visited.length, 40503) ^ 0x9e3779b1);
-    const map = places[Math.floor(rand() * places.length)];
-    const e = table[map][Math.floor(rand() * table[map].length)];
+    // ETS item 9: places holds at least two stages, each filtered to have a non-empty list in table
+    const map = places[Math.floor(rand() * places.length)]!;
+    const e = table[map]![Math.floor(rand() * table[map]!.length)]!;
     const L = Math.max(1, level | 0), elite = (n + 1) % 3 === 0;      // every third job is an elite hunt: one real, stronger fight
     const count = clamp(2 + Math.floor(L / 7) + Math.floor(rand() * 2), 2, 9);
     const tier = L >= 35 ? ["Super Charge"] : L >= 20 ? ["Life Disk", "Power Charge"] : L >= 9 ? ["Energy Disk", "Revive Disk", "Sober Disk"] : ["Antidote Disk", "Energy Disk"];
-    const item = tier[Math.floor(rand() * tier.length)];
+    // ETS item 9: every tier has two or more items and rand() is below 1
+    const item = tier[Math.floor(rand() * tier.length)]!;
     const where = mapLabel(map);
     if (elite) {
         return {
@@ -540,10 +677,12 @@ function ensureGenerated() {
 function toast(msg: string) {
     if (!toastEl) return;
     toastEl.textContent = msg; toastEl.style.opacity = "1";
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = "0"; }, 4200);
+    // ETS item 9: toast() returned early unless toastEl was set, and nothing clears it
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl!.style.opacity = "0"; }, 4200);
 }
-function objectiveText(d, i) {
-    const o = d.objectives[i], a = st.active[d.id], p = a ? (a.p[i] || 0) : 0, t = targetOf(d, i);
+function objectiveText(d: QuestDef, i: number) {
+    // ETS item 9: i is an index into d.objectives that every caller took from d.objectives itself
+    const o = d.objectives[i]!, a = st.active[d.id], p = a ? (a.p[i] || 0) : 0, t = targetOf(d, i);
     if (o.type === "defeat") return `Defeat ${o.species.join(" / ")}${o.maps ? " in " + [...new Set(o.maps.map(mapLabel))].join(" / ") : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
     if (o.type === "challenge") return `${o.label ?? "Win the challenge fight"}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
     if (o.type === "talk") return `${o.label ?? `Talk to ${o.name ?? "someone"} in ${placesOf(o.maps)}`}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
@@ -560,19 +699,20 @@ const MARK: Record<string, string> = { ready: "!", active: ">", available: "*", 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 const logEntries = () => ["ready", "active", "available", "done"].flatMap((s) => allDefs().filter((d) => statusOf(d) === s).map((d) => ({ d, s })));
 
-function detailText(d, s: string) {
+function detailText(d: QuestDef, s: string) {
     const ref = turnInRef(d);
     const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} x ${it.name}`)].filter(Boolean).join(", ");
     const goals = d.objectives.map((_, i) => "- " + objectiveText(d, i)).join("\n");
+    // ETS item 9: challengeIndex(d) >= 0 was tested in the same condition, and the startAt test comes right before its use
     const where = s === "available" ? (d.offer ? `Talk to ${d.offer.name} in ${placesOf(d.offer.maps)}.` : d.acceptAt && !atGiver(d) ? `Accept it at: ${placesOf(d.acceptAt)}.` : "")
         : s === "ready" && ref ? `Report to ${ref.name} in ${placesOf(ref.maps)}.`
-        : s === "active" && challengeIndex(d) >= 0 && !canBegin(d) && d.objectives[challengeIndex(d)].startAt ? `Begin it at: ${placesOf(d.objectives[challengeIndex(d)].startAt)}.` : "";
+        : s === "active" && challengeIndex(d) >= 0 && !canBegin(d) && d.objectives[challengeIndex(d)]!.startAt ? `Begin it at: ${placesOf(d.objectives[challengeIndex(d)]!.startAt!)}.` : "";
     return [`${d.title}${s === "done" ? " (done)" : ""}\n${d.giver ? d.giver + ": " : ""}${d.text ?? ""}`, goals, rw ? `Reward: ${rw}` : "", where].filter(Boolean).join("\n\n");
 }
-async function showQuest(d: Quest): Promise<"leave" | null> {
+async function showQuest(d: QuestDef): Promise<"leave" | boolean | null> {
     const s = statusOf(d);
     await say("Quest", detailText(d, s));
-    const acts = [];
+    const acts: [string, () => boolean | "leave"][] = [];
     if (s === "available" && !d.offer && atGiver(d)) acts.push(["Accept", () => accept(d.id)]);
     if (s === "ready" && !turnInRef(d)) acts.push(["Claim reward", () => claim(d.id)]);
     if (s === "active" && challengeIndex(d) >= 0 && canBegin(d)) acts.push(["Begin the fight", () => { beginChallenge(d.id); return "leave"; }]);
@@ -582,8 +722,9 @@ async function showQuest(d: Quest): Promise<"leave" | null> {
 }
 /** The quest log: a choice list of quests (4 to a page), each opening its details in the conversation box. */
 // a quest whose giver (or notice board) is in the place the player is standing in
-const isHere = (d) => !!lastMap && (d.offer ? d.offer.maps : d.acceptAt ?? []).some((m) => sameMapId(m, lastMap));
-const placeOf = (d) => (d.offer ? mapLabel(d.offer.maps[0]) : d.acceptAt ? mapLabel(d.acceptAt[0]) : "Wanted board");
+// ETS item 9: !!lastMap was tested and the callback runs at once
+const isHere = (d: QuestDef) => !!lastMap && (d.offer ? d.offer.maps : d.acceptAt ?? []).some((m) => sameMapId(m, lastMap!));
+const placeOf = (d: QuestDef) => (d.offer ? mapLabel(d.offer.maps[0]) : d.acceptAt ? mapLabel(d.acceptAt[0]) : "Wanted board");
 
 /** The game's choice list over any number of labels, four at a time. Returns the index picked, or -1 for Back. */
 async function pagedPick(prompt: string, labels: string[]) {
@@ -598,10 +739,11 @@ async function pagedPick(prompt: string, labels: string[]) {
     }
 }
 /** A list of quests; "leave" when one of them starts a fight (the log closes). */
-async function listQuests(prompt: string, ds: { title: string }[]) {
+async function listQuests(prompt: string, ds: QuestDef[]) {
     const i = await pagedPick(prompt, ds.map((d) => `${MARK[statusOf(d)]} ${clip(d.title, 34)}`));
     if (i < 0) return null;
-    return (await showQuest(ds[i])) === "leave" ? "leave" : null;     // afterwards the menu is rebuilt: the quest may have changed bucket
+    // ETS item 9: i < 0 returned above
+    return (await showQuest(ds[i]!)) === "leave" ? "leave" : null;     // afterwards the menu is rebuilt: the quest may have changed bucket
 }
 
 export async function openLog() {
@@ -617,13 +759,15 @@ export async function openLog() {
             const options = [...buckets.map(([n, l]) => `${n} (${l!.length})`), "Reset quests", "Close"];
             const pick = await ask("Quests", options);
             if (pick < buckets.length) {
-                const [name, list] = buckets[pick] as [string, any[]];
+                // ETS item 9: pick < buckets.length was checked on the line above
+                const [name, list] = buckets[pick] as [string, QuestDef[]];
                 if (name === "Elsewhere") {                                  // by place, so the player can see where jobs are waiting
                     const places = [...new Set(list.map(placeOf))].sort();
                     for (;;) {
                         const i = await pagedPick("Where?", places.map((p) => `${p} (${list.filter((d) => placeOf(d) === p).length})`));
                         if (i < 0) break;
-                        if ((await listQuests(places[i], list.filter((d) => placeOf(d) === places[i]))) === "leave") return true;
+                        // ETS item 9: i < 0 broke out above
+                        if ((await listQuests(places[i]!, list.filter((d) => placeOf(d) === places[i]))) === "leave") return true;
                     }
                 } else if ((await listQuests(name, list)) === "leave") return true;
             } else if (options[pick] === "Reset quests") {
@@ -638,11 +782,12 @@ export async function openLog() {
  * ordered) and the person to report to once it is ready. game.js uses it to put a stand-in at the character's usual post
  * when the story has them away from this map at the player's point in the story (the quest would otherwise be stuck).
  */
-export function questNeededNpcs(mapId) {
+export function questNeededNpcs(mapId: MapId | null): number[] {
     if (!enabled() || !mapId) return [];
-    const out = new Set();
+    const out = new Set<number>();
     for (const id of Object.keys(st.active)) {
-        const d = defOf(id), a = st.active[id];
+        // ETS item 9: id comes from Object.keys(st.active), so the entry exists
+        const d = defOf(id), a = st.active[id]!;
         if (!d) continue;
         d.objectives.forEach((o, i) => {
             if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !o.maps?.some((m) => sameMap(m, mapId))) return;
@@ -656,9 +801,9 @@ export function questNeededNpcs(mapId) {
 }
 
 /** What mark a character wears for the extra quests: "turnin" (a finished job to hand in: red "!"), "offer" (a job to give: red "?") or null. */
-export function questNpcMark(npcId, mapId) {
+export function questNpcMark(npcId: number, mapId: MapId | null): "turnin" | "offer" | null {
     if (!enabled() || dialogBusy || logOpen || !mapId) return null;
-    let mark = null;
+    let mark: "offer" | null = null;
     for (const d of allDefs()) {
         const s = statusOf(d);
         if (s === "ready" && atNpc(turnInRef(d), npcId, mapId)) return "turnin";
@@ -673,9 +818,9 @@ export function questNpcMark(npcId, mapId) {
  * default) holds once the quest is handed in, "accepted" from the moment it is taken. Read every frame by game.js, which
  * hands the list to web/quest-props.js; off with the Quests switch, like the rest of this layer.
  */
-export function questPropsOn(mapId) {
+export function questPropsOn(mapId: MapId | null): QuestProp[] {
     if (!enabled() || !mapId) return [];
-    const out = [];
+    const out: QuestProp[] = [];
     for (const d of allDefs()) {
         const list = d.props;
         if (!Array.isArray(list)) continue;
@@ -695,7 +840,7 @@ export function questPropsOn(mapId) {
 }
 
 /** Text for the game's own character set (the pause page): its fonts have no slash, brackets or stars. */
-const forGameText = (s) => String(s).replace(/(\d+)\/(\d+)/g, "$1 of $2").replace(/\s+\/\s+/g, " or ").replace(/[^A-Za-z0-9 .,'\-:!?"]/g, " ").replace(/\s+/g, " ").trim();
+const forGameText = (s: string) => String(s).replace(/(\d+)\/(\d+)/g, "$1 of $2").replace(/\s+\/\s+/g, " or ").replace(/[^A-Za-z0-9 .,'\-:!?"]/g, " ").replace(/\s+/g, " ").trim();
 
 /**
  * The extra row on the pause home list (one of PauseSeed.extraRows in engine/dw3/ui/pause-root-session.ts, opens "quests"; web/pause-extra-rows.js lists it). The label carries the
@@ -709,7 +854,7 @@ export function questsPauseRow() {
 }
 
 /** A co-op partner won the challenge fight with these screens: credit any open challenge of mine that is the same fight. */
-export function questsCreditChallenge(screens) {
+export function questsCreditChallenge(screens: number[]) {
     const key = JSON.stringify(screens);
     bump("challenge", (o) => JSON.stringify(o.screens ?? [o.screen]) === key);
 }
@@ -717,14 +862,14 @@ export function questsCreditChallenge(screens) {
 /** How many extra quests this player has finished (shared on the multiplayer player card). */
 export function questsDoneCount() { return Object.keys(st?.done ?? {}).length; }
 /** Is that quest handed in? (Read-only: the mount layer unlocks a mount from it.) */
-export function questDone(id) { return !!st?.done?.[id]; }
+export function questDone(id: string) { return !!st?.done?.[id]; }
 
 /** What the QUESTS page lists: ready, open and new quests, each with the three lines shown under the list. */
 const EMPTY_SENTENCE = "Explore and talk to people. Quests appear as you play.";
 export function questsPausePage() {
     if (!enabled() || !defs.length) return null;
     const MARK: Record<string, string> = { ready: "! ", active: "- ", available: "? " };
-    const W = (s) => textWidth(s);                                       // the game font's own advance widths
+    const W = (s: string) => textWidth(s);                                       // the game font's own advance widths
     const TITLE_W = 126;                                                 // the list window's text area (x 189 to the window edge)
     const entries = logEntries().filter(({ d, s }) => s === "ready" || s === "active" || (s === "available" && isHere(d))).map(({ d, s }) => {
         const a = st.active[d.id];
@@ -734,18 +879,18 @@ export function questsPausePage() {
             : s === "available" ? (d.offer ? `Talk to ${d.offer.name} in ${placesOf(d.offer.maps.slice(0, 1))}` : d.acceptAt ? `Accept it at ${placesOf(d.acceptAt.slice(0, 1))}` : "Open it with F3")
             : (k >= 0 ? objectiveText(d, k) : "");
         const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} ${it.name}`)].filter(Boolean).join(", ");
-        const line = (t) => fitByWidth(forGameText(t), W, BAND_TEXT_W);     // the page has no room for an ellipsis
+        const line = (t: string) => fitByWidth(forGameText(t), W, BAND_TEXT_W);     // the page has no room for an ellipsis
         // the full text, for reading: description, every objective with its progress, the reward and where to go
         const full = [d.text ?? "", ...d.objectives.map((_, j) => "- " + objectiveText(d, j)), rw ? `Reward: ${rw}` : "", goal]
             .filter(Boolean).flatMap((t) => wrapByWidth(forGameText(t), W, BAND_TEXT_W));
-        const pages = [];
+        const pages: string[][] = [];
         for (let i = 0; i < full.length; i += 3) pages.push([full[i] ?? "", full[i + 1] ?? "", full[i + 2] ?? ""]);
         return { title: fitByWidth(MARK[s] + forGameText(d.short ?? d.title), W, TITLE_W), lines: [line(d.title), line(goal), line(rw ? `Reward: ${rw}` : "")], pages: pages.length ? pages : [["", "", ""]] };
     });
     return { prompt: "QUESTS   Enter: Read", readPrompt: "QUESTS   Enter: Next", emptyLines: wrapToLines(EMPTY_SENTENCE, W, BAND_TEXT_W), entries };
 }
 
-function installUi(stageEl) {
+function installUi(stageEl: HTMLElement) {
     const css = document.createElement("style");
     css.textContent = `
       #quest-toast { position:absolute; left:50%; transform:translateX(-50%); top:14px; z-index:51; max-width:80%; padding:5px 12px; background:rgb(0,0,32); border:1px solid rgb(104,104,208);
@@ -762,20 +907,22 @@ function installUi(stageEl) {
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem }: QuestInstall) {
     if (!stageEl || api) return;
     api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem };
     installUi(stageEl);
-    let triggerDefs = [];
+    // ETS item 42: triggers are raw rows; installTriggers checks every one (id and map) before it keeps it
+    let triggerDefs: unknown[] = [];
     try {
-        const [q, v, m]: [any, any, any] = await Promise.all([
+        // ETS item 42: our own shipped files; every quest goes through validate() below, the others are read with ?? fallbacks
+        const [q, v, m]: [QuestsFile, Record<string, string>, ManifestMaps] = await Promise.all([
             fetch("quests.json").then((r) => r.json()),
             fetch("map-variants.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
             fetch("assets/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
         ]);
         variants = v || {};
         mapNames = Object.fromEntries((m.maps ?? []).map((x) => [x.id, x.name]));
-        const seen = new Set();
+        const seen = new Set<string>();
         for (const d of q.quests ?? []) {
             const bad = validate(d);
             if (bad || seen.has(d.id)) { console.warn(`[quests] skipped "${d.id}": ${bad || "duplicate id"}`); continue; }
@@ -800,8 +947,9 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
     await loadRoam();
     ensureGenerated(); announceUnlocks();
     window.__quests = {   // debug / test hooks; nothing in the game reads these
-        get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id) => (defOf(id) ? statusOf(defOf(id)) : null),
-        openLog, npcMark: questNpcMark, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id) => (defOf(id) ? detailText(defOf(id), statusOf(defOf(id))) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
+        // ETS item 9: the ternaries on status and detail ask defOf(id) first
+        get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id: string) => (defOf(id) ? statusOf(defOf(id)!) : null),
+        openLog, npcMark: questNpcMark, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id: string) => (defOf(id) ? detailText(defOf(id)!, statusOf(defOf(id)!)) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
         where: () => ({ lastMap, lastX, lastY, enabled: enabled() }),
         // test panel hooks (web/quest-lab.js, ?questlab=1): bend the quest state so a quest can be tried at once.
         // They only touch the quest layer's own store, never the story.
@@ -810,8 +958,8 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
              *  focus: while it holds, only this quest may be offered at its giver (several demos share one character). */
             prepare(id: string): { level: number; status: string } {
                 labFocus = id;
-                const seen = new Set();
-                const markDone = (q) => {
+                const seen = new Set<string>();
+                const markDone = (q: string): void => {
                     const d = defOf(q);
                     if (!d || seen.has(q)) return;
                     seen.add(q);
@@ -826,17 +974,18 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
                 return { level: d?.unlock?.level ?? 1, status: statusOf(d) };
             },
             /** Meet every objective at once (taking the quest first if needed). */
-            finishGoals(id) {
+            finishGoals(id: string) {
                 const d = defOf(id);
                 if (!d) return false;
                 if (!st.active[id]) { if (st.done[id]) return false; st.active[id] = { p: d.objectives.map(() => 0), seen: d.objectives.map(() => []), at: Date.now() }; }
-                d.objectives.forEach((_, i) => { st.active[id].p[i] = targetOf(d, i); });
+                // ETS item 9: the line above made st.active[id]
+                d.objectives.forEach((_, i) => { st.active[id]!.p[i] = targetOf(d, i); });
                 saveState(); toast(`Goals met: ${d.title}`);
                 return true;
             },
             reset() { st = freshState(); declined.clear(); labFocus = null; saveState(); },
             /** Focus one quest for the next offer (null clears it); prepare() does this on its own. */
-            focus(id) { labFocus = id ?? null; },
+            focus(id: string | null | undefined) { labFocus = id ?? null; },
         },
     };
 }

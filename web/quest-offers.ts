@@ -14,13 +14,13 @@ import type { QuestOfferFilters } from "./types/quest-offers.js";
 const clipTitle = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 
 /** The jobs this person could hand out in this place right now, in file order (the offer loop's exact filters). */
-export function offersAt(defs, npcId, mapId: number, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
+export function offersAt(defs, npcId: number, mapId: string, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
     const out = [];
     for (const d of defs ?? []) {
         if (labFocus && d.id !== labFocus) continue;                       // the lab asked for one quest in particular
         if (statusOf(d) !== "available" || !d.offer) continue;
         if (d.offer.npc !== npcId) continue;
-        if (!d.offer.maps.some((m: number) => canon(m) === canon(mapId))) continue; // night/story variants count as the same place
+        if (!d.offer.maps.some((m: string) => canon(m) === canon(mapId))) continue; // night/story variants count as the same place
         if (declined && typeof declined.has === "function" && declined.has(d.id)) continue;   // "not now" this session
         out.push(d);
     }

@@ -65,7 +65,7 @@ export function applyUpgradeDefaults(fx: AmbienceSettings) {
     return fx;
 }
 export const UPGRADE_MARK_KEY = "dw.fx.shiplist";
-export function needsUpgrade(markValue) { return !markValue; }
+export function needsUpgrade(markValue: string | null | undefined) { return !markValue; }
 
 /**
  * Installed copy: make every "out" key read false and every "auto" key read true, for good. The key stays
@@ -86,7 +86,7 @@ export function lockShipped(fx: AmbienceSettings) {
  * `markValue`, the stored marker, is empty) and then lock. Returns { upgraded } so the caller can store the
  * marker and the new settings. On the owner PC nothing changes (saved settings are respected).
  */
-export function finishShipLoad(fx: AmbienceSettings, { installed = false, markValue = null } = {}) {
+export function finishShipLoad(fx: AmbienceSettings, { installed = false, markValue = null }: { installed?: boolean; markValue?: string | null } = {}) {
     if (!installed) return { upgraded: false, installed: false };
     const upgraded = needsUpgrade(markValue);
     if (upgraded) applyUpgradeDefaults(fx);

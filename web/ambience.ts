@@ -32,9 +32,192 @@ import { createRuleOverride } from "./host-rules.js";   // multiplayer: the host
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
-import type { AmbienceConditions, AmbienceMode, AmbienceSettings } from "./types/ambience.js";
-interface SceneAmbienceProfile extends AmbienceConditions {
+import type { AmbienceSettings } from "./types/ambience.js";
+import type { FootPoint } from "./game/types.js";
+
+/** The settings object: the named values and switches of AmbienceSettings, plus any switch looked up by its key at run time (FX_DEFS, saved profiles, URL flags). */
+type FxBag = AmbienceSettings & { [key: string]: unknown };
+
+/** The map being shown (only what this file reads). */
+interface AmbienceMap {
+    id: string;
+    name: string;
+}
+
+/** What profileOf measures for one map: every gate flag, the map picture's numbers and its classification picture. */
+interface MapProfile {
+    open: boolean;
+    snowy: boolean;
+    sandy: boolean;
+    night: boolean;
+    rainy: boolean;
+    leaves: boolean;
+    fireflies: boolean;
+    tod: boolean;
+    fog: boolean;
+    /** how dark the fog is drawn (a quest scene sets it) */
+    fogK?: number;
+    shafts: boolean;
+    heat: boolean;
+    pollen: boolean;
+    butterflies: boolean;
+    birds: boolean;
+    breath: boolean;
+    sway: boolean;
+    villagers: boolean;
+    swamp: boolean;
+    coast: boolean;
+    bats: boolean;
+    clouds: boolean;
+    lamps: boolean;
+    devils: boolean;
+    grassShare: number;
+    lum: number;
+    room: number;
+    w: number;
+    h: number;
+    seed: number;
+    /** the classification picture: the map's base picture (a day/night variant reads its base) */
+    cls: HTMLImageElement;
+    baseLamps?: boolean;
+    indoorK?: number;
     indoorLit?: boolean;
+}
+
+/** How strongly each effect is blowing right now, 0..1. */
+interface WeatherLevels {
+    rain: number;
+    snow: number;
+    blizzard: number;
+    sand: number;
+    leaves: number;
+}
+
+/** The map picture's pixels, read once. */
+interface PixelGrid {
+    data: Uint8ClampedArray;
+    w: number;
+    h: number;
+}
+
+/** The map's collision grid as scenery.js reads it. */
+interface CollisionGrid {
+    cell: number;
+    cols: number;
+    rows: number;
+    cells: number[];
+}
+
+interface RainDrop { gx: number; gy: number; h: number; v: number; l: number; a: number; }
+interface Splash { x: number; y: number; age: number; }
+interface SnowFlake { x: number; y: number; v: number; s: number; ph: number; sw: number; }
+interface FallingLeaf { x: number; y: number; v: number; d: number; ph: number; rot: number; spin: number; hue: number; kx: number; ky: number; }
+interface Firefly { x: number; y: number; ax: number; ay: number; fx: number; fy: number; ph: number; bl: number; bp: number; }
+interface Grit { x: number; y: number; v: number; l: number; a: number; }
+interface DustCloud { x: number; y: number; rad: number; v: number; a: number; }
+interface StormStreak { x: number; y: number; v: number; a: number; }
+interface OmenMote { x: number; y: number; vx: number; vy: number; ph: number; s: number; a: number; }
+type OmenCue = NonNullable<Window["__omen"]>;
+
+/** The one reusable object scenery.js, scenery2.js and scenery3.js draw from. */
+interface AmbienceScene {
+    DW: number;
+    DH: number;
+    DWB: number;
+    DHB: number;
+    wrapX: (x: number, cam: number) => number;
+    wrapY: (y: number, cam: number) => number;
+    wrapXB: (x: number, cam: number) => number;
+    wrapYB: (y: number, cam: number) => number;
+    wrapRange: (v: number, period: number, margin: number) => number;
+    fx: FxBag;
+    map: AmbienceMap;
+    p: MapProfile;
+    L: WeatherLevels;
+    t: number;
+    dt: number;
+    now: number;
+    fade: number;
+    camX: number;
+    camY: number;
+    Q: number;
+    pix: () => PixelGrid | null;
+    pixMap: () => PixelGrid | null;
+    feet: FootPoint[];
+    moving: boolean;
+    dir: string;
+    wind: number;
+    img: HTMLImageElement | null;
+    grid: () => CollisionGrid | null;
+    isWater: (x: number, y: number) => boolean;
+    waterStage: () => boolean;
+    waterTest: () => ReturnType<typeof waterPixelTest>;
+    onThunder: (ms: number) => void;
+    onStep: (type: string, vol: number) => void;
+}
+
+/** A quest scene's atmosphere override (see the block above setAmbienceScene). */
+interface SceneFx {
+    weather: string | null;
+    strength: number;
+    force: boolean;
+    wRamp: number;
+    wFrames: number;
+    wPending: boolean;
+    time: string | null;
+    tRamp: number;
+    tFrames: number;
+    tPending: boolean;
+    phase0: number;
+    target: number | null;
+    savedTod: number | undefined;
+    waiters: ((done: number) => void)[];
+}
+
+/** One scene atmosphere step as a quest scene writes it. The values come from scene data, so every field is read through String / Number / === . */
+interface AmbienceSceneSpec {
+    // ETS item 42: scene data from outside; each field is coerced (String, Number) or compared before use
+    weather?: unknown;
+    strength?: unknown;
+    time?: unknown;
+    force?: unknown;
+    frames?: unknown;
+}
+
+/** What a fight started here should look like (battle3d.js reads it through window.__battleAtmos). */
+interface AtmosState {
+    mapId: string;
+    tod: boolean;
+    nightMap: boolean;
+    foggy: boolean;
+    L: { rain: number; snow: number; blizzard: number; sand: number; };
+}
+
+/** One F2 preset: all switches (all) or the listed ones (on), plus the time and weather it pins. */
+type Preset = { tod: string; mode: string; all: true; on?: undefined; } | { tod: string; mode: string; all?: undefined; on: string[]; };
+
+/** A showcase scene of the top-bar menu: the time of day and weather it pins. */
+interface ShowcaseScene {
+    tod: string;
+    mode: string;
+}
+
+/** One saved F2 profile slot: every switch as a boolean, plus the three non-switch settings as text. */
+type ProfileSnapshot = Record<string, boolean | string>;
+
+/** What a DEV_OPEN row says: an in-game screen (extra) or a page to open (href). */
+interface DevOpenEntry {
+    extra?: boolean;
+    href?: string;
+    noopener?: boolean;
+}
+
+/** The F2 page the panel builds (web/dev-panel.js). */
+type DevView = ReturnType<typeof createDevView>;
+
+/** What /__dw2003/status answers (only the part read here). */
+interface ExtrasStatus {
+    dw2?: { state?: string; };
 }
 
 const VIEW_H = 240;
@@ -57,11 +240,11 @@ export const FX_GROUPS: [string, [string, string][]][] = [
 ];
 export const FX_DEFS = FX_GROUPS.flatMap(([, list]) => list);
 window.__fxKeys = FX_DEFS.map(([k]) => k);
-const QUALITY = { low: 0.4, medium: 0.7, high: 1 };
+const QUALITY: Record<string, number> = { low: 0.4, medium: 0.7, high: 1 };
 // "Time" setting: pins the time-of-day phase (0 = daylight, 0.77 = deepest dusk); auto = the slow cycle
-const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
+const TODMODES: Record<string, number | undefined> = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
 const STORE_KEY = "dw.fx.v1";
-export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" } as AmbienceSettings;   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
+export const fx: FxBag = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
 const EXPERIMENTAL = ["showfps", "villagers", "hd2d", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "battlespeed", "movetheatre", "showfps", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
@@ -108,7 +291,8 @@ function syncLegacyFlags() {
     window.__noWaterRefl = !fx.reflect;
     window.__grassPush = !!fx.grasspush;
     window.__todForce = TODMODES[fx.todMode];
-    window.__lightGain = fx.lightGain;        // read by scenery2.js (lamp strength)
+    // ETS item 9: fx.lightGain is set to 1 at start-up (above) and only ever written as a number
+    window.__lightGain = fx.lightGain!;        // read by scenery2.js (lamp strength)
     applyVolumes();
 }
 /** The OPTIONS volumes onto the players (web/game.js also applies them when it creates the players). */
@@ -118,16 +302,16 @@ function applyVolumes() {
     setWeatherVolume(fx.soundVolume!);
     setMusicVolume(fx.musicVolume);
 }
-function save(keys = null) {
+function save(keys: string[] | null = null) {
     for (const k of keys || Object.keys(fx)) if (hostRules.canSave(k)) stored[k] = fx[k];   // a key the host decides is never written to my own save
     try { localStorage.setItem(STORE_KEY, JSON.stringify(stored)); } catch { }
 }
-export function setNum(key, value: number) {
+export function setNum(key: string, value: number) {
     fx[key] = value;
     syncLegacyFlags();
     save([key]);
 }
-export function setFx(key, value) {
+export function setFx(key: string, value: unknown) {
     fx[key] = value;
     syncLegacyFlags();
     save([key]);
@@ -136,7 +320,7 @@ export function setFx(key, value) {
 if (SHIPPED) Object.defineProperty(window, "__fx", { get: () => fx, set() { }, configurable: true });   // nothing can swap the object
 else Object.defineProperty(window, "__fx", { value: fx, writable: true, configurable: true, enumerable: true });
 /** Set several settings at once and save once (the OPTIONS screen: a Detail level is 36 values). */
-export function setFxMany(values) {
+export function setFxMany(values: Record<string, unknown>) {
     Object.assign(fx, values);
     syncLegacyFlags();
     save(Object.keys(values));
@@ -147,7 +331,7 @@ window.__setFxMany = setFxMany;
 window.__hostRules = {
     apply(rules: Record<string, boolean>) { hostRules.apply(rules); syncLegacyFlags(); refreshPanel(); },
     clear() { hostRules.clear(); syncLegacyFlags(); refreshPanel(); },
-    locked: (k) => hostRules.locked(k),
+    locked: (k: string) => hostRules.locked(k),
 };
 window.__isWaterAt = (x, y) => isWaterAt(S.map ? S.map.id : "", x, y);
 window.__setFx = setFx;
@@ -161,30 +345,33 @@ window.__setFx = setFx;
     if (q.has("nosand")) fx.sand = false;
     if (q.has("noambience")) for (const k of ["rain", "snow", "sand", "lightning", "sound", "gusts", "breath", "frost", "tod", "clouds", "lamps", "fog", "shafts", "heat", "sparkle", "pollen", "leaves", "fireflies", "butterflies", "birds", "dragonflies", "fish", "critters", "devils", "steps", "puddles", "footsteps", "ambience", "musicfx", "nightlight", "windows", "screenfx", "wildlife", "rainwater", "sway", "wetlook", "mirror", "villagers"]) fx[k] = false;
     if (q.has("nosound")) fx.sound = false;
-    if (q.get("quality")! in QUALITY) fx.quality = q.get("quality");
+    // ETS item 9: the test on this line proved the key exists in QUALITY, so get() is not null
+    if (q.get("quality")! in QUALITY) fx.quality = q.get("quality")!;
     if (q.get("weather") === "always" || q.get("rain") === "always") fx.weatherMode = "always";
 }
 syncLegacyFlags();
 
 // Which effects can show on which map; the panel greys out the others so a toggle that
 // cannot change anything here does not look broken.
-const APPLIES = {
-    rain: (p): boolean => p.rainy, lightning: (p) => p.rainy, snow: (p) => p.snowy, sand: (p) => p.sandy,
+/** One effect's "does it apply on this map" test. */
+type AppliesTest = (p: MapProfile, map: AmbienceMap) => boolean | undefined;
+const APPLIES: Record<string, AppliesTest> = {
+    rain: (p) => p.rainy, lightning: (p) => p.rainy, snow: (p) => p.snowy, sand: (p) => p.sandy,
     gusts: (p) => p.open, breath: (p) => p.snowy, frost: (p) => p.snowy, sparkle: (p) => p.snowy,
     indoor: (p) => p.indoorLit, tod: (p) => p.tod, clouds: (p) => p.clouds, lamps: (p) => p.lamps, fog: (p) => p.fog, shafts: (p) => p.shafts,
     heat: (p) => p.heat, pollen: (p) => p.pollen, leaves: (p) => p.leaves, fireflies: (p) => p.fireflies,
     butterflies: (p) => p.butterflies, critters: (p) => p.butterflies, birds: (p) => p.birds, devils: (p) => p.devils,
-    dragonflies: (p, map): boolean => p.open && !p.snowy && isWaterStage(map.id), fish: (p, map) => p.open && !p.snowy && isWaterStage(map.id),
-    steps: (p) => p.open, puddles: (p) => p.rainy || p.snowy, reflect: (p: SceneAmbienceProfile, map: { id: string }) => isWaterStage(map.id),
-    sway: (p) => p.sway, wetlook: (p) => p.open, mirror: (p: SceneAmbienceProfile, map: { id: string }) => isWaterStage(map.id), villagers: (p) => p.villagers,
-    nightlight: (p) => p.open, windows: (p) => p.lamps, screenfx: (p) => p.open, rainwater: (p: SceneAmbienceProfile, map: { id: string }): boolean => p.rainy && isWaterStage(map.id),
+    dragonflies: (p, map) => p.open && !p.snowy && isWaterStage(map.id), fish: (p, map) => p.open && !p.snowy && isWaterStage(map.id),
+    steps: (p) => p.open, puddles: (p) => p.rainy || p.snowy, reflect: (p, map) => isWaterStage(map.id),
+    sway: (p) => p.sway, wetlook: (p) => p.open, mirror: (p, map) => isWaterStage(map.id), villagers: (p) => p.villagers,
+    nightlight: (p) => p.open, windows: (p) => p.lamps, screenfx: (p) => p.open, rainwater: (p, map) => p.rainy && isWaterStage(map.id),
     wildlife: (p) => p.swamp || p.coast || p.sandy || p.bats, musicfx: (p) => p.open, ambience: (p) => p.open,
 };
-let lastMarked = null;
-function markApplicable(map, p) {
+let lastMarked: string | null = null;
+function markApplicable(map: AmbienceMap, p: MapProfile) {
     if (!panel || !dev) return;
     lastMarked = map.id;
-    const na = new Set();
+    const na = new Set<string>();
     for (const [k] of FX_DEFS) if (APPLIES[k] && !APPLIES[k](p, map)) na.add(k);
     dev.setNa(na);
 }
@@ -201,7 +388,9 @@ const SHAFTY = [
     /^South Sector — (Ether Jungle|Jungle Grave)/,
 ];
 export { isOpenAirMapName };
-const profiles = new Map(); // stageId -> profile
+/** a map profile as the debug hook and the perf test read it: the picture is left out */
+export type MapProfileView = Omit<MapProfile, "cls"> & { cls: undefined };
+const profiles = new Map<string, MapProfile>(); // stageId -> profile
 
 function scan(img: HTMLImageElement) {
     // 64-wide downsample: mean luminance and grass share are all we need.
@@ -223,7 +412,7 @@ function scan(img: HTMLImageElement) {
     return { lum: n ? lum / n : 0, grass: n ? grass / n : 0, room: rn ? room / rn : 0 };
 }
 
-function profileOf(map, mapImg: HTMLImageElement) {
+function profileOf(map: AmbienceMap, mapImg: HTMLImageElement): MapProfile | null {
     let p = profiles.get(map.id);
     if (p !== undefined) return p;
     const cls = classSource(map.id, mapImg);
@@ -264,7 +453,7 @@ function profileOf(map, mapImg: HTMLImageElement) {
     console.log(`ambience: ${map.id} ${map.name} -> ${JSON.stringify({ ...p, cls: undefined })}`);
     return p;
 }
-window.__ambienceProfile = (id) => { const p = profiles.get(id); return p && { ...p, cls: undefined }; };
+window.__ambienceProfile = (id: string) => { const p = profiles.get(id); return p && { ...p, cls: undefined }; };
 /** Testing aid: does the scene override draw this effect right now (the map's profile AND the player's own switch)? */
 window.__ambienceSceneAllows = (kind) => sceneAllows(String(kind));
 
@@ -273,7 +462,7 @@ function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
 
 // World-anchored particles: each keeps a map-pixel position and is drawn wrapped
@@ -281,14 +470,14 @@ const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
 // never drags them along and the newly uncovered strip is already populated.
 const M = 40, DH = VIEW_H + 2 * M;
 let DW = VIEW_W + 2 * M;
-const wrapX = (x, cam: number) => (((x - cam + M) % DW) + DW) % DW - M;
-const wrapY = (y, cam: number) => (((y - cam + M) % DH) + DH) % DH - M;
+const wrapX = (x: number, cam: number) => (((x - cam + M) % DW) + DW) % DW - M;
+const wrapY = (y: number, cam: number) => (((y - cam + M) % DH) + DH) % DH - M;
 const MB = 200, DHB = VIEW_H + 2 * MB;
 let DWB = VIEW_W + 2 * MB;       // big soft shapes (dust)
-const wrapXB = (x, cam: number) => (((x - cam + MB) % DWB) + DWB) % DWB - MB;
-const wrapYB = (y, cam: number) => (((y - cam + MB) % DHB) + DHB) % DHB - MB;
+const wrapXB = (x: number, cam: number) => (((x - cam + MB) % DWB) + DWB) % DWB - MB;
+const wrapYB = (y: number, cam: number) => (((y - cam + MB) % DHB) + DHB) % DHB - MB;
 
-const wrapRange = (v, period, margin) => (((v + margin) % period) + period) % period - margin;
+const wrapRange = (v: number, period: number, margin: number) => (((v + margin) % period) + period) % period - margin;
 // The particle tori follow the view width; true when it changed (the particles are then laid out again).
 function syncViewDims() {
     if (DW === VIEW_W + 2 * M) return false;
@@ -300,10 +489,10 @@ function syncViewDims() {
 const wideCount = (n: number, big = false) => Math.round(n * (big ? DWB / (320 + 2 * MB) : DW / (320 + 2 * M)));
 
 // pixels of the current map's classification picture, read once per map visit
-let pixCache = null;
-function pixOf(p) {
+let pixCache: { p: MapProfile; px: PixelGrid | null; } | null = null;
+function pixOf(p: MapProfile): PixelGrid | null {
     if (pixCache && pixCache.p === p) return pixCache.px;
-    let px = null;
+    let px: PixelGrid | null = null;
     try {
         const cv = document.createElement("canvas");
         cv.width = p.w; cv.height = p.h;
@@ -314,11 +503,11 @@ function pixOf(p) {
     pixCache = { p, px };
     return px;
 }
-let pixImgCache = null;
-function pixOfImg(img) {
+let pixImgCache: { img: HTMLImageElement; px: PixelGrid | null; } | null = null;
+function pixOfImg(img: HTMLImageElement | null): PixelGrid | null {
     if (!img) return null;
     if (pixImgCache && pixImgCache.img === img) return pixImgCache.px;
-    let px = null;
+    let px: PixelGrid | null = null;
     try {
         const cv = document.createElement("canvas");
         cv.width = img.naturalWidth; cv.height = img.naturalHeight;
@@ -330,9 +519,10 @@ function pixOfImg(img) {
     return px;
 }
 // everything scenery.js needs, in one reusable object
-const S = {
+// ETS item 9: map, p and L are null until fillS writes them; every scenery call comes after a fillS call
+const S: AmbienceScene = {
     DW, DH, DWB, DHB, wrapX, wrapY, wrapXB, wrapYB, wrapRange,
-    fx, map: null, p: null, L: null, t: 0, dt: 0, now: 0, fade: 1, camX: 0, camY: 0, Q: 1,
+    fx, map: null!, p: null!, L: null!, t: 0, dt: 0, now: 0, fade: 1, camX: 0, camY: 0, Q: 1,
     pix: () => pixOf(S.p),
     pixMap: () => pixOfImg(S.img),
     feet: [], moving: false, dir: "down", wind: 18, img: null,
@@ -340,10 +530,10 @@ const S = {
     isWater: (x: number, y: number) => isWaterAt(S.map!.id, x, y),
     waterStage: () => isWaterStage(S.map!.id),
     waterTest: () => waterPixelTest(S.map!.id),
-    onThunder: (ms) => thunder(fx.sound!, ms, (Math.random() * 2 - 1) * 0.85),
-    onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps!, type, vol); },
+    onThunder: (ms: number) => thunder(fx.sound!, ms, (Math.random() * 2 - 1) * 0.85),
+    onStep: (type: string, vol: number) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps!, type, vol); },
 };
-function fillS(map, p: SceneAmbienceProfile, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo = fx) {
+function fillS(map: AmbienceMap, p: MapProfile, L: WeatherLevels, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo: FxBag = fx) {
     S.img = img ?? S.img;
     S.feet = window.__feet || [];
     S.moving = !!(S.feet[0] && S.feet[0].moving); S.dir = S.feet[0]?.dir ?? "down";
@@ -360,7 +550,7 @@ function silenceAll() {
     setAmbience(false, {});
     setMusic(window.__bgm?.el, false, 0, 0);
 }
-function soundTick(p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, fxo = fx) {
+function soundTick(p: MapProfile, L: WeatherLevels, fxo: FxBag = fx) {
     if (!p.open && !sceneFx) { silenceAll(); return; }
     const rain = fxo.rain ? L.rain : 0, storm = fxo.snow ? L.blizzard : 0, sandL = fxo.sand ? L.sand : 0;
     const bad = Math.max(rain, storm, sandL);
@@ -380,20 +570,20 @@ function soundTick(p, L: { rain: number; snow: number; blizzard: number; sand: n
 export function ambienceSilence() { silenceAll(); }
 
 // ------------------------------------------------------------------- state
-let curId = null, curSince = 0, lastT = 0;
-let drops = [], splashes = [], flakes = [], leaves = [], flies = [], grit = [], dust = [], storm = [];
-let glow = null;
+let curId: string | null = null, curSince = 0, lastT = 0;
+let drops: RainDrop[] = [], splashes: Splash[] = [], flakes: SnowFlake[] = [], leaves: FallingLeaf[] = [], flies: Firefly[] = [], grit: Grit[] = [], dust: DustCloud[] = [], storm: StormStreak[] = [];
+let glow: HTMLCanvasElement | null = null;
 
 // EXPERIMENT (omen, web/omen.js): "A feeling before a fight" — game.js puts the cue on
 // window.__omen (read-only here: the encounter counter is never touched) and this layer draws
 // it in view space: a dark edge shadow and a few dust specks that grow as the counter runs out.
 // `omenShown` eases the level, so stopping mid-warning fades the feeling instead of snapping it.
-let omenCue = null;          // the last cue with a real feeling, kept while it fades
+let omenCue: OmenCue | null = null;          // the last cue with a real feeling, kept while it fades
 let omenShown = 0;           // eased 0..1 copy of the level
 let omenSeed = -1;           // which map's mote layout is already built
-let omenMotes = [];
+let omenMotes: OmenMote[] = [];
 const OMEN_MOTES = 26;
-function omenMotesFor(seed) {
+function omenMotesFor(seed: number) {
     if (seed === omenSeed) return;
     omenSeed = seed;
     const r = rng((seed >>> 0) ^ 0x9e3779b9);
@@ -416,7 +606,7 @@ function glowSprite() {
     return glow;
 }
 
-function resetFor(map, p) {
+function resetFor(map: AmbienceMap, p: MapProfile) {
     curId = map.id; curSince = performance.now();
     pixCache = null; pixImgCache = null; S.p = p; S.map = map;
     resetScenery(map, p, S);
@@ -453,7 +643,8 @@ function resetFor(map, p) {
             const x = r() * p.w, y = r() * p.h;
             if (wantGrass) {
                 const o = ((y | 0) * p.w + (x | 0)) * 4;
-                const gR = data[o], gG = data[o + 1], gB = data[o + 2];
+                // ETS item 9: o stays inside the w * h * 4 pixel array (x < w, y < h)
+                const gR = data[o]!, gG = data[o + 1]!, gB = data[o + 2]!;
                 if (!(gG >= 105 && gG > gR * 1.22 && gG > gB * 1.7)) continue;
             }
             flies.push({ x, y, ax: 6 + r() * 14, ay: 4 + r() * 8, fx: 0.2 + r() * 0.5, fy: 0.3 + r() * 0.6,
@@ -480,9 +671,9 @@ const WEIGHTS: Record<string, [string, number][]> = {
 };
 const BUCKET = 40000, FADE = 5000;
 const sessionSalt = (Math.random() * 4e9) >>> 0;
-const mix = (a, b: number) => (((a >>> 0) ^ Math.imul((b | 0) + 0x9e3779b9, 2654435761)) >>> 0) || 1;
+const mix = (a: number, b: number) => (((a >>> 0) ^ Math.imul((b | 0) + 0x9e3779b9, 2654435761)) >>> 0) || 1;
 
-function pickState(p, bucket: number) {
+function pickState(p: MapProfile, bucket: number) {
     const list = p.snowy ? WEIGHTS.snowy : p.sandy ? WEIGHTS.sandy : p.rainy ? WEIGHTS.rainy : null;
     if (!list) return "clear";
     const r = rng(mix(mix(p.seed, bucket), sessionSalt)); r(); r();
@@ -490,13 +681,13 @@ function pickState(p, bucket: number) {
     for (const [st, w] of list) if ((x -= w) < 0) return st;
     return "clear";
 }
-function leavesOn(p, bucket: number) {
+function leavesOn(p: MapProfile, bucket: number) {
     const r = rng(mix(mix(p.seed ^ 0x5bd1e995, bucket), sessionSalt)); r(); r();
     return r() < 0.55;
 }
 // How strongly each effect is blowing right now, 0..1, for this map.
-function levels(p, now: number) {
-    const L = { rain: 0, snow: 0, blizzard: 0, sand: 0, leaves: 0 };
+function levels(p: MapProfile, now: number): WeatherLevels {
+    const L: WeatherLevels = { rain: 0, snow: 0, blizzard: 0, sand: 0, leaves: 0 };
     // A quest scene's own atmosphere (see the block below): exactly what it asked for, however this map is profiled.
     const sc = sceneFx;
     if (sc) {
@@ -510,7 +701,8 @@ function levels(p, now: number) {
         else if (w === "leaves" && sceneAllows("leaves")) L.leaves = k;
         return L;
     }
-    const add = (k: string, w: number) => { if (k in L) L[k] += w; };
+    // ETS item 9: the `in L` test on this line proved k names one of the WeatherLevels
+    const add = (k: string, w: number) => { if (k in L) L[k as keyof WeatherLevels] += w; };
     const force = window.__weatherForce;
     if (typeof force === "string") {
         for (const s of force.split("+")) add(s, 1);
@@ -542,21 +734,21 @@ function levels(p, now: number) {
 //
 // Everything is exactly as it was when the scene ends, is skipped, fights, warps or the map changes:
 // clearAmbienceScene() restores window.__todForce (whatever the panel had pinned) and the map's own profile.
-export const TOD_PHASES = { day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
-let sceneFx = null;          // { weather, strength, force, wRamp, wFrames, wPending, time, tRamp, tFrames, tPending, phase0, target, savedTod, waiters }
+export const TOD_PHASES: Record<string, number> = { day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
+let sceneFx: SceneFx | null = null;          // { weather, strength, force, wRamp, wFrames, wPending, time, tRamp, tFrames, tPending, phase0, target, savedTod, waiters }
 let sceneRev = 0;            // bumped when the override changes shape: the particle sets rebuild from the new profile
 let lastSceneRev = -1;
 let flashUntil = 0;          // a cued lightning flash keeps the ambience layer drawing for its 0.6 s
 
 /** True when a scene effect must draw although the map's own profile would not have it. */
 const sceneAllows = (kind: string) => !!sceneFx && (sceneFx.force || fx[kind] !== false);
-const sceneEase = (k) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
+const sceneEase = (k: number) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
 
 /** The map's profile as this frame must read it. The same object when no scene override is on. */
-function sceneProfile(p: SceneAmbienceProfile): SceneAmbienceProfile {
+function sceneProfile(p: MapProfile): MapProfile {
     const sc = sceneFx;
     if (!sc) return p;
-    const q = { ...p } as AmbienceConditions;
+    const q: MapProfile = { ...p };
     const w = sc.weather;
     if (w === "clear") {
         q.rainy = q.snowy = q.sandy = q.leaves = q.fireflies = q.fog = false;
@@ -581,7 +773,7 @@ function sceneProfile(p: SceneAmbienceProfile): SceneAmbienceProfile {
 function sceneFxFlags() {
     const sc = sceneFx;
     if (!sc?.force) return fx;
-    const o = { ...fx } as AmbienceSettings;
+    const o: FxBag = { ...fx };
     const w = sc.weather;
     if (w === "fog") o.fog = true;
     if (w === "rain" || w === "storm") o.rain = true;
@@ -599,7 +791,7 @@ function sceneFxFlags() {
  * scene can pin the night and then add fog without losing the night. Resolves when the fade-in is over (never rejects);
  * a later step of the same kind replaces the fade and resolves the earlier wait at once.
  */
-export function setAmbienceScene(spec) {
+export function setAmbienceScene(spec: AmbienceSceneSpec): Promise<number> {
     if (!spec || typeof spec !== "object") return Promise.resolve(0);
     if (!sceneFx) {
         sceneFx = {
@@ -635,7 +827,7 @@ export function setAmbienceScene(spec) {
     }
     if (spec.force === true) sc.force = true;
     if (!sc.wPending && !sc.tPending) return Promise.resolve(1);
-    return new Promise((resolve) => { sc.waiters.push(resolve); });
+    return new Promise<number>((resolve) => { sc.waiters.push(resolve); });
 }
 
 /** Advance the scene override's fades (game.js calls this once a frame). */
@@ -693,20 +885,20 @@ export function ambienceLightning(count = 1, force = false) {
             if (fx.sound) thunder(true, 320 + Math.random() * 900, (Math.random() * 2 - 1) * 0.6);
         }, i * 420);
     }
-    return new Promise((resolve) => setTimeout(resolve, (n - 1) * 420 + 300));
+    return new Promise<number>((resolve) => setTimeout(resolve, (n - 1) * 420 + 300));
 }
 
 // ------------------------------------------------------------------- frame
 // Returns a draw(ctx) closure for this frame (or null when nothing applies).
 // What a fight started here should look like (battle3d.js, F2 -> Atmosphere -> "Battle sky & weather"): the last
 // overworld map's weather as measured above, and the time of day live.
-let lastAtmos = null;
+let lastAtmos: AtmosState | null = null;
 window.__battleAtmos = () => {
     if (!lastAtmos) return null;
     const phase = todPhaseNow();
     return { ...lastAtmos, phase, rgb: todColor(phase), thunder: () => thunder(fx.sound!, 900, (Math.random() * 2 - 1) * 0.6) };
 };
-export function ambienceFor(map, mapImg, camX: number, camY: number) {
+export function ambienceFor(map: AmbienceMap, mapImg: HTMLImageElement, camX: number, camY: number) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p) return null;
@@ -717,7 +909,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
     // room (the Asuka inns, lobbies, labs) already looks right, so it is left exactly as the game draws it.
     p.indoorK = Math.max(0, Math.min(1, (95 - (p.room || 0)) / 20));
     p.indoorLit = !p.open && hasLights(map.id) && p.indoorK > 0.02;
-    p.lamps = p.baseLamps || (fx.indoor && p.indoorLit);
+    // ETS item 9: every FX_DEFS key (indoor too) is set to true or false at start-up
+    p.lamps = p.baseLamps || (fx.indoor! && p.indoorLit);
     if (panel && !panel.hidden && lastMarked !== map.id) markApplicable(map, p);
     // A quest scene's atmosphere reads the map's profile as if it had the effects the scene asked for (a copy, so the
     // cached profile and the panel's own marks never change), and honours the same panel switches unless forced.
@@ -760,7 +953,7 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
     const wind = (18 + 10 * Math.sin(t / 7)) * (1 + 1.8 * gl);   // px/s, leaves and rain slant share it
     S.wind = wind;
 
-    return (ctx) => {
+    return (ctx: CanvasRenderingContext2D) => {
         ctx.save();
         ctx.beginPath(); ctx.rect(0, 0, VIEW_W, VIEW_H); ctx.clip();
         drawScenery(ctx, S);
@@ -786,7 +979,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
         if (wantLeaves) {
             const nLf = Math.round(leaves.length * Q);
             for (let li = 0; li < leaves.length; li++) {
-                const lf = leaves[li];
+                // ETS item 9: li is below leaves.length
+                const lf = leaves[li]!;
                 lf.y += (lf.v + lf.ky) * dt; lf.x += (wind * 0.6 + lf.d * Math.sin(t * 0.9 + lf.ph) * 0.5 + lf.kx) * dt; lf.rot += lf.spin * dt;
                 const damp = Math.exp(-3 * dt); lf.kx *= damp; lf.ky *= damp;
                 const sx = wrapX(lf.x, camX), sy = wrapY(lf.y, camY);
@@ -812,7 +1006,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
             const shown = Math.round(flakes.length * any * Q);
             ctx.fillStyle = "#fff";
             for (let i = 0; i < flakes.length; i++) {
-                const s = flakes[i];
+                // ETS item 9: i is below flakes.length
+                const s = flakes[i]!;
                 s.y += s.v * speedK * dt; s.x += (Math.sin(t * 0.8 + s.ph) * s.sw * (1 - 0.6 * bz) + drift) * dt;
                 if (i >= shown) continue;
                 const sx = wrapX(s.x, camX), sy = wrapY(s.y, camY);
@@ -862,7 +1057,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
             const shown = Math.round(drops.length * rain * Q);
             ctx.strokeStyle = "#c4d6ff";
             for (let i = 0; i < drops.length; i++) {
-                const d = drops[i];
+                // ETS item 9: i is below drops.length
+                const d = drops[i]!;
                 d.h -= d.v * dt;                                   // height above its ground spot
                 if (d.h <= 0) {
                     // it lands where it lands: the splash is planted in the world and stays put
@@ -877,7 +1073,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
             }
             ctx.lineWidth = 0.5; ctx.strokeStyle = "#dbe7ff";
             for (let i = splashes.length - 1; i >= 0; i--) {
-                const s = splashes[i]; s.age += dt;
+                // ETS item 9: i is below splashes.length
+                const s = splashes[i]!; s.age += dt;
                 if (s.age > 0.35) { splashes.splice(i, 1); continue; }
                 const sx = wrapX(s.x, camX), sy = wrapY(s.y, camY);
                 if (sx < -10 || sx > VIEW_W + 10 || sy < -4 || sy > VIEW_H + 4) continue;
@@ -907,7 +1104,8 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
                 const n = Math.min(omenMotes.length, Math.round(omenMotes.length * k * cue.rustle));
                 ctx.fillStyle = "#dccca6";
                 for (let i = 0; i < n; i++) {
-                    const m = omenMotes[i];
+                    // ETS item 9: i is below n, which is at most omenMotes.length
+                    const m = omenMotes[i]!;
                     m.x += (m.vx + wind * 0.12) * dt; m.y += m.vy * dt;
                     if (m.y < -3) m.y += VIEW_H + 6;
                     if (m.x < -3) m.x += VIEW_W + 6; else if (m.x > VIEW_W + 3) m.x -= VIEW_W + 6;
@@ -925,7 +1123,7 @@ export function ambienceFor(map, mapImg, camX: number, camY: number) {
 
 // ------------------------------------------------- bodies: look, reflection, crowd
 let lastBody = 0;
-function bodyFxTick(map, p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number) {
+function bodyFxTick(map: AmbienceMap, p: MapProfile, L: WeatherLevels, now: number) {
     const dt = Math.min(0.1, lastBody ? (now - lastBody) / 1000 : 0);
     lastBody = now;
     tickWet(fx.rain ? L.rain : 0, dt);
@@ -935,11 +1133,11 @@ function bodyFxTick(map, p, L: { rain: number; snow: number; blizzard: number; s
         if (w > 0.06) filter = `brightness(${(1 - 0.22 * w).toFixed(3)}) contrast(${(1 + 0.1 * w).toFixed(3)}) saturate(${(1 + 0.15 * w).toFixed(3)})`;
         else if (fx.sand && L.sand > 0.2) filter = `sepia(${(0.38 * L.sand).toFixed(2)}) brightness(0.95)`;
     }
-    let reflect = null;
+    let reflect: ((x: number, y: number) => number) | null = null;
     if (fx.mirror && !window.__noWaterRefl && isWaterStage(map.id)) {
-        reflect = (x, y) => {
+        reflect = (x: number, y: number) => {
             if (!isWaterAt(map.id, x, y + 8)) return 0;
-            // + coerces these booleans to 0/1, which is the cover the water reflection wants
+            // ETS item 9: isWaterAt gives booleans and the sum below relies on them counting as 0/1 (the cover the water reflection wants); the JavaScript must keep the plain +
             const cover = ((isWaterAt(map.id, x, y + 8) as unknown as number) + (isWaterAt(map.id, x, y + 18) as unknown as number) + (isWaterAt(map.id, x, y + 28) as unknown as number)) / 3;
             return 0.58 * cover;
         };
@@ -949,7 +1147,7 @@ function bodyFxTick(map, p, L: { rain: number; snow: number; blizzard: number; s
     if (st && st.scenes) syncVillagers(fx.villagers, map, p, st);
 }
 // swaying trees: the foreground layer redrawn with the canopies moving (null = draw it normally)
-export function swayFor(map, mapImg) {
+export function swayFor(map: AmbienceMap, mapImg: HTMLImageElement) {
     if (!fx.sway || window.__hideProps || !(mapImg instanceof Image)) return null;
     const p = profiles.get(map.id) || profileOf(map, mapImg);
     if (!p || !p.sway) return null;
@@ -959,7 +1157,7 @@ export function swayFor(map, mapImg) {
 
 // The ground layer (puddles, footprints, dust, ripples): drawn after the map, under the sprites.
 let lastG = 0;
-export function groundFxFor(map, mapImg, camX: number, camY: number) {
+export function groundFxFor(map: AmbienceMap, mapImg: HTMLImageElement, camX: number, camY: number) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p || !p.open) return null;
@@ -971,19 +1169,19 @@ export function groundFxFor(map, mapImg, camX: number, camY: number) {
     lastG = now;
     const fade = smooth((now - curSince) / 1500);
     fillS(map, sceneProfile(p), levels(p, now), now, dt, fade, camX, camY, mapImg, sceneFxFlags());
-    return (ctx) => groundScenery(ctx, S);
+    return (ctx: CanvasRenderingContext2D) => groundScenery(ctx, S);
 }
 
 // ------------------------------------------------------- presets & profiles
 const BASE = ["grass", "grasspush", "water", "reflect", "seam", "sway", "wetlook", "mirror"];
-const PRESETS = {
+const PRESETS: Record<string, Preset> = {
     cinematic: { tod: "golden", mode: "auto", all: true },
     clear: { tod: "day", mode: "clear", on: [...BASE, "indoor", "gusts", "clouds", "shafts", "pollen", "butterflies", "birds", "dragonflies", "fish", "critters", "leaves", "sparkle", "steps", "puddles", "ambience", "footsteps", "wildlife", "tod"] },
     cozyrain: { tod: "dusk", mode: "always", on: [...BASE, "indoor", "rain", "rainwater", "fog", "puddles", "screenfx", "sound", "ambience", "musicfx", "steps", "footsteps", "lamps", "lightpool", "lightreveal", "nightlight", "tod", "leaves", "wildlife", "clouds"] },
     storm: { tod: "day", mode: "storm", on: [...BASE, "indoor", "rain", "rainwater", "lightning", "snow", "sand", "gusts", "frost", "breath", "screenfx", "puddles", "sound", "musicfx", "steps", "footsteps", "clouds", "tod"] },
     night: { tod: "night", mode: "auto", on: [...BASE, "indoor", "tod", "lamps", "lightpool", "lightreveal", "nightlight", "fireflies", "fog", "wildlife", "ambience", "sound", "footsteps", "steps", "sparkle", "gusts"] },
 };
-function applyPreset(name) {
+function applyPreset(name: string) {
     const d = PRESETS[name];
     if (!d) return;
     for (const [k] of FX_DEFS) {
@@ -996,7 +1194,7 @@ function applyPreset(name) {
 window.__applyPreset = applyPreset;
 // Showcase scenes (the top-bar "Showcase" menu): everything that suits the map is on, the time of
 // day and weather are pinned, and the map itself still decides which effects can show.
-export function applyScene(sc) {
+export function applyScene(sc: ShowcaseScene) {
     for (const [k] of FX_DEFS) fx[k] = k !== "villagers";
     fx.todMode = sc.tod; fx.weatherMode = sc.mode; fx.quality = "high";
     window.__weatherForce = undefined;
@@ -1004,13 +1202,13 @@ export function applyScene(sc) {
 }
 const PROFILE_KEY = "dw.fx.profiles";
 function snapshot() {
-    const o = {} as AmbienceMode;
+    const o: ProfileSnapshot = {};
     for (const [k] of FX_DEFS) o[k] = !!fx[k];
     o.weatherMode = fx.weatherMode; o.todMode = fx.todMode; o.quality = fx.quality;
     return o;
 }
-function profileAct(kind, slot) {
-    let all = {};
+function profileAct(kind: string, slot: string) {
+    let all: Record<string, ProfileSnapshot> = {};
     try { all = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}"); } catch { }
     if (kind === "save") {
         all[slot] = snapshot();
@@ -1026,7 +1224,8 @@ function profileAct(kind, slot) {
 // F8 hides the chrome (header, effects button and panel) and goes fullscreen; F9 saves a
 // PNG of the game picture; F10 starts and stops a clip of the game canvas (a .webm).
 // The recording is of the canvas alone, so no window, panel or label is ever in it.
-let photoOn = false, recorder = null, recChunks = [], toastEl = null, toastTimer: number | ReturnType<typeof setTimeout> = 0, recDot = null;
+// ETS item 9: toastEl is built by installFxPanel; toast() returns at once while it is missing, so the timer callback below only runs with it set
+let photoOn = false, recorder: MediaRecorder | null = null, recChunks: Blob[] = [], toastEl: HTMLDivElement = null!, toastTimer: number | ReturnType<typeof setTimeout> = 0, recDot: HTMLDivElement | null = null;
 function gameCanvas() {
     return [...document.querySelectorAll<HTMLCanvasElement>("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null && !isBattleLayer(c)) || null;
 }
@@ -1091,7 +1290,8 @@ function setPhoto(on: boolean) {
 window.__photo = { screenshot, toggleRecord, setPhoto };
 
 // ------------------------------------------------------------------- panel
-let panel = null, gear = null, dev = null;
+// ETS item 9: panel, gear and dev stay null until installFxPanel builds them (it returns at once when they exist); every listener and callback it registers runs after that, and the other readers test `!panel` first
+let panel: HTMLDivElement = null!, gear: HTMLButtonElement = null!, dev: DevView = null!;
 // The F2 page is built on its first open and only refreshed while it is open (web/dev-panel.js).
 function refreshPanel() {
     if (!panel || panel.hidden || !dev || !dev.isBuilt()) return;
@@ -1119,12 +1319,13 @@ export function installFxPanel(stageEl: HTMLElement | null) {
         fx, shipOf: shipClass,
         spriteFilters: Object.entries(SPRITE_FILTERS).filter(([k]) => k === "off" || GPU_FILTER_NAMES.includes(k)),
         dialMode: () => dialModeFromFx(fx),
-        locked: (k) => hostRules.locked(k),
+        locked: (k: string) => hostRules.locked(k),
         close: () => { if (!panel.hidden) toggle(); },
         // the DW2 extras (Mount) need the player's own Digimon World 2 disc: say so, with the launcher's extras page
         // (asked once, when the page is first opened; a closed page makes no request)
-        onFirstOpen(view) {
-            fetch("/__dw2003/status").then((r) => r.ok ? r.json() : null).then((st) => {
+        onFirstOpen(view: { setNote: (html: string) => void }) {
+            // ETS item 42: the status JSON comes from the launcher; only dw2.state is read, behind the !st / !st.dw2 tests
+            fetch("/__dw2003/status").then((r) => r.ok ? r.json() : null).then((st: ExtrasStatus | null) => {
                 if (!st || !st.dw2 || st.dw2.state === "done") return;
                 view.setNote(`Mount needs your own Digimon World 2 disc: <a href="/__dw2003/extras.html" target="_blank">add it here</a>.`);
             }).catch(() => { });
@@ -1133,14 +1334,16 @@ export function installFxPanel(stageEl: HTMLElement | null) {
     const toggle = () => { panel.hidden = !panel.hidden; if (!panel.hidden) lastMarked = null; gear.classList.toggle("open", !panel.hidden); gear.blur(); if (!panel.hidden) dev.show(); };
     gear.addEventListener("click", toggle);
     panel.addEventListener("input", (e) => {
-        const t = e.target;
+        // ETS item 9: this listener only hears the page's own sliders
+        const t = e.target as HTMLInputElement | null;
         if (t!.dataset && t!.dataset.slider) {
             setNum(t!.dataset.slider, +t!.value);
             const v = panel.querySelector(`[data-val="${t!.dataset.slider}"]`); if (v) v.textContent = (+t!.value).toFixed(2);
         }
     });
     panel.addEventListener("change", (e) => {
-        const t = e.target;
+        // ETS item 9: this listener only hears the page's own checkboxes and selects (all have value, checked and dataset)
+        const t = e.target as HTMLInputElement | null;
         if (t!.dataset.fx) setFx(t!.dataset.fx, t!.checked);
         else if ("mode" in t!.dataset) setFx("weatherMode", t!.value);
         else if ("quality" in t!.dataset) setFx("quality", t!.value);
@@ -1152,16 +1355,19 @@ export function installFxPanel(stageEl: HTMLElement | null) {
     });
     // An Open button of the F2 page: the key's own switch must be on. Screens inside the game go through
     // window.__openExtra (web/game.js) and the page steps aside; the others open in a new tab (web/dev-panel-model.js DEV_OPEN).
-    const openDev = (key) => {
-        const o = DEV_OPEN[key];
+    const openDev = (key: string) => {
+        // ETS item 9: DEV_OPEN is frozen with a fixed key list; the Open buttons only carry keys of it, and a missing key gives undefined (tested next line)
+        const o = (DEV_OPEN as Record<string, DevOpenEntry | undefined>)[key];
         if (!o || !fx[key]) return;
         if (o.extra) { if (window.__openExtra?.(key)) { panel.hidden = true; gear.classList.remove("open"); } }
         else window.open(o.href, "_blank", o.noopener ? "noopener" : undefined);
     };
     panel.addEventListener("click", (e) => {
-        const act = e.target!.closest("[data-act]");
+        // ETS item 9: clicks reach this listener only from elements inside the panel
+        const act = (e.target as Element).closest<HTMLElement>("[data-act]");
         if (act) {
-            const [kind, arg] = act.dataset.act.split(":");
+            // ETS item 9: every [data-act] button of the page is built as "kind" or "kind:arg"
+            const [kind, arg] = act.dataset.act!.split(":") as [string, string];
             if (kind === "save" || kind === "load") profileAct(kind, arg);
             else if (kind === "photo") setPhoto(!photoOn);
             else if (kind === "shot") screenshot();
@@ -1169,7 +1375,8 @@ export function installFxPanel(stageEl: HTMLElement | null) {
             else if (kind === "open") openDev(arg);
             act.blur(); return;
         }
-        const b = e.target!.closest("[data-all]");
+        // ETS item 9: clicks reach this listener only from elements inside the panel
+        const b = (e.target as Element).closest<HTMLElement>("[data-all]");
         if (!b) return;
         for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1";
         syncLegacyFlags(); save(); refreshPanel();

@@ -9,7 +9,7 @@ import { currentMap } from "./session.js";
 import { S } from "./state.js";
 import type { MpLaunchOptions, MpPracticeOptions } from "../mpbattle/types.js";
 import type { QuestBattleOptions } from "./types.js";
-import type { EnemyRecord } from '../types/battle.js';
+import type { MpFoe } from '../types/mpsocial.js';
 
 
 // Encounter rate is now governed by the authentic data: stages with no zone pool
@@ -111,7 +111,7 @@ async function mpCoopRandom(mapId, x: number, y: number) {
         if (!a) return;
         const b = await battle.rollEncounter(mapId, x, y);
         const foes = [a.party[0], ...(b ? [b.party[0]] : [])];
-        const go = (f: EnemyRecord[], withId: number | null) => (withId ? mpbLaunch({ foes: f, withId, label: "Wild Digimon", screenId: a.screen ?? null }) : startQuestBattle(f, {}));
+        const go = (f: MpFoe[], withId?: number | null) => (withId ? mpbLaunch({ foes: f, withId, label: "Wild Digimon", screenId: a.screen ?? null }) : startQuestBattle(f, {}));
         if (!coopTry(foes, "Wild Digimon", go)) go(foes, null);
     } finally { coopRolling(false); }
 }

@@ -36,7 +36,7 @@
 import {
     questFxSpawn, questFxGet, questFxRemove, questFxSheetInfo, loadQuestFxSheets,
 } from "./quest-fx.js";
-import type { QuestProp } from "./types/quest-props.js";
+import type { QuestProp, QuestPropRow } from "./types/quest-props.js";
 
 const LAYERS = ["entity", "behind", "front"];
 /** Every prop's effect name carries this prefix, so it can never collide with a scene's effect name. */
@@ -50,7 +50,7 @@ const SOLID_HALF_MAX = 12;
 const SOLID_DEPTH = 10;
 
 /** The props holding on the current map: [{ key, name, sheet, x, y, clip, layer, solid }]. */
-let shown = [];
+let shown: QuestPropRow[] = [];
 /** The solid foot boxes of those props (empty when none is solid). */
 let boxes = [];
 /** The map those boxes belong to, so a frame between a map change and the next tick cannot use another map's boxes. */
@@ -101,7 +101,7 @@ export function questPropsTick(mapId: string | number | null | undefined, onThis
  * test can drive it without the browser.
  */
 export function normalize(onThisMap) {
-    const out = [];
+    const out: QuestPropRow[] = [];
     const seen = new Set();
     for (const p of Array.isArray(onThisMap) ? onThisMap : []) {
         if (!p || typeof p !== "object") continue;
@@ -112,7 +112,7 @@ export function normalize(onThisMap) {
         const key = String(p.key ?? `${sheet}@${Math.round(x)},${Math.round(y)}`);
         if (seen.has(key)) continue;                    // one place per key: a duplicate can never stack
         seen.add(key);
-        const r = { key, name: PREFIX + key, sheet, x, y } as QuestProp;
+        const r = { key, name: PREFIX + key, sheet, x, y } as QuestPropRow;
         if (p.clip != null && p.clip !== "") r.clip = String(p.clip);
         if (LAYERS.includes(p.layer)) r.layer = p.layer;
         if (p.solid === true) r.solid = true;

@@ -43,8 +43,9 @@ const SAY_MS = 6500;            // how long a speech bubble stays over a head
 const CHAT_GAP_MS = 650;        // F2 "Chat: keep every line I type": over the relay's 600 ms drop, so a line waits instead
 export const EMOTES = ["♥", "!", "?", "...", "♪", ":)", "GG", "zZ"];   // 0..7
 
+// ETS item 9: the literal null would type id as null; the room hands me a number id when I am welcomed
 const mp = {
-    ws: null, status: "off", room: null, id: null, name: "", hostId: null,
+    ws: null, status: "off", room: null, id: null as number | null, name: "", hostId: null,
     addresses: [], hosting: false, host: "",   // the host's own addresses, to show to friends
     peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteIx, emoteUntil, say, sayUntil, card }
     me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteIx: null, emoteUntil: 0 },
@@ -57,11 +58,11 @@ const mp = {
 // ------------------------------------------------------------ events for the social dock
 const listeners = new Set<MpListener>();
 /** fn(type, data): "status" | "roster" | "chat" {id,name,text,self,mark} | "chatstate" {mark} | "feed" {id,name,kind,text} | "sys" {text} | "trade" {...} */
-export const mpOn = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
+export const mpOn = (fn: MpListener) => { listeners.add(fn); return () => listeners.delete(fn); };
 const emit = (type: string, data = {}) => { for (const f of [...listeners]) { try { f(type, data); } catch (e) { console.warn("[multiplayer]", e); } } };
 
 export const isOnline = () => mp.status === "online";
-export const myId = () => mp.id;
+export const myId = (): number | null => mp.id;
 export const myName = () => mp.name;
 /** True when I made this room: the only one who can open a Server Champ night or call its fights. */
 export const amHost = () => mp.status === "online" && mp.hostId != null && mp.hostId === mp.id;
@@ -71,9 +72,9 @@ export const serverChampOn = () => typeof window !== "undefined" && window.__fx?
 export const chatQueueOn = () => typeof window !== "undefined" && window.__fx?.chatqueue === true;
 /** Everyone in the room except me: [{ id, name, map, card, away }] */
 export const peerList = () => [...mp.peers].map(([id, p]) => ({ id, name: p.name, map: p.map, card: p.card, away: !!p.away }));
-export const peerOf = (id) => mp.peers.get(id) ?? null;
+export const peerOf = (id: number | null | undefined) => mp.peers.get(id) ?? null;
 /** The peer, only when they are really here: a player who is away (dropped, seat kept) is not. */
-export const peerHere = (id) => { const p = mp.peers.get(id); return p && !p.away ? p : null; };
+export const peerHere = (id: number | null | undefined) => { const p = mp.peers.get(id); return p && !p.away ? p : null; };
 /** How many are playing, me included, not counting players who are away. */
 export const playingCount = () => [...mp.peers.values()].filter((p) => !p.away).length + 1;
 
@@ -306,7 +307,7 @@ export function rejoinSaved(defaultName) {
 }
 
 function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false, away: false }; }
-export const sendRaw = (o) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
+export const sendRaw = (o: object) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
 const sayTime = (text) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
 
 // ------------------------------------------------------------ the chat queue (F2 -> Extras -> Chat)
@@ -340,7 +341,7 @@ export function sendEmote(i: number) {
 /** Say something: it goes to everyone's chat log, and shows over my head here and over my character for players in my stage.
  *  Returns "sent" | "queued" | false. With F2 -> Extras -> "Chat: keep every line I type" on, a line typed inside the
  *  relay's gap waits its turn (its local row shows "..."), so the room hears every line instead of the last one. */
-export function sendChat(text) {
+export function sendChat(text: string) {
     text = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
     if (!text) return false;
     mp.me.say = text; mp.me.sayUntil = performance.now() + sayTime(text);
@@ -351,16 +352,16 @@ export function sendChat(text) {
     if (r === "queued") { mark.queued = true; emit("chatstate", { mark }); }
     return r;
 }
-export function sendFeed(kind, text) { return sendRaw({ t: "feed", kind, text }); }
-export function sendCard(card) { return sendRaw({ t: "card", card }); }
-export const sendTrade = (o) => sendRaw({ t: "trade", ...o });
-export const sendDuel = (o) => sendRaw({ t: "duel", ...o });
-export const sendGoto = (o) => sendRaw({ t: "goto", ...o });
-export const sendCoop = (o) => sendRaw({ t: "coop", ...o });
+export function sendFeed(kind: string, text: string) { return sendRaw({ t: "feed", kind, text }); }
+export function sendCard(card: unknown) { return sendRaw({ t: "card", card }); }
+export const sendTrade = (o: object) => sendRaw({ t: "trade", ...o });
+export const sendDuel = (o: object) => sendRaw({ t: "duel", ...o });
+export const sendGoto = (o: object) => sendRaw({ t: "goto", ...o });
+export const sendCoop = (o: object) => sendRaw({ t: "coop", ...o });
 /** A many-vs-many fight message to these players (web/mpbattle.js). */
-export const sendMpb = (ids, d) => sendRaw({ t: "mpb", to: ids, d });
+export const sendMpb = (ids: number[], d: unknown) => sendRaw({ t: "mpb", to: ids, d });
 /** A Server Champ night message (web/mp-league.js, server/room-core.mjs): only with F2 -> Extras -> Server Champ league on. */
-export const sendLeague = (o) => serverChampOn() ? sendRaw({ t: "lg", ...o }) : false;
+export const sendLeague = (o: object) => serverChampOn() ? sendRaw({ t: "lg", ...o }) : false;
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */

@@ -29,7 +29,7 @@ interface GroundGrid {
 }
 
 interface GroundFoot {
-    id: number;
+    id: string;
     x: number;
     y: number;
     moving?: boolean;
@@ -47,7 +47,7 @@ interface GroundSceneryState {
     camY: number;
     now: number;
     feet?: GroundFoot[];
-    grid: () => GroundGrid | undefined;
+    grid: () => GroundGrid | null | undefined;
     isWater: (x: number, y: number) => boolean;
     onStep: (type: string, volume: number) => void;
     DW?: number;

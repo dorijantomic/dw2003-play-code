@@ -45,7 +45,7 @@ interface SharedShotOpts {
 }
 
 interface RigPoint { x: number; y: number; z: number; }
-interface RigBone { parent_slot?: number | null; verts?: RigPoint[]; }
+interface RigBone { parent_slot?: number | null; verts?: [number, number, number][]; }
 interface RigModel { folder?: string; num_bones?: number | null; bones: RigBone[]; }
 interface RigCollider { bone: number; role: string; prop: boolean; hand: boolean; compact: number; c: RigPoint; a: RigPoint; b: RigPoint; radius: number; halfLen: number; }
 interface Rig { folder: string | undefined; model: RigModel; colliders: RigCollider[]; parent: number[]; depth: number[]; n: number; }

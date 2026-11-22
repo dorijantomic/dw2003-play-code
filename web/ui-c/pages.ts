@@ -16,23 +16,102 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 import type { UiRect } from "./types.js";
-import type { UiPart, UiRun, UiMatrix } from "./types.js";
+import type { UiPart, UiRun, UiMatrix, UiCapturePart } from "./types.js";
 /** The footer page transform: an identity matrix (only translation-free placements accepted by applyRel). */
 type FooterRel = UiMatrix & Readonly<{ a: 1; d: 1; e: 0; f: 0 }>;
 
 /** A footer page part: a drawable part plus its page transform. */
 type FooterPart = UiPart & { rel: FooterRel };
 
+/** A text run as these composers read it: the game's string at its pen, with the optional right anchor and face colour. */
+type PageRun = UiRun & { right?: number | null };
+
+/** A claimed capture clip (position, size, layers, row) with its page transform and the part name the claim gave it. */
+type PagePart = UiPart & UiCapturePart & { part: string; rel: FooterRel };
+
+/** What the screens hand over (screens.ts ScreenContext): the claimed parts and the runs. The parts are typed as drawable parts there, though at run time they are capture clips. */
+interface ScreenParts {
+    // ETS item 38: any[] only in this signature; every composer narrows it to PagePart[] at once (screens.ts ScreenContext types the parts as UiPart)
+    parts: any[];
+    runs: UiRun[];
+}
+
+/** A run whose face is the game's colour string (types.ts UiRun.face says number, but the colour is a CSS string). */
+// ETS item 38: any only for this one member, read in two callbacks (the hint line, the row label)
+type FaceRun = PageRun & { face?: any };
+
+/** Anything that carries a page transform (and the layer its claim gave it). */
+interface RelClip {
+    rel: FooterRel;
+    layer?: string;
+}
+
+/** One game line of the footer: its pen y and its runs (never empty). */
+interface FootLine {
+    y: number;
+    runs: [PageRun, ...PageRun[]];
+}
+
+/** The runs of one hint plate line (never empty). */
+type HintLine = [PageRun, ...PageRun[]];
+
+/** The backdrop's options: the wall and the faint word (where, how big). */
+interface BackdropCfg {
+    wall?: boolean | undefined;
+    word?: string | null | undefined;
+    wordAt?: { x: number; y: number; } | undefined;
+    wordDp?: number | undefined;
+}
+
+/** One row of the info card's grouping by pen y. */
+interface InfoRow {
+    y: number;
+    runs: PageRun[];
+}
+
+/** A stat row of the info card (LV / HP / MP): its label run, the number runs' strings, their right edge. */
+interface InfoStat {
+    id: string;
+    label: PageRun;
+    y: number;
+    values: string[];
+    right: number | null;
+    raw: PageRun[];
+}
+
+/** The info card's runs: the name run and the stat rows. */
+interface InfoCard {
+    name: PageRun | null;
+    stats: InfoStat[];
+}
+
+/** A party card's state: the cursor's ("on"), SORT's held partner ("locked") or neither. */
+type CardState = "normal" | "on" | "locked";
+
+/** The options of composeRows: the title strip height and the confirm / question box flags. */
+interface RowsOpts {
+    titleH?: number;
+    confirm?: boolean;
+    question?: boolean;
+}
+
+/** The options of composeWindowPage. */
+interface WindowPageCfg {
+    wash?: boolean;
+    messageWindow?: boolean;
+    word?: string | null;
+}
+
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r: { x: number; y: number; }, rc: UiRect, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
 const lbl = (key: string, str: string | undefined, rect: UiRect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
-export const takeIn = (runs, rc, used: Set<unknown>, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
+export const takeIn = <R extends { x: number; y: number; }>(runs: R[], rc: UiRect, used: Set<unknown>, pad = 0): R[] => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
 
 // ------------------------------------------------------------------------------------------------ backdrop, footer, hints
 /** The scrolling diamond field (stripes over the whole limit, the game's own scroll counter) and, when asked, the right-hand wall + big word. */
-export function composeBackdropPart(back, cfg: PausePageOpts, out) {
+export function composeBackdropPart(back: { x: number; }, cfg: BackdropCfg, out: UiPart[]) {
     out.push(stripes(back.x));
     if (cfg.wall) out.push({ key: "backdrop.wall", kind: "wall", shape: "wallL", part: "wall", layer: "under", rect: { x: dx(660), y: 0, w: N(620), h: 240 }, color: "var(--c-wall)", sx: 1, sy: 1 });
     if (cfg.word) { const wx = cfg.wordAt?.x ?? dx(640); out.push(typeWord("backdrop.type", cfg.word, { x: wx, y: cfg.wordAt?.y ?? N(400), w: Math.max(40, 320 - wx), h: N(cfg.wordDp ?? 140) }, ID, cfg.wordDp ?? 140, null, false, true)); }
@@ -49,16 +128,16 @@ export { tokenLine };
  *  a word the game draws past the divider (the demo page's "BIT"). */
 /** A footer number (digits with their separators); a right-anchored run with letters is a word. */
 const FOOT_NUMBER = /^[0-9][0-9,./ ]*$/;
-const footRight = (lineRuns, j: number) => (lineRuns[j + 1] ? lineRuns[j + 1].x - 1 : j ? 318 : dx(1060));
+const footRight = (lineRuns: PageRun[], j: number) => (lineRuns[j + 1] ? lineRuns[j + 1]!.x - 1 : j ? 318 : dx(1060));
 
-export function composeFooter(foot: FooterPart, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
+export function composeFooter(foot: FooterPart, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = foot.rel, r = clipRect(foot);
     out.push({ key: "footer.plate", kind: "band", part: "footer", layer: "under", rect: r, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     out.push(solid("footer.tab", applyRel({ x: dx(0), y: r.y, w: N(206), h: N(4) }, rel), "var(--c-orange)", rel));
     out.push(solid("footer.div1", applyRel({ x: dx(206), y: r.y + N(4), w: N(4), h: r.h - N(8) }, rel), "var(--c-under)", rel));
     out.push(solid("footer.div2", applyRel({ x: dx(1068), y: r.y + N(4), w: N(4), h: r.h - N(8) }, rel), "var(--c-under)", rel));
     const mine = takeIn(runs, { x: -9999, y: r.y, w: 99999, h: r.h }, used).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
-    const lines = [];
+    const lines: FootLine[] = [];
     for (const m of mine) { const l = lines.find((q) => Math.abs(q.y - m.y) <= 2); if (l) l.runs.push(m); else lines.push({ y: m.y, runs: [m] }); }
     // one or two lines: 12 dp from the top, 44 dp apart; more (the QUESTS description band has three): spread evenly inside the band
     const many = lines.length > 2, pitch = many ? (r.h - N(8) - N(36)) / (lines.length - 1) : N(44), top = many ? N(4) : N(12);
@@ -72,8 +151,8 @@ export function composeFooter(foot: FooterPart, runs: UiRun[], used: Set<unknown
             // (the game right-anchors words too, e.g. that hint: a right-anchored run is a number only when its text is one)
             const isNum = m.right != null && FOOT_NUMBER.test(String(m.text).trim());
             const edge = isNum ? null : m.right ?? (!l.runs[j + 1] && m.x + (m.w ?? 0) >= dx(1060) - 2 ? dx(1060) : null);
-            const left = j ? l.runs[j - 1].x + (l.runs[j - 1].w ?? 0) + 2 : dx(232);
-            const x = isNum ? m.right - N(120) : edge != null ? Math.max(left, edge - N(320)) : m.x;
+            const left = j ? l.runs[j - 1]!.x + (l.runs[j - 1]!.w ?? 0) + 2 : dx(232);
+            const x = isNum ? m.right! - N(120) : edge != null ? Math.max(left, edge - N(320)) : m.x;
             const room = isNum ? N(120) : edge != null ? edge - x : Math.max(N(80), (l.runs[j + 1]?.x ?? dx(1060)) - m.x - 1);
             out.push(lbl(`footer.l${i}.${j}`, m.text, applyRel({ x, y, w: room, h: N(36) }, rel), 26, 36, { role: isNum ? "number" : "body", align: isNum || edge != null ? "right" : "left", rel, maxDp: Math.round(room * 3) }));
         });
@@ -84,7 +163,7 @@ export function composeFooter(foot: FooterPart, runs: UiRun[], used: Set<unknown
  * The item detail line (C3): a full-width band 58 dp tall centred on the game's clip, dividers at 206 / 624 / 846 dp; the item name in
  * Russo 22, the cell labels ("Equip", "Items") dim 18, their numbers Chakra Petch 700 26 right-anchored. The item icon stays art.
  */
-export function composeDetail(p, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
+export function composeDetail(p: PagePart, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), h = N(58), y = r.y + (r.h - h) / 2;
     out.push({ key: "detail.band", kind: "band", part: "detail", layer: "under", rect: applyRel({ x: 0, y, w: 320, h }, rel), edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const [k, d] of [[1, 206], [2, 624], [3, 846]]) out.push(solid(`detail.div${k}`, applyRel({ x: dx(d!), y: y + N(4), w: N(4), h: h - N(8) }, rel), "var(--c-under)", rel));
@@ -97,7 +176,7 @@ export function composeDetail(p, runs: UiRun[], used: Set<unknown>, out: UiPart[
  * the cell labels ("Equip", "Items") dim Russo 18, the item name Russo 22; all centred on `mid` (native). `isCellLabel(run)` says which
  * plain runs are cell labels (the rest is the name).
  */
-export function detailTexts(mine, mid: number, rel: UiMatrix, out, k: string, isCellLabel: ((m: { x: number; }) => boolean) | ((m: { x: number; }) => boolean)) {
+export function detailTexts(mine: PageRun[], mid: number, rel: UiMatrix, out: UiPart[], k: string, isCellLabel: (m: { x: number; }) => boolean) {
     for (const m of [...mine].sort((a, b) => a.x - b.x)) {
         const isNum = m.right != null || /^[0-9]+$/.test(m.text);
         if (isNum) {
@@ -115,7 +194,7 @@ export function detailTexts(mine, mid: number, rel: UiMatrix, out, k: string, is
  * The navy arrow tree of "Switch with who?" as a path in native units relative to the tree piece: an up arrow under each top cell, a
  * bar joining them, a down arrow to each bottom cell. `cxs` / `downs` = arrow centre x (native, relative to the tree), `h` = tree height.
  */
-export function switchTreePath(cxs, downs, h: number) {
+export function switchTreePath(cxs: number[], downs: number[], h: number) {
     if (!cxs.length) return "";
     const lo = Math.min(...cxs, ...downs), hi = Math.max(...cxs, ...downs), barTop = Math.round(h * 0.38), barBot = barTop + 6;
     let d = `M${lo - 3} ${barTop}H${hi + 3}V${barBot}H${lo - 3}Z`;
@@ -129,7 +208,7 @@ export function switchTreePath(cxs, downs, h: number) {
  * navy. Cells and tree come from the clip's own sheet layers: cells = the pieces about 44 x 71, tree = the wide flat piece. The white
  * active arrows and the capsules are other clips (art) and draw over this.
  */
-export function composeSwitchWindow(p, i, out) {
+export function composeSwitchWindow(p: PagePart, i: string | number, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), L = p.layers ?? [];
     out.push({ key: `sw${i}.plate`, kind: "plate", part: "window", layer: "under", rect: r, shape: "ch", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     const cells = L.filter((l: { w: number; h: number; }) => l.w >= 30 && l.w <= 60 && l.h >= 50 && l.h < p.h - 4);
@@ -148,13 +227,13 @@ const isNumText = (t: string) => /^[0-9]+$/.test(t);
  * Read the info card's runs (lab / gym partner pickers): rows grouped by pen y; a row whose first word is LV / HP / MP is a stat row,
  * its number runs (sorted by x) are its values. The name is the top run that is not a stat label. Strings only, as the game drew them.
  */
-export function readInfoRuns(runs) {
-    const rows = [];
+export function readInfoRuns(runs: PageRun[]) {
+    const rows: InfoRow[] = [];
     for (const r of [...runs].sort((a, b) => a.y - b.y || a.x - b.x)) {
         const row = rows.find((g) => Math.abs(g.y - r.y) <= 2);
         if (row) row.runs.push(r); else rows.push({ y: r.y, runs: [r] });
     }
-    const out = { name: null, stats: [] };
+    const out: InfoCard = { name: null, stats: [] };
     for (const g of rows) {
         g.runs.sort((a, b) => a.x - b.x);
         const label = g.runs.find((r) => !isNumText(r.text) && r.text !== "/");
@@ -162,7 +241,7 @@ export function readInfoRuns(runs) {
         if (head) {
             const nums = g.runs.filter((r) => isNumText(r.text));
             const right = nums.length ? Math.max(...nums.map((n) => n.right ?? n.x + (n.w ?? 8))) : null;
-            out.stats.push({ id: head[1]!.toUpperCase(), label, y: g.y, values: nums.map((n) => n.text), right, raw: g.runs });
+            out.stats.push({ id: head[1]!.toUpperCase(), label: label!, y: g.y, values: nums.map((n) => n.text), right, raw: g.runs });
         } else if (!out.name && label) out.name = label;
     }
     return out;
@@ -173,7 +252,7 @@ export function readInfoRuns(runs) {
  * dim labels with a bar (ratio from the two numbers the game drew) and "cur/max" right-anchored in amber (MP light blue). A row the game
  * draws with placeholders ("----") is shown as its own text, no bar.
  */
-export function composeInfoCard(p, i, runs, used: Set<unknown>, out) {
+export function composeInfoCard(p: PagePart, i: string | number, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used);
@@ -196,21 +275,21 @@ export function composeInfoCard(p, i, runs, used: Set<unknown>, out) {
             continue;
         }
         // placeholders or an unknown row: the game's own strings, left to right
-        s.raw.forEach((m, j: number) => out.push(lbl(`${k}.${s.id}.${j}`, m.text, applyRel({ x: m.x, y: mid - N(12), w: N(Math.max(40, (m.w ?? 8) * 3.5)), h: N(24) }, rel), 18, 24, { color: j === 0 ? "var(--c-dim-label)" : "var(--c-num)", rel })));
+        s.raw.forEach((m, j) => out.push(lbl(`${k}.${s.id}.${j}`, m.text, applyRel({ x: m.x, y: mid - N(12), w: N(Math.max(40, (m.w ?? 8) * 3.5)), h: N(24) }, rel), 18, 24, { color: j === 0 ? "var(--c-dim-label)" : "var(--c-num)", rel })));
     }
 }
 
 /** A hint plate ("Button: Back"): chamfered frame, bleeding to the screen edge, the game's text with its button badge. */
-export function composeHint(p: FooterPart, i: string | number, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
+export function composeHint(p: FooterPart, i: string | number, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
     // one line per pen line: runs on the same line (the gym's "TP 1  TP 5  TP10" choices) stay side by side at the game's own x
-    const lines = [];
+    const lines: HintLine[] = [];
     for (const m of mine) { const l = lines.find((q) => Math.abs(q[0].y - m.y) <= 2); if (l) l.push(m); else lines.push([m]); }
     lines.forEach((line, k) => {
         const y = r.y + (r.h - N(36) * lines.length) / 2 + k * N(36);
-        line.forEach((m, j) => {
+        line.forEach((m: FaceRun, j) => {
             // the first run: inset 36 dp, or the game's own x when the plate has a lead in front of the text (the drill plate's stripes)
             const x = j ? m.x : Math.max(r.x + N(36), m.x), end = line[j + 1]?.x ?? r.x + r.w;
             tokenLine(j ? `hint${i}.l${k}.${j}` : `hint${i}.l${k}`, m.text, x, y, rel, out, { w: end - x - (line[j + 1] ? 2 : 8), color: m.face ?? null });   // the game's face colour (the drill gain is light blue)
@@ -223,7 +302,7 @@ export function composeHint(p: FooterPart, i: string | number, runs: UiRun[], us
  * "Not enough BIT." over the buy list): the plate goes over the list (layer "over", above the item icons), its text is the leftmost run
  * column only, and the list texts under it are taken (covered) -- the disc overprints them, unreadable.
  */
-export function composeHeaderPlate(p: FooterPart, i: number, runs: UiRun[], used: Set<unknown>, out: UiPart[], cover = false) {
+export function composeHeaderPlate(p: FooterPart, i: number, runs: PageRun[], used: Set<unknown>, out: UiPart[], cover = false) {
     const rel = p.rel, r = clipRect(p);
     out.push(cover ? { ...platePart(p, i), layer: "over" } : platePart(p, i));
     let mine = takeIn(runs, r, used);
@@ -250,7 +329,7 @@ export const WIN_TITLE = Object.freeze({ bodyDy: 9, tabDx: N(18) });
  * The window of rows: the window plate, one plate per label (pitch read from the labels), the cursor row orange and pushed out, the
  * chevron in the pose the game's cursor glyph says. `win` is the claimed window part; labels = the runs inside it below `titleH`.
  */
-export function composeRows(win, i: string | number, runs: UiRun[], used: Set<unknown>, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
+export function composeRows(win: RelClip, i: string | number, runs: PageRun[], used: Set<unknown>, out: UiPart[], opt: RowsOpts = {}) {
     const rel = win.rel, wr = clipRect(win), titleH = opt.titleH ?? 0;
     const body = { x: wr.x, y: wr.y + titleH, w: wr.w, h: wr.h - titleH };
     // a titled window (CARD FOLDERS, the techniques list, the equipment item grid) = the C4 tab panel: the window from WIN_TITLE.bodyDy below
@@ -269,22 +348,22 @@ export function composeRows(win, i: string | number, runs: UiRun[], used: Set<un
     const cur = inside.find((r) => isCursorToken(r.text));
     const plain = inside.filter((r) => !isCursorToken(r.text) && r.right == null).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
     // one row per pen line: the leftmost run is its label, any other run on the same line (the "X 1" count of an item row) is drawn in it
-    const rows = [], extras = [];
+    const rows: PageRun[] = [], extras: PageRun[] = [];
     for (const r of plain) (rows.some((q) => Math.abs(q.y - r.y) <= 2) ? extras : rows).push(r);
     const onRowY = (r: { y: number; }) => rows.some((q) => Math.abs(q.y - r.y) <= 2);
     inside.filter((r) => !isCursorToken(r.text) && r.right != null).forEach((r) => { if (onRowY(r)) extras.push(r); else used.delete(r); });   // other numbers stay generic text
     // a question box (C9: the field Yes / No, the choice box): the top line without the cursor is the prompt, Russo 26 / 36 at the game's x
-    if (opt.question && rows.length > 1 && !(cur && Math.abs(rows[0].y - cur.y) <= 2)) {
-        const q = rows.shift();
+    if (opt.question && rows.length > 1 && !(cur && Math.abs(rows[0]!.y - cur.y) <= 2)) {
+        const q = rows.shift()!;
         tokenLine(`win${i}.prompt`, q.text, q.x, q.y + 4.5 - N(36) / 2, rel, out, { w: body.x + body.w - q.x - 4 });
     }
     if (!rows.length) return;
-    const gaps = rows.slice(1).map((r, k) => r.y - rows[k].y).filter((d) => d > 3);
+    const gaps = rows.slice(1).map((r, k) => r.y - rows[k]!.y).filter((d) => d > 3);
     const pitch = gaps.length ? Math.min(...gaps) : 14;
     // the confirm box (C5): 40 dp rows centred on the game's pen line (9 native glyph rows), Russo 26 / 40, the focused row pushed out
     const c = opt.confirm ? CONFIRM : null, h = c ? Math.min(c.rowH, pitch - 2) : pitch - 2;
-    const selected = cur ? rows.reduce((b, r) => (Math.abs(r.y - cur.y) < Math.abs(b.y - cur.y) ? r : b), rows[0]) : null;
-    rows.forEach((r, k) => {
+    const selected = cur ? rows.reduce((b, r) => (Math.abs(r.y - cur.y) < Math.abs(b.y - cur.y) ? r : b), rows[0]!) : null;
+    rows.forEach((r: FaceRun, k) => {
         const on = r === selected, top = c ? r.y + 4.5 - h / 2 : r.y - 1, px = body.x + 10;
         const left = c ? body.x + (on ? c.onIn : c.plainIn) : on ? px - 6 : px;
         const rect = applyRel({ x: left, y: top, w: body.x + body.w - left + 1, h }, rel);
@@ -307,7 +386,7 @@ export function composeRows(win, i: string | number, runs: UiRun[], used: Set<un
  * The number spinner ("X 1" under "How many?"): the C ch box with the orange live edge, "X" dim Russo 26 at the game's x, the count
  * Chakra Petch 700 40 right-anchored on the game's right edge; both centred on the box. The count is the game's run, never state.
  */
-export function composeSpinner(p, i, runs, used: Set<unknown>, out) {
+export function composeSpinner(p: RelClip, i: string | number, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), mid = r.y + r.h / 2;
     out.push(spinnerPlate(`spin${i}.plate`, applyRel(r, rel), rel, true));
     for (const m of takeIn(runs, r, used)) {
@@ -322,8 +401,8 @@ export function composeSpinner(p, i, runs, used: Set<unknown>, out) {
 }
 
 /** The spinner's up / down arrows: the game draws them while the count can change; the C triangles on its x, centred on the spinner box. */
-export function composeSpinArrows(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, parts, out) {
-    const r = clipRect(p), box = parts.filter((q: { part: string; }) => q.part === "spinner").map(clipRect).find((b) => r.x >= b.x - 4 && r.x < b.x + b.w + 4 && r.y >= b.y - 4 && r.y < b.y + b.h + 4);
+export function composeSpinArrows(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i: string | number, parts: { part: string; }[], out: UiPart[]) {
+    const r = clipRect(p), box = parts.filter((q) => q.part === "spinner").map(clipRect).find((b) => r.x >= b.x - 4 && r.x < b.x + b.w + 4 && r.y >= b.y - 4 && r.y < b.y + b.h + 4);
     out.push(spinArrows(`spin${i}.arrows`, r.x + r.w / 2, box ? box.y + box.h / 2 : r.y + r.h / 2, p.rel));
 }
 
@@ -341,10 +420,10 @@ export const LOCKED_ROW = 8;
  * The state of every card from the highlight parts: "on" (the cursor), "locked" (SORT holds this partner) or "normal". The palette
  * row of the draw call decides (row 8 = locked); a highlight without a row is the cursor.
  */
-export function cardStates(cards, highlights) {
-    const st = cards.map(() => "normal");
+export function cardStates(cards: { y: number; }[], highlights: { y: number; row: number; }[]) {
+    const st: CardState[] = cards.map(() => "normal");
     for (const h of highlights) {
-        const i = cards.findIndex((c: { y: number; }) => Math.abs(c.y - h.y) < 3);
+        const i = cards.findIndex((c) => Math.abs(c.y - h.y) < 3);
         if (i < 0) continue;
         st[i] = (h.row | 0) === LOCKED_ROW ? "locked" : "on";
     }
@@ -363,14 +442,14 @@ export function cyclePulse(row: number) {
  * The SORT swap bracket (C style): an orange bar right of the portraits with two arrow heads pointing at the two portraits. `p` = the
  * claimed bracket clip; the arrows sit 7 native below its top and 8 above its bottom (the portrait centres of the two cards).
  */
-export function composeBracket(p, out) {
+export function composeBracket(p: PagePart, out: UiPart[]) {
     const r = clipRect(p);
     out.push({ key: "swap.bracket", kind: "bracket", part: "swapBracket", layer: "over", rect: r, arrows: [7 * p.rel.d, r.h - 8 * p.rel.d], color: "var(--c-orange)", sx: p.rel.a, sy: p.rel.d });
 }
 
-function composePickerCard(i, card, namePart, portrait, state: string, runs, used, out, hl = null) {
+function composePickerCard(i: number, card: PagePart, namePart: PagePart | null, portrait: PagePart | null, state: string, runs: PageRun[], used: Set<unknown>, out: UiPart[], hl: PagePart | null = null) {
     const Y = card.y, rel = card.rel, f = inCard(rel, card.x, Y), c = COLORS[state], k = `card${i}`;
-    runs.filter((m: { x: number; y: number; }) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
+    runs.filter((m) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
     partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker as unknown as typeof CARD_VARIANTS.home, c);
     if (portrait) {
         out.push(plate(`${k}.portrait`, "portrait", f(469, 3, 128, 128), rel, { edge: c.edge }));
@@ -380,7 +459,7 @@ function composePickerCard(i, card, namePart, portrait, state: string, runs, use
 }
 
 /** The header of the sidebar pages (C2): plate 664 x 69 slanted left, the game's title in Russo One 30. */
-function composePageHeader(part: FooterPart & { x: number; y: number }, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
+function composePageHeader(part: PagePart, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = part.rel, f = at(rel, part.x - 34, part.y - 13);
     out.push({ key: "header.plate", kind: "plate", part: "header", layer: "under", rect: f(616, 39, 664, 69), shape: "sl", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const m of takeIn(runs, { x: 100, y: part.y, w: 300, h: 22 }, used)) tokenLine("header.t", m.text, dx(676), N(53) + (part.y - 13), rel, out, { role: "label", sizeDp: 30, lineDp: 40, w: 150 });
@@ -391,26 +470,26 @@ function composePageHeader(part: FooterPart & { x: number; y: number }, runs: Ui
  * (the screen's own parts, composed right after the backdrop: the status sheets, sheets.js) }. The right part follows the clips the game draws: the 5-row list (cmfont panel) gets the home list,
  * the folders page its title + rows window, the partner pickers the big wall and the faint word.
  */
-export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
-    const out = [], used = cfg.used ?? new Set();
-    const of = (n: string) => parts.filter((p) => p.part === n);
+export function composePausePage({ parts, runs }: ScreenParts, cfg: PausePageOpts = {}): UiPart[] {
+    const out: UiPart[] = [], used: Set<UiRun> = cfg.used ?? new Set();
+    const of = (n: string): PagePart[] => parts.filter((p) => p.part === n);
     const back = of("backdrop")[0], panel = of("panel")[0], folder = of("folderWin")[0], header = of("header")[0], money = of("money")[0], foot = of("footer")[0];
-    const cards = of("card").sort((a: { y: number; }, b: { y: number; }) => a.y - b.y), names = of("cardName"), portraits = of("portrait");
+    const cards = of("card").sort((a, b) => a.y - b.y), names = of("cardName"), portraits = of("portrait");
     if (back) composeBackdropPart(back, { wall: cfg.wall ?? (!panel && !folder), word: panel || folder ? null : cfg.word, wordAt: cfg.wordAt, wordDp: cfg.wordDp }, out);
     if (cfg.extra) cfg.extra(parts, runs, used, out);
     if (panel) {
-        const mine = runs.filter((r: { x: number; y: number; }) => r.x >= panel.x && r.y >= panel.y && r.y < 160);
+        const mine = runs.filter((r) => r.x >= panel.x && r.y >= panel.y && r.y < 160);
         composePanel(panel, mine, out, cfg.word ?? "MENU");
-        mine.forEach((r: UiRun) => used.add(r));
+        mine.forEach((r) => used.add(r));
     }
     if (folder) composeRows(folder, 0, runs, used, out, { titleH: 17 });
     if (header) composePageHeader(header, runs, used, out);
     const highlights = of("highlight"), states = cardStates(cards, highlights);
-    cards.forEach((c: { y: number; }, i: string | number) => composePickerCard(i, c, names.find((n: { y: number; }) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p: { y: number; }) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i], runs, used, out,
-        highlights.find((h: { y: number; }) => Math.abs(h.y - c.y) < 3) ?? null));
+    cards.forEach((c, i) => composePickerCard(i, c, names.find((n) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i], runs, used, out,
+        highlights.find((h) => Math.abs(h.y - c.y) < 3) ?? null));
     for (const b of of("bracket")) composeBracket(b, out);
     for (const d of of("detail")) composeDetail(d, runs, used, out);
-    if (money) { composeMoney(money, runs, out); runs.filter((r: { x: number; y: number; }) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r: UiRun) => used.add(r)); }
+    if (money) { composeMoney(money, runs, out); runs.filter((r) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r) => used.add(r)); }
     if (foot) composeFooter(foot, runs, used, out);
     composeLists(parts, runs, used, out, { skip: folder ? [clipRect(folder)] : [], pulse: cyclePulse });
     restOfRuns(runs, used, ID, out, "page");
@@ -419,12 +498,12 @@ export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
 
 // ------------------------------------------------------------------------------------------------ one window + plates (lab, shop, inn, help, demo)
 /** Parts by claim: header / hint / name / money plates with their text, the window of rows, any other claimed plate plain. */
-export function composeWindowPage({ parts, runs }, cfg: { wash?: boolean; messageWindow?: boolean; word?: string | null; } = {}) {
-    const out = [], used = new Set();
+export function composeWindowPage({ parts, runs }: ScreenParts, cfg: WindowPageCfg = {}): UiPart[] {
+    const out: UiPart[] = [], used = new Set<unknown>();
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
-    const lists = parts.filter((p: { part: string; }) => p.part === "listWin").map(clipRect);
-    const overList = (p) => { const r = clipRect(p); return lists.some((l) => r.x < l.x + l.w && l.x < r.x + r.w && r.y < l.y + l.h && l.y < r.y + r.h); };
-    parts.forEach((p, i) => {
+    const lists = parts.filter((p: PagePart) => p.part === "listWin").map(clipRect);
+    const overList = (p: PagePart) => { const r = clipRect(p); return lists.some((l) => r.x < l.x + l.w && l.x < r.x + r.w && r.y < l.y + l.h && l.y < r.y + r.h); };
+    parts.forEach((p: PagePart, i) => {
         if (p.part === "backdrop") composeBackdropPart(p, {}, out);
         else if (p.part === "window") composeRows(p, i, runs, used, out);
         else if (p.part === "confirm") composeRows(p, i, runs, used, out, { confirm: true });
@@ -455,32 +534,32 @@ export function composeWindowPage({ parts, runs }, cfg: { wash?: boolean; messag
         else if (p.part === "folder") composeFolderPlate(p, i, out);
         else if (p.shape) out.push(platePart(p, i));
     });
-    composeLists(parts, runs, used, out, { skip: parts.filter((p: { part: string; }) => p.part === "window").map(clipRect), pulse: cyclePulse });
+    composeLists(parts, runs, used, out, { skip: parts.filter((p: PagePart) => p.part === "window").map(clipRect), pulse: cyclePulse });
     composeArrows(runs, used, out);
     restOfRuns(runs, used, ID, out, "w");
     return out;
 }
 
 /** A deck folder row (card shop / deck editor): the C frame, orange edge on the cursor's folder, cyan while it is held for the actions. */
-function composeFolderPlate(p: { state: string; }, i, out) {
+function composeFolderPlate(p: PagePart, i: number, out: UiPart[]) {
     const edge = p.state === "on" ? "var(--c-orange)" : p.state === "held" ? "var(--c-cyan)" : "var(--c-edge)";
     out.push({ ...platePart(p, i), edge });
 }
 
 /** The ITEMS bag (C3): stripes, the full-width list window with the faint word, the tab, item cells, pager, detail line, footer. */
-export const composeListPage = (c: Parameters<typeof composeWindowPage>[0], cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
+export const composeListPage = (c: ScreenParts, cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
 
 /**
  * The shop item line on "Equip who?" (one clip): name plate | Equip / Items plate, and the price plate under the right end. The split
  * points are the clip's own sheet layers: the first tall layer starts the stats block, the second one starts the price plate.
  */
-export function shopDetailRects(layers) {
+export function shopDetailRects(layers: UiRect[]) {
     if (!layers.length) return [];
     const tall = layers.filter((l: { h: number; }) => l.h > 30).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x);
     const right = Math.max(...layers.map((l) => l.x + l.w)), top = Math.min(...layers.map((l) => l.h));
     const full = Math.max(...layers.map((l) => l.h));
     if (tall.length < 2) return [{ x: 0, y: 0, w: right, h: full, shape: "ch" }];
-    const s = tall[0].x, p = tall[1].x;
+    const s = tall[0]!.x, p = tall[1]!.x;
     return [
         { x: 0, y: 0, w: s, h: top, shape: "ch" },
         { x: s, y: 0, w: right - s, h: top, shape: "ch" },
@@ -488,7 +567,7 @@ export function shopDetailRects(layers) {
     ];
 }
 
-function composeShopDetail(p, i, runs, used: Set<unknown>, out) {
+function composeShopDetail(p: PagePart, i: number, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, rects = shopDetailRects(p.layers ?? []);
     rects.forEach((r, k) => out.push(plate(`p${i}.detail${k}`, "detail", applyRel({ x: p.x + r.x, y: p.y + r.y, w: r.w, h: r.h }, rel), rel, { shape: r.shape })));
     // the name block and the Equip / Items block (the top row): C3 detail texts; the price plate under them keeps the generic money text
@@ -499,12 +578,12 @@ function composeShopDetail(p, i, runs, used: Set<unknown>, out) {
 }
 
 /** The shop partner-card cursor frame: C corner brackets in the cursor's colour cycle (the game's palette row). */
-function composePickHighlight(p: { row: number; rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, out) {
+function composePickHighlight(p: { row: number; rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i: number, out: UiPart[]) {
     out.push(corners(`p${i}.pick`, clipRect(p), cyclePulse(p.row), p.rel));
 }
 
 /** The game's stat-change arrow token ("48 [arrow-right] 62") as a small orange chevron at the token's pen position. */
-export function composeArrows(runs: { text: string; x: number; y: number; }[], used: Set<unknown>, out) {
+export function composeArrows(runs: { text: string; x: number; y: number; }[], used: Set<unknown>, out: UiPart[]) {
     runs.forEach((r: { text: string; x: number; y: number; }, k) => {
         if (used.has(r) || r.text !== "[arrow-right]") return;
         used.add(r);
@@ -514,11 +593,11 @@ export function composeArrows(runs: { text: string; x: number; y: number; }[], u
 }
 
 /** The money plate of the shop screens: the game's amount (right-anchored, Chakra Petch 700) and its unit in orange. */
-function composeMoneyPlate(p, i, runs, used: Set<unknown>, out) {
+function composeMoneyPlate(p: PagePart, i: number, runs: PageRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used);
-    const amount = mine.find((m: { right: null; text: string; }) => m.right != null || /^[0-9,.]+$/.test(m.text)), unit = mine.find((m) => m !== amount);
+    const amount = mine.find((m) => m.right != null || /^[0-9,.]+$/.test(m.text)), unit = mine.find((m) => m !== amount);
     const top = r.y + (r.h - N(42)) / 2;
     const edge = amount ? (amount.right ?? amount.x + (amount.w ?? 20)) : 0;
     if (amount) out.push(lbl(`money${i}.amount`, amount.text, applyRel({ x: edge - N(140) - 2, y: top, w: N(140), h: N(42) }, rel), 32, 42, { role: "number", align: "right", rel, maxDp: 140 }));
@@ -526,6 +605,6 @@ function composeMoneyPlate(p, i, runs, used: Set<unknown>, out) {
 }
 
 /** The lab / gym partner pickers: plates by claim (info card, hints, header, window, stat window, TP plate) and all their text; capsules are art. */
-export function composeCapsule({ parts, runs }) {
+export function composeCapsule({ parts, runs }: ScreenParts) {
     return composeWindowPage({ parts, runs }, {});
 }

@@ -17,7 +17,7 @@
 // unchanged (tests/mount.test.js proves it position by position).
 import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit, mountRenderInfo, probeFramebuffer, renderSelfTest, sceneProbe } from "./mount3d.js";
 import type { GameState } from "./game/types.js";
-import type { Dw2Model } from "./mount3d.js";
+import type { MountAsset } from "./mount3d.js";
 
 
 /**
@@ -82,7 +82,8 @@ const S = {
   dir: "down",
   moving: false,
   granted: new Set(),      // mount ids unlocked by a quest (filled from the quest layer each tick)
-  asset: null,
+  // ETS item 9: a bare null types the field as null only; the asset is a MountAsset once loaded
+  asset: null as MountAsset | null,
   loading: false,
   rendererFailed: false,
   lastRender: 0,
@@ -145,8 +146,8 @@ export function mountActorHidden(npc) {
   return !!host?.questDone?.(def.unlock) && S.mode !== "idle";
 }
 
-const actorAssets = new Map();   // url -> asset | null (loading or missing)
-function actorAsset(key: string, url: string): Dw2Model | null {
+const actorAssets = new Map<string, MountAsset | null>();   // url -> asset | null (loading or missing)
+function actorAsset(key: string, url: string): MountAsset | null {
   if (actorAssets.has(url)) return actorAssets.get(url);
   actorAssets.set(url, null);
   loadMountAsset(key, url).then((a) => actorAssets.set(url, a)).catch(() => {});

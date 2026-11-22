@@ -11,42 +11,184 @@
 import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendGoto, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
 import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
-import type { MpRosterRow, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
-interface MpLeaguePair { a: string; b: string; r: number; m: number; }
+import type { MpFoe, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
+// the tamer ids of a Server Champ night are the room's peer ids: whole numbers (server/room-core.mjs checks Number.isInteger)
+interface MpLeaguePair { a: number; b: number; r: number; m: number; game: number; }
 
 interface MpLeagueMatch {
-  a: string;
-  b: string;
-  w?: string | null;
-  g?: string[];
+  a: number;
+  b: number;
+  w?: number | null;
+  g?: number[];
   bye?: boolean;
   dead?: boolean;
   wo?: boolean;
 }
 
+/** The Server Champ night as the dock reads it (unpackLeague in web/mp-league.ts makes it from the room's packed copy). */
+interface MpLeagueNight {
+  bestOf: number;
+  ids: number[];
+  dropped: number[];
+  r: number;
+  phase: string;
+  asked: boolean;
+  champ: number | null;
+  rounds: MpLeagueMatch[][];
+}
+
+/** The room's packed bracket as it travels in one relay message (see packLeague in web/mp-league.ts). */
+interface MpLeagueWire {
+  b: number;
+  i: number[];
+  d: number[];
+  r: number;
+  f: string;
+  k: 0 | 1;
+  c?: number | null;
+  R: (number | null)[][][];
+}
+
+/** What the room says happened in the bracket; the fields depend on k. */
+type MpLeagueEvent =
+  | { k: "closed" }
+  | { k: "open" }
+  | { k: "pair"; r: number; a: number; b: number }
+  | { k: "game"; w: number; n: number; a: number; b: number }
+  | { k: "win"; w: number; l: number; g: string; c?: boolean }
+  | { k: "drop"; id: number; w?: number | null }
+  | { k: "round"; r: number };
+
+interface MpLogMark { queued?: boolean; dropped?: boolean; }
+
+/** One line of the ALL / CHAT / EVENTS log. */
+type MpLogEntry =
+  | { k: "sys"; text: string; at?: string }
+  | { k: "chat"; name: string; text: string; self?: boolean | undefined; mark?: MpLogMark | undefined; at?: string }
+  | { k: "feed"; kind: string; name: string; text: string; self?: boolean; at?: string };
+
+interface MpSocialState { tab: string; log: MpLogEntry[]; collapsed: boolean; unread: number; }
+
+/** One Digimon of a player card (what mpCard in web/game/mp-chat.ts sends). */
+interface MpCardMon {
+  n: string;
+  f: string;
+  id: number;
+  lv: number;
+  xp: number;
+  hp: number;
+  mhp: number;
+  mp: number;
+  mmp: number;
+  st: Record<string, number>;
+}
+
+/** A player's card: their party, chapter, BIT and quests. `champ` is set by the dock for the Server Champ. */
+interface MpCard {
+  v: number;
+  chapter: number;
+  bits: number;
+  quests: number;
+  party: MpCardMon[];
+  champ?: boolean;
+}
+
+/** One row of the PLAYERS tab: a peer of the room, or me ("self"). */
+interface MpPlayerRow {
+  id: number;
+  name: string;
+  map: string | null;
+  card: MpCard | null;
+  self?: boolean;
+  away?: boolean;
+}
+
+/** An offer in a trade: items and BIT. */
+interface MpTradeOffer { items: MpTradeItem[]; bits: number; }
+
+type MpTimerId = ReturnType<typeof setTimeout>;
+
+interface MpDuelResult { hp: number; won: boolean; }
+interface MpDuel { st: string; id: number; mine: MpDuelResult | null; theirs: MpDuelResult | null; }
+
+interface MpCoopBase { id: number; foes: MpFoe[]; label: string; screens?: number[] | undefined; timer: MpTimerId; }
+/** A co-op fight I offered ("out"): `start` runs it here. */
+interface MpCoopOut extends MpCoopBase { st: "out"; scaled: MpFoe[]; start: (foes: MpFoe[], partnerId?: number | null) => boolean | void; }
+/** A co-op fight my partner offered me ("in"). */
+interface MpCoopIn extends MpCoopBase { st: "in"; }
+type MpCoop = MpCoopOut | MpCoopIn;
+
+interface MpPartyAsk { id: number; out: boolean; }
+interface MpGo { st: string; id: number; timer: MpTimerId; }
+
+/** The shared enemy of a co-op fight, as the battle reports it. */
+interface MpCoopState {
+  index: number;
+  hp: number;
+  maxHp: number;
+  count: number;
+  me: { name: string; hp: number; maxHp: number } | null;
+}
+
+/** What the game gives the dock (built in web/game.ts). */
+interface MpSocialApi {
+  card: () => MpCard | null;
+  currentMapId: () => string | null;
+  mapName: (id: string) => string | null;
+  busy: () => boolean;
+  releaseKeys: () => void;
+  where: () => { map: string | null; x: number; y: number; dir: string };
+  canGo: () => boolean;
+  warpNear: (mapId: string, x: number, y: number) => Promise<string>;
+  bits: () => number;
+  canFight: () => boolean;
+  coopState: () => MpCoopState | null;
+  coopSetHp: (i: number, hp: number) => void;
+  coopFight: (foes: MpFoe[], done: () => void, screens?: number[]) => boolean;
+  startDuel: (card: MpCard | null, cb: (res: MpDuelResult) => void) => boolean;
+  tradable: () => MpTradeItem[];
+  exchange: (gives: MpTradeOffer, gets: MpTradeOffer) => string;
+}
+
+interface MpSocialInstall { stageEl: HTMLElement; api: MpSocialApi; }
+
+// The messages the relay sends the dock (server/room-core.mjs checks them). One interface per kind of message;
+// MpDockEvent is all of them together, because the listener gets every kind.
+interface MpChatEv { name: string; text: string; self?: boolean; mark?: MpLogMark; kind: string; status: string; }
+interface MpTradeMsg { op: string; from: number; items: MpTradeItem[]; bits: number; gives: MpTradeOffer; gets: MpTradeOffer; reason: string; }
+interface MpDuelMsg { op: string; from: number; hp: number; won: boolean; }
+interface MpCoopMsg { op: string; from: number; foes: MpFoe[]; label: string; screens?: number[]; }
+interface MpGotoMsg { op: string; from: number; map: string; x: number; y: number; }
+interface MpLeagueMsg { op: string; why: string; lg: MpLeagueWire | null; pair: MpLeaguePair | null; ev: MpLeagueEvent | null; }
+interface MpDockEvent extends MpChatEv, MpTradeMsg, MpDuelMsg, MpCoopMsg, MpGotoMsg, MpLeagueMsg { }
+
+interface MpKindIcons { level: [string, string]; quest: [string, string]; evolve: [string, string]; info: [string, string]; [kind: string]: [string, string] | undefined; }
+
 
 const MAX_LOG = 300;
-const S = { tab: "all", log: [], collapsed: false, unread: 0 };
-let api = null, dock = null, el = {} as MpSocialEls, trade = null as MpTrade, duel = null, go = null, inspectId = null;
-let prevParty = null, lastCardJson = "";
-let myMapSeen = null;                                        // the map my PLAYERS row was last drawn for
-let league = null, leaguePair = null, leagueGames = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
+const S: MpSocialState = { tab: "all", log: [], collapsed: false, unread: 0 };
+// ETS item 9: installSocial sets api, dock and el (null as never, {} as MpSocialEls) before any other function of this file can run
+let api: MpSocialApi = null as never, dock: HTMLElement = null as never, el = {} as MpSocialEls, trade: MpTrade | null = null, duel: MpDuel | null = null, go: MpGo | null = null, inspectId: number | null = null;
+let prevParty: MpCardMon[] | null = null, lastCardJson = "";
+let myMapSeen: string | null = null;                         // the map my PLAYERS row was last drawn for
+let league: MpLeagueNight | null = null, leaguePair: MpLeaguePair | null = null, leagueGames: number[] = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
 
 // ------------------------------------------------------------ small helpers
-const h = (tag, cls?, ...kids) => {
+// ETS item 38: the kids are nodes, strings, numbers or false/null; each is checked in the body (nodeType), never returned
+const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, ...kids: any[]): HTMLElementTagNameMap[K] => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     for (const k of kids) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }
     return e;
 };
-const btn = (label, onclick, cls = "") => { const b = h("button", cls, label); b.type = "button"; b.onclick = onclick; return b; };
+const btn = (label: string, onclick: () => void, cls = "") => { const b = h("button", cls, label); b.type = "button"; b.onclick = onclick; return b; };
 const clock = () => new Date().toTimeString().slice(0, 5);
-const hue = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x % 360; };
-const nameColor = (n) => `hsl(${hue(n)} 85% 72%)`;
-const place = (mapId) => (mapId ? (api.mapName(mapId) || mapId) : "somewhere new");
-const note = (text) => add({ k: "sys", text });
+const hue = (s: string) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x % 360; };
+const nameColor = (n: string) => `hsl(${hue(n)} 85% 72%)`;
+const place = (mapId: string | null) => (mapId ? (api.mapName(mapId) || mapId) : "somewhere new");
+const note = (text: string) => add({ k: "sys", text });
 
-function add(entry) {
+function add(entry: MpLogEntry) {
     entry.at = clock();
     S.log.push(entry);
     if (S.log.length > MAX_LOG) S.log.shift();
@@ -55,7 +197,7 @@ function add(entry) {
 }
 
 // ------------------------------------------------------------ the log
-const KIND: Record<string, string[]> = { level: ["▲", "#ffd34d"], quest: ["★", "#7dffa0"], evolve: ["◆", "#ff9af0"], info: ["•", "#9ad0ff"] };
+const KIND: MpKindIcons = { level: ["▲", "#ffd34d"], quest: ["★", "#7dffa0"], evolve: ["◆", "#ff9af0"], info: ["•", "#9ad0ff"] };
 
 function drawLog() {
     if (!el.log) return;
@@ -91,7 +233,7 @@ function badge() {
     el.unread.hidden = !(S.collapsed && S.unread);
 }
 
-function setTab(t) {
+function setTab(t: string) {
     S.tab = t; if (t !== "players") S.unread = 0;
     for (const [k, b] of Object.entries(el.tabs)) b.classList.toggle("on", k === t);
     el.log.hidden = t === "players"; el.players.hidden = t !== "players";
@@ -99,7 +241,7 @@ function setTab(t) {
 }
 
 // ------------------------------------------------------------ players
-function levelLine(card) {
+function levelLine(card: MpCard | null) {
     const lead = card?.party?.[0];
     return lead ? `Lv ${lead.lv} ${lead.f || lead.n}` : card ? "no Digimon yet" : "no card yet";
 }
@@ -114,7 +256,8 @@ function drawPlayers() {
     sel.onchange = () => { try { localStorage.setItem(KEY_STR, sel.value); } catch { /* storage blocked */ } };
     el.players.append(h("div", "sub", "Co-op boss strength ", sel, partner != null ? `   Partner: ${peerOf(partner)?.name ?? "?"}` : ""));
     if (serverChampOn()) el.players.append(leagueStrip());
-    const rows: MpRosterRow[] = [{ id: myId(), name: myName(), map: here, card: api.card(), self: true }, ...peerList()];
+    // ETS item 9: the dock is shown only while online (see tick below), and a room welcome gave me my id; offline the row is hidden
+    const rows: MpPlayerRow[] = [{ id: myId()!, name: myName(), map: here, card: api.card(), self: true }, ...peerList()];
     for (const p of rows) {
         const nm = h("b", "nm", (p.id === partner ? "★ " : "") + p.name); nm.style.color = isChamp(p) ? "#ffd34d" : nameColor(p.name);
         const where = h("div", "sub", `${levelLine(p.card)}  ·  ${place(p.map)}${p.map && p.map === here ? "  ●" : ""}`);
@@ -130,12 +273,12 @@ function drawPlayers() {
 }
 
 // ------------------------------------------------------------ inspect
-function bar(v, max, cls) {
+function bar(v: number, max: number, cls: string) {
     const w = max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0;
     const b = h("div", "bar " + cls); const f = h("i"); f.style.width = w + "%"; b.append(f); return b;
 }
 
-function openInspect(id) {
+function openInspect(id: number) {
     inspectId = id; drawInspect();
 }
 function closeInspect() { inspectId = null; if (el.inspect) el.inspect.hidden = true; }
@@ -143,7 +286,7 @@ function closeInspect() { inspectId = null; if (el.inspect) el.inspect.hidden = 
 function drawInspect() {
     if (inspectId == null || !el.inspect) return;
     const self = inspectId === myId();
-    const p = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
+    const p: MpPlayerRow | null = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
     if (!p) { closeInspect(); return; }
     const c = p.card;
     const box = el.inspect; box.hidden = false; box.replaceChildren();
@@ -168,15 +311,15 @@ function drawInspect() {
 }
 
 // ------------------------------------------------------------ trading
-const offerLine = (o) => {
+const offerLine = (o: MpTradeOffer | null | undefined) => {
     const parts = (o?.items ?? []).map((i) => `${i.qty} x ${i.name || "item " + i.id}`);
     if (o?.bits) parts.push(`${o.bits} BIT`);
     return parts.join(", ") || "nothing";
 };
 
-function newTrade(st, id) { return { st, id, mine: { items: {}, bits: 0 }, theirs: { items: [], bits: 0 }, myOk: false, theirOk: false, bag: [] }; }
+function newTrade(st: string, id: number): MpTrade { return { st, id, mine: { items: {}, bits: 0 }, theirs: { items: [], bits: 0 }, myOk: false, theirOk: false, bag: [] }; }
 
-function askTrade(id) {
+function askTrade(id: number) {
     if (trade) { note("You are already in a trade."); return; }
     const p = peerOf(id); if (!p) return;
     if (p.away) { note(`${p.name} is away.`); return; }
@@ -186,17 +329,21 @@ function askTrade(id) {
 }
 
 function myOffer() {
-    const held: Map<number, MpTradeItem> = new Map(trade.bag.map((b) => [b.id, b] as [number, MpTradeItem]));
+    // ETS item 9: myOffer only runs while a trade is open (drawTrade, confirmTrade, pushOffer)
+    const held: Map<number, MpTradeItem> = new Map(trade!.bag.map((b): [number, MpTradeItem] => [b.id, b]));
     const items: MpTradeItem[] = [];
-    for (const [id, qty] of Object.entries(trade.mine.items)) {
+    // ETS item 9: a trade is open here (see above)
+    for (const [id, qty] of Object.entries(trade!.mine.items)) {
         const b = held.get(+id);
         if (b && qty > 0) items.push({ id: +id, qty: Math.min(qty, b.qty), name: b.name });
     }
-    return { items, bits: Math.max(0, Math.min(trade.mine.bits | 0, api.bits())) };
+    // ETS item 9: a trade is open here (see above)
+    return { items, bits: Math.max(0, Math.min(trade!.mine.bits | 0, api.bits())) };
 }
-function pushOffer() { trade.myOk = false; trade.theirOk = false; sendTrade({ op: "offer", ...myOffer() }); }
+// ETS item 9: pushOffer is only called from the trade window's buttons and confirmTrade, while a trade is open
+function pushOffer() { trade!.myOk = false; trade!.theirOk = false; sendTrade({ op: "offer", ...myOffer() }); }
 
-function endTrade(msg?: string) {
+function endTrade(msg?: string | null) {
     if (msg) note(msg);
     trade = null; if (el.trade) el.trade.hidden = true;
 }
@@ -223,12 +370,15 @@ function drawTrade() {
     for (const b of trade.bag) {
         const q = trade.mine.items[b.id] ?? 0;
         const row = h("div", "it" + (q ? " pick" : ""), h("span", "in", b.name), h("span", "ct", `${q}/${b.qty}`),
-            btn("-", () => { trade.mine.items[b.id] = Math.max(0, q - 1); pushOffer(); drawTrade(); }),
-            btn("+", () => { trade.mine.items[b.id] = Math.min(b.qty, q + 1); pushOffer(); drawTrade(); }));
+            // ETS item 9: these buttons are only on screen while the trade is open
+            btn("-", () => { trade!.mine.items[b.id] = Math.max(0, q - 1); pushOffer(); drawTrade(); }),
+            btn("+", () => { trade!.mine.items[b.id] = Math.min(b.qty, q + 1); pushOffer(); drawTrade(); }));
         list.append(row);
     }
-    const bits = h("input"); bits.type = "number"; bits.min = "0"; bits.max = String(api.bits()); bits.value = String(trade.mine.bits || 0); bits.className = "bits";
-    bits.onchange = () => { trade.mine.bits = Math.max(0, Math.min(api.bits(), bits.value | 0)); pushOffer(); drawTrade(); };
+    // ETS item 38: the input's value is a string that `| 0` turns into a number (as the code always did)
+    const bits: HTMLInputElement & { value: any } = h("input"); bits.type = "number"; bits.min = "0"; bits.max = String(api.bits()); bits.value = String(trade.mine.bits || 0); bits.className = "bits";
+    // ETS item 9: the BIT box is only on screen while the trade is open
+    bits.onchange = () => { trade!.mine.bits = Math.max(0, Math.min(api.bits(), bits.value | 0)); pushOffer(); drawTrade(); };
     mine.append(list, h("div", "sub", "BIT ", bits, ` of ${api.bits()}`));
     const theirs = h("div", "col", h("div", "sub", `${who} gives`), h("div", "offer", offerLine(trade.theirs)),
         h("div", "sub", trade.theirOk ? `${who} confirmed.` : `${who} has not confirmed.`));
@@ -244,7 +394,8 @@ function confirmTrade() {
     trade.bag = api.tradable();                                    // what I really have right now
     const o = myOffer();
     const same = o.items.length === Object.values(trade.mine.items).filter((q) => q > 0).length
-        && o.items.every((i) => trade.mine.items[i.id] === i.qty) && o.bits === (trade.mine.bits | 0);
+        // ETS item 9: confirmTrade returned above unless a trade is open
+        && o.items.every((i) => trade!.mine.items[i.id] === i.qty) && o.bits === (trade.mine.bits | 0);
     if (!same) {                                                   // I no longer have all of it: fix the offer, and ask again
         trade.mine.items = Object.fromEntries(o.items.map((i) => [i.id, i.qty])); trade.mine.bits = o.bits;
         pushOffer(); note("Your offer changed (you no longer had all of it). Check it, then confirm again."); drawTrade();
@@ -258,7 +409,7 @@ function cancelTrade() { if (trade) sendTrade({ op: "cancel" }); endTrade(); }
 
 const END_TEXT: Record<string, string> = { declined: "declined the trade.", cancelled: "cancelled the trade.", left: "left the room.", busy: "is busy with another trade.", gone: "is not here any more." };
 
-function onTrade(m) {
+function onTrade(m: MpTradeMsg) {
     if (m.op === "ask") {
         trade = newTrade("in", m.from);
         const n = peerOf(m.from)?.name ?? "A player";
@@ -288,7 +439,7 @@ function onTrade(m) {
 // A friendly duel: you each fight a copy of the other's team (their Digimon, levels and HP from their card), played by the
 // computer, using the game's own battle. Nothing is kept: EXP, drops and BIT from it are taken back afterwards. Each side
 // then sends how it went; the one who did better against the other's team wins.
-function askDuel(id) {
+function askDuel(id: number) {
     if (duel || trade) { note("Finish what you are doing first."); return; }
     const p = peerOf(id); if (!p) return;
     if (p.away) { note(`${p.name} is away.`); return; }
@@ -302,22 +453,24 @@ function askDuel(id) {
 function startFight() {
     const p = peerHere(duel?.id);
     if (!p) { endDuel("They left."); return; }
-    duel.st = "fight"; drawDuel();
+    // ETS item 9: startFight is only called while a duel is open (askDuel / onDuel / the Accept button set it first)
+    duel!.st = "fight"; drawDuel();
     const started = api.startDuel(p.card, (res) => {
         if (!duel) return;
         duel.mine = res; duel.st = "wait";
         sendDuel({ op: "result", to: duel.id, hp: res.hp, won: res.won });
         drawDuel(); verdict();
     });
-    if (!started) { sendDuel({ op: "cancel", to: duel.id }); endDuel("The duel could not start (are you busy, or without a Digimon?)."); }
+    // ETS item 9: the duel is still open here (see startFight above)
+    if (!started) { sendDuel({ op: "cancel", to: duel!.id }); endDuel("The duel could not start (are you busy, or without a Digimon?)."); }
 }
 
 function verdict() {
     if (!duel?.mine) return;
     const n = peerOf(duel.id)?.name ?? "your friend";
     if (!duel.theirs) { if (!peerHere(duel.id)) endDuel(`${n} left before finishing the duel.`); return; }
-    const score = (r) => (r.won ? 1 : 0) + r.hp, me = score(duel.mine), them = score(duel.theirs);
-    const pct = (r) => (r.won ? `won with ${Math.round(r.hp * 100)}% HP left` : "lost");
+    const score = (r: MpDuelResult) => (r.won ? 1 : 0) + r.hp, me = score(duel.mine), them = score(duel.theirs);
+    const pct = (r: MpDuelResult) => (r.won ? `won with ${Math.round(r.hp * 100)}% HP left` : "lost");
     const text = Math.abs(me - them) < 0.02 ? "A draw!" : me > them ? `You win the duel against ${n}!` : `${n} wins the duel.`;
     endDuel(`Duel with ${n}: ${text}  (you ${pct(duel.mine)}; ${n} ${pct(duel.theirs)})`);
 }
@@ -336,14 +489,16 @@ function drawDuel() {
     const who = peerOf(duel.id)?.name ?? "that player";
     box.hidden = false; box.replaceChildren();
     box.append(h("div", "hd", h("div", "ttl", `Duel with ${who}`)));
-    if (duel.st === "out") box.append(h("div", "sub", `Waiting for ${who} to answer...`), h("div", "acts", btn("Cancel", () => { sendDuel({ op: "cancel", to: duel.id }); endDuel(); })));
+    // ETS item 9: these buttons are only on screen while the duel is open
+    if (duel.st === "out") box.append(h("div", "sub", `Waiting for ${who} to answer...`), h("div", "acts", btn("Cancel", () => { sendDuel({ op: "cancel", to: duel!.id }); endDuel(); })));
     else if (duel.st === "in") box.append(h("div", "sub", `${who} challenges you to a friendly duel. You each fight a copy of the other's team; nothing is kept.`),
-        h("div", "acts", btn("Accept", () => { sendDuel({ op: "yes", to: duel.id }); startFight(); }), btn("Decline", () => { sendDuel({ op: "no", to: duel.id }); endDuel(`You declined ${who}.`); })));
+        // ETS item 9: these buttons are only on screen while the duel is open
+        h("div", "acts", btn("Accept", () => { sendDuel({ op: "yes", to: duel!.id }); startFight(); }), btn("Decline", () => { sendDuel({ op: "no", to: duel!.id }); endDuel(`You declined ${who}.`); })));
     else if (duel.st === "fight") box.append(h("div", "sub", "Fighting..."));
     else box.append(h("div", "sub", `Your fight is over. Waiting for ${who} to finish theirs...`));
 }
 
-function onDuel(m) {
+function onDuel(m: MpDuelMsg) {
     const n = peerOf(m.from)?.name ?? "A player";
     if (m.op === "ask") {
         if (duel || trade || !api.canFight() || !peerOf(m.from)?.card?.party?.length) { sendDuel({ op: "no", to: m.from }); return; }
@@ -366,19 +521,19 @@ function onDuel(m) {
 // (web/mpbattle.js): both Digimon on one side, all the enemies on the other. Each player's own game gives them their own EXP,
 // BIT and quest progress for it.
 const KEY_STR = "dw.mp.strength";
-let partner = null, partyAsk = null, coop = null, rolling = false;
+let partner: number | null = null, partyAsk: MpPartyAsk | null = null, coop: MpCoop | null = null, rolling = false;
 const strength = () => { try { return Math.max(1, Math.min(3, Number(localStorage.getItem(KEY_STR)) || 2)); } catch { return 2; } };
-const scaleFoes = (foes, m) => foes.map((f) => ({
+const scaleFoes = (foes: MpFoe[], m: number) => foes.map((f) => ({
     ...f, hp: Math.min(999999, Math.round(f.hp * m)), stat_scale: Math.max(1, Math.min(64, Math.round((f.stat_scale ?? 16) * (1 + (m - 1) * 0.25)))),
 }));
 
 export const coopPartner = () => partner;
 /** True when a fight should be offered to the partner right now. */
 export const coopReady = () => !!(isOnline() && partner != null && peerHere(partner) && !coop && !rolling && !duel && !trade);
-export function coopRolling(on) { rolling = !!on; }
+export function coopRolling(on: boolean) { rolling = !!on; }
 
 /** Offer a fight to my partner. `start(foes, partnerId)` runs it here (partnerId null = fight alone). Returns false when I have no partner (the caller just fights). */
-export function coopTry(foes, label, start, screens?: any) {
+export function coopTry(foes: MpFoe[], label: string, start: MpCoopOut["start"], screens?: number[]) {
     if (!(isOnline() && partner != null && peerHere(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
     rolling = false;
     const m = strength(), scaled = scaleFoes(foes, m);
@@ -413,13 +568,15 @@ function drawCoop() {
         box.hidden = false;
         box.append(h("div", "hd", h("div", "ttl", `Co-op fight with ${who}`)));
         if (coop.st === "out") box.append(h("div", "sub", `${coop.label || "A fight"}: waiting for ${who} to join (enemies x${strength()} stronger)...`),
-            h("div", "acts", btn("Fight alone", () => { clearTimeout(coop.timer); sendCoop({ op: "cancel", to: coop.id }); const c = coop; coop = null; drawCoop(); c.start(c.foes); })));
+            // ETS item 9: this button is only on screen while the fight I offered ("out") is open
+            h("div", "acts", btn("Fight alone", () => { clearTimeout(coop!.timer); sendCoop({ op: "cancel", to: coop!.id }); const c = coop as MpCoopOut; coop = null; drawCoop(); c.start(c.foes); })));
         else box.append(h("div", "sub", `${who} is starting a fight: ${coop.label || "enemies"} (${coop.foes.map((f) => `${f.name} Lv${f.level}`).join(", ")}). Join them?`),
+            // ETS item 9: these buttons are only on screen while the fight I was offered is open
             h("div", "acts", btn("Join", () => {
-                clearTimeout(coop.timer); sendCoop({ op: "yes", to: coop.id });
-                const c = coop; coop = null; drawCoop();
+                clearTimeout(coop!.timer); sendCoop({ op: "yes", to: coop!.id });
+                const c = coop!; coop = null; drawCoop();
                 note(`Joining ${peerOf(c.id)?.name ?? "your partner"}'s fight...`);   // their game sends the fight setup next
-            }), btn("No", () => { clearTimeout(coop.timer); sendCoop({ op: "no", to: coop.id }); coop = null; drawCoop(); })));
+            }), btn("No", () => { clearTimeout(coop!.timer); sendCoop({ op: "no", to: coop!.id }); coop = null; drawCoop(); })));
         return;
     }
     if (partyAsk && !partyAsk.out) {
@@ -427,14 +584,15 @@ function drawCoop() {
         box.hidden = false;
         box.append(h("div", "hd", h("div", "ttl", `${who} wants to team up`)),
             h("div", "sub", "Team up for the side quests: when one of you starts a quest fight or meets a wild Digimon, the other can join the same fight and share the enemy's HP. The main story stays your own."),
-            h("div", "acts", btn("Team up", () => { sendCoop({ op: "pyes", to: partyAsk.id }); partner = partyAsk.id; note(`You teamed up with ${who}.`); partyAsk = null; drawCoop(); drawPlayers(); }),
-                btn("No", () => { sendCoop({ op: "pno", to: partyAsk.id }); partyAsk = null; drawCoop(); })));
+            // ETS item 9: these buttons are only on screen while the team-up request is open
+            h("div", "acts", btn("Team up", () => { sendCoop({ op: "pyes", to: partyAsk!.id }); partner = partyAsk!.id; note(`You teamed up with ${who}.`); partyAsk = null; drawCoop(); drawPlayers(); }),
+                btn("No", () => { sendCoop({ op: "pno", to: partyAsk!.id }); partyAsk = null; drawCoop(); })));
         return;
     }
     box.hidden = true;
 }
 
-function onCoop(m) {
+function onCoop(m: MpCoopMsg) {
     const n = peerOf(m.from)?.name ?? "A player";
     if (m.op === "pask") {
         if (partner != null || partyAsk) { sendCoop({ op: "pno", to: m.from }); return; }
@@ -481,7 +639,7 @@ function endGoto(msg?: string) {
     if (msg) note(msg);
 }
 
-function answerGoto(id) {                                        // I say yes: tell them where I stand
+function answerGoto(id: number) {                                        // I say yes: tell them where I stand
     const w = api.where();
     if (!w?.map) { sendGoto({ op: "no", to: id }); return; }
     sendGoto({ op: "at", to: id, map: w.map, x: w.x, y: w.y, dir: w.dir });
@@ -493,11 +651,12 @@ function drawGoto() {
     const who = peerOf(go.id)?.name ?? "A player";
     box.hidden = false; box.replaceChildren();
     box.append(h("div", "hd", h("div", "ttl", `${who} wants to come to you`)),
-        h("div", "acts", btn("Yes", () => { const id = go.id; endGoto(); if (api.canGo()) answerGoto(id); else sendGoto({ op: "no", to: id }); }),
-            btn("No", () => { sendGoto({ op: "no", to: go.id }); endGoto(); })));
+        // ETS item 9: these buttons are only on screen while the request is open
+        h("div", "acts", btn("Yes", () => { const id = go!.id; endGoto(); if (api.canGo()) answerGoto(id); else sendGoto({ op: "no", to: id }); }),
+            btn("No", () => { sendGoto({ op: "no", to: go!.id }); endGoto(); })));
 }
 
-async function onGoto(m) {
+async function onGoto(m: MpGotoMsg) {
     const n = peerOf(m.from)?.name ?? "A player";
     if (m.op === "ask") {
         if (go || !api.canGo()) { sendGoto({ op: "no", to: m.from }); return; }
@@ -536,13 +695,13 @@ const LEAGUE_NO: Record<string, string> = {
     wrong_winner: "The winner does not match the games you reported.",
 };
 
-const lgName = (id) => (id === myId() ? myName() : (peerOf(id)?.name ?? `Tamer ${id}`));
+const lgName = (id: number | null | undefined) => (id === myId() ? myName() : (peerOf(id)?.name ?? `Tamer ${id}`));
 const matchOf = (pair: MpLeaguePair | null): MpLeagueMatch | null => (pair ? league?.rounds?.[pair.r]?.[pair.m] ?? null : null);
-const leagueScore = (m: MpLeagueMatch | null, id: string): number => (m?.g ?? []).filter((g) => g === id).length;
+const leagueScore = (m: MpLeagueMatch | null, id: number): number => (m?.g ?? []).filter((g) => g === id).length;
 /** The room's champion from its own bracket; null until the final is won, or with the switch off. */
 const champId = () => (serverChampOn() && league ? league.champ : null);
 /** The champ colour: the room's champion, or a card that says so itself. Off = a normal card. */
-const isChamp = (p) => serverChampOn() && (p.id === champId() || p.card?.champ === true);
+const isChamp = (p: { id: number | string | null; card?: MpCard | null }) => serverChampOn() && (p.id === champId() || p.card?.champ === true);
 
 function matchText(m: MpLeagueMatch | null | undefined) {
     if (!m) return "?";
@@ -570,15 +729,17 @@ function leagueStrip() {
     const acts = h("div", "acts");
     if (amHost() && league.champ == null) {
         if (!leaguePair) acts.append(btn("Next fight", () => sendLeague({ op: "next" })));
-        else acts.append(btn(`${lgName(leaguePair.a)} won game`, () => reportGame(leaguePair.a)),
-            btn(`${lgName(leaguePair.b)} won game`, () => reportGame(leaguePair.b)));
+        // ETS item 9: these buttons only exist while a fight is on the table
+        else acts.append(btn(`${lgName(leaguePair.a)} won game`, () => reportGame(leaguePair!.a)),
+            btn(`${lgName(leaguePair.b)} won game`, () => reportGame(leaguePair!.b)));
     }
     // the pair on the table can start today's friendly duel (each side fights a copy of the other's team)
     if (leaguePair && !duel && !trade && (myId() === leaguePair.a || myId() === leaguePair.b)) {
         const other = myId() === leaguePair.a ? leaguePair.b : leaguePair.a;
         acts.append(btn(`Duel ${lgName(other)}`, () => askDuel(other)));
     }
-    if (league.ids.includes(myId()) && !league.dropped.includes(myId())) acts.append(btn("Drop out", () => sendLeague({ op: "drop" })));
+    // ETS item 9: a night exists only in a room, and the room has welcomed me (it gave me an id) before it sends one
+    if (league.ids.includes(myId()!) && !league.dropped.includes(myId()!)) acts.append(btn("Drop out", () => sendLeague({ op: "drop" })));
     if (acts.childNodes.length) box.append(acts);
     return box;
 }
@@ -592,15 +753,15 @@ function startLeague() {
     sendLeague({ op: "open", ids });
 }
 
-function reportGame(id) {
+function reportGame(id: number) {
     if (!leaguePair) return;
     leagueGames.push(id);                                     // the games of this fight, in order (best of three)
     if (!sendLeague({ op: "win", winner: id, games: leagueGames })) { leagueGames.pop(); note("Could not send the result (not in a room, or the switch is off)."); }
 }
 
-function announceLeague(ev) {
+function announceLeague(ev: MpLeagueEvent | null) {
     if (!ev) return;
-    const feed = (text) => add({ k: "feed", kind: "info", name: "Server Champ", text });
+    const feed = (text: string) => add({ k: "feed", kind: "info", name: "Server Champ", text });
     if (ev.k === "closed") { note("The Server Champ night ended (the host left)."); return; }
     if (!league) return;
     if (ev.k === "open") feed(`night is on: ${league.ids.length} tamers, best of ${league.bestOf}. The winner is Server Champ until the next night.`);
@@ -613,7 +774,7 @@ function announceLeague(ev) {
 
 function clearLeague() { league = null; leaguePair = null; leagueGames = []; leagueKey = ""; }
 
-function onLeague(m) {
+function onLeague(m: MpLeagueMsg) {
     if (!serverChampOn()) return;
     if (m.op === "no") {
         note(LEAGUE_NO[m.why] ?? "The Server Champ night server said no.");
@@ -636,7 +797,7 @@ function post(kind: string, text: string) {
 }
 
 /** The quest layer calls this when I finish an extra quest. */
-export function socialQuestDone(title) { if (isOnline() && api) post("quest", `finished the quest "${String(title).slice(0, 50)}"`); }
+export function socialQuestDone(title: string) { if (isOnline() && api) post("quest", `finished the quest "${String(title).slice(0, 50)}"`); }
 
 function pollSelf() {
     if (!api) return;
@@ -657,7 +818,8 @@ function pollSelf() {
     if (duel && (duel.st === "fight")) { prevParty = null; return; }   // a duel's EXP is taken back: not news
     if (prevParty) {
         card.party.forEach((b, i) => {
-            const a = prevParty[i];
+            // ETS item 9: prevParty was checked just above, and nothing in this loop changes it
+            const a = prevParty![i];
             if (!a || a.n !== b.n) return;
             if (b.lv > a.lv) post("level", `${b.n} reached Lv ${b.lv}!`);
             else if (b.f && a.f && b.f !== a.f) post("evolve", `${b.n} became ${b.f}!`);
@@ -677,7 +839,7 @@ function toggleCollapse() {
     badge();
 }
 
-export function installSocial({ stageEl, api: a }) {
+export function installSocial({ stageEl, api: a }: MpSocialInstall) {
     api = a;
     const css = document.createElement("style");
     css.textContent = `
@@ -729,9 +891,9 @@ export function installSocial({ stageEl, api: a }) {
     document.head.appendChild(css);
 
     dock = h("div"); dock.id = "mp-dock"; dock.style.display = "none";
-    const tabs = {} as Record<string, HTMLElement>;
+    const tabs: Record<string, HTMLElement> = {};
     const top = h("div", "top");
-    for (const [k, label] of [["all", "ALL"], ["chat", "CHAT"], ["events", "EVENTS"], ["players", "PLAYERS"]]) {
+    for (const [k, label] of [["all", "ALL"], ["chat", "CHAT"], ["events", "EVENTS"], ["players", "PLAYERS"]] satisfies [string, string][]) {
         tabs[k] = btn(label, () => { if (S.collapsed) toggleCollapse(); setTab(k); }); top.append(tabs[k]);
     }
     const unread = h("span", "un"); unread.hidden = true;
@@ -764,7 +926,7 @@ export function installSocial({ stageEl, api: a }) {
     };
     // typing here must not walk the character or press game buttons
     for (const box of [dock, inspect, tradeBox, duelBox, coopBox, goBox]) {
-        for (const type of ["keydown", "keyup", "keypress"]) box.addEventListener(type, (e) => { if (e.key !== "F4") e.stopPropagation(); });
+        for (const type of ["keydown", "keyup", "keypress"] as const) box.addEventListener(type, (e) => { if (e.key !== "F4") e.stopPropagation(); });
         box.addEventListener("focusin", () => api.releaseKeys());
     }
     input.addEventListener("keydown", (e) => {
@@ -773,7 +935,7 @@ export function installSocial({ stageEl, api: a }) {
     });
     for (const w of [inspect, tradeBox]) w.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (w === inspect) closeInspect(); else cancelTrade(); } });
 
-    mpOn((type, d) => {
+    mpOn((type: string, d: MpDockEvent) => {
         if (type === "chat") add({ k: "chat", name: d.name, text: d.text, self: d.self, mark: d.mark });
         else if (type === "chatstate") drawLog();          // a waiting line left (or did not): repaint its "..." mark
         else if (type === "feed") add({ k: "feed", kind: d.kind, name: d.name, text: d.text });

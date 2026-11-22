@@ -12,24 +12,37 @@
 //
 // Nothing here reads game state: mount.js owns the riding rules.
 import * as THREE from "./lib3d/three.module.js";
-interface PoseBoundsMesh { min: number[]; max: number[]; }
+/** A model-space direction or axis. */
+type Vec3 = [number, number, number];
+/** A rotation quaternion (x, y, z, w). */
+type Quat = [number, number, number, number];
+/** A Float32Array read at the fixed offsets 0..2; the named keys make those reads plain numbers. */
+interface Vec3F extends Float32Array { 0: number; 1: number; 2: number }
+/** A Float32Array read at the fixed offsets 0..3 (a quaternion). */
+interface QuatF extends Float32Array { 0: number; 1: number; 2: number; 3: number }
+/** A Float32Array read at the fixed offsets 0..15 (a 4x4 column-major matrix). */
+interface Mat4F extends Float32Array {
+  0: number; 1: number; 2: number; 3: number; 4: number; 5: number; 6: number; 7: number;
+  8: number; 9: number; 10: number; 11: number; 12: number; 13: number; 14: number; 15: number;
+}
 
-interface PoseBoundsModel { nodes: GltfNode[]; meshes: PoseBoundsMesh[]; }
+interface PoseBoundsModel { nodes: GltfNode[]; meshes: DwMesh[]; }
 
-interface PoseBoundsResult { min?: number[]; max?: number[]; center?: number[]; size?: number[]; }
+interface PoseBoundsResult { min: number[]; max: number[]; center: number[]; size: number[]; }
 
 interface MountPose {
-  model?: Dw2Model;
+  model: Dw2Model;
   t: Float32Array;
   r: Float32Array;
   s: Float32Array;
   world: Float32Array;
+  n: number;
 }
 
 interface GaitLeg {
   sign: number;
   hip: number;
-  axis: string;
+  axis: Vec3;
   chain?: number[];
 }
 
@@ -55,6 +68,9 @@ interface Still {
   at?: number;
 }
 
+/** Where the rider sits: a bone and a point local to it, plus the px the feet drop below it. */
+interface Seat { node: number; at: Vec3; drop?: number }
+
 interface MountRenderOptions {
   x: number;
   y: number;
@@ -65,12 +81,55 @@ interface MountRenderOptions {
   timeSec?: number;
   walk?: Walk | null;
   still?: Still | null;
-  seat?: number | null;
+  seat?: Seat | null;
   hide?: number[] | null;
 }
 
 interface RigLeg { end: number; }
-interface MeasureRig { legs: RigLeg[]; height?: number; forwardAxis: string; }
+/** One leg chain found by measureRig, before the lower-half test. */
+interface LegChain { chain: number[]; end: number; top: number; root: number }
+/** One leg of a measured rig. */
+interface MeasuredLeg { hip: number; end: number; depth: number; chain: number[] }
+/** What measureRig returns: the rig as measured from the bind pose. */
+interface MeasuredRig {
+  height: number; body: number; legs: MeasuredLeg[]; feet: number[]; head: number;
+  forward: Vec3; forwardAxis: string; back: number; bounds: PoseBoundsResult; bind: MountPose;
+}
+/** One leg of the calibrated gait. */
+interface CalibratedLeg { hip: number; end: number; axis: Vec3; sign: number; swing: number }
+/** The uniforms the mount shader declares (three.js types ShaderMaterial.uniforms as a bare Object). */
+interface MountUniforms { uTex: { value: THREE.Texture | null }; uAlphaCut: { value: number }; uCut: { value: THREE.Vector4 } }
+/** The mount's ShaderMaterial with its uniforms typed. */
+type MountMaterial = THREE.ShaderMaterial & { uniforms: MountUniforms };
+/** What three.js's Object3D constructor adds with Object.defineProperties (its JS gives TypeScript no types for them). */
+interface Placed { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
+/** The group that holds one mount model. */
+type MountGroup = THREE.Group & Placed;
+/** A bone's group; __node is the index of the glTF node it stands for. */
+type BoneObject = THREE.Object3D & { __node?: number | undefined };
+/** The WebGLRenderer with the `info` its constructor sets at run time (its JS gives TypeScript no type for it). */
+interface RendererInfo { render: { calls: number; triangles: number }; programs?: WebGLProgram[] | null }
+type MountRenderer = THREE.WebGLRenderer & { info: RendererInfo; domElement: HTMLCanvasElement };
+/** three.js's OrthographicCamera plus the `rotation` its constructor defines at run time. */
+type MountCamera = THREE.OrthographicCamera & { rotation: THREE.Euler };
+/** A scene-graph node as the probes read it (three.js's own types lack isMesh, geometry and material). */
+interface ProbeNode {
+  isMesh?: boolean; visible?: boolean; children: ProbeNode[];
+  geometry?: { attributes?: { position?: { count?: number } }; index?: { count?: number } | null; drawRange?: { count?: number } };
+  material?: { visible?: boolean };
+  matrixWorld?: { elements?: number[] };
+  layers?: { mask?: number };
+}
+/** What sceneProbe reports about the first mesh it finds. */
+interface MeshProbe { pos: number | null; idx: boolean; range: number | null; mw: number[] }
+/** What sceneProbe returns. */
+interface SceneProbeResult { sameScene: number; freshScene: number | null; info: MeshProbe | null; camWorld: number[] }
+/** One loaded mount model: the parsed glTF, its measured rig and gait, and its three.js objects. */
+export interface MountAsset {
+  model: Dw2Model; rig: MeasuredRig; legs: CalibratedLeg[]; group: MountGroup; meshes: THREE.Mesh[];
+  texture: THREE.Texture | null; material: MountMaterial;
+  _floor?: Record<string, number | null>; _bones?: Map<number, BoneObject>;
+}
 interface ClipWalkStats { clip: string; dur: number; ticks: number; inPlace: boolean; loops: boolean; loopErr: number; bodyTravel: number; feet: number; usableFeet: number; alternation: number; walk: boolean; why?: string; }
 
 
@@ -82,14 +141,14 @@ const COS = Math.cos(PITCH);
 // ── the fixed palette (16 colours) and the near-black outline ───────────────────────────────────
 // A neutral ramp (shadows to highlights) plus two accents. Flat shading and the palette together are what
 // make the render read as painted pixel art instead of a lit 3D object.
-export const PALETTE = [
+export const PALETTE: Vec3[] = [
   [16, 16, 22], [32, 32, 42], [52, 52, 64], [78, 78, 92],
   [104, 104, 120], [132, 132, 148], [160, 160, 176], [190, 190, 202],
   [214, 214, 222], [238, 238, 242],
   [86, 62, 44], [126, 94, 62], [176, 142, 96],
   [58, 92, 148], [104, 150, 206], [206, 150, 120],
 ];
-export const OUTLINE = [10, 10, 14];
+export const OUTLINE: Vec3 = [10, 10, 14];
 
 // ── glTF decoding (the DW2 subset: non-indexed triangles, rigid node TRS, LINEAR clips) ─────────
 /** Any of the views an accessor decodes into. */
@@ -116,12 +175,12 @@ interface GltfChannel { sampler: number; target: { node: number; path: string } 
 interface GltfAnimation { name?: string; channels?: GltfChannel[]; samplers: GltfSampler[] }
 interface GltfBufferView { buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }
 interface GltfBuffer { uri?: string; byteLength?: number }
-interface GltfNode { children?: number[]; mesh?: number; name?: string }
+interface GltfNode { children?: number[]; mesh?: number; name?: string; translation?: number[]; rotation?: number[]; scale?: number[] }
 interface GltfDoc {
   nodes: GltfNode[]; scene?: number; scenes?: { nodes?: number[] }[];
   meshes?: GltfMesh[]; accessors: GltfAccessor[]; materials?: GltfMaterial[];
   images?: GltfImage[]; animations?: GltfAnimation[]; buffers: GltfBuffer[];
-  bufferViews: GltfBufferView[]; textures?: { source?: number }[];
+  bufferViews: GltfBufferView[]; textures?: { source?: number }[]; skins?: { joints?: number[] }[];
 }
 const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const COMPONENT: Record<number, { Ctor: new (n: number) => TypedArr; get: keyof DataReader; size: number; norm: number }> = {
@@ -133,7 +192,7 @@ const COMPONENT: Record<number, { Ctor: new (n: number) => TypedArr; get: keyof 
   5126: { Ctor: Float32Array, get: "getFloat32", size: 4, norm: 0 },
 };
 
-function decodeBase64(b64: string | undefined) {
+function decodeBase64(b64: string) {
   if (typeof atob === "function") {
     const s = atob(b64);
     const out = new Uint8Array(s.length);
@@ -145,13 +204,14 @@ function decodeBase64(b64: string | undefined) {
 
 function dataUri(uri: string | undefined) {
   const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(uri || ""));
-  return m && m[2] ? decodeBase64(m[3]) : null;
+  // ETS item 9: capture group 3, (.*), takes part in every match of this regex, so it is a string here
+  return m && m[2] ? decodeBase64(m[3]!) : null;
 }
 
 /** One decoded primitive: its attribute arrays plus the vertex count and material index. */
 interface DwPrim { pos: TypedArr; nrm: TypedArr | null | undefined; uv: TypedArr | null | undefined; count: number; material: number }
 /** One mesh: its primitives and (after the box pass) its local bounds. */
-interface DwMesh { prims: DwPrim[]; min?: number[]; max?: number[] }
+interface DwMesh { prims: DwPrim[]; min?: Vec3; max?: Vec3 }
 /** One material as the renderer wants it. */
 interface DwMaterial { name: string | null; alphaMode: string; alphaCutoff: number; image: number | null }
 /** One animated node channel. */
@@ -190,11 +250,12 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
     const prims = [];
     for (const p of m.primitives || []) {
       if ((p.mode ?? 4) !== 4 || p.indices != null) continue;      // DW2 writes non-indexed triangles only
-      const pos = readAccessor(model, p.attributes.POSITION!);
+      const pos = readAccessor(model, p.attributes.POSITION);
       if (!pos) continue;
       const uv = p.attributes.TEXCOORD_0 != null ? readAccessor(model, p.attributes.TEXCOORD_0) : null;
       const nrm = p.attributes.NORMAL != null ? readAccessor(model, p.attributes.NORMAL) : null;
-      prims.push({ pos, nrm, uv, count: json.accessors[p.attributes.POSITION].count | 0, material: p.material ?? -1 });
+      // ETS item 9: pos is not null, so readAccessor found POSITION and its accessor
+      prims.push({ pos, nrm, uv, count: json.accessors[p.attributes.POSITION!]!.count | 0, material: p.material ?? -1 });
     }
     model.meshes.push({ prims });
   }
@@ -229,13 +290,13 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
   });
   // mesh-local boxes (accessor min/max, or a scan) for pose bounds
   for (const mesh of model.meshes) {
-    let min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    let min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
     for (const p of mesh.prims) {
       if (!p.pos.length) continue;
       for (let i = 0; i < p.pos.length; i += 3) for (let c = 0; c < 3; c++) {
-        const v = p.pos[i + c];
-        if (v! < min[c]!) min[c] = v;
-        if (v! > max[c]!) max[c] = v;
+        const v: number = p.pos[i + c];
+        if (v < min[c]!) min[c] = v;
+        if (v > max[c]!) max[c] = v;
       }
     }
     mesh.min = min.every(Number.isFinite) ? min : [0, 0, 0];
@@ -250,7 +311,7 @@ function walkParents(json: GltfDoc, idx: number, parent: number, out: Int32Array
 }
 
 /** One accessor as a typed array (de-interleaved when the bufferView says so). */
-export function readAccessor(model: Dw2Model, idx: number): TypedArr | null | undefined {
+export function readAccessor(model: Dw2Model, idx: number | undefined): TypedArr | null | undefined {
   if (idx == null) return null;
   if (model.accessors.has(idx)) return model.accessors.get(idx);
   const g = model.json, a = g.accessors?.[idx];
@@ -283,7 +344,7 @@ export function readAccessor(model: Dw2Model, idx: number): TypedArr | null | un
 }
 
 // ── posing (local TRS per node, then world matrices) ────────────────────────────────────────────
-export function bindPose(model) {
+export function bindPose(model: Dw2Model): MountPose {
   const n = model.nodes.length;
   const pose = {
     model,
@@ -298,7 +359,7 @@ export function bindPose(model) {
   return pose;
 }
 
-export function composeTRS(t, r, s, out = new Float32Array(16)) {
+export function composeTRS(t: Vec3F, r: QuatF, s: Vec3F, out: Float32Array = new Float32Array(16)) {
   const x = r[0], y = r[1], z = r[2], w = r[3];
   const x2 = x + x, y2 = y + y, z2 = z + z;
   const xx = x * x2, xy = x * y2, xz = x * z2;
@@ -312,7 +373,7 @@ export function composeTRS(t, r, s, out = new Float32Array(16)) {
   return out;
 }
 
-export function mat4Mul(a, b: Float32Array<ArrayBuffer>, out = new Float32Array(16)) {
+export function mat4Mul(a: Float32Array, b: Float32Array, out: Float32Array = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
     for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]!;
@@ -321,10 +382,11 @@ export function mat4Mul(a, b: Float32Array<ArrayBuffer>, out = new Float32Array(
   return out;
 }
 
-export function updateWorld(pose): Float32Array {
+export function updateWorld(pose: MountPose): Float32Array {
   const local = new Float32Array(16);
-  const walk = (i, parent) => {
-    composeTRS(pose.t.subarray(i * 3, i * 3 + 3), pose.r.subarray(i * 4, i * 4 + 4), pose.s.subarray(i * 3, i * 3 + 3), local);
+  const walk = (i: number, parent: Float32Array | null): void => {
+    // ETS item 9: subarray(i * 3, i * 3 + 3) and subarray(i * 4, i * 4 + 4) of the pose arrays hold exactly 3 and 4 elements
+    composeTRS(pose.t.subarray(i * 3, i * 3 + 3) as Vec3F, pose.r.subarray(i * 4, i * 4 + 4) as QuatF, pose.s.subarray(i * 3, i * 3 + 3) as Vec3F, local);
     const out = pose.world.subarray(i * 16, i * 16 + 16);
     if (parent) mat4Mul(parent, local, out); else out.set(local);
     for (const c of pose.model.nodes[i].children || []) walk(c, out);
@@ -334,7 +396,7 @@ export function updateWorld(pose): Float32Array {
 }
 
 /** Sample a clip onto a fresh bind pose (a channel only touches its own node). */
-export function sampleClipPose(model, clipIndex, timeSec: number) {
+export function sampleClipPose(model: Dw2Model, clipIndex: number, timeSec: number) {
   const pose = bindPose(model);
   const clip = model.anims[clipIndex];
   if (clip) {
@@ -344,19 +406,20 @@ export function sampleClipPose(model, clipIndex, timeSec: number) {
   return pose;
 }
 
-function applyChannel(pose, ch, time: number) {
+function applyChannel(pose: MountPose, ch: DwChannel, time: number) {
   const { times, values, comps } = ch;
   const n = times.length;
   if (!n) return;
   const dst = ch.path === "rotation" ? pose.r : ch.path === "translation" ? pose.t : pose.s;
   const off = ch.node * comps;
   const put = (i: number) => { for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c]; };
-  if (n === 1 || time <= times[0]) return put(0);
-  if (time >= times[n - 1]) return put(n - 1);
+  // ETS item 9: n = times.length is above 0 here, and lo, mid and hi stay inside 0..n-1
+  if (n === 1 || time <= times[0]!) return put(0);
+  if (time >= times[n - 1]!) return put(n - 1);
   let lo = 0, hi = n - 1;
-  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid] <= time) lo = mid; else hi = mid; }
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= time) lo = mid; else hi = mid; }
   if (ch.interp === "STEP") return put(lo);
-  const a = times[hi] > times[lo] ? (time - times[lo]) / (times[hi] - times[lo]) : 0;
+  const a = times[hi]! > times[lo]! ? (time - times[lo]!) / (times[hi]! - times[lo]!) : 0;
   for (let c = 0; c < comps; c++) dst[off + c] = values[lo * comps + c] + (values[hi * comps + c] - values[lo * comps + c]) * a;
   if (ch.path === "rotation") {                                  // shortest-arc nlerp, then normalise
     let d = 0;
@@ -369,22 +432,25 @@ function applyChannel(pose, ch, time: number) {
   }
 }
 
-const point = (m, x, y, z) => [
+const point = (m: Mat4F, x: number, y: number, z: number): Vec3 => [
   m[0] * x + m[4] * y + m[8] * z + m[12],
   m[1] * x + m[5] * y + m[9] * z + m[13],
   m[2] * x + m[6] * y + m[10] * z + m[14],
 ];
 
 /** World-space AABB of a pose (each mesh's local box through its node's world matrix). */
-export function poseBounds(model: PoseBoundsModel, pose: MountPose, out: { min?: number[]; max?: number[]; center?: number[]; size?: number[] } = {}) {
+// ETS item 9: poseBounds sets min, max, center and size on `out` before it returns, so the empty default is complete for every reader
+export function poseBounds(model: PoseBoundsModel, pose: MountPose, out: PoseBoundsResult = {} as PoseBoundsResult) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   model.nodes.forEach((node, i) => {
     if (node.mesh == null) return;
     const mesh = model.meshes[node.mesh];
     if (!mesh) return;
-    const m = pose.world.subarray(i * 16, i * 16 + 16);
+    // ETS item 9: subarray(i * 16, i * 16 + 16) of the world array holds exactly the 16 elements of one matrix
+    const m = pose.world.subarray(i * 16, i * 16 + 16) as Mat4F;
+    // ETS item 9: the box loop at the end of parseDw2Gltf gave every mesh its min and max
     for (let c = 0; c < 8; c++) {
-      const p = point(m, c & 1 ? mesh.max[0] : mesh.min[0], c & 2 ? mesh.max[1] : mesh.min[1], c & 4 ? mesh.max[2] : mesh.min[2]);
+      const p = point(m, c & 1 ? mesh.max![0] : mesh.min![0], c & 2 ? mesh.max![1] : mesh.min![1], c & 4 ? mesh.max![2] : mesh.min![2]);
       for (let k = 0; k < 3; k++) { if (p[k] < min[k]!) min[k] = p[k]; if (p[k] > max[k]!) max[k] = p[k]; }
     }
   });
@@ -408,23 +474,23 @@ export function poseBounds(model: PoseBoundsModel, pose: MountPose, out: { min?:
  *   height  the bind-pose height in model units
  *   back    the body-root joint's bind-pose y, i.e. where a rider sits in model units
  */
-export function measureRig(model) {
+export function measureRig(model: Dw2Model): MeasuredRig {
   const bind = bindPose(model);
   updateWorld(bind);
   const bounds = poseBounds(model, bind);
-  const H = bounds.size![1] || 1;
+  const H = bounds.size[1] || 1;
   const nodes = model.nodes;
   const joints = (model.json.skins?.[0]?.joints || nodes.map((_, i) => i)).filter((i) => nodes[i]?.mesh == null);
   const jointSet = new Set(joints);
   // the body root: the joint with the most descendants
-  const countChildren = (i) => (nodes[i].children || []).reduce((s, c) => s + 1 + countChildren(c), 0);
-  let body = joints[0], best = -1;
+  const countChildren = (i: number): number => (nodes[i].children || []).reduce((s, c) => s + 1 + countChildren(c), 0);
+  let body: number = joints[0], best = -1;
   for (const j of joints) { const d = countChildren(j); if (d > best) { best = d; body = j; } }
   // leg chains: from every root's children, walk to the chain end. A LEG is a chain of >= 3 joints whose
   // end hangs in the lower half of the model (the DW2 rigs also hang a 1-2 joint tail and armour pieces off
   // the roots, and those must not be walked).
-  const legs = [];
-  const walk = (i, chain) => {
+  const legs: LegChain[] = [];
+  const walk = (i: number, chain: number[]): void => {
     chain.push(i);
     const kids = (nodes[i].children || []).filter((c) => jointSet.has(c));
     if (!kids.length) return;
@@ -432,13 +498,13 @@ export function measureRig(model) {
   };
   for (const root of model.roots) {
     for (const c of (nodes[root].children || []).filter((x) => jointSet.has(x))) {
-      const chain = [];
+      const chain: number[] = [];
       walk(c, chain);
       legs.push({ chain, end: chain[chain.length - 1], top: chain[0], root });
     }
   }
   const legsBelow = legs.filter((L) => L.chain.length >= 3
-    && bind.world[L.end * 16 + 13]! < bounds.min![1]! + 0.4 * H            // the end hangs low
+    && bind.world[L.end * 16 + 13]! < bounds.min[1]! + 0.4 * H            // the end hangs low
     && bind.world[L.end * 16 + 13]! < bind.world[L.top * 16 + 13]!);      // and the chain descends to it
   const feet = legsBelow.map((L) => L.end);
   // head: the highest joint that is not on a leg
@@ -450,7 +516,7 @@ export function measureRig(model) {
     if (y! > headY) { headY = y; head = j; }
   }
   // forward: from the body's centroid toward the head, on the horizontal plane, as the dominant axis
-  let fwd = [0, 0, 0];
+  let fwd: Vec3 = [0, 0, 0];
   if (head >= 0) {
     const dx = bind.world[head * 16 + 12]! - bind.world[body * 16 + 12]!;
     const dz = bind.world[head * 16 + 14]! - bind.world[body * 16 + 14]!;
@@ -478,15 +544,16 @@ export function measureRig(model) {
  * This is measured, not assumed: the DW2 rigs bind their bones with non-identity rotations, so "rotate
  * about X" is wrong for some of them.
  */
-export function calibrateGait(model: Dw2Model, rig, swingDeg = 14) {
+export function calibrateGait(model: Dw2Model, rig: MeasuredRig, swingDeg = 14): CalibratedLeg[] {
   const bind = rig.bind;
   const legs = rig.legs.map((L) => {
     const hip = L.hip;
-    const parent = model.parents[hip];
+    const parent: number = model.parents[hip];
     // world rotation of the hip's parent, inverted, so a model-space axis can be expressed in parent space
-    const pw = parent >= 0 ? bind.world.subarray(parent * 16, parent * 16 + 16) : null;
-    const axes = [];
-    for (const axis of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+    // ETS item 9: subarray(parent * 16, parent * 16 + 16) of the world array holds exactly the 16 elements of one matrix
+    const pw = parent >= 0 ? bind.world.subarray(parent * 16, parent * 16 + 16) as Mat4F : null;
+    const axes: { axis: Vec3; along: number }[] = [];
+    for (const axis of [[1, 0, 0], [0, 1, 0], [0, 0, 1]] satisfies Vec3[]) {
       const local = pw ? worldVecToLocal(pw, axis) : axis;
       const probe = bindPose(model);
       rotateJoint(probe, hip, local, (swingDeg * Math.PI) / 180);
@@ -505,7 +572,7 @@ export function calibrateGait(model: Dw2Model, rig, swingDeg = 14) {
   return legs;
 }
 
-function worldVecToLocal(m, v) {
+function worldVecToLocal(m: Mat4F, v: Vec3): Vec3 {
   // inverse of the rotation part (a rigid transform): transpose
   return [
     m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
@@ -514,21 +581,22 @@ function worldVecToLocal(m, v) {
   ];
 }
 
-function rotateJoint(pose, node, axis: string | number[], angle: number) {
+function rotateJoint(pose: MountPose, node: number, axis: Vec3, angle: number) {
   const q = quatFromAxis(axis, angle);
   const off = node * 4;
   const b = [pose.r[off], pose.r[off + 1], pose.r[off + 2], pose.r[off + 3]];
-  const r = quatMul(q, b);                        // extra rotation applied in the bone's PARENT space
+  // ETS item 9: b holds the four elements of the bone's rotation, read from pose.r at off
+  const r = quatMul(q, b as Quat);                        // extra rotation applied in the bone's PARENT space
   pose.r[off] = r[0]; pose.r[off + 1] = r[1]; pose.r[off + 2] = r[2]; pose.r[off + 3] = r[3];
 }
 
-export function quatFromAxis(axis, angle: number) {
+export function quatFromAxis(axis: Vec3, angle: number): Quat {
   const len = Math.hypot(axis[0], axis[1], axis[2]) || 1;
   const s = Math.sin(angle / 2);
   return [(axis[0] / len) * s, (axis[1] / len) * s, (axis[2] / len) * s, Math.cos(angle / 2)];
 }
 
-export function quatMul(a, b) {
+export function quatMul(a: Quat, b: Quat): Quat {
   return [
     a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
     a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
@@ -562,8 +630,8 @@ export function applyGait(pose: MountPose, rig: GaitRig, legs: GaitLeg[], phase:
 }
 
 /** Where each foot is (model space) for a given gait phase — the footfall proof. */
-export function gaitFootfalls(model: Dw2Model, rig: GaitRig, legs: (GaitLeg & RigLeg)[], steps = 16): [number, number, number][][] {
-  const out = [];
+export function gaitFootfalls(model: Dw2Model, rig: GaitRig, legs: (GaitLeg & RigLeg)[], steps = 16): Vec3[][] {
+  const out: Vec3[][] = [];
   for (let i = 0; i < steps; i++) {
     const pose = bindPose(model);
     applyGait(pose, rig, legs, i / steps);
@@ -579,13 +647,13 @@ export function gaitFootfalls(model: Dw2Model, rig: GaitRig, legs: (GaitLeg & Ri
  * between planted and lifted, and does a planted foot slide along the ground? Returns the numbers, so the
  * mount table's `walk` can be justified (or refused) instead of guessed.
  */
-export function clipWalkStats(model: Dw2Model, clipIndex: number, rig = null): ClipWalkStats | null {
+export function clipWalkStats(model: Dw2Model, clipIndex: number, rig: MeasuredRig | null = null): ClipWalkStats | null {
   const clip = model.anims[clipIndex];
   if (!clip) return null;
   rig = rig || measureRig(model);
   const fps = 30;                                   // DW2 keys its clips at 1/30 s (measured: key step 0.033333)
   const nticks = Math.max(4, Math.round(clip.dur * fps));
-  const P = [];
+  const P: Vec3[][] = [];
   for (let t = 0; t <= nticks; t++) {
     const pose = sampleClipPose(model, clipIndex, t / fps);
     P.push(rig!.legs.map((L) => [pose.world[L.end * 16 + 12], pose.world[L.end * 16 + 13], pose.world[L.end * 16 + 14]]));
@@ -634,7 +702,7 @@ export function clipWalkStats(model: Dw2Model, clipIndex: number, rig = null): C
 }
 
 /** The clip index the table names, or -1 (the procedural gait is used then). */
-export function walkClipIndex(model, walk: Walk | null) {
+export function walkClipIndex(model: Dw2Model, walk: Walk | null) {
   if (!walk || walk.kind !== "clip") return -1;
   const i = model.anims.findIndex((a) => a.name === walk.name);
   return i;
@@ -673,8 +741,8 @@ const FRAG = `
     gl_FragColor = vec4(rgb, 1.0);
   }`;
 
-let renderer = null, scene: THREE.Scene | null = null, camera = null;
-const loaded = new Map();        // model path -> { model, rig, legs, group, meshes, texture } | null
+let renderer: MountRenderer | null = null, scene: THREE.Scene | null = null, camera: MountCamera | null = null;
+const loaded = new Map<string, MountAsset | null>();        // model path -> { model, rig, legs, group, meshes, texture } | null
 
 function ensureRenderer() {
   if (renderer) return true;
@@ -682,7 +750,8 @@ function ensureRenderer() {
     const canvas = document.createElement("canvas");
     canvas.width = MOUNT_VIEW.w;
     canvas.height = MOUNT_VIEW.h;
-    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, premultipliedAlpha: true });
+    // ETS item 9: three.js sets renderer.info in the WebGLRenderer constructor; its JS gives TypeScript no type for it
+    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, premultipliedAlpha: true }) as MountRenderer;
     renderer.setPixelRatio(1);
     renderer.setSize(MOUNT_VIEW.w, MOUNT_VIEW.h, false);
     renderer.setClearColor(0x000000, 0);
@@ -692,7 +761,8 @@ function ensureRenderer() {
     return false;
   }
   scene = new THREE.Scene();
-  camera = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
+  // ETS item 9: Object3D defines rotation at run time with Object.defineProperties; three.js's JS gives TypeScript no type for it
+  camera = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5) as MountCamera;
   camera.rotation.x = -PITCH;
   return true;
 }
@@ -710,15 +780,17 @@ async function imageFrom(uri: string) {
  * Load one mount model from `url` (a path under web/, git-ignored, never shipped). Returns null when the
  * file is not there, so the mount feature hides itself and nothing else breaks.
  */
-const loading = new Map();       // key -> the in-flight load, so two callers share one copy
-export function loadMountAsset(key: string, url: string) {
-  if (loaded.has(key)) return Promise.resolve(loaded.get(key));
+const loading = new Map<string, Promise<MountAsset | null>>();       // key -> the in-flight load, so two callers share one copy
+export function loadMountAsset(key: string, url: string): Promise<MountAsset | null> {
+  // ETS item 9: loaded.has(key) was just checked, and the map holds MountAsset or null, never undefined
+  if (loaded.has(key)) return Promise.resolve<MountAsset | null>(loaded.get(key)!);
   if (!loading.has(key)) loading.set(key, loadMountAssetOnce(key, url).finally(() => loading.delete(key)));
-  return loading.get(key);
+  // ETS item 9: the line above set the key when it was missing
+  return loading.get(key)!;
 }
 
-async function loadMountAssetOnce(key: string, url: string) {
-  let asset = null;
+async function loadMountAssetOnce(key: string, url: string): Promise<MountAsset | null> {
+  let asset: MountAsset | null = null;
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -726,8 +798,10 @@ async function loadMountAssetOnce(key: string, url: string) {
     const rig = measureRig(model);
     const legs = calibrateGait(model, rig);
     if (!ensureRenderer()) throw new Error("no WebGL");
-    const group = new THREE.Group();
+    // ETS item 9: Object3D defines position, rotation and scale at run time; three.js's JS gives TypeScript no types for them
+    const group = new THREE.Group() as MountGroup;
     const meshes: THREE.Mesh[] = [];
+    // ETS item 9: ShaderMaterial.uniforms is typed as a bare Object in three.js's JS; these are the uniforms the shaders below declare
     const material = new THREE.ShaderMaterial({
       uniforms: { uTex: { value: null }, uAlphaCut: { value: 0.5 }, uCut: { value: new THREE.Vector4(0, 0, 0, 1) } },
       vertexShader: VERT,
@@ -736,9 +810,9 @@ async function loadMountAssetOnce(key: string, url: string) {
       depthTest: true,
       depthWrite: true,
       side: THREE.DoubleSide,
-    });
+    }) as MountMaterial;
     const image = model.images[0]?.uri ? await imageFrom(model.images[0].uri) : null;
-    let texture = null;
+    let texture: THREE.Texture | null = null;
     if (image) {
       texture = new THREE.Texture(image);
       texture.magFilter = THREE.NearestFilter;
@@ -751,15 +825,16 @@ async function loadMountAssetOnce(key: string, url: string) {
       material.uniforms.uTex.value = texture;
     }
     // one mesh per primitive, parented to a group per bone node (three composes the hierarchy for us)
-    const boneGroups = new Map();
-    const groupOf = (node: number | undefined) => {
-      if (boneGroups.has(node)) return boneGroups.get(node);
-      const obj: any = new THREE.Object3D();
+    const boneGroups = new Map<number, BoneObject>();
+    const groupOf = (node: number): BoneObject => {
+      // ETS item 9: boneGroups.has(node) was just checked
+      if (boneGroups.has(node)) return boneGroups.get(node)!;
+      const obj: BoneObject = new THREE.Object3D();
       obj.matrixAutoUpdate = false;
       obj.__node = node;
       boneGroups.set(node, obj);
-      const parent = model.parents[node];
-      (parent! >= 0 ? groupOf(parent) : group).add(obj);
+      const parent: number = model.parents[node];
+      (parent >= 0 ? groupOf(parent) : group).add(obj);
       return obj;
     };
     model.nodes.forEach((node, i) => {
@@ -772,7 +847,8 @@ async function loadMountAssetOnce(key: string, url: string) {
         geo.setAttribute("normal", new THREE.BufferAttribute(prim.nrm || new Float32Array(prim.count * 3).fill(0), 3));
         geo.setAttribute("uv", new THREE.BufferAttribute(prim.uv || new Float32Array(prim.count * 2), 2));
         geo.boundingSphere = null;
-        const mesh = new THREE.Mesh(geo, material);
+        // ETS item 38: three.js's JS-inferred Mesh does not pass to add() (its raycast takes arguments); this any stays in this loop body
+        const mesh: any = new THREE.Mesh(geo, material);
         mesh.frustumCulled = false;
         mesh.matrixAutoUpdate = false;
         parent.add(mesh);
@@ -781,7 +857,8 @@ async function loadMountAssetOnce(key: string, url: string) {
     });
     // scale so the model stands `size` game pixels tall, and put its feet on y = 0 / the ground point
     asset = { model, rig, legs, group, meshes, texture, material };
-    scene.add(group);
+    // ETS item 9: ensureRenderer() returned true above, so scene is set
+    scene!.add(group);
   } catch (e) {
     console.warn(`mount3d: ${url} not loaded (${e.message}); the mount stays hidden`);
     asset = null;
@@ -796,7 +873,7 @@ const _m = new THREE.Matrix4();
  * Render one frame of a mount standing at field pixel (x, y), facing `dir` (an 8-way field direction
  * name). Returns the hidden canvas (MOUNT_VIEW sized, palette-quantised, outlined) or null.
  */
-function standFloor(asset, walk) {
+function standFloor(asset: MountAsset, walk: Walk | null) {
   if (!walk?.idle) return null;
   asset._floor ??= {};
   if (!(walk.idle in asset._floor)) {
@@ -806,14 +883,15 @@ function standFloor(asset, walk) {
   return asset._floor[walk.idle];
 }
 
-export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = false, size = 64, timeSec = 0, walk = null, still = null, seat = null, hide = null }: MountRenderOptions): HTMLCanvasElement | null {
+export function renderMount(asset: MountAsset | null, { x, y, dir = "down", phase = 0, moving = false, size = 64, timeSec = 0, walk = null, still = null, seat = null, hide = null }: MountRenderOptions): HTMLCanvasElement | null {
   if (!asset || !ensureRenderer()) return null;
+  // ETS item 9: ensureRenderer() returned true above, so renderer, scene and camera are set below
   const { model, rig, legs, group } = asset;
   // A model whose own clip passed the walk test (clipWalkStats) walks with that clip; otherwise the gait
   // web/mount3d.js calibrated from this very rig drives the legs.
   const clipIndex = walkClipIndex(model, walk);
   const clip = clipIndex >= 0 ? model.anims[clipIndex] : null;
-  let pose;
+  let pose: MountPose;
   const stillIndex = still ? model.anims.findIndex((a) => a.name === still.clip) : -1;
   // a held frame of one of the model's own clips (`still.at` 0..1, 1 = the clip's last frame): a pose, not a motion
   if (stillIndex >= 0) pose = sampleClipPose(model, stillIndex, (still!.at ?? 1) * model.anims[stillIndex].dur);
@@ -844,7 +922,7 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
   const facing = { down: 0, "down-left": -Math.PI / 4, left: -Math.PI / 2, "up-left": (-3 * Math.PI) / 4,
     up: Math.PI, "up-right": (3 * Math.PI) / 4, right: Math.PI / 2, "down-right": Math.PI / 4 }[dir] ?? 0;
   // every loaded model sits in the one shared scene; only the one asked for may appear in this render
-  for (const kid of scene.children) kid.visible = kid === group;
+  for (const kid of scene!.children) kid.visible = kid === group;
   // a verifier may leave named bones out of the render (which part covers the rider?)
   for (const [node, obj] of boneObjects(asset)) obj.visible = !hide?.includes(node);
   group.scale.setScalar(scale);
@@ -855,13 +933,13 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
   const ground = stillIndex >= 0 ? poseBounds(model, pose).min![1] : standFloor(asset, walk) ?? b.min[1];
   group.position.set(x, -ground * scale, y / SIN);
   // the camera window: `x` centred, the ground row `y` near the bottom of the cell
-  camera.left = x - MOUNT_VIEW.w / 2;
-  camera.right = x + MOUNT_VIEW.w / 2;
-  camera.top = -y + MOUNT_VIEW.h - 8;
-  camera.bottom = -y - 8;
-  camera.updateProjectionMatrix();
-  renderer.render(scene, camera);
-  const out = pixelate(renderer.domElement);
+  camera!.left = x - MOUNT_VIEW.w / 2;
+  camera!.right = x + MOUNT_VIEW.w / 2;
+  camera!.top = -y + MOUNT_VIEW.h - 8;
+  camera!.bottom = -y - 8;
+  camera!.updateProjectionMatrix();
+  renderer!.render(scene!, camera!);
+  const out = pixelate(renderer!.domElement);
   lastSplit = seat ? splitAtSeat(asset, out, seat) : null;
   return out;
 }
@@ -882,7 +960,7 @@ export function mountSplit() { return lastSplit; }
  * fragments: along an orthographic ray a near fragment is always nearer than any far one), BACK otherwise.
  * An outline pixel follows a front neighbour. seatX/seatY are the saddle point in cell pixels.
  */
-function splitAtSeat(asset, pix, seat) {
+function splitAtSeat(asset: MountAsset, pix: HTMLCanvasElement, seat: Seat) {
   const obj = boneObjects(asset).get(seat.node);
   if (!obj || !splitCanvases) return null;
   const w = MOUNT_VIEW.w, h = MOUNT_VIEW.h;
@@ -920,8 +998,8 @@ function splitAtSeat(asset, pix, seat) {
     const d = f ? front.data : back.data;
     d[i] = s[i]; d[i + 1] = s[i + 1]; d[i + 2] = s[i + 2]; d[i + 3] = s[i + 3];
   }
-  for (const [k, img] of [["front", front], ["back", back]]) {
-    const c = splitCanvases[k as string];
+  for (const [k, img] of [["front", front], ["back", back]] satisfies ["front" | "back", ImageData][]) {
+    const c = splitCanvases[k];
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     c.getContext("2d", { willReadFrequently: true }).putImageData(img, 0, 0);
   }
@@ -930,23 +1008,25 @@ function splitAtSeat(asset, pix, seat) {
 }
 
 /** Render the mount's own scene and the same group in a fresh scene: narrows down an empty render. */
-export function sceneProbe() {
+export function sceneProbe(): SceneProbeResult | null {
   if (!ensureRenderer()) return null;
-  const cam: any = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
+  // ETS item 9: ensureRenderer() returned true above, so renderer and scene are set below
+  // ETS item 9: Object3D defines rotation at run time; three.js's JS gives TypeScript no type for it
+  const cam = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5) as MountCamera;
   cam.rotation.x = -PITCH;
   cam.updateMatrixWorld(true);
-  renderer.render(scene, cam);
-  const sameScene = renderer.info.render.calls;
-  const g = scene.children[0];
-  let info = null;
-  if (g) g.traverse((o) => { if (!info && o.isMesh) info = { pos: o.geometry?.attributes?.position?.count ?? null, idx: !!o.geometry?.index, range: o.geometry?.drawRange?.count ?? null, mw: Array.from(o.matrixWorld?.elements?.slice(12, 15) ?? []) }; });
+  renderer!.render(scene!, cam);
+  const sameScene = renderer!.info.render.calls;
+  const g = scene!.children[0];
+  let info: MeshProbe | null = null;
+  if (g) g.traverse((o: ProbeNode) => { if (!info && o.isMesh) info = { pos: o.geometry?.attributes?.position?.count ?? null, idx: !!o.geometry?.index, range: o.geometry?.drawRange?.count ?? null, mw: Array.from(o.matrixWorld?.elements?.slice(12, 15) ?? []) }; });
   let freshScene = null;
   if (g) {
     const s2 = new THREE.Scene();
     s2.add(g);
-    renderer.render(s2, cam);
-    freshScene = renderer.info.render.calls;
-    scene.add(g);
+    renderer!.render(s2, cam);
+    freshScene = renderer!.info.render.calls;
+    scene!.add(g);
   }
   return { sameScene, freshScene, info, camWorld: Array.from(cam.matrixWorld.elements.slice(0, 16)) };
 }
@@ -954,19 +1034,22 @@ export function sceneProbe() {
 /** Render a plain box through the same renderer: isolates "the renderer draws" from "this model draws". */
 export function renderSelfTest() {
   if (!ensureRenderer()) return null;
+  // ETS item 9: ensureRenderer() returned true above, so renderer is set below
   const s = new THREE.Scene();
+  // ETS item 38: three.js's JS-inferred Mesh has no position and does not pass to Scene.add; this any stays in this function
   const m: any = new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), new THREE.MeshBasicMaterial({ color: 0xff00ff }));
   m.position.set(56, 0, 60);
   s.add(m);
-  const cam: any = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
+  // ETS item 9: Object3D defines rotation at run time; three.js's JS gives TypeScript no type for it
+  const cam = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5) as MountCamera;
   cam.rotation.x = -PITCH;
-  renderer.render(s, cam);
-  const gl = renderer.getContext();
+  renderer!.render(s, cam);
+  const gl = renderer!.getContext();
   const buf = new Uint8Array(MOUNT_VIEW.w * MOUNT_VIEW.h * 4);
   gl.readPixels(0, 0, MOUNT_VIEW.w, MOUNT_VIEW.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
   let alpha = 0;
   for (let i = 3; i < buf.length; i += 4) if (buf[i]! > 0) alpha++;
-  return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, alpha };
+  return { calls: renderer!.info.render.calls, tris: renderer!.info.render.triangles, alpha };
 }
 
 /** Read the renderer's own framebuffer (not a 2D copy): how many pixels the last render actually wrote. */
@@ -987,7 +1070,7 @@ export function probeFramebuffer() {
 /** What the last render submitted (numbers only: the tests and verifier read this, never a picture). */
 export function mountRenderInfo() {
   let meshes = 0, visibleMeshes = 0, depth = 0, matVisible = 0, layerMask = 0;
-  const walk = (o, d) => {
+  const walk = (o: ProbeNode, d: number): void => {
     depth = Math.max(depth, d);
     if (o.isMesh) {
       meshes++;
@@ -1015,10 +1098,10 @@ export function mountRenderInfo() {
 
 const _t = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion();
 
-function boneObjects(asset) {
+function boneObjects(asset: MountAsset): Map<number, BoneObject> {
   if (!asset._bones) {
-    const map = new Map();
-    const walk = (obj) => {
+    const map = new Map<number, BoneObject>();
+    const walk = (obj: BoneObject): void => {
       if (obj.__node != null) map.set(obj.__node, obj);
       for (const child of obj.children) walk(child);
     };
@@ -1033,7 +1116,7 @@ const scratch = typeof document !== "undefined" ? document.createElement("canvas
 let lastSolid: Uint8Array<ArrayBuffer> | null = null;            // the last pixelate()'s body mask (1 = a rendered surface, 0 = empty or outline)
 
 /** Map the render to the fixed palette and add a 1 px outline around the silhouette. */
-export function pixelate(srcCanvas) {
+export function pixelate(srcCanvas: HTMLCanvasElement) {
   if (!scratch) return srcCanvas;
   const w = srcCanvas.width, h = srcCanvas.height;
   if (scratch.width !== w || scratch.height !== h) { scratch.width = w; scratch.height = h; }
@@ -1079,7 +1162,7 @@ export function nearestPalette(r: number | undefined, g: number | undefined, b: 
 }
 
 /** How many model pixels are on screen (tests/verify use the number, never a picture). */
-export function solidPixelCount(canvas) {
+export function solidPixelCount(canvas: HTMLCanvasElement | null) {
   if (!canvas || !canvas.getContext) return 0;
   const c2 = canvas.getContext("2d", { willReadFrequently: true });
   const d = c2.getImageData(0, 0, canvas.width, canvas.height).data;

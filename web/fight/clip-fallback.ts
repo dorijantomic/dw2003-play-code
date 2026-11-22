@@ -1,4 +1,5 @@
 import type { FightGate } from './types.js';
+import type { CastSolverModel } from './anim-solver.js';
 interface CastBakeEntry {
   table?: number;
   gate?: FightGate;
@@ -63,8 +64,7 @@ interface ClipScript {
   buildKind?: string;
 }
 
-interface ClipScriptModel {
-  folder: string | number;
+interface ClipScriptModel extends CastSolverModel {
   actions?: Record<number, ClipScript | undefined>;
 }
 // A technique the model has no action clip for.
@@ -1171,7 +1171,7 @@ function donorPayload(model: DonorScriptModel, clip: string | number, row: { d: 
  * self-cast script — its own authored script only when that script carries no defender-facing cue,
  * never an attack body and never the Greymon last resort.
  */
-export function resolveClipScript(model: { folder: string | number; }, clip: number, opts = {}) {
+export function resolveClipScript(model: Omit<ClipScriptModel, "actions">, clip: number, opts = {}) {
   // THE HAND PICKS (dw2-picks.js): only with DW2 motion on. "dw2" plays the DW2 motion even where the
   // body owns this clip (falls through to the rule when the body has no DW2 motion for it); "dw3"
   // keeps every DW2 body away from this clip.

@@ -46,11 +46,180 @@ import { motionFor, releasePoint, handPoint, windupFor } from "./motion-constant
 import { headCastFor, HEAD_CAST_JUMP, HEAD_CAST_IDLE } from "./head-cast-constants.js";
 import { bodyHeight, penetration, clearanceTolerance, rigColliders, poseCollider, pairClearance, allowedPairs } from "./anim-collision.js";
 import { sharedShotMode, sharedShotTargets, SHARED_SHOT } from "./anim-collision.js";
-import type { FightAimOffsets, FightChannels, FightGate, FightMetrics, FightPlan, FightSkeleton } from "./types.js";
-import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
-interface CastSolverModel extends Dw2LoadedModel {
+import type { FightMetrics, FightPlan } from "./types.js";
+import type { armEquip } from "./digimon-anatomy.js";
+
+/** A 3-vector (x, y, z) in model units. */
+type Vec3 = [number, number, number];
+/** A row-major 3x3 matrix (k16's layout). */
+type Mat3 = [Vec3, Vec3, Vec3];
+/** The flat column-major 3x3 the renderer and firing-axis.js use. */
+type Mat9 = [number, number, number, number, number, number, number, number, number];
+/** One channel key: three values and the frame they sit on (30000 ends the channel). */
+type ChanRow = [number, number, number, number];
+/** The classes K19a measured motion for. */
+type MotionClass = "hand" | "prop" | "mouth" | "eyes" | "body";
+
+/** A bone's channels: ch1 translation keys and ch2 rotation keys. */
+interface SolverChannels {
+  ch1?: ChanRow[];
+  ch2?: ChanRow[];
+}
+
+/** One bone of a loaded battle model, as far as the solver reads it. */
+interface SolverBone {
+  parent_slot?: number | null;
+  verts?: Vec3[];
+  anim?: SolverChannels;
+}
+
+/** One entry of a playlist table. */
+interface SolverTableRow {
+  value: number;
+  loop_target: number;
+  aux: null;
+}
+
+interface SolverTimelineEntry {
+  table?: SolverTableRow[];
+}
+
+/** A loaded battle model, as far as the solver reads it (the folder names the Digimon). */
+interface SolverModel {
+  folder: string;
+  num_bones?: number | null;
+  bones: SolverBone[];
+  timeline?: SolverTimelineEntry[];
+}
+
+export interface CastSolverModel extends SolverModel {
   solverCasts?: Record<string, CastSolveOut>;
   __solverBakes?: number;
+}
+
+/** One emitter site of a technique, with the geometry class and the arm it sits on. */
+interface SolverSite {
+  id: string;
+  cls: string;
+  /** the bone, as launch-plan.js types it */
+  bone: string;
+  chain: number[] | null;
+  side: "left" | "right" | null;
+  equip: ReturnType<typeof armEquip> | null;
+}
+
+type ShotRule = ReturnType<typeof shotsFor>;
+
+interface SolverGroupOk {
+  ok: true;
+  cls: MotionClass;
+  mode: "combined" | "spread" | "single";
+  ids: string[];
+  sites: SolverSite[];
+  rule: ShotRule;
+  armSites: SolverSite[];
+}
+
+interface SolverGroupFail {
+  ok: false;
+  reason: string;
+  rule?: ShotRule;
+  sites?: SolverSite[];
+}
+
+/** A plan that makePlan has given its aim points (planCast alone leaves them out). */
+type AimedPlan = SolverPlan & { aimPoints: number[][] };
+
+/** A plan from planCast plus the two knobs the attempt ladder adds to it. */
+interface SolverPlan extends FightPlan {
+  leanScale?: number;
+  pushBase?: number;
+}
+
+interface PlanFail {
+  ok: false;
+  reason: string;
+}
+
+/** One rung of SOLVER.attemptLadder. */
+type AttemptRung = (typeof SOLVER)["attemptLadder"][number];
+
+/** One sampled tick of a bake: every bone's world position and rotation. */
+interface TraceRow {
+  t: number;
+  pos: Vec3[];
+  rot: number[][][];
+}
+
+/** One tick of a plan: where each arm's wrist goes, or the bone a centre shot leaves from, plus lean, head pitch and root. */
+interface SolverFrame {
+  aim: { bone: string; point: number[] } | null;
+  arms: { left: number[] | null; right: number[] | null };
+  head?: number;
+  lean?: number;
+  root?: number[];
+}
+
+/** The rules a baked cast is judged on (the head-cast ones only exist on a head cast). */
+interface SolverGate {
+  aim: boolean;
+  clearance: boolean;
+  ground: boolean;
+  gap: boolean;
+  motion: boolean;
+  reachable: boolean;
+  headPitch?: boolean;
+  jump?: boolean;
+  idle?: boolean;
+  body?: boolean;
+}
+
+/** A firing axis as the solver reads it: the unit axis and the point it leaves from. */
+interface SolverAxis {
+  axis: Vec3;
+  origin: Vec3;
+  cls: string;
+}
+
+/** What bakeSolverPose returns. */
+interface BakeOut {
+  model: SolverModel;
+  table: number;
+  offset: number;
+  ticks: number;
+  trace: TraceRow[];
+  metrics: FightMetrics;
+}
+
+interface BakeOpts {
+  offset?: number;
+  table?: number | null;
+  baseFrame?: number | null;
+}
+
+interface SolveOpts {
+  tech?: string | null;
+  apply?: boolean;
+  offset?: number | null;
+  force?: boolean;
+}
+
+/** The head-cast check verifyBake reads off the baked pose. */
+interface HeadGate {
+  peak: number;
+  peakTick: number;
+  release: number;
+  lift: number;
+  band: (number | null)[];
+  cell: string | null;
+  n: number | null;
+  hub: boolean;
+  jump: number;
+  jumpBar: number;
+  ok: boolean;
+  jumpOk: boolean;
+  liftFull?: number;
+  scale?: number;
 }
 
 
@@ -154,12 +323,27 @@ interface HeadSchedule {
 }
 
 interface SolverPose {
-  rot: number[][];
-  pos: number[][];
-  scale: number[][];
+  rot: Mat9[];
+  pos: Vec3[];
+  scale: Vec3[];
   visible: boolean[];
   frame: number;
 }
+
+type PoseRotPos = Pick<SolverPose, "rot" | "pos">;
+
+/** One site's firing axis at the release pose, and how far it is off the aim line. */
+interface AimRow {
+  id: string;
+  cls?: string;
+  origin?: Vec3;
+  axis?: Vec3;
+  error: number | null;
+  yaw?: number;
+  pitch?: number;
+}
+
+type VerifyOut = ReturnType<typeof verifyBake>;
 
 
 
@@ -249,14 +433,15 @@ export const SOLVER = {
 // once K20 decides it is. Until then the solver only takes over the (model, technique) pairs the caller
 // enables, so every other built script is byte-identical. `key` is `${folder}|${techKey}`; a pair with no
 // technique (an item / an unnamed clip) is never taken over by the slice.
-let SCOPE = null;
-const techKey = (name) => String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+let SCOPE: "all" | Set<string> | null = null;
+const techKey = (name: string | null | undefined) => String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** Enable the solver: null = off (default), "all" = every pair its gate accepts, or a list of pairs
  *  `[{ folder, tech }]` / `["folder|techkey", ...]`. Returns the scope in force. */
 export function setSolverScope(scope: "all" | null | Array<string | { folder?: string; tech?: string }>): "all" | null | Set<string> {
-  if (scope == null || scope === "all") { SCOPE = scope; return SCOPE; }
-  const set = new Set();
+  // ETS item 9: this branch only ever holds null or "all"; the loose compile cannot narrow an == null test.
+  if (scope == null || scope === "all") { SCOPE = scope as "all" | null; return SCOPE; }
+  const set = new Set<string>();
   for (const p of scope) {
     if (typeof p === "string") { set.add(p); continue; }
     if (p?.folder) set.add(`${p.folder}|${techKey(p.tech)}`);
@@ -269,7 +454,7 @@ export function setSolverScope(scope: "all" | null | Array<string | { folder?: s
 export function solverScope() { return SCOPE; }
 
 /** May the solver take over this (model, technique)? Generic: scope only, no species logic. */
-export function solverEnabledFor(model, { tech = null } = {}) {
+export function solverEnabledFor(model: { folder?: string | number } | null | undefined, { tech = null }: { tech?: string | null } = {}): boolean {
   if (SCOPE == null) return false;
   if (!tech) return false;                       // an unnamed clip/item keeps the A9/A10 builds
   if (SCOPE === "all") return true;
@@ -293,14 +478,14 @@ function motionClassOf(cls: string, sideCount = 1): "hand" | "prop" | "mouth" | 
  *   class  K19b's geometry class of those sites + K17's arm equipment, folded to K19a's measured classes.
  * Returns { ok, cls, mode, ids, sites, rule, reason }.
  */
-export function solverGroup(model, { tech = null } = {}) {
+export function solverGroup(model: SolverModel | null | undefined, { tech = null }: { tech?: string | null } = {}): SolverGroupOk | SolverGroupFail {
   const folder = model?.folder;
   if (!folder) return { ok: false, reason: "no folder" };
   const rule = shotsFor(folder, tech ?? "");
   const ids = Array.isArray(rule?.emitters) ? rule.emitters.slice() : [];
   if (!ids.length) return { ok: false, reason: `the technique's rule fires nothing (${rule?.mode ?? "?"})`, rule };
   if (rule.mode === "per-limb-contact") return { ok: false, reason: "a contact move, not a cast", rule };
-  const sites = [];
+  const sites: SolverSite[] = [];
   for (const id of ids) {
     const info = emitterClass(folder, id);
     const bone = emitterBone(folder, id);
@@ -324,14 +509,14 @@ export function solverGroup(model, { tech = null } = {}) {
 const K19F_DEBUG = typeof process !== "undefined" && !!process.env?.K19F_DEBUG;   // Node diagnostics only: the
 // module runs in the BROWSER too, where `process` does not exist and the old unguarded `process.env.K19F_DEBUG`
 // threw inside the per-tick bake (K19f item 9: the solver had never run in the real game, only in node tools).
-const clamp = (v, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const smooth = (u: number) => { const t = clamp(u, 0, 1); return t * t * (3 - 2 * t); };
-const lerp3 = (a, b, u: number) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+const lerp3 = (a: Vec3, b: Vec3, u: number): Vec3 => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
 
 /** The renderer's ch1/ch2 sampler (anim-retarget sample(), duplicated here: that module keeps it private). */
-function chan(ch, frame) {
+function chan(ch: ChanRow[] | undefined, frame: number): Vec3 {
   if (!Array.isArray(ch) || !ch.length) return [0, 0, 0];
-  let lo = ch[0], hi = ch[0];
+  let lo = ch[0]!, hi = ch[0]!;
   for (const rec of ch) {
     if (rec[3] === 30000) break;
     if (rec[3] <= frame) lo = rec; else { hi = rec; break; }
@@ -342,10 +527,10 @@ function chan(ch, frame) {
 }
 
 /** The rest pose in the shape firing-axis.js takes ({rot: flat column-major, pos}). */
-export function poseOf(model: Dw2LoadedModel, frame = 0, blend = null): SolverPose { return poseFromChannels(model, frame, { blend }); }
+export function poseOf(model: SolverModel, frame = 0, blend = null): SolverPose { return poseFromChannels(model, frame, { blend }); }
 
 /** k16's row-major 3x3 -> the flat column-major the renderer/firing-axis use. */
-const flatOf = (M) => [M[0][0], M[1][0], M[2][0], M[0][1], M[1][1], M[2][1], M[0][2], M[1][2], M[2][2]];
+const flatOf = (M: Mat3): Mat9 => [M[0][0], M[1][0], M[2][0], M[0][1], M[1][1], M[2][1], M[0][2], M[1][2], M[2][2]];
 
 /**
  * The frame the solver treats as the body's neutral: the first frame of the table the script returns to
@@ -353,7 +538,7 @@ const flatOf = (M) => [M[0][0], M[1][0], M[2][0], M[0][1], M[1][1], M[2][1], M[0
  * stands is this one — a channel's frame 0 can be a modelling default that sits a tenth of a body height
  * below the idle (K19f: Kokatorimon's legs at frame 0 are 0.13 h lower than its own idle).
  */
-export function neutralFrame(model) {
+export function neutralFrame(model: SolverModel | null | undefined): number {
   let lo = Infinity;
   for (const e of model?.timeline?.[1]?.table ?? []) {
     const v = e?.value | 0;
@@ -363,10 +548,10 @@ export function neutralFrame(model) {
 }
 
 /** The lowest mesh point of a posed model (+Y is down, so the largest y) and the bone that carries it. */
-export function lowestVertex(model, pose) {
+export function lowestVertex(model: SolverModel, pose: PoseRotPos) {
   let best = { y: -Infinity, bone: -1 };
   for (let i = 0; i < model.bones.length; i++) {
-    const R = pose.rot[i], t = pose.pos[i], vs = model.bones[i].verts || [];
+    const R = pose.rot[i], t = pose.pos[i], vs = model.bones[i]!.verts || [];
     if (!R || !t) continue;
     for (const v of vs) {
       const y = (R[1] * v[0] + R[4] * v[1] + R[7] * v[2]) + t[1];
@@ -400,7 +585,7 @@ export function headScheduleFrom(cell: HeadCastCell, { windup = 41 } = {}): Head
  * actor returns to), the cell's measured lift at the peak, level again before the release: that is the
  * disc's own shape (K20a: peak +24 deg median, at 40% of the wind-up, release pitch +1.2 deg median).
  */
-export function headCastSchedule(h, t: number, ticks = Infinity) {
+export function headCastSchedule(h: HeadSchedule | null | undefined, t: number, ticks = Infinity): number {
   if (!h || !(h.lift > 0) || t <= 0 || t >= ticks - 1) return 0;
   if (t < h.rise) return h.lift * smooth(t / Math.max(1, h.rise));
   const peakEnd = h.rise + h.hold;
@@ -419,7 +604,7 @@ export function headCastSchedule(h, t: number, ticks = Infinity) {
  * (a spell: windup ≈ 0.18 of the cast, flight ≈ 0.40 — K19a's numbers), and each class's own medians
  * override the excursion and the release point.
  */
-export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): FightPlan | { ok: false; reason: string; } {
+export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null, quantile = 0.5 }: { tick?: number | null; quantile?: number } = {}): SolverPlan | PlanFail {
   const folder = model.folder;
   const rig = rigOf(model);
   if (!rig || rig.source !== "bonemap") return { ok: false, reason: "no bone map for this rig" };
@@ -472,8 +657,8 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
   // actually hangs on), not from the emitter's name: the K19b class's arm.side is the donor's authored
   // side, and a spread built on it put the "left" arm on the right (its muzzle came out at +x and
   // crossed the other arm).
-  const restTip = group.sites.map((s) => {
-    if (s.chain?.length) { const p = neutral.pos[s.chain[s.chain.length - 1]]; return p ? [p[0], p[1], p[2]] : null; }
+  const restTip = group.sites.map((s): Vec3 | null => {
+    if (s.chain?.length) { const p = neutral.pos[s.chain[s.chain.length - 1]!]; return p ? [p[0], p[1], p[2]] : null; }
     const t = tipOf(neutral.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone));
     return t ? [t[0], t[1], t[2]] : null;
   });
@@ -483,7 +668,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
     if (Math.abs(dx) > 1e-3 * H) return Math.sign(dx);
     return s.side === "left" ? -1 : s.side === "right" ? 1 : 0;
   });
-  const releaseFor = (i) => {
+  const releaseFor = (i: number): Vec3 => {
     const s = sides[i] || 0;
     const t = restTip[i];
     if (!isArm) {
@@ -511,7 +696,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
   };
   // R3: a combined shot converges the sites to the measured clasp gap; a spread keeps each site's own side.
   let targets = group.sites.map((_, i) => releaseFor(i));
-  let origins = targets.slice();
+  let origins: number[][] = targets.slice();
   let shared = null;
   if (group.sites.length > 1) {
     const pts = targets.map((p) => ({ x: p[0], y: p[1], z: p[2] }));
@@ -520,7 +705,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
         points: pts, mode: group.mode, height: H,
         aim: [0, 0, 1], origin: { x: torsoX, y: floorY - base!.height!, z: torsoZ + base!.forward },
       });
-      targets = shared.points.map((p) => [p.x, p.y, p.z]);
+      targets = shared.points.map((p): Vec3 => [p.x, p.y, p.z]);
       origins = shared.origins.map((p) => [p.x, p.y, p.z]);
     } else {
       // SPREAD: each site already sits on its own side of the midline (releaseFor), and each fires its own
@@ -528,12 +713,12 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
       // correction is that two shots may not leave from one point: a pair the body itself places closer than
       // one hand block is pushed apart sideways, heights and forward untouched.
       const minSep = SHARED_SHOT.minSeparation * H;
-      if (targets.length === 2 && Math.abs(targets[0][0] - targets[1][0]) < minSep) {
-        const mid = (targets[0][0] + targets[1][0]) / 2;
-        const d0 = targets[0][0] - mid;
+      if (targets.length === 2 && Math.abs(targets[0]![0] - targets[1]![0]) < minSep) {
+        const mid = (targets[0]![0] + targets[1]![0]) / 2;
+        const d0 = targets[0]![0] - mid;
         const s0 = Math.abs(d0) > 1e-6 ? Math.sign(d0) : -1;
-        targets[0][0] = mid + s0 * minSep / 2;
-        targets[1][0] = mid - s0 * minSep / 2;
+        targets[0]![0] = mid + s0 * minSep / 2;
+        targets[1]![0] = mid - s0 * minSep / 2;
       }
       origins = targets.map((p) => p.slice());
       shared = { basis: `emitters spread about the aim line, each on its own side, no pair closer than ${SHARED_SHOT.minSeparation} h` };
@@ -548,8 +733,8 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
   // drives through the release (K19a: lift → hold → arrive before the release).
   const apexUp = isArm ? (wu.up || 0) : 0;
   const apexBack = isArm ? (wu.back || 0) : Math.min(wu.back || 0, SOLVER.centreBack * H);
-  const sideOf = (i) => sides[i] || (group.sites.length > 1 ? (i === 0 ? -1 : 1) : 0);
-  const apexOf = (scale) => targets.map((p, i) => {
+  const sideOf = (i: number) => sides[i] || (group.sites.length > 1 ? (i === 0 ? -1 : 1) : 0);
+  const apexOf = (scale: number) => targets.map((p, i) => {
     const out = isArm ? SOLVER.swingBase * H * scale : 0;      // outward, on the site's own side
     return [p[0] + sideOf(i) * out, p[1] - apexUp, p[2] - apexBack];
   });
@@ -564,11 +749,11 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
   // The frame path is REBUILT from the plan's points, never aliased into them: a frame that held the apex
   // array itself was shifted once per attempt by the clearance adjustment, so the wind-up ramp grew a
   // little every attempt until the arms were flung five body heights sideways (K19f item 4's real cause).
-  const frames: FightAimOffsets[] = [];
+  const frames: SolverFrame[] = [];
   const buildFrames = () => {
     frames.length = 0;
     for (let t = 0; t < ticks; t++) {
-      const f = { arms: { left: null, right: null }, aim: null } as FightAimOffsets;
+      const f: SolverFrame = { arms: { left: null, right: null }, aim: null };
       // the effector path: rest -> apex (ease) -> hold -> drive to the release point -> overshoot -> rest
       const u = t <= windup * 0.6 ? smooth(t / Math.max(1, windup * 0.6))
         : t <= windup ? 1
@@ -577,8 +762,8 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
         : smooth((t - release - follow) / Math.max(1, ticks - release - follow));
       // u: 0 at the apex/hold, 1 at the release point. The rest->apex leg is its own interpolation below.
       for (let i = 0; i < group.sites.length; i++) {
-        const s = group.sites[i];
-        let p;
+        const s = group.sites[i]!;
+        let p: number[];
         if (t <= windup * 0.6) {
           const a = smooth(t / Math.max(1, windup * 0.6));
           p = restTip[i] ? lerp3(restTip[i], plan.apex[i], a) : plan.apex[i].slice();
@@ -629,9 +814,10 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
     // the aim may start at (after the head has come back down, so the aim never eats the lift)
     head: headPlan, headSites, rootCap, aimStart: headPlan ? Math.min(windup, headPlan.rise + headPlan.hold + headPlan.fall) : 0,
     swing: { base: SOLVER.swingBase, cap: SOLVER.swingCap, scale: 1 },
+    // ETS item 9: every FightPlan field is set here, but types.ts types hand as all-required and rootCap as number; this plan holds optional hand fields and a null rootCap.
   } as FightPlan;
   /** Widen (or reset) the outward swing: the apex moves out on each site's own side, the release stays. */
-  plan.setSwing = (scale) => {
+  plan.setSwing = (scale: number) => {
     plan.swing.scale = scale;
     plan.apex = apexOf(scale);
     buildFrames();
@@ -643,15 +829,16 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
 
 // ── the bake: the plan solved onto the model's own skeleton ──────────────────────────────────────────
 
-const mul = (A, B) => [0, 1, 2].map((r) => [0, 1, 2].map((c) => A[r][0] * B[0][c] + A[r][1] * B[1][c] + A[r][2] * B[2][c]));
-const tr = (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]];
-const mv = (A, v) => [A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2], A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2], A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2]];
-const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const len3 = (a) => Math.hypot(a[0], a[1], a[2]);
-const unit3 = (a) => { const l = len3(a); return l > 1e-9 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0]; };
-const ID3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-const rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
-const fromTo = (u: number[], v: number[]) => {
+// ETS item 40: r and c only run over the literal [0, 1, 2], so every read is in range and the map yields the three rows of three that Mat3 promises.
+const mul = (A: Mat3, B: Mat3): Mat3 => [0, 1, 2].map((r) => [0, 1, 2].map((c) => A[r]![0] * B[0][c]! + A[r]![1] * B[1][c]! + A[r]![2] * B[2][c]!)) as Mat3;
+const tr = (A: Mat3): Mat3 => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]];
+const mv = (A: Mat3, v: Vec3): Vec3 => [A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2], A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2], A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2]];
+const sub3 = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const len3 = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
+const unit3 = (a: Vec3): Vec3 => { const l = len3(a); return l > 1e-9 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0]; };
+const ID3: Mat3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+const rx = (t: number): Mat3 => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
+const fromTo = (u: Vec3, v: Vec3): Mat3 => {
   const a = unit3(u), b = unit3(v);
   if (!len3(a) || !len3(b)) return ID3;
   const c = a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
@@ -664,40 +851,41 @@ const fromTo = (u: number[], v: number[]) => {
   const ax = unit3([a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!]);
   return axisAngle(ax, Math.atan2(len3([a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!]), c));
 };
-const axisAngle = (axis, ang) => {
+const axisAngle = (axis: Vec3, ang: number): Mat3 => {
   const [x, y, z] = axis, c = Math.cos(ang), s = Math.sin(ang), t = 1 - c;
   return [[t * x * x + c, t * x * y - s * z, t * x * z + s * y],
           [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
           [t * x * z - s * y, t * y * z + s * x, t * z * z + c]];
 };
-const axisOf = (M) => {
+const axisOf = (M: Mat3): { axis: Vec3; ang: number } => {
   const c = clamp((M[0][0] + M[1][1] + M[2][2] - 1) / 2, -1, 1);
   const ang = Math.acos(c);
   if (ang < 1e-9) return { axis: [0, 0, 1], ang: 0 };
-  const ax = [M[2][1] - M[1][2], M[0][2] - M[2][0], M[1][0] - M[0][1]];
+  const ax: Vec3 = [M[2][1] - M[1][2], M[0][2] - M[2][0], M[1][0] - M[0][1]];
   return { axis: unit3(ax), ang };
 };
-const clampRot = (M, max) => { const { axis, ang } = axisOf(M); return ang <= max ? M : axisAngle(axis, max); };
+const clampRot = (M: Mat3, max: number): Mat3 => { const { axis, ang } = axisOf(M); return ang <= max ? M : axisAngle(axis, max); };
 /** The same rotation, scaled to `k` of its angle — the aim's fade in/out over the cast. */
-const scaleRot = (M, k: number): number[][] => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
-const localOf = (c0, c1, c2) => {
-  const Rz = [[Math.cos(c2 * TAU), -Math.sin(c2 * TAU), 0], [Math.sin(c2 * TAU), Math.cos(c2 * TAU), 0], [0, 0, 1]];
-  const Ry = [[Math.cos(c1 * TAU), 0, Math.sin(c1 * TAU)], [0, 1, 0], [-Math.sin(c1 * TAU), 0, Math.cos(c1 * TAU)]];
-  const Rx = [[1, 0, 0], [0, Math.cos(c0 * TAU), -Math.sin(c0 * TAU)], [0, Math.sin(c0 * TAU), Math.cos(c0 * TAU)]];
+const scaleRot = (M: Mat3, k: number): Mat3 => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
+const localOf = (c0: number, c1: number, c2: number): Mat3 => {
+  const Rz: Mat3 = [[Math.cos(c2 * TAU), -Math.sin(c2 * TAU), 0], [Math.sin(c2 * TAU), Math.cos(c2 * TAU), 0], [0, 0, 1]];
+  const Ry: Mat3 = [[Math.cos(c1 * TAU), 0, Math.sin(c1 * TAU)], [0, 1, 0], [-Math.sin(c1 * TAU), 0, Math.cos(c1 * TAU)]];
+  const Rx: Mat3 = [[1, 0, 0], [0, Math.cos(c0 * TAU), -Math.sin(c0 * TAU)], [0, Math.sin(c0 * TAU), Math.cos(c0 * TAU)]];
   return mul(Rz, mul(Ry, Rx));
 };
 /** A real local rotation -> a ch2 triple, nearest the previous key (the K16 branch rule). */
-function toCh2(M, prev = null) {
+function toCh2(M: Mat3, prev: Vec3 | null = null): Vec3 {
   const cb = Math.hypot(M[0][0], M[1][0]);
   let c0: number | undefined, c1: number | undefined, c2: number | undefined;
   if (cb > 1e-7) { c1 = Math.atan2(-M[2][0], cb); c2 = Math.atan2(M[1][0], M[0][0]); c0 = Math.atan2(M[2][1], M[2][2]); }
   else { c1 = Math.atan2(-M[2][0], cb); c2 = Math.atan2(-M[0][1], M[1][1]); c0 = 0; }
   let t = [c0 / TAU, c1 / TAU, c2 / TAU];
   if (prev) {
-    const wrap = (x: number, p) => { let d = x - p; d = ((d % 4096) + 4096) % 4096; if (d > 2048) d -= 4096; return p + d; };
+    const wrap = (x: number, p: number) => { let d = x - p; d = ((d % 4096) + 4096) % 4096; if (d > 2048) d -= 4096; return p + d; };
     const alt = [t[0]! + 2048, 2048 - t[1]!, t[2]! + 2048];
-    const cost = (v) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
-    const a = t.map((x, i) => wrap(x, prev[i])), b = alt.map((x, i) => wrap(x, prev[i]));
+    const cost = (v: Vec3) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
+    // ETS item 9: mapping a three-component vector gives three components; TS types the result number[].
+    const a = t.map((x, i) => wrap(x, prev[i])) as Vec3, b = alt.map((x, i) => wrap(x, prev[i])) as Vec3;
     t = cost(a) <= cost(b) ? a : b;
   }
   const norm = (x: number | undefined) => { let r = Math.round(x!) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
@@ -705,27 +893,27 @@ function toCh2(M, prev = null) {
 }
 
 /** Parent-before-child order, the subtree of each bone, and the rest world pose. */
-function rigTopology(model) {
+function rigTopology(model: SolverModel) {
   const n = model.num_bones ?? model.bones.length;
-  const kids = Array.from({ length: n }, () => []);
+  const kids: number[][] = Array.from({ length: n }, () => []);
   const roots: number[] = [];
   const parent = Array.from({ length: n }, (_, i) => (model.bones[i]?.parent_slot ?? 0) - 1);
   for (let i = 0; i < n; i++) {
-    const p = parent[i];
-    if (p! >= 0 && p! < n) kids[p].push(i); else roots.push(i);
+    const p = parent[i]!;
+    if (p >= 0 && p < n) kids[p]!.push(i); else roots.push(i);
   }
-  const order: (number | undefined)[] = [];
+  const order: number[] = [];
   const stack = roots.slice().reverse();
   while (stack.length) {
-    const i = stack.pop();
+    const i = stack.pop()!;
     order.push(i);
-    for (const k of kids[i].slice().reverse()) stack.push(k);
+    for (const k of kids[i]!.slice().reverse()) stack.push(k);
   }
   for (let i = 0; i < n; i++) if (!order.includes(i)) order.push(i);
-  const subs = Array.from({ length: n }, () => []);
+  const subs: number[][] = Array.from({ length: n }, () => []);
   for (let i = 0; i < n; i++) {
     let p = i, guard = 0;
-    while (p >= 0 && p < n && guard++ <= n) { subs[p]!.push(i); p = parent[p]; }
+    while (p >= 0 && p < n && guard++ <= n) { subs[p]!.push(i); p = parent[p]!; }
   }
   return { n, kids, roots, order, subs, parent };
 }
@@ -738,14 +926,15 @@ function rigTopology(model) {
  * technique's launch bytes (K19e §1: m094icem Ice Blow's op6 573 -> 767). With it, every frame outside the
  * baked window samples exactly what it sampled before the bake.
  */
-function withHold(own, added, holdAt: number) {
+function withHold(own: ChanRow[] | undefined, added: ChanRow[], holdAt: number): ChanRow[] {
   const out = Array.isArray(own) ? own.filter((r) => r[3] !== 30000).map((r) => r.slice()) : [];
-  if (out.length && out[out.length - 1][3] < holdAt) {
-    const v = out[out.length - 1];
-    out.push([v[0], v[1], v[2], holdAt]);
+  if (out.length && out[out.length - 1]![3]! < holdAt) {
+    const v = out[out.length - 1]!;
+    out.push([v[0]!, v[1]!, v[2]!, holdAt]);
   }
   const last = added[added.length - 1];
-  return [...out, ...added, [last[0], last[1], last[2], 30000]];
+  // ETS item 40: every row is four numbers, but slice() widens the tuples to number[] on the way through.
+  return [...out, ...added, [last[0], last[1], last[2], 30000]] as ChanRow[];
 }
 
 /**
@@ -753,7 +942,7 @@ function withHold(own, added, holdAt: number) {
  * playback order. The engine plays one entry per tick, so walking this list at one entry per tick is the
  * idle's own rate — that is what a cast must keep playing underneath (K20b item 3).
  */
-export function idlePlaylist(model: Dw2LoadedModel & { timeline?: { table?: { value?: number }[] }[] }, fallback = null): number[] {
+export function idlePlaylist(model: SolverModel | null | undefined, fallback: number | null = null): number[] {
   const tab = model?.timeline?.[1]?.table ?? [];
   const out = tab.map((e) => e?.value | 0).filter((v) => v >= 0 && v < 0x8000);
   if (out.length) return out;
@@ -772,7 +961,7 @@ export function idlePlaylist(model: Dw2LoadedModel & { timeline?: { table?: { va
  *      head/chest/tail emitter is rotated to aim;
  *   3. the locals are written as ch2 keys with the K16 joint limit, the root's ch1 pinned (feet planted).
  */
-export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = null, baseFrame = null } = {}) {
+export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset = SOLVER.offset, table = null, baseFrame = null }: BakeOpts = {}): BakeOut {
   const rig = rigOf(target);
   const folder = target.folder ?? null;
   const topo = rigTopology(target);
@@ -782,24 +971,24 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
   // body a tenth of its height below the pose the engine actually draws when it stands.
   const base = baseFrame ?? plan.baseFrame ?? neutralFrame(target);
   const rest = poseFromChannels(target, base);
-  const restW = rest.rot.map((f) => [[f[0], f[3], f[6]], [f[1], f[4], f[7]], [f[2], f[5], f[8]]]);
+  const restW = rest.rot.map((f): Mat3 => [[f[0], f[3], f[6]], [f[1], f[4], f[7]], [f[2], f[5], f[8]]]);
   // ── the IDLE the cast plays over (K20b item 3) ────────────────────────────────────────────────────────
   // Every bone starts each tick at the pose the model itself is standing in on the idle playlist, and the
   // solver's motion is layered on that. A bone the cast does not drive therefore keeps the idle's own
   // breathing (wings, tail, crest) instead of being frozen on one frame for the whole cast and popping on
   // entry and exit, and the table's first and last frame land on an idle frame.
   const idleList = idlePlaylist(target, base);
-  const m3 = (f) => [[f[0], f[3], f[6]], [f[1], f[4], f[7]], [f[2], f[5], f[8]]];
+  const m3 = (f: Mat9): Mat3 => [[f[0], f[3], f[6]], [f[1], f[4], f[7]], [f[2], f[5], f[8]]];
   const idlePoses = idleList.map((f) => poseFromChannels(target, f));
   const idleW = idlePoses.map((p) => p.rot.map(m3));
   const idleL = idlePoses.map((p, k) => p.rot.map((f, i) => {
-    const pp = parent[i];
-    return mul(tr(pp! >= 0 && pp! < n ? idleW[k][pp] : ID3), m3(f));
+    const pp = parent[i]!;
+    return mul(tr(pp >= 0 && pp < n ? idleW[k]![pp]! : ID3), m3(f));
   }));
   const rootBone = rig.root;
-  const keys = new Map(), prevKeys = new Map(), key1 = new Map();
-  const metrics = { ikClamped: 0, jointsClamped: 0, axisAim: 0, bones: 0, unreachable: 0 } as FightMetrics;
-  const trace = [];
+  const keys = new Map<number, ChanRow[]>(), prevKeys = new Map<number, Vec3>(), key1 = new Map<number, ChanRow[]>();
+  const metrics: FightMetrics = { ikClamped: 0, jointsClamped: 0, axisAim: 0, bones: 0, unreachable: 0 };
+  const trace: TraceRow[] = [];
 
   // world rotations for one tick, from the IDLE frame of that tick
   const W = new Array(n), P = new Array(n);
@@ -808,13 +997,13 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
   const rebuild = () => {
     for (const i of topo.order) {
       const c1 = chan(target.bones[i]?.anim?.ch1, curFrame);
-      const p = parent[i];
+      const p = parent[i]!;
       if (p < 0 || p >= n) { P[i] = [-c1[0], c1[1], -c1[2]]; continue; }
       const o = mv(W[p], c1);
       P[i] = [P[p][0] - o[0]!, P[p][1] + o[1], P[p][2] - o[2]!];
     }
   };
-  const rotateSubtree = (bone, R) => { for (const j of subs[bone]!) W[j] = mul(R, W[j]); };
+  const rotateSubtree = (bone: number, R: Mat3) => { for (const j of subs[bone]!) W[j] = mul(R, W[j]); };
   // a bone whose subtree carries mesh that stands on the floor at the neutral pose: turning it drags the
   // feet, so a head cast spreads its pitch over the ancestors ABOVE that line only (K20a's hub section).
   const groundedSet = (() => {
@@ -833,10 +1022,10 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     }
     return out;
   })();
-  const carriesGrounded = (bone) => [...subs[bone]].some((b) => groundedSet.has(b));
+  const carriesGrounded = (bone: number) => [...subs[bone]].some((b) => groundedSet.has(b));
   const baseLowY = lowestVertex(target, rest).y;
   /** The joints a head cast may pitch: the head's own joint, then its ancestors while they carry no feet. */
-  const headJointsOf = (bone) => {
+  const headJointsOf = (bone: number) => {
     const out = [bone];
     let p = parent[bone], guard = 0;
     while (p! >= 0 && p! < n && guard++ < n) {
@@ -887,7 +1076,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // by S·R·S. Both the measured axis and the wanted direction therefore go through S before the
     // rotation is computed — otherwise the limb turns about a mirrored axis and never lands on the aim.
     const num = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
-    const toMat = (v) => [-v[0], v[1], -v[2]];
+    const toMat = (v: Vec3): Vec3 => [-v[0], v[1], -v[2]];
     /**
      * The rotation to apply to a bone so that the DRAWN geometry turns `u` onto `v`. The drawn geometry is
      * the bone matrix conjugated by S = diag(-1, 1, -1) (see the comment above), so both vectors go through
@@ -895,10 +1084,11 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
      * unmirrored vectors (what the position passes used to do) swings the limb through the MIRRORED arc in
      * x/z: it drove Piedmon's wrist 0.18 h the wrong way instead of onto a point well inside its reach.
      */
-    const fromToDraw = (u: number[], v: number[]) => fromTo(toMat(u), toMat(v));
-    const measure = (site, aimPoint) => {
+    const fromToDraw = (u: Vec3, v: Vec3): Mat3 => fromTo(toMat(u), toMat(v));
+    const measure = (site: SolverSite, aimPoint: Vec3) => {
       const poseNow = { rot: W.map(flatOf), pos: P.map((p) => p.slice()) };
-      const fa = firingAxis(target, folder, site.id, poseNow, { rest });
+      // ETS item 9: firingAxis reads its axis and origin off three-component rows, but types them number[].
+      const fa = firingAxis(target, folder, site.id, poseNow, { rest }) as SolverAxis | null;
       if (!fa || !len3(fa.axis)) return null;
       const wantDir = unit3(sub3(aimPoint, fa.origin));
       const want = len3(wantDir) ? wantDir : fa.axis;
@@ -916,14 +1106,15 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
      * at the target from frame 0 is not its rest pose — that turn alone buried Piedmon's upper arm 0.036 h
      * inside his own thigh at both ends of the cast.
      */
-    const turnTo = (bone, site, aimPoint, eps: number, maxAng = Infinity, blend = 1) => {
+    const turnTo = (bone: number, site: SolverSite, aimPoint: Vec3, eps: number, maxAng = Infinity, blend = 1) => {
       let best = measure(site, aimPoint);
       if (!best) return false;
       let applied = 0;
       for (let pass = 0; pass < 3 && best.err > eps; pass++) {
         const snapW = W.slice();
         let pick = null;
-        for (const cand of [fromTo(best.axisM, best.wantM), fromTo(best.axisM.map((v) => -v), best.wantM), fromTo(best.axisM, best.wantM.map((v) => -v))]) {
+        // ETS item 9: mapping a three-component vector gives three components; TS types the result number[].
+        for (const cand of [fromTo(best.axisM, best.wantM), fromTo(best.axisM.map((v) => -v) as Vec3, best.wantM), fromTo(best.axisM, best.wantM.map((v) => -v) as Vec3)]) {
           const R = scaleRot(maxAng < Math.PI ? clampRot(cand, maxAng) : cand, blend);
           if (axisOf(R).ang < 1e-4) continue;
           for (let j = 0; j < n; j++) W[j] = snapW[j];
@@ -940,8 +1131,8 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // about its own head, so the firing point never travels (K19f: Kokatorimon's mouth moved 0.000 h in
     // every axis). The chain that moves it is the path from the body's root down to it, and the effector
     // is the firing TIP (launch-plan's own tip arithmetic), not the bone head.
-    const tipPrev = new Map(plan.sites.map((s) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
-    const driveChainOf = (bone) => {
+    const tipPrev = new Map(plan.sites.map((s: SolverSite) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
+    const driveChainOf = (bone: number) => {
       const chain: (number | undefined)[] = [];
       let p = parent[bone], guard = 0;
       while (p! >= 0 && p! < n && guard++ < n) { chain.push(p); p = parent[p]; }
@@ -951,12 +1142,13 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       return chain;
     };
     /** Rotate the joints that CARRY a centre emitter until its firing tip reaches `point`. */
-    const ccdTip = (chain: number[], s: { bone: string }, point: number[], passes: number) => {
+    const ccdTip = (chain: number[], s: SolverSite, point: Vec3, passes: number) => {
       const prev = tipPrev.get(s.bone) ?? null;
       for (let pass = 0; pass < passes; pass++) {
         for (let k = chain.length - 1; k >= 0; k--) {
-          const j = chain[k];
-          const tip = tipOf(P, target, s.bone, prev!);
+          const j = chain[k]!;
+          // ETS item 9: tipOf builds its tip from three-component rows, but types it number[].
+          const tip = tipOf(P, target, s.bone, prev!) as Vec3 | null;
           if (!tip) continue;
           const u = sub3(tip, P[j]), v = sub3(point, P[j]);
           if (len3(u) < 1e-6 || len3(v) < 1e-6) continue;
@@ -974,7 +1166,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
      * in a spread cast), and on a five-bone arm it left the shoulder in a configuration the aim could not
      * recover (Knightmon, 103.5 deg). The distal joints move the hand least, so they are tried first.
      */
-    const aimChain = (chain, s, point, eps = 0.004, blend = 1) => {
+    const aimChain = (chain: number[], s: SolverSite, point: Vec3, eps = 0.004, blend = 1) => {
       // a PROP turns its wrist to aim the blade, and a wrist turn sweeps a metre of steel through whatever
       // stands beside the body (Piedmon's own back box): a prop is aimed from the SHOULDER inward, so the
       // blade travels with the whole arm instead of pivoting into the torso. A bare hand aims from the
@@ -986,7 +1178,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
         if (m && m.err <= Math.max(eps * 2, 0.02)) break;   // close enough: stop climbing
       }
     };
-  let rootDelta = [0, 0, 0];
+  let rootDelta: Vec3 = [0, 0, 0];
     for (const s of plan.sites) {
       const chain = s.chain ?? null;
       if (chain && chain.length) {
@@ -1011,7 +1203,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
         // point (each joint bounded by K16.maxIk), then the AIM is distributed from the wrist inward (R1).
         // CCD needs no elbow/split guess: it works for a 2-bone chibi arm and a 5-bone knight's arm alike,
         // and it straightens the arm when the target is at the edge of reach instead of folding it.
-        const ccd = (target, passes: number) => {
+        const ccd = (target: Vec3, passes: number) => {
           for (let pass = 0; pass < passes; pass++) {
             for (let k = chain.length - 2; k >= 0; k--) {
               const j = chain[k];
@@ -1044,7 +1236,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
               const eff = m?.fa?.origin ?? P[tipBone];
               if (!eff) continue;
               const cur = sub3(eff, P[tipBone]);
-              const point = [wantP[0] + cur[0] + (effOff[0]! - cur[0]!) * aimScale,
+              const point: Vec3 = [wantP[0] + cur[0] + (effOff[0]! - cur[0]!) * aimScale,
                              wantP[1] + cur[1] + (effOff[1]! - cur[1]!) * aimScale,
                              wantP[2] + cur[2] + (effOff[2]! - cur[2]!) * aimScale];
               const u = sub3(eff, P[j]), v = sub3(point, P[j]);
@@ -1141,12 +1333,12 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       // on one exemplar), and it silently walks the muzzle off the aim line — the read-back in solveCast
       // caught it. A root key at the idle changes nothing the solver does and makes the drawn pose the
       // solved pose.
-      const p = parent[i];
-      const Wp = p! >= 0 && p! < n ? W[p] : ID3;
+      const p = parent[i]!;
+      const Wp = p >= 0 && p < n ? W[p] : ID3;
       const L = mul(tr(Wp), W[i]);
       // K20b: the delta is measured against the IDLE local of this tick, so a bone the cast does not drive
       // keeps its idle value exactly (dc = I) and the joint limit is a limit on the cast's own deviation.
-      const Lr = LrTick?.[i] ?? mul(tr(p! >= 0 && p! < n ? restW[p] : ID3), restW[i]);
+      const Lr = LrTick?.[i] ?? mul(tr(p >= 0 && p < n ? restW[p]! : ID3), restW[i]!);
       const d = mul(tr(Lr), L);
       const dc = clampRot(d, K16.maxJoint);
       const { ang } = axisOf(d);
@@ -1160,7 +1352,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const out = toCh2(mul(Lr, dc), prevKeys.get(i) ?? null);
       prevKeys.set(i, out);
       if (!keys.has(i)) keys.set(i, []);
-      keys.get(i).push([out[0], out[1], out[2], offset + t]);
+      keys.get(i)!.push([out[0], out[1], out[2], offset + t]);
       if (moved > 1e-7) metrics.bones++;    // counted per tick; the report divides by the tick count
     }
     // 4. translations: the pose is PLANTED, so every bone's ch1 is held at its IDLE value for the whole
@@ -1183,23 +1375,23 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     for (const i of topo.order) {
       const c1 = c1s[i];
       if (!key1.has(i)) key1.set(i, []);
-      key1.get(i).push([c1[0], c1[1], c1[2], offset + t]);
+      key1.get(i)!.push([c1[0], c1[1], c1[2], offset + t]);
     }
-    trace.push({ t, pos: P.map((p) => (p ? p.slice() : null)), rot: W.map((M) => M.map((r2) => r2.slice())) });
+    trace.push({ t, pos: P.map((p) => (p ? p.slice() : null)), rot: W.map((M: Mat3) => M.map((r2: Vec3) => r2.slice())) });
   }
 
-  const model = {
+  const model: SolverModel = {
     ...target,
     bones: target.bones.map((b, i) => {
       const moved = keys.get(i);
       const trans = key1.get(i);
       if (!moved && !trans) return b;
-      const anim = { ...(b.anim || {}) } as FightChannels;
+      const anim: SolverChannels = { ...(b.anim || {}) };
       if (moved) anim.ch2 = withHold(b.anim?.ch2, moved, offset);
       if (trans) anim.ch1 = withHold(b.anim?.ch1, trans, offset);
       return { ...b, anim };
     }),
-  } as FightSkeleton;
+  };
   const idx = table ?? (() => { let k = Math.max(62, model.timeline?.length ?? 0); while (model.timeline?.[k]?.table) k++; return k; })();
   model.timeline = (target.timeline ? target.timeline.slice() : []);
   model.timeline[idx] = { table: [
@@ -1216,14 +1408,15 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
 // ── the entry point: solve, verify, and (on pass) write into the live model ─────────────────────────
 
 /** The point an emitter's axis is aimed at: the opponent's mid-body, on its own line, in model space. */
-function targetPoint(model, plan: FightPlan) {
+function targetPoint(model: SolverModel, plan: FightPlan): Vec3 {
   const H = plan.H;
   return [0, plan.floorY - H * 0.5, plan.torso[2] + SOLVER.aimDistance];
 }
 
 /** The firing TIP of one site under a pose — the same point launch-plan writes the launch op from. */
-function tipAt(pose: SolverPose, model: Dw2LoadedModel, folder, s: { id: string; bone: string }): number[] | null {
-  return tipOf(pose.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone));
+function tipAt(pose: SolverPose, model: SolverModel, folder: string, s: SolverSite): Vec3 | null {
+  // ETS item 40: tipOf builds its tip from three-component rows, but types it number[]; the cast stays in this small function.
+  return tipOf(pose.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone)) as Vec3 | null;
 }
 
 /**
@@ -1238,14 +1431,15 @@ function tipAt(pose: SolverPose, model: Dw2LoadedModel, folder, s: { id: string;
  *              least SOLVER.driveFloor of it (R2 — no more aiming by standing still)
  *   reachable  the wrist gets to the planned point without stretching past the arm
  */
-export function verifyBake(model, plan: FightPlan, bake, group) {
+export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, group: SolverGroupOk) {
   const folder = model.folder;
   const off = bake.offset;
   const neutral = poseFromChannels(bake.model, plan.baseFrame ?? 0);
   const relPose = poseFromChannels(bake.model, off + plan.release);
-  const aim = [];
+  const aim: AimRow[] = [];
   for (const [i, s] of plan.sites.entries()) {
-    const fa = firingAxis(bake.model, folder, s.id, relPose);
+    // ETS item 9: firingAxis reads its axis and origin off three-component rows, but types them number[].
+    const fa = firingAxis(bake.model, folder, s.id, relPose) as SolverAxis | null;
     if (!fa) { aim.push({ id: s.id, error: null }); continue; }
     const e = aimError(fa.axis, fa.origin, plan.aimPoints?.[i] ?? plan.aimPoint);
     aim.push({ id: s.id, cls: fa.cls, origin: fa.origin, axis: fa.axis, error: e.full, yaw: e.yaw, pitch: e.pitch });
@@ -1253,8 +1447,8 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const worstAim = Math.max(...aim.map((a) => (a.error == null ? 999 : a.error)));
   // where the emitter actually IS at release — the muzzle/mouth the geometry reports (a prop arm's wrist is
   // NOT its muzzle), in the same body-relative units as the constants
-  const body = (q) => ({ height: (plan.floorY - q[1]) / plan.H, forward: (q[2] - plan.torso[2]) / plan.H, lateral: Math.abs(q[0]) / plan.H });
-  const reached = plan.sites.map((s, i) => {
+  const body = (q: Vec3) => ({ height: (plan.floorY - q[1]) / plan.H, forward: (q[2] - plan.torso[2]) / plan.H, lateral: Math.abs(q[0]) / plan.H });
+  const reached = plan.sites.map((s: SolverSite, i: number) => {
     const o = aim[i]?.origin, p = relPose.pos[s.bone];
     if (!o || !p) return null;
     const wantM = plan.isArm ? plan.hand : plan.rel;      // what the class's own casts say: wrist for an arm
@@ -1276,7 +1470,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
     for (let i = 0; i < list.length; i += step) out.push(poseFromChannels(bake.model, list[i]));
     return out;
   })();
-  const restClear = new Map();
+  const restClear = new Map<string, number | null>();
   const idleColliders = rigC ? idleSample.map((pose) => rigC.colliders.map((c) => poseCollider(c, pose))) : [];
   for (const [i, j] of rigC ? allowedPairs(rigC) : []) {
     let best: number | null = null;
@@ -1293,7 +1487,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const authorTol = clearanceTolerance(bake.model, folder);
   const noise = SOLVER.clearanceNoise * plan.H;
   const propBone = new Set(rigC ? rigC.colliders.map((c, i) => (c.prop ? i : -1)).filter((i) => i >= 0) : []);
-  const roleOf = (i) => (rigC ? rigC.colliders[i]?.role : null);
+  const roleOf = (i: number) => (rigC ? rigC.colliders[i]?.role : null);
   const allowed = (i: number, j: number) => {
     // An "extra" collider is a part the K12 bone map does not claim as a role — a back box, a cape, a
     // wing, a decoration. Its capsule fits that shape very loosely and the lead/skeptic exchange already
@@ -1327,9 +1521,10 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   // the floor the model itself stands on at each tick (its own idle's floor): a cast that plays OVER the
   // idle may not be judged against a floor the idle itself has already left (K20b item 3)
   const idleFramesB = idlePlaylist(bake.model, plan.baseFrame ?? 0);
-  const idleFloorAt = (t) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
-  const orig = (pose: SolverPose, s: FightPlan["sites"][number]): { x: number; y: number; z: number } | null => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
-  const t0 = plan.sites.map((s) => orig(neutral, s));
+  const idleFloorAt = (t: number) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
+  // ETS item 9: firingAxis reads its origin off a three-component row, but types it number[].
+  const orig = (pose: SolverPose, s: SolverSite): Vec3 | null => (firingAxis(bake.model, folder, s.id, pose) as SolverAxis | null)?.origin ?? null;
+  const t0 = plan.sites.map((s: SolverSite) => orig(neutral, s));
   let travel = 0, groundWorst = 0, groundTick: number | null = null, penTicks = 0, worstPen = null, gapMin = Infinity;
   for (const t of at) {
     const pose = poseFromChannels(bake.model, off + t);
@@ -1343,7 +1538,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
       const rise = (idleFloorAt(t) - low.y) / plan.H;
       if (rise > groundWorst) { groundWorst = rise; groundTick = t; }
     }
-    const tips = plan.sites.map((s) => orig(pose, s));
+    const tips = plan.sites.map((s: SolverSite) => orig(pose, s));
     for (let i = 0; i < tips.length; i++) {
       if (tips[i] && t0[i]) travel = Math.max(travel, len3(sub3(tips[i], t0[i])));
       for (let j = i + 1; j < tips.length; j++) if (tips[i] && tips[j]) gapMin = Math.min(gapMin, len3(sub3(tips[i], tips[j])));
@@ -1360,10 +1555,10 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   //              cast enters and leaves the idle without a pop (K20b item 3, C13).
   //   body       the root's own travel, capped at the disc's measured root travel for a head cast
   //              (K20a rootTravelH p50 = 0.13 H): a head cast may not slide further than the disc does.
-  let headGate = null, rootTravel = 0, idlePop: { start: number; end: number; ownJitter: number; } | null = null, releaseTravel = 0;
+  let headGate: HeadGate | null = null, rootTravel = 0, idlePop: { start: number; end: number; ownJitter: number; } | null = null, releaseTravel = 0;
   {
     const rigB = rigOf(bake.model);
-    const rNow = (f) => chan(bake.model.bones[rigB.root]?.anim?.ch1, f);
+    const rNow = (f: number) => chan(bake.model.bones[rigB.root]?.anim?.ch1, f);
     for (let t = 0; t < plan.ticks; t++) {
       const c = rNow(off + t);
       // the transport is measured against the IDLE's own ch1 at that tick: the idle's sway is the idle's
@@ -1372,14 +1567,14 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
       rootTravel = Math.max(rootTravel, d);
       if (t === plan.release) releaseTravel = d;
     }
-    const vtxDelta = (a, b) => {
+    const vtxDelta = (a: PoseRotPos, b: PoseRotPos) => {
       let worst = 0;
       for (let i = 0; i < a.pos.length; i++) {
         const Ra = a.rot[i], Rb = b.rot[i], ta = a.pos[i], tb = b.pos[i];
         if (!Ra || !Rb || !ta || !tb) continue;
         for (const v of bake.model.bones[i]?.verts || []) {
-          const pa = [Ra[0] * v[0] + Ra[3] * v[1] + Ra[6] * v[2] + ta[0], Ra[1] * v[0] + Ra[4] * v[1] + Ra[7] * v[2] + ta[1], Ra[2] * v[0] + Ra[5] * v[1] + Ra[8] * v[2] + ta[2]];
-          const pb = [Rb[0] * v[0] + Rb[3] * v[1] + Rb[6] * v[2] + tb[0], Rb[1] * v[0] + Rb[4] * v[1] + Rb[7] * v[2] + tb[1], Rb[2] * v[0] + Rb[5] * v[1] + Rb[8] * v[2] + tb[2]];
+          const pa: Vec3 = [Ra[0] * v[0] + Ra[3] * v[1] + Ra[6] * v[2] + ta[0], Ra[1] * v[0] + Ra[4] * v[1] + Ra[7] * v[2] + ta[1], Ra[2] * v[0] + Ra[5] * v[1] + Ra[8] * v[2] + ta[2]];
+          const pb: Vec3 = [Rb[0] * v[0] + Rb[3] * v[1] + Rb[6] * v[2] + tb[0], Rb[1] * v[0] + Rb[4] * v[1] + Rb[7] * v[2] + tb[1], Rb[2] * v[0] + Rb[5] * v[1] + Rb[8] * v[2] + tb[2]];
           worst = Math.max(worst, Math.hypot(pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]) / plan.H);
         }
       }
@@ -1388,7 +1583,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
     const idleFrames = idlePlaylist(bake.model, plan.baseFrame ?? 0);
     const idlePoses = idleFrames.map((f) => poseFromChannels(bake.model, f));
     let jitter = 0;
-    for (let k = 0; k < idlePoses.length; k++) jitter = Math.max(jitter, vtxDelta(idlePoses[k], idlePoses[(k + 1) % idlePoses.length]));
+    for (let k = 0; k < idlePoses.length; k++) jitter = Math.max(jitter, vtxDelta(idlePoses[k]!, idlePoses[(k + 1) % idlePoses.length]!));
     const startPose = poseFromChannels(bake.model, off);
     const endPose = poseFromChannels(bake.model, off + plan.ticks - 1);
     const nearStart = Math.min(...idlePoses.map((p) => vtxDelta(startPose, p)));
@@ -1400,10 +1595,10 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
       // bone at a tick against the same matrix at neutral, reduced to its rotation about the model's
       // lateral axis. (+ = the nose goes up on screen, the sign the solver applies.) The firing AXIS is not
       // used here: on some heads it is degenerate (Kokatorimon's reads [0,0,1] at every tick).
-      const Wof = (f) => poseFromChannels(bake.model, f).rot[site.bone];
-      const toM = (R) => [[R[0], R[3], R[6]], [R[1], R[4], R[7]], [R[2], R[5], R[8]]];
+      const Wof = (f: number) => poseFromChannels(bake.model, f).rot[site.bone];
+      const toM = (R: Mat9): Mat3 => [[R[0], R[3], R[6]], [R[1], R[4], R[7]], [R[2], R[5], R[8]]];
       const W0 = toM(Wof(plan.baseFrame ?? 0));
-      const pitchAt = (f) => {
+      const pitchAt = (f: number) => {
         const R = Wof(f);
         if (!R) return null;
         const W = toM(R);
@@ -1418,7 +1613,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
       }
       let peak = -Infinity, peakTick = 0, jump = 0;
       for (let i = 0; i < series.length; i++) {
-        if (series[i]! > peak) { peak = series[i]; peakTick = i; }
+        if (series[i]! > peak) { peak = series[i]!; peakTick = i; }
         if (i) jump = Math.max(jump, Math.abs(series[i]! - series[i - 1]!));
       }
       const lo = plan.head.p10, hi = plan.head.p90;
@@ -1435,7 +1630,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const idleBar = idlePop ? Math.max(idlePop.ownJitter, HEAD_CAST_IDLE.unitsH.p90) * 1.5 + 1e-3 : null;
   const bodyGate = bodyCap == null ? null : { travel: +releaseTravel.toFixed(3), total: +rootTravel.toFixed(3), cap: +bodyCap.toFixed(3), ok: releaseTravel <= bodyCap + 5e-3 };
 
-  const plannedMove = Math.max(...plan.targets.map((p, i) => {
+  const plannedMove = Math.max(...plan.targets.map((p: Vec3, i: number) => {
     const s = plan.sites[i];
     const restP = tipAt(neutral, bake.model, folder, s);
     return restP ? len3(sub3(p, restP)) : 0;
@@ -1444,11 +1639,11 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   // pulled in to this body's own arm length) without stretching past that length. A centre emitter is
   // rotated, not translated, so it has no reach question.
   const tr = bake.trace[plan.release];
-  const reach = plan.sites.map((s, i) => {
+  const reach = plan.sites.map((s: SolverSite, i: number) => {
     if (!s.chain?.length) return { id: s.id, centre: true, ok: true };
     let L = 0;
-    for (let k = 1; k < s.chain.length; k++) L += len3(sub3(tr.pos[s.chain[k]], tr.pos[s.chain[k - 1]]));
-    const S0 = tr.pos[s.chain[0]], wrist = tr.pos[s.chain[s.chain.length - 1]];
+    for (let k = 1; k < s.chain.length; k++) L += len3(sub3(tr.pos[s.chain[k]!], tr.pos[s.chain[k - 1]!]));
+    const S0 = tr.pos[s.chain[0]!], wrist = tr.pos[s.chain[s.chain.length - 1]!];
     const wantD = len3(sub3(plan.targets[i], S0));
     const maxD = L * K16.reachSlack;
     const eff = Math.min(wantD, maxD);
@@ -1457,14 +1652,14 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
     return { id: s.id, ok, d: +(d / plan.H).toFixed(3), arm: +(L / plan.H).toFixed(3), wantD: +(wantD / plan.H).toFixed(3), pulled: wantD > maxD + 1e-6 };
   });
   const minGap = SHARED_SHOT.minSeparation * plan.H;
-  const gate = {
+  const gate: SolverGate = {
     aim: aim.every((a) => a.error != null && a.error <= SOLVER.aimToleranceDeg),
     clearance: penTicks === 0,
     ground: groundWorst <= SOLVER.groundShare,
     gap: !(plan.mode === "spread" && plan.sites.length > 1) || gapMin >= minGap,
     motion: plannedMove >= SOLVER.motionFloor * plan.H && travel >= SOLVER.driveFloor * plannedMove,
-    reachable: reach.every((r) => r.ok),
-  } as FightGate;
+    reachable: reach.every((r: { ok: boolean }) => r.ok),
+  };
   // K20b's own rules apply to a head cast only; every other cast keeps exactly the gate it had.
   if (headGate) {
     gate.headPitch = headGate.ok;
@@ -1500,7 +1695,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
  * A pair is solved ONCE and reused (K19f): the engine calls this from two entry points and every cast used
  * to append a fresh ~142 KB of keys and a new table (five casts left the frame offsets outside 16 bits).
  */
-export function solveCast(model, { tech = null, apply = true, offset = null, force = false } = {}): CastSolveOut | null {
+export function solveCast(model: CastSolverModel, { tech = null, apply = true, offset = null, force = false }: SolveOpts = {}): CastSolveOut | null {
   const group = solverGroup(model, { tech });
   if (!group.ok) return null;
   const key = techKey(tech ?? "");
@@ -1513,7 +1708,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   // the class's median hand point, the swing widened, the class's own upper quantiles, then a forward push
   // with a damped lean. The first rung that passes the gate is kept; the best (fewest failing rules) is
   // the one reported when none does, and the pair is then refused (the caller plays its existing build).
-  const makePlan = (quantile: number) => {
+  const makePlan = (quantile: number): AimedPlan | null => {
     const p = planCast(model, group, { quantile });
     if (!p.ok) return null;
     p.aimPoint = targetPoint(model, p);
@@ -1521,13 +1716,14 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
     // instead of every muzzle converging on the same distant point. Converging aim lines swing both arms to
     // the midline and read as one combined shot — exactly what "spread" is not; it also crossed the forearms
     // (K19c's clearance flagged left-arm x right-arm at -0.08 h). A combined shot is one shot, one aim point.
-    p.aimPoints = p.sites.map((s, i) => (p.mode === "spread" && p.sites.length > 1)
+    p.aimPoints = p.sites.map((s: SolverSite, i: number) => (p.mode === "spread" && p.sites.length > 1)
       ? [p.targets[i][0], p.aimPoint![1], p.aimPoint![2]]
       : p.aimPoint);
-    return p;
+    // ETS item 9: p.aimPoints was assigned two lines above; TS narrows the property but not the plan that holds it.
+    return p as AimedPlan;
   };
   /** Apply a rung to a fresh plan: its swing, its push, its lean. The frames follow the points. */
-  const applyRung = (p, rung, gapNeed) => {
+  const applyRung = (p: AimedPlan, rung: AttemptRung, gapNeed: number) => {
     // a HEAD cast's body travel is capped at the disc's own root travel (K20a): the ladder may widen the
     // swing but it may not push the body further forward than the disc ever slides it (K20b item 2)
     if (rung.push && !p.headSites) {
@@ -1557,7 +1753,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   const start0 = makePlan(SOLVER.attemptLadder[0]!.quantile);
   if (!start0) return null;
   if (start + start0.ticks >= SOLVER.frameLimit) return null;   // the channel sentinel/16-bit limit
-  let best = null, plan = start0, gapNeed = 0;
+  let best: { bake: BakeOut; v: VerifyOut; plan: AimedPlan } | null = null, plan = start0, gapNeed = 0;
   for (const [n, rung] of SOLVER.attemptLadder.entries()) {
     if (n >= SOLVER.maxAttempts) break;
     const p = makePlan(rung.quantile);
@@ -1590,8 +1786,8 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
       }
       if (p.headScale != null) p.head = { ...p.head, lift: p.head.lift * p.headScale, liftFull: p.head.lift, scale: p.headScale };
     }
-    const score = (x) => Object.values(x.gate).filter((ok) => !ok).length * 1000 + x.report.penetration.badTicks;
-    if (K19F_DEBUG) console.error("[k19f attempt]", n, JSON.stringify(v.gate), "q", rung.quantile, "swing", rung.swing, "bad", v.report.penetration.badTicks, "over", Math.round(v.report.penetration.over), "targets", JSON.stringify(p.targets.map((q2) => q2.map(Math.round))), "why", JSON.stringify(v.report.penetration.violations?.slice(0, 2)));
+    const score = (x: VerifyOut) => Object.values(x.gate).filter((ok) => !ok).length * 1000 + x.report.penetration.badTicks;
+    if (K19F_DEBUG) console.error("[k19f attempt]", n, JSON.stringify(v.gate), "q", rung.quantile, "swing", rung.swing, "bad", v.report.penetration.badTicks, "over", Math.round(v.report.penetration.over), "targets", JSON.stringify(p.targets.map((q2: number[]) => q2.map(Math.round))), "why", JSON.stringify(v.report.penetration.violations?.slice(0, 2)));
     if (!best || score(v) < score(best.v)) best = { bake: bk, v, plan: p };
     plan = p;
     if (v.pass) break;
@@ -1612,7 +1808,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   // at the RELEASE frame of the solved table (a prop arm's muzzle, a mouth's tip), one per emitter site
   const lplan = launchPointsFor(bake.model, { tech, tables: [bake.table], frame: bake.offset + plan.release });
   const launch = (lplan.points ?? []).map((p) => ({ id: p.id, bone: p.bone, frame: p.frame, x: p.x, y: p.y, z: p.z }));
-  const out = {
+  const out: CastSolveOut = {
     ok: true, table: bake.table, ticks: plan.ticks, offset: bake.offset, tick: plan.release,
     windup: plan.windup, release: plan.release, flight: plan.flight, follow: plan.follow,
     cls: plan.cls, mode: plan.mode, report, group, plan, bake, launch,
@@ -1629,11 +1825,11 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   return out;
 }
 
-function hdrRoot(model: Dw2LoadedModel): number {
+function hdrRoot(model: SolverModel): number {
   return rigOf(model).root ?? 0;
 }
 
 /** The report of every cast solved on a model (the viewer panel / the harness read this). */
-export function solverReportFor(model) {
-  return Object.entries(model?.solverCasts ?? {} as Record<string, any>).map(([tech, v]: [string, any]) => ({ tech, ...v }));
+export function solverReportFor(model: CastSolverModel | null | undefined) {
+  return Object.entries(model?.solverCasts ?? {}).map(([tech, v]: [string, CastSolveOut]) => ({ tech, ...v }));
 }

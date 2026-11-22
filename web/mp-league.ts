@@ -26,11 +26,11 @@
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
 import type { MpLeagueState } from "./types/mp-league.js";
-interface MatchScoreMatch { a: string; b: string; w?: string | null; g?: string[]; }
+interface MatchScoreMatch { a: number; b: number; w?: number | null; g?: number[]; }
 
 interface MpLeaguePackExtra {
-    ids: string[];
-    dropped: string[];
+    ids: number[];
+    dropped: number[];
     asked?: boolean;
     champ?: boolean;
 }
@@ -39,30 +39,30 @@ type MpLeaguePackable = MpLeagueReportState & MpLeaguePackExtra;
 
 interface MpLeaguePacked {
     b: number;
-    i: string[];
-    d: string[];
+    i: number[];
+    d: number[];
     r: number;
     f: string;
     k: 0 | 1;
     c: boolean | undefined;
-    R: (string | null)[][][];
+    R: (number | null)[][][];
 }
 
 interface MpForfeitMatch extends MpLeagueMatch { wo?: boolean; }
 type MpForfeitLeague = Omit<MpLeagueReportState, "rounds"> & {
     rounds: MpForfeitMatch[][];
-    ids: string[];
-    dropped: string[];
+    ids: number[];
+    dropped: number[];
 };
 
-interface MpStandingRow { id: string; wins: number; losses: number; games: number; round: number; dropped: boolean; champ: boolean; out: boolean; }
+interface MpStandingRow { id: number; wins: number; losses: number; games: number; round: number; dropped: boolean; champ: boolean; out: boolean; }
 
 interface MpLeagueMatch {
-    a: string;
-    b: string;
-    w?: string | null;
+    a: number;
+    b: number;
+    w?: number | null;
     dead?: boolean;
-    g: string[];
+    g: number[];
 }
 
 type MpLeagueReportState = MpLeagueState & {
@@ -79,10 +79,10 @@ interface MpReportRefused {
 interface MpReportAccepted {
     ok: true;
     ended: boolean;
-    a: string;
-    b: string;
-    winner: string | null | undefined;
-    games: string[];
+    a: number;
+    b: number;
+    winner: number | null | undefined;
+    games: number[];
     r: number;
     m: number;
 }
@@ -95,7 +95,7 @@ export const MAX_TAMERS = 8;
 export const DEFAULT_BEST_OF = 3;
 
 const isTamer = (id) => Number.isInteger(id) && id > 0;
-const has = (list, id: string) => Array.isArray(list) && list.includes(id);
+const has = (list, id: number) => Array.isArray(list) && list.includes(id);
 
 /** A new night: the first round drawn (with the byes the bracket needs) and the folder closed until its first fight. */
 export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; bestOf?: number } = {}) {
@@ -128,7 +128,7 @@ export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; b
     };
 }
 
-const out = (lg: MpForfeitLeague, id: string | null) => id == null || has(lg.dropped, id);
+const out = (lg: MpForfeitLeague, id: number | null) => id == null || has(lg.dropped, id);
 
 /** Mark the round complete, or the whole night when it was the last one. Called after every decided fight. */
 function settle(lg) {
@@ -233,7 +233,7 @@ export function matchScore(m: MatchScoreMatch | null | undefined) {
 }
 
 /** A tamer leaves the night: their open fight goes to the opponent, and no later pairing calls them again. */
-export function forfeit(lg: MpForfeitLeague, id: string): { refused: string } | { ok: true; id: string; to: string | null } {
+export function forfeit(lg: MpForfeitLeague, id: number): { refused: string } | { ok: true; id: number; to: number | null } {
     if (!lg || !has(lg.ids, id)) return { refused: "unknown" };
     if (has(lg.dropped, id)) return { refused: "dropped" };
     lg.dropped.push(id);

@@ -2,13 +2,14 @@
 // without the game depending on them. Emitting with no listener costs nothing and changes nothing.
 const listeners = new Map();
 
-export function on(name: string, fn) {
+// Each event name has its own payload shape, so a listener is typed where it subscribes.
+export function on<P>(name: string, fn: (payload: P) => void) {
     if (!listeners.has(name)) listeners.set(name, new Set());
     listeners.get(name).add(fn);
     return () => listeners.get(name).delete(fn);
 }
 
-export function emit(name, payload) {
+export function emit(name: string, payload?: unknown) {
     const set = listeners.get(name);
     if (!set) return;
     for (const fn of [...set]) {

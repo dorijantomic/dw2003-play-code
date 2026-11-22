@@ -15,7 +15,7 @@ export interface QuestTriggerContext {
   /** the quest layer's state store, read again after a scene ran */
   state?: QuestSnapshot | (() => QuestSnapshot);
   /** a quest's status as the quest layer reports it ("available", "active", "ready", "done") */
-  statusOf?: (id: string) => string;
+  statusOf?: (id: string) => string | null;
   warn?: (msg: string) => void;
   battle?: QuestTriggerSwitch;
   dialogBusy?: QuestTriggerSwitch;

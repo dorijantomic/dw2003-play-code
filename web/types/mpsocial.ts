@@ -1,15 +1,5 @@
 // Types for web/mpsocial.ts (the social dock: ALL / CHAT / EVENTS / PLAYERS, inspect, trade, duel, co-op, go).
 
-/** One row of the PLAYERS tab: a peer of the room, or me ("self"). */
-export interface MpRosterRow {
-  id: number;
-  name: string;
-  map: string | null;
-  card: any;                  // the card as the other game sent it (their name, party, quests)
-  self?: boolean;
-  away?: boolean;
-}
-
 /** The elements of the dock, made once in installSocial. */
 export interface MpSocialEls {
   log: HTMLElement;
@@ -40,4 +30,14 @@ export interface MpTrade {
   myOk: boolean;
   theirOk: boolean;
   bag: MpTradeItem[];
+}
+
+/** One enemy of a fight offered to the partner (the game's own enemy row; the dock only reads name, level and the HP numbers). */
+export interface MpFoe {
+  name: string;
+  level: number;
+  hp: number;
+  stat_scale?: number;
+  digimonId?: number;
+  mp?: number;
 }

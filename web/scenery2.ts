@@ -9,14 +9,12 @@ import { darkness, setReveal } from "./scenery.js";
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceSettings } from "./types/ambience.js";
 import type { AmbienceConditions } from "./types/ambience.js";
-type GustFx = AmbienceConditions & { gusts?: boolean };
 
-type GustSettings = AmbienceSettings & { open?: boolean };
 
 interface GustScene {
     map: { id: string };
-    fx: GustFx;
-    p: GustSettings;
+    fx: { gusts?: boolean };
+    p: { open?: boolean };
     now: number;
     camX: number;
 }
