@@ -9,7 +9,7 @@
 //           line break = 02 01, page break = 02 02 02 02 03, and a few punctuation codes (PUNCT below)
 // Characters the disc text has no code for are dropped, never guessed.
 
-const PUNCT = {
+const PUNCT: Record<string, number[]> = {
     " ": [0x01, 0x01], ".": [0x01, 0x05], ",": [0x01, 0x04], "'": [0x01, 0x13], "-": [0x01, 0x1a],
     ":": [0x01, 0x07], "\"": [0x01, 0x14], "!": [0xe7], "?": [0xe6],
 };

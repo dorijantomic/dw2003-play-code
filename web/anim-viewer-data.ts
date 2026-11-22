@@ -55,7 +55,7 @@ export const groupOrder = (g: { key: string; type: string; clip: number; multi: 
 // Three display names differ from their model_map key; the same three that battle3d.js's
 // canonicalModelName() rewrites before resolveModelFolder (the pause/report screens print the
 // display name). Authored data, no disc content.
-export const CANONICAL_NAME = {
+export const CANONICAL_NAME: Record<string, string> = {
   "BK WarGreymon": "BKWarGreymon",
   "Imperialdramon-F": "ImperialdramonFM",
   "Imperialdramon-P": "ImperialdramonPM",

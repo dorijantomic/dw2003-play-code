@@ -14,7 +14,7 @@ import { groupSizes, gymRows } from "./gym-map.js";
 import { gymStatForId } from "./battle.js";
 
 // gymStatForId returns the engine's own short keys; the page writes them out.
-const STAT_WORDS = {
+const STAT_WORDS: Record<string, string> = {
     str: "strength", def: "defence", spt: "spirit", wis: "wisdom", spd: "speed", chr: "charisma",
     maxHp: "max HP", maxMp: "max MP",
 };

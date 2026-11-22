@@ -11,7 +11,7 @@ import type { GameState } from "./game/types.js";
 import type { CardShopScreen } from "./types/cardshop-translated.js";
 import type { CardShopOptions } from "./types/cardshop-translated.js";
 
-const PACKS = { 646: 'cmfont', 1598: 'stcdsp' };
+const PACKS: Record<string, string> = { 646: 'cmfont', 1598: 'stcdsp' };
 let dataPromise;
 let packDataPromise;
 async function loadPackData() {

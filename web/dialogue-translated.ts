@@ -35,7 +35,7 @@ interface RawPaintCommand {
 }
 
 
-const PACK_NAMES = { 0x02860000: "cmfont" };
+const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 const CONFIRM_BIT = 1 << 13;
 /** The game key that drives the confirm bit (Circle). */

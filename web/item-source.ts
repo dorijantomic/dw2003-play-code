@@ -19,7 +19,7 @@
 // Nothing here is guessed: a kind the files do not name never becomes a row, an
 // id the index does not hold returns null, and a shop with no name stays nameless.
 
-const CATEGORY_WORD = {
+const CATEGORY_WORD: Record<string, string> = {
     consumable: "consumable",
     booster: "card booster",
     key: "key item",

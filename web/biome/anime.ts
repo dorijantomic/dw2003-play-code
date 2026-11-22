@@ -16,7 +16,7 @@ const ASSETS = new URL("./assets/", import.meta.url).href;
 export const catalog = await fetch(ASSETS + "anime.json").then((r) => (r.ok ? r.json() : [])).catch(() => []);
 
 /** which kinds are listed in which tab's grid */
-const TAB_KINDS = {
+const TAB_KINDS: Record<string, string[]> = {
   forest: ["tree", "pine", "cherry", "deadtree", "bush", "plant", "grass", "flower", "mushroom", "wood", "rock"],
   beach: ["palm", "shell", "seaweed", "rock", "grass", "plant", "wood", "bush", "flower"],
   lake: ["lily", "reed", "seaweed", "willow", "tree", "cherry", "plant", "grass", "rock", "wood", "flower", "bush"],

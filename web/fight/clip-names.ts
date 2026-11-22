@@ -116,7 +116,7 @@ export function clipFamily(id) {
 // The battle engine's 18 action slots (the vocabulary the research pages print). These are
 // NOT the tool's 62 names above: the engine numbers its action scripts 0..17, and the game's
 // own records name those slots, not the cut-scene test list.
-const CLIP_LABELS = {
+const CLIP_LABELS: Record<string, string> = {
   0: "idle",
   1: "multi-hit contact",
   2: "survive",

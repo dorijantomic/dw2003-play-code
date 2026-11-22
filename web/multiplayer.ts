@@ -87,7 +87,7 @@ function wsAddress(text: string) {
 const testRelay = () => new URLSearchParams(location.search).get("relay");
 
 // ------------------------------------------------------------ connection
-const REASONS = {
+const REASONS: Record<string, string> = {
     no_room: "Connected, but there is no room with that code. Check the code with your friend.",
     full: "That room is full.",
     busy: "The server is busy. Try again in a moment.",

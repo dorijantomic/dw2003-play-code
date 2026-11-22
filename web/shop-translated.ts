@@ -21,7 +21,7 @@ interface ShopLoadedCatalog { catalog: ShopCatalog; itemRecords: Uint8Array<Arra
 
 
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
-const PACKS = { 646: "cmfont", 1026: "stshop" };
+const PACKS: Record<string, string> = { 646: "cmfont", 1026: "stshop" };
 
 const DATA_LABEL = "Merchant data";
 const readJson = (path: string) => fetchJson(path, DATA_LABEL);

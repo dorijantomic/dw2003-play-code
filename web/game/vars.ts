@@ -147,7 +147,7 @@ export const PACKED_JINGLES = {
 //     on this cue.
 // A music-start word with no stem here stays on the sample sink, which is what
 // plays the bit-30 jingles that DO have a sample (W_JINGLE).
-export const PACKED_MUSIC = {
+export const PACKED_MUSIC: Record<string, string> = {
     "0x60040002": "demo_bgm",
     "0x611c0000": "ttlbgm",
 };

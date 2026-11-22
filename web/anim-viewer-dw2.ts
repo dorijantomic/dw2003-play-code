@@ -62,7 +62,7 @@ export function filterDw2(models, { query = "", stage = "" } = {}) {
 }
 
 // ── glTF decoding ───────────────────────────────────────────────────────────────────────────────
-const COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const COMPONENT = {
   5120: { ctor: Int8Array, get: "getInt8", size: 1, norm: 127 },
   5121: { ctor: Uint8Array, get: "getUint8", size: 1, norm: 255 },

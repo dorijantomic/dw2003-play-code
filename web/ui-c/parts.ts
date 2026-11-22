@@ -359,7 +359,7 @@ function fillDock(root, desc, g) {
 /** The damage pop: its own element, ONE `.pp` child per hit event (`desc.evt`). A re-fill with the same event only moves the box (the enemy walks on screen),
  *  it never builds a second number; a new event builds a new one, the CSS plays once and fades. `desc.o` = { kind: dmg | heal | miss | counter | status, tone: crit | weak | resist | "",
  *  tag: the small word, status: poison | frozen | confuse | sleep, text: the shown figure when it is not the HP drop }. */
-const POP_FONT = { player: 84, enemy: 100 };
+const POP_FONT: Record<string, number> = { player: 84, enemy: 100 };
 function fillPop(root, desc, g) {
     const r = g.rect, d = g.ed.d, o = desc.o ?? {}, kind = o.kind ?? "dmg", tone = o.tone ?? "";
     root.className = `uic-part uic-pop uic-pop-${desc.side} uic-pop-${kind}${tone ? ` uic-pop-${tone}` : ""}${o.status ? ` uic-pop-st-${o.status}` : ""}`;

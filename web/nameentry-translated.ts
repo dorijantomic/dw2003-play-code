@@ -12,7 +12,7 @@ import { fetchBytes, loadResidentResources } from "./resident-data.js";
 import type { NameEntryScreen } from "./types/nameentry-translated.js";
 
 // The picture handles the screen asks for: the keyboard art and the chooser art.
-const PACKS = { 1904: "namedt", 648: "stdgnm" };
+const PACKS: Record<string, string> = { 1904: "namedt", 648: "stdgnm" };
 const NAME_BANKS = [0x40, 0x86];
 const MAX_PARTNERS = 3;
 

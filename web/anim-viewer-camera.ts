@@ -34,7 +34,7 @@ export const PITCH_LIMIT = 89 * DEG;        // default clamp: never exactly vert
 export const PITCH_LIMIT_FULL = 89.95 * DEG; // "allow full pitch" toggle
 
 /** The preset views, as {yaw,pitch} in degrees. `battle` is handled by the page (the game camera). */
-export const PRESETS = {
+export const PRESETS: Record<string, { yaw: number; pitch: number; }> = {
   front: { yaw: 0, pitch: 8 },
   back: { yaw: 180, pitch: 8 },
   left: { yaw: 90, pitch: 8 },

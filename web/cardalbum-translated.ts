@@ -34,10 +34,10 @@ interface CardAlbumData {
 
 
 const LABEL = "Card album";
-const PACKS = { 0x605: "stalbm" };
+const PACKS: Record<string, string> = { 0x605: "stalbm" };
 const TEXT_OFFSETS = [0x16, 0x1d, 0x24];
-const COLOURS = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
-const STAGES = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
+const COLOURS: Record<string, number> = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
+const STAGES: Record<string, number> = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
 
 let dataPromise;
 function loadData(language: number): Promise<CardAlbumData> {

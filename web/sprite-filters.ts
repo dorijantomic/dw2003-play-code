@@ -5,7 +5,7 @@
 // by side on one sheet. Every filter turns a native sheet into a 4x one; the game tags it with
 // density 4 (assets.js) so all frame rectangles stay in native coordinates.
 
-export const SPRITE_FILTERS = {
+export const SPRITE_FILTERS: Record<string, string> = {
   off: "Off (original pixels)",
   bilinear: "Plain smooth (bilinear)",
   epx: "EPX / Scale2x, twice",

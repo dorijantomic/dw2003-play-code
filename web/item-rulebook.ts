@@ -21,7 +21,7 @@
 // (0x63); tests/item-rulebook.test.js holds all three equal to the engine's.
 export const CAPS = { hpMp: 0x270f, stat: 0x3e7, tp: 0x63 };
 
-const STAT_WORD = {
+const STAT_WORD: Record<string, string> = {
     stat_str: "Strength", stat_def: "Defense", stat_spt: "Spirit",
     stat_wis: "Wisdom", stat_spd: "Speed", stat_chr: "Charisma",
 };

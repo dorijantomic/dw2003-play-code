@@ -396,7 +396,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     // without a ring (no battleData) or with a seventh row it stays the game's list of plates
     cmds.sort((a, b) => a.r.y - b.r.y);                   // the game may draw them in any order: slot i = the i-th row from the top
     const dockOn = !!data && !fullScreen && cmds.length > 0 && cmds.length <= 6;
-    const TITLE = { 3: "TECH", 4: "ITEM", 11: "TAG", 13: "DV", 15: "DNA" };
+    const TITLE: Record<string, string> = { 3: "TECH", 4: "ITEM", 11: "TAG", 13: "DV", 15: "DNA" };
     let spend = null;
     if (dockOn) {
         const words = cmds.map((c) => take(runs, used, c.r).map((m) => m.text).join(" "));

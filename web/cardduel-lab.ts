@@ -59,7 +59,7 @@ let ticks = 0, intro = true, auto = false;
 let cursor = 0, marks = new Set(), ask = 0, confirm = false;
 let banner = "Card Battle", stage = "intro";
 let introCards: { si: number; i: number; start: number; land: number; flip: number; }[] = [], lastLand = new Set();
-let flights = [], prevHand = { player: [], opponent: [] }, prevField = { player: 0, opponent: 0 };
+let flights = [], prevHand = { player: [], opponent: [] }, prevField: Record<string, number> = { player: 0, opponent: 0 };
 let choiceCursor = 0;
 
 async function boot() {

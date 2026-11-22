@@ -9,7 +9,9 @@
 // check (tsconfig.web.json) has 0 errors in it and its strict error count went down. At round end a
 // cross-file non-strict check puts back changed files that break other files. Rounds repeat while the
 // strict total drops. Type syntax only: same-js must stay "all same".
-//   node tools/rewrite/type-passes.mjs --pass callbacks|lets [--rounds N] [--dry]
+//   --pass records    const X = { a: ..., b: ... } that is looked up by a computed key (X[key], TS7053): type it as
+//                     Record<string, V>, V = the union of the values it already holds.
+//   node tools/rewrite/type-passes.mjs --pass callbacks|lets|records [--rounds N] [--dry]
 import ts from "typescript";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -145,6 +147,29 @@ function collectLets(prog, ck) {
   return edits;
 }
 
+// ---- pass: records ----
+function collectRecords(prog, ck) {
+  const edits = new Map(), done = new Set();
+  for (const f of WEB) {
+    const sf = prog.getSourceFile(f); if (!sf) continue;
+    for (const d of prog.getSemanticDiagnostics(sf)) {
+      if (d.code !== 7053 || d.start == null) continue;
+      let ea = null; const v = (n) => { if (ts.isElementAccessExpression(n) && n.getStart(sf) <= d.start && n.getEnd() >= d.start + d.length) ea = n; if (n.getStart(sf) <= d.start && n.getEnd() >= d.start) ts.forEachChild(n, v); }; v(sf);
+      if (!ea || !ts.isIdentifier(ea.expression)) continue;
+      const sym = ck.getSymbolAtLocation(ea.expression); const dc = sym?.valueDeclaration;
+      if (!dc || !ts.isVariableDeclaration(dc) || dc.type || !dc.initializer || !ts.isObjectLiteralExpression(dc.initializer) || done.has(dc)) continue;
+      if (!dc.initializer.properties.length || !dc.initializer.properties.every((p) => ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p))) continue;
+      done.add(dc);
+      const vals = dc.initializer.properties.map((p) => show(ck, ck.getTypeAtLocation(ts.isPropertyAssignment(p) ? p.initializer : p.name), dc));
+      if (vals.some((x) => !x)) continue;
+      const u = union(vals); if (!u) continue;
+      const ty = "Record<string, " + u + ">"; if (ty.length > MAX_LEN) continue;
+      const df = dc.getSourceFile().fileName; (edits.get(df) ?? edits.set(df, []).get(df)).push({ pos: dc.name.getEnd(), text: ": " + ty, what: dc.name.text });
+    }
+  }
+  return edits;
+}
+
 const apply = (text, es) => { let out = text; for (const e of [...es].sort((a, b) => b.pos - a.pos)) out = out.slice(0, e.pos) + e.text + out.slice(e.pos); return out; };
 function judge(f, text, base) { setText(f, text); if (LS.getSyntacticDiagnostics(f).length) return null; if (looseN(f)) return null; const s = strictN(f); return s < base ? s : null; }
 
@@ -171,7 +196,7 @@ let t0 = Date.now(), before = total();
 console.log("type-passes " + PASS + ": start " + before + " strict errors (" + ((Date.now() - t0) / 1000).toFixed(0) + "s)");
 for (let round = 1; round <= ROUNDS; round++) {
   const prog = LS.getProgram(), ck = prog.getTypeChecker();
-  const edits = PASS === "lets" ? collectLets(prog, ck) : collectCallbacks(prog, ck);
+  const edits = PASS === "lets" ? collectLets(prog, ck) : PASS === "records" ? collectRecords(prog, ck) : collectCallbacks(prog, ck);
   let nE = 0; for (const es of edits.values()) nE += es.length;
   const changed = new Set(), orig = new Map(); let kept = 0;
   for (const [f, es] of edits) {

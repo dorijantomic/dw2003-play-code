@@ -83,7 +83,7 @@ interface FightCommandSession {
 
 
 /** The row picture pack: handle 0x04550000 is disc index 1109, PGFGTC00. */
-const PACKS = { 1109: "pgfgc00" };
+const PACKS: Record<string, string> = { 1109: "pgfgc00" };
 const NAME_BANK = 0x7f;
 // The command list takes the four directions and the four face buttons only;
 // the two shoulder buttons and start/select are not rows here.

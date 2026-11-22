@@ -44,7 +44,7 @@ interface PauseSharedData {
 // (pack << 16) | subPack (F0x80099324: `pack << 16`, `| 1` for the area list, `| 2`
 // for the markers), so the map's three SHEETS need the whole handle and the two
 // whole-archive packs only need the directory.
-const PACKS = {
+const PACKS: Record<string, string> = {
     0x0404: "ststat", 0x0286: "cmfont",
     0x07990000: "stwmp0map", 0x07990001: "stwmp0area", 0x07990002: "stwmp0icon",
     0x079b0000: "stwmp1map", 0x079b0001: "stwmp1area", 0x079b0002: "stwmp1icon",

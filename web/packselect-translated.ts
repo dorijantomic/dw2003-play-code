@@ -25,7 +25,7 @@ interface PackSelectShared {
 
 // The picture handles the wizard asks for: the window art, the intro background
 // and the portrait / keyboard art.
-const PACKS = { 650: "stnmet", 708: "cmnbgd", 1904: "namedt" };
+const PACKS: Record<string, string> = { 650: "stnmet", 708: "cmnbgd", 1904: "namedt" };
 const BANKS = [0x8d, 0x4e, 0x86];
 const PRESS_FRAMES = 4;
 

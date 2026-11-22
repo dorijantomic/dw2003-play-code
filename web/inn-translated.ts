@@ -23,7 +23,7 @@ import { fetchBytes, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import type { InnScreen } from "./types/inn-translated.js";
 
-const PACK_NAMES = { 0x02860000: "cmfont" };
+const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 
 const DATA_LABEL = "Inn data";

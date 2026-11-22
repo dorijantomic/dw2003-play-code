@@ -8,7 +8,7 @@ const $ = (id: string): any => document.getElementById(id);
 const esc = (s: string | undefined) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const CLAIM_KEYS = ["verified", "partially_verified", "candidate", "contradicted"];
 const CLAIM_WORDS = { verified: "proven", partially_verified: "partly proven", candidate: "unproven reading", contradicted: "disproved" };
-const WIRED_WORDS = { implemented: "In the game", partial: "Partly in the game", not_applicable: "Not a game feature", unknown: "Unknown" };
+const WIRED_WORDS: Record<string, string> = { implemented: "In the game", partial: "Partly in the game", not_applicable: "Not a game feature", unknown: "Unknown" };
 const pretty = (id: string) => id.replace(/-/g, " ").replace(/^./, (c: string) => c.toUpperCase());
 
 const views = [

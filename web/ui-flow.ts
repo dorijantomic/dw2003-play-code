@@ -18,7 +18,7 @@ const labels = {
   runtime: { ours: "Our code", mixed: "MIPS + ours" },
   research: { compared: "Original captured", mapped: "Research mapped", partial: "Gaps remain" },
 };
-const researchText = {
+const researchText: Record<string, string> = {
   compared: "An original-game capture exists for this step, and the browser route was exercised. This does not certify every variant or a visual match.",
   mapped: "Research notes describe this route; this step has not been fully checked in the browser.",
   partial: "Some behavior is documented, but gaps remain for this step or its route.",

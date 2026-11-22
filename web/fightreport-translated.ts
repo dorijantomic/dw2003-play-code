@@ -54,7 +54,7 @@ interface ScreenCompose {
 
 
 /** The report art: 0x079F0000 is disc index 1951 (STFRPT), 0x02860000 is 646 (CMFONT, the banner). */
-const PACKS = { 1951: "stfrpt", 646: "cmfont" };
+const PACKS: Record<string, string> = { 1951: "stfrpt", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
 const BANKS = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, "pause"]];
 

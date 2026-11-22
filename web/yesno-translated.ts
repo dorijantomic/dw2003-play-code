@@ -12,7 +12,7 @@ import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import type { YesNoScreen } from "./types/yesno-translated.js";
 
-const PACK_NAMES = { 0x02860000: "cmfont" };
+const PACK_NAMES: Record<string, string> = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 /** Game key -> pad bit (identity logical-button map: Up 4, Down 6, confirm 13). */
 const KEY_BITS: [string, number][] = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13]];

@@ -12,7 +12,7 @@
 export const WALK_TICK_RATE = 50;       // = FIELD_TICK_RATE (engine/systems/animation-controller)
 export const WALK_BLEND_FRACTION = 0.4; // the last 40% of each frame's time is the fade
 
-const MIRROR = { right: "left", "down-right": "down-left", "up-right": "up-left" };
+const MIRROR: Record<string, string> = { right: "left", "down-right": "down-left", "up-right": "up-left" };
 
 /** Blend weight of the next frame: 0 until the last `fraction` of the frame, then a linear ramp to 1. */
 export function blendWeight(remaining: number, duration: number, fraction = WALK_BLEND_FRACTION) {

@@ -175,7 +175,7 @@ function problems(rc) {
 }
 
 // ---- battle data (tools/fusion_battle.py, plain words)
-const STAT_WORDS = { str: "Strength", def: "Defence", spt: "Spirit", wis: "Wisdom", spd: "Speed" };
+const STAT_WORDS: Record<string, string> = { str: "Strength", def: "Defence", spt: "Spirit", wis: "Wisdom", spd: "Speed" };
 function li(ul: HTMLUListElement, text: string | null, cls?: string | undefined) { const e = document.createElement("li"); e.textContent = text; if (cls) e.className = cls; ul.appendChild(e); return e; }
 function heading(box: { appendChild: (arg0: HTMLDivElement) => void; }, text: string | null) { const h = document.createElement("div"); h.className = "small"; h.style.marginTop = "8px"; h.style.color = "#9ec5ff"; h.textContent = text; box.appendChild(h); }
 

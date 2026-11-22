@@ -279,7 +279,7 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
   const lineSlot = lineSlotOf(member, rules);
   const at = { lineSlot, equipment: member?.equipment ?? {} };
   const options = slotOptions(member, pool, items, rules);
-  const pick = {
+  const pick: Record<string, number> = {
     head: bestOf(options.head, lookup),
     body: bestOf(options.body, lookup),
     right: 0,

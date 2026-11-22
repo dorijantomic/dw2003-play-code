@@ -60,7 +60,7 @@ export function prepare(key: string | undefined, stage: HTMLElement | null, canv
     return { geo: g, scope: s, getArt: () => { s.artUsed = true; s.artCtx ??= a.getContext("2d"); s.artCtx.imageSmoothingEnabled = false; return s.artCtx; } };
 }
 
-const KIND_LAYER = { text: "text", type: "under" };
+const KIND_LAYER: Record<string, string> = { text: "text", type: "under" };
 /** Kinds that never bleed to the stage edge (a balloon at the screen edge stays a balloon). index.js check() uses the same set. */
 export const NO_BLEED = new Set(["text", "type", "chevron", "icon", "bar", "corners", "bracket", "balloon", "ring", "dock", "pop", "node", "svg-nb"]);
 

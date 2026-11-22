@@ -31,7 +31,7 @@ import type { GymScreen } from "./types/gym-translated.js";
 
 import type { InventoryRow } from "./game/types.js";
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
-const PACK_NAMES = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
+const PACK_NAMES: Record<string, string> = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];

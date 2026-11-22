@@ -33,7 +33,7 @@ export const dw2FileUrl = (folder, root = DW2_ROOT) => `${root}/${folder}.json`;
 export const ratingId = (slot) => `dw2:${slot}`;
 
 /** What each clip slot is, in the words the viewer's own clip list uses. */
-export const SLOT_LABELS = {
+export const SLOT_LABELS: Record<string, string> = {
   0: "idle", 1: "hit (light)", 2: "hit / survive", 3: "death", 4: "evade",
   5: "normal attack", 6: "combo", 7: "combo (2-beat)", 8: "combo (3-beat)",
   9: "spell", 10: "item / self cast", 11: "special / signature", 12: "presentation (not the model's)",
@@ -368,10 +368,10 @@ const h = (tag, props = {}, ...kids) => {
   for (const k of kids) if (k != null && k !== "") n.append(k);
   return n;
 };
-const VERDICT_MARK = { works: "✓", broken: "✗", unsure: "?" };
+const VERDICT_MARK: Record<string, string> = { works: "✓", broken: "✗", unsure: "?" };
 const VERDICTS = ["works", "broken", "unsure"];
 
-const PICK_WORD = { dw2: "DW2", dw3: "DW3" };
+const PICK_WORD: Record<string, string> = { dw2: "DW2", dw3: "DW3" };
 /** What the game plays for a row: the pick when there is one, else the automatic rule. */
 const resultOf = (row, pick) => pick || row.rule;
 /**

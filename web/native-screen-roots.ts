@@ -10,7 +10,7 @@
 // (the shop adapter, no longer shipped) and the lab both boot the override from here so a lab
 // capture shows the same screen the player gets.
 
-export const NATIVE_ROOT_CTORS = {
+export const NATIVE_ROOT_CTORS: Record<string, number> = {
     "pro/stitshop": 0x8008c118,
 };
 

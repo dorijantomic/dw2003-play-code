@@ -34,7 +34,7 @@ interface MemcardData {
 
 
 /** The card art: 0x029D0000 is disc index 669 (STMCRDCS), 0x02860000 is 646 (CMFONT). */
-const PACKS = { 669: "stmcrd", 646: "cmfont" };
+const PACKS: Record<string, string> = { 669: "stmcrd", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
 const BANKS = [[0x78, "memcard"], [0xa9, "memcard"], [0x94, "shop-banks"]];
 

@@ -97,7 +97,7 @@ function motionText(s) {
     return "";
 }
 
-const WEATHER_WORDS = {
+const WEATHER_WORDS: Record<string, string> = {
     fog: "Fog rolls in", rain: "It starts raining", storm: "A storm breaks", snow: "It starts snowing",
     blizzard: "A blizzard blows in", sand: "A sandstorm blows in", leaves: "Leaves blow past",
     fireflies: "Fireflies come out", clear: "The weather clears",

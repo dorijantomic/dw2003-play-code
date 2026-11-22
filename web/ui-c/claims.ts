@@ -39,7 +39,7 @@ const CUBES = Object.freeze({ artSizes: Object.freeze([[16, 16]]) });
 const LANG_CURSOR = { part: "langCursor", layer: "under" };
 const KEY_BUTTON = Object.freeze({ part: "keyButton", layer: "under", artInset: Object.freeze([5, 2, 3, 3]) });
 const WIZ_STEPS = Object.freeze({ part: "wizSteps", layer: "over", layers: true });
-const NAMEDT = { 29: { part: "nameHdr", layer: "under" }, 30: { part: "portraitFrame", layer: "under" }, 31: { part: "portraitBack", layer: "under" },
+const NAMEDT: Record<string, { part: string; layer: string; } | { part: string; layer: string; layers: boolean; }> = { 29: { part: "nameHdr", layer: "under" }, 30: { part: "portraitFrame", layer: "under" }, 31: { part: "portraitBack", layer: "under" },
     55: { part: "nameSlots", layer: "under", layers: true }, 53: { part: "nameSlots", layer: "under", layers: true },
     37: { part: "keyboard", layer: "under", layers: true }, 39: { part: "keyCursor", layer: "over" }, 40: { part: "slotCursor", layer: "over" } };
 for (const id of [60, 61, 62, 63, 64, 70, 71, 72, 44, 45, 46, 47, 48, 77, 78, 79]) NAMEDT[id] = KEY_BUTTON;
@@ -52,7 +52,7 @@ for (const id of [60, 61, 62, 63, 64, 70, 71, 72, 44, 45, 46, 47, 48, 77, 78, 79
 // item count plate (40), the Digivolve stat panel (37), the DNA species strip (43), the message / description pane (49). The page arrows
 // (31, 32, 8 x 8) are pictures.
 const PGF = (part: string, o = {}) => ({ part, layer: "under", ...o });
-const PGFGC00 = {
+const PGFGC00: Record<string, { part: string; layer: string; }> = {
     0: PGF("hudPlate", { side: "enemy" }), 1: PGF("hudPlate", { side: "player" }), 10: PGF("bezel", { layer: "over" }),
     30: PGF("dvFrame"), 11: PGF("dvInner"),
     34: PGF("cmdRow", { layers: true }), 36: PGF("cmdRow", { layers: true }), 47: PGF("tagRow", { layers: true }),

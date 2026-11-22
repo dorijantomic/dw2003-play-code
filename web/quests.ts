@@ -556,7 +556,7 @@ function objectiveText(d, i) {
     if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  (done)" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
     return "?";
 }
-const MARK = { ready: "!", active: ">", available: "*", done: "x" };
+const MARK: Record<string, string> = { ready: "!", active: ">", available: "*", done: "x" };
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 const logEntries = () => ["ready", "active", "available", "done"].flatMap((s) => allDefs().filter((d) => statusOf(d) === s).map((d) => ({ d, s })));
 
@@ -723,7 +723,7 @@ export function questDone(id) { return !!st?.done?.[id]; }
 const EMPTY_SENTENCE = "Explore and talk to people. Quests appear as you play.";
 export function questsPausePage() {
     if (!enabled() || !defs.length) return null;
-    const MARK = { ready: "! ", active: "- ", available: "? " };
+    const MARK: Record<string, string> = { ready: "! ", active: "- ", available: "? " };
     const W = (s) => textWidth(s);                                       // the game font's own advance widths
     const TITLE_W = 126;                                                 // the list window's text area (x 189 to the window edge)
     const entries = logEntries().filter(({ d, s }) => s === "ready" || s === "active" || (s === "available" && isHere(d))).map(({ d, s }) => {

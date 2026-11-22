@@ -257,8 +257,8 @@ export function coverMaterial(shared, densName, name: string) {
 }
 
 // ---------------------------------------------------------------- the assets (WHERE they lie: web/built/place/floorcover.js)
-const GEO = { fern: () => fernGeometry(true), clover: cloverGeometry, tuft: tuftGeometry, litter: leafGeometry, twig: twigGeometry, pebble: pebbleGeometry };
-const DENS = { fern: "uFcDensFern", clover: "uFcDensClover", tuft: "uFcDensTuft", litter: "uFcDensLitter", twig: "uFcDensTwig", pebble: "uFcDensPebble" };
+const GEO: Record<string, () => THREE.BufferGeometry> = { fern: () => fernGeometry(true), clover: cloverGeometry, tuft: tuftGeometry, litter: leafGeometry, twig: twigGeometry, pebble: pebbleGeometry };
+const DENS: Record<string, string> = { fern: "uFcDensFern", clover: "uFcDensClover", tuft: "uFcDensTuft", litter: "uFcDensLitter", twig: "uFcDensTwig", pebble: "uFcDensPebble" };
 /** the uniforms every cover material of one arena shares (wind, fade, gain, night dim) */
 export function coverUniforms() {
   return { uFcWind: { value: COVER.WIND_K }, uFcFar0: { value: COVER.FAR0_M }, uFcFar1: { value: COVER.FAR1_M },

@@ -73,7 +73,7 @@ export function useMessage(item, before, after, result) {
     return `${result?.amount ?? (after?.hp ?? 0) - (before?.hp ?? 0)} HP healed.`;
   }
   if (eff === "mp") return `${result?.amount ?? (after?.mp ?? 0) - (before?.mp ?? 0)} MP healed.`;
-  const STAT_MSG = {
+  const STAT_MSG: Record<string, string> = {
     stat_hp: "Max HP increased by {1}.", stat_mp: "Max MP increased by {1}.",
     stat_str: "Strength increased by {1}.", stat_def: "Defense increased by {1}.",
     stat_spt: "Spirit increased by {1}.", stat_wis: "Wisdom increased by {1}.",

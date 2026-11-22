@@ -22,9 +22,9 @@ interface CardDeckLoadedData {
 
 
 // 1904 = namedt: the folder rename is the name keyboard (without it every keyboard clip was skipped, text only)
-const PACKS = { 1598: "stcdsp", 1904: "namedt" };
-const COLOURS = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
-const STAGES = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
+const PACKS: Record<string, string> = { 1598: "stcdsp", 1904: "namedt" };
+const COLOURS: Record<string, number> = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
+const STAGES: Record<string, number> = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
 const LABEL = "Card folder";
 // The editor's four text banks, each language + a fixed offset: the card-name
 // (CARDNM) and card-text (CARDST) runs the album also loads, the card-shop bank

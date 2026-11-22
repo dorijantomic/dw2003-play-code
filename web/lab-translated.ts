@@ -38,14 +38,14 @@ import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from
 import type { LabScreen } from "./types/lab-translated.js";
 
 /** The lab's picture handles: the stdglabo archive (chrome and the chart's portraits) and CMFONT. */
-const PACK_NAMES = { 0x02c50000: "stdglabo", 0x02c50001: "stdglabo_portraits", 0x02860000: "cmfont" };
+const PACK_NAMES: Record<string, string> = { 0x02c50000: "stdglabo", 0x02c50001: "stdglabo_portraits", 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 const PARTY_SLOTS = 3;
 const LEDGER_ENTRIES = 44;
 const EMPTY = 0xffff;
 const EQUIPMENT_SLOTS = ["head", "body", "right", "left", "acc0", "acc1"];
 /** The directory each shared text bank family lives in. */
-const SHARED_DIRS = { wizard: "wizard", pause: "pause" };
+const SHARED_DIRS: Record<string, string> = { wizard: "wizard", pause: "pause" };
 
 const DATA_LABEL = "Lab data";
 

@@ -25,7 +25,7 @@
 /** Roles the table shows, in order. */
 import type { AnimRoleBones, CompareQuery } from "./types/anim-viewer-compare.js";
 export const ROLE_ORDER = ["torso", "head", "footL", "footR", "wingL", "wingR"];
-export const ROLE_LABELS = {
+export const ROLE_LABELS: Record<string, string> = {
   torso: "torso", head: "head", footL: "left foot", footR: "right foot", wingL: "left wing", wingR: "right wing",
 };
 

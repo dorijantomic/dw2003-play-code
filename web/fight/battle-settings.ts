@@ -17,7 +17,7 @@ export const CORE_STORE_KEY = "dw.fx.v1";
 // Both battle rules are OFF by default: a switch the player has never touched must not change a fight.
 // (web/ship-list.js: ownclips and smoothanim are out, dw2motion is auto = on. In the browser the live fx object carries that default;
 // these headless defaults stay off so the Node tools and tests keep the disc motion. Without the DW2 extras the swap falls back to the disc motion.)
-const DEFAULTS = { ownclips: false, dw2motion: false, smoothanim: false };
+const DEFAULTS: Record<string, boolean> = { ownclips: false, dw2motion: false, smoothanim: false };
 
 export function battleSetting(key: string) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;

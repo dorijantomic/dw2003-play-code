@@ -260,7 +260,7 @@ export const SPARKLE_ACTOR_FRAMES = SPARKLE_FLOURISH.reduce(
 // A step is [spriteId, duration]; 0xff means "jump to pair index = duration".
 // Both hold forever, so unlike program 3 they never finish. Their arming notify
 // (0x800837ec, manager type 0x32d) is not modelled by the walker yet.
-export const SPARKLE_PROGRAMS = {
+export const SPARKLE_PROGRAMS: Record<string, number[][]> = {
     1: [
         [0x23, 3], [0x27, 4], [0x28, 4], [0x2d, 4], [0x2e, 4], [0x2f, 3],
         [0x30, 2], [0x2e, 2], [0x2d, 2], [0x2e, 2],

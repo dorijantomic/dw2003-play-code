@@ -22,7 +22,7 @@
 // Pure module: no canvas, no window, no imports (a node test pins it).
 
 /** emote index -> FIELDCOM glyph-program row (the numbers in web/fieldcom.js KIND). */
-export const EMOTE_BUBBLE = { 1: 0, 3: 3 };
+export const EMOTE_BUBBLE: Record<string, number> = { 1: 0, 3: 3 };
 
 /** The FIELDCOM glyph row for emote index `i`, or null when the disc has no mark for it. */
 export function bubbleFor(i: number | null) {

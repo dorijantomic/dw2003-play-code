@@ -23,7 +23,7 @@ const PLACE_TOL = 4;               // strict tolerance while placing (the test t
 const COMPONENT_GAP = 96;
 const PIN_MERGE = 24;
 
-const OPP = { E: "W", W: "E", N: "S", S: "N" };
+const OPP: Record<string, string> = { E: "W", W: "E", N: "S", S: "N" };
 const horiz = (d: string) => d === "E" || d === "W";
 
 /** A rectangle in map or world pixels. */

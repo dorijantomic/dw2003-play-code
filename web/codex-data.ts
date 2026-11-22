@@ -84,7 +84,7 @@ export function lineTargets(evolutions, slot: string | number, profiles) {
 }
 
 // The field-element ids the disc stores at 0x800a4530 (engine/dw3/battle-formulas.ts ELEMENT_ID).
-const FIELD_ELEMENT_NAMES = { 1: "normal", 2: "Fire", 3: "Water", 4: "Ice", 5: "Wind", 6: "Thunder", 7: "Machine", 8: "Dark" };
+const FIELD_ELEMENT_NAMES: Record<string, string> = { 1: "normal", 2: "Fire", 3: "Water", 4: "Ice", 5: "Wind", 6: "Thunder", 7: "Machine", 8: "Dark" };
 
 /** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11 -> "11th". */
 function ordinal(n: number) {

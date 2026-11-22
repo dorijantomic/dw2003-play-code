@@ -386,7 +386,7 @@ export function emitterClass(folder: string | number, emitterId) {
     return { cls, bone, arm: { side, chain }, equip, reason: `k17:${equip.class}` };
   }
   // body-located sites
-  const map = { mouth: "head", head: "head", eyes: "head", chest: "chest", back: "back", tail: "tail", wings: "wing", "whole-body": "body" };
+  const map: Record<string, string> = { mouth: "head", head: "head", eyes: "head", chest: "chest", back: "back", tail: "tail", wings: "wing", "whole-body": "body" };
   const cls = map[part];
   if (!cls) return { cls: null, bone: null, reason: "unknown-site" };
   const bone = part === "tail" ? (tailChain(folder) || []).slice(-1)[0] ?? m.t ?? m.r

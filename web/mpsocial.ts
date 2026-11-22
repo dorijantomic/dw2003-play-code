@@ -55,7 +55,7 @@ function add(entry) {
 }
 
 // ------------------------------------------------------------ the log
-const KIND = { level: ["▲", "#ffd34d"], quest: ["★", "#7dffa0"], evolve: ["◆", "#ff9af0"], info: ["•", "#9ad0ff"] };
+const KIND: Record<string, string[]> = { level: ["▲", "#ffd34d"], quest: ["★", "#7dffa0"], evolve: ["◆", "#ff9af0"], info: ["•", "#9ad0ff"] };
 
 function drawLog() {
     if (!el.log) return;
@@ -256,7 +256,7 @@ function confirmTrade() {
 }
 function cancelTrade() { if (trade) sendTrade({ op: "cancel" }); endTrade(); }
 
-const END_TEXT = { declined: "declined the trade.", cancelled: "cancelled the trade.", left: "left the room.", busy: "is busy with another trade.", gone: "is not here any more." };
+const END_TEXT: Record<string, string> = { declined: "declined the trade.", cancelled: "cancelled the trade.", left: "left the room.", busy: "is busy with another trade.", gone: "is not here any more." };
 
 function onTrade(m) {
     if (m.op === "ask") {
@@ -522,7 +522,7 @@ async function onGoto(m) {
 // host opens it and calls each fight, and the winner's card says SERVER CHAMP until the next night.
 // F2 -> Extras -> "Server Champ league", off by default: no button, no message, and a card that carries the mark
 // draws as a normal card.
-const LEAGUE_NO = {
+const LEAGUE_NO: Record<string, string> = {
     no_league: "No Server Champ night is open.",
     open: "A Server Champ night is already open.",
     ids: "A Server Champ night needs 2 to 8 tamers who are in the room.",

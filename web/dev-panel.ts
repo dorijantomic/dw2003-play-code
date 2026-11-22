@@ -23,7 +23,7 @@ interface DevRow {
 
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
-const BADGE = {
+const BADGE: Record<string, string[]> = {
     in: ["In", "In the game: on at the start, and the player may switch it in OPTIONS."],
     auto: ["Auto", "In the game: always on, there is no switch."],
     out: ["Out", "Not for players: hidden, and always off in the installed copy."],

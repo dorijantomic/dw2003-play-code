@@ -4,7 +4,7 @@
 // the slot is one voice per side, freed when the voice ends (the observable
 // proxy for the original effect object's lifetime). Pure/DOM-free for testing.
 export function battleVoiceGate() {
-  const busy = { player: false, enemy: false };
+  const busy: Record<string, boolean> = { player: false, enemy: false };
   return {
     /** true if the caller may start a voice on `side` (and claims the slot). */
     acquire(side: string | number) {

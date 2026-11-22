@@ -262,9 +262,9 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
 // The page: the tables, the pickers, the pad and the draw.
 // ---------------------------------------------------------------------------
 
-const CATEGORY_WORDS = { 2: "physical attack", 3: "magical attack", 4: "heal or cure", 5: "stat or MP move", 6: "field technique" };
+const CATEGORY_WORDS: Record<string, string> = { 2: "physical attack", 3: "magical attack", 4: "heal or cure", 5: "stat or MP move", 6: "field technique" };
 const OPTION_KEYS = ["form", "enemy", "technique", "field", "crit", "armour", "multi"];
-const OPTION_LABELS = { form: "FORM", enemy: "ENEMY", technique: "TECHNIQUE", field: "FIELD", crit: "CRIT", armour: "ARMOUR", multi: "MULTI CREST" };
+const OPTION_LABELS: Record<string, string> = { form: "FORM", enemy: "ENEMY", technique: "TECHNIQUE", field: "FIELD", crit: "CRIT", armour: "ARMOUR", multi: "MULTI CREST" };
 const CRIT_MODES = ["roll", "lands", "misses"];
 const CRIT_LABELS = { roll: "roll the disc's dice", lands: "the crit lands", misses: "no crit" };
 const ARMOUR_STEPS = [0, 8, 16, 32, 64];

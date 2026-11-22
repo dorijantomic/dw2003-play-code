@@ -127,7 +127,7 @@ const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 
 const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right", "down-right"];
 // The only two clip meanings the research reads (field-actor-anim-engine.md; LOW confidence in the decode): 1 = idle,
 // 7 = talk. Every other clip is the number the actor's own animation sheet holds, so a name is never invented for it.
-export const ANIMS = { idle: 1, talk: 7 };
+export const ANIMS: Record<string, number> = { idle: 1, talk: 7 };
 // the facing index that looks along (vx, vy) in screen space (y grows downward)
 const lookAlong = (vx: number, vy: number) => [6, 7, 0, 1, 2, 3, 4, 5][(Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8];
 /**
@@ -344,7 +344,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
             // code here: the cutscene bubble actor the story scenes use pops it.
             // F2 -> Extras -> Quest emotes gates the step (off by default); `settings` above is opts.fx / window.__fx.
             if (settings?.questemotes !== true) return bad("bubble needs F2 -> Extras -> Quest emotes switched on");
-            const BUBBLES = { exclaim: 805, puffs: 807, close: 806 };
+            const BUBBLES: Record<string, number> = { exclaim: 805, puffs: 807, close: 806 };
             if (!Object.hasOwn(BUBBLES, s.bubble)) return bad(`bubble ${JSON.stringify(s.bubble)} is not one of exclaim, puffs, close`);
             if (s.who == null || !Number.isFinite(Number(s.who))) return bad("bubble needs who: a character id");
             const cmd = BUBBLES[s.bubble], slot = 803;

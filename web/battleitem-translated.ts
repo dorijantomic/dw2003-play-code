@@ -64,7 +64,7 @@ type BattleItemMove = Record<string, string | number | boolean | null>;
 // item descriptions (0x63) are the merchant screens' shared banks, already
 // extracted (web/assets/data/shop-banks).
 const BANKS = [0x7f, 0x6a, 0x63];
-const SHOP_BANK_DIRS = { 0x7f: "battlecmd", 0x6a: "shop-banks", 0x63: "shop-banks" };
+const SHOP_BANK_DIRS: Record<string, string> = { 0x7f: "battlecmd", 0x6a: "shop-banks", 0x63: "shop-banks" };
 const DATA_LABEL = "Battle item data";
 
 let dataPromise = null;

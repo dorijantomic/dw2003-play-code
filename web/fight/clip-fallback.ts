@@ -83,7 +83,7 @@ interface ClipScriptModel {
 // around if the fighter stands on the near side.
 
 // the projectile sprite most player spells of each element fire (tools: counted over the disc's clip-9 scripts)
-const PROJECTILE_BY_ELEMENT = { 1: 220, 2: 221, 3: 205, 4: 210, 5: 218, 6: 210, 7: 206, 8: 217 };
+const PROJECTILE_BY_ELEMENT: Record<string, number> = { 1: 220, 2: 221, 3: 205, 4: 210, 5: 218, 6: 210, 7: 206, 8: 217 };
 
 let donorActions = null;
 /** The Greymon donor's `actions` (a player species with every clip), or null to turn the last resort off. */
@@ -204,7 +204,7 @@ const VICTIM_LINE = 5120;          // the arena z line authored basics anchor th
 // that covers its hits (never one that hides a hit): clip 5 = {1,2,4} for a 1/2/4-hit basic, clip 11 =
 // {0..4} for its multi rows. A hit count above the widest authored shape plays the widest, exactly as
 // every authored script of that clip does (a 7-hit row on clip 11 plays its 4-beat shape).
-const CLIP_CONTACT_VARIANTS = {
+const CLIP_CONTACT_VARIANTS: Record<string, number[]> = {
   0: [0], 1: [0], 2: [0], 3: [0], 4: [0],
   5: [1, 2, 4], 6: [1], 7: [2], 8: [3], 9: [0, 1], 10: [0, 1], 11: [0, 1, 2, 3, 4], 12: [0, 1],
   13: [3], 14: [1], 15: [0], 16: [0, 1], 17: [1],

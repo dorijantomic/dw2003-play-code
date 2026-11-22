@@ -123,7 +123,7 @@ export function ownNumbers(sp, partner, profiles = null) {
     const add = onStarter ? null : sp.profile;
     const root = add ? (profiles ?? []).find((p) => p.name === partner.rookie) : null;
     const base = baseNumbers(root ?? sp.profile, level);
-    const out = { hp: Number(rec.maxHp ?? base!.hp), mp: Number(rec.maxMp ?? base!.mp), level };
+    const out: Record<string, number> = { hp: Number(rec.maxHp ?? base!.hp), mp: Number(rec.maxMp ?? base!.mp), level };
     for (const k of CORE_KEYS) {
         const worn = add && FORM_KEYS.includes(k) ? Number(add[k]) || 0 : 0;
         const stored = rec.stats?.[k];

@@ -76,7 +76,7 @@ const SELL_CATS = ["Items", "Weapons", "Armor", "Accessories"];
 // stitshop's 0x8008CB1C class-label table selects these ESITSHOP lines from
 // the item's descriptor byte +2. The detail panel prints the extra line for
 // item classes 2..13 (exe-decomp/stitshop_c/F0x8008a0d0.c:11-21).
-const WEAPON_CLASS_LINES = {
+const WEAPON_CLASS_LINES: Record<string, string> = {
   2: "Left Hand", 3: "Right or Left", 4: "Head", 5: "Body",
   6: "Accessory", 7: "Both Hands", 8: "Accessory",
 };

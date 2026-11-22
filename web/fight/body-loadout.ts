@@ -37,13 +37,13 @@ import type { LoadoutQuery } from "./types.js";
 
 /** The disc's eight technique elements (engine/dw3/battle-formulas.ts ELEMENT_ID; the
  *  skills table spells every one of the 426 techniques' own element this way). */
-export const ELEMENT_NAMES = {
+export const ELEMENT_NAMES: Record<string, string> = {
   1: "normal", 2: "fire", 3: "water", 4: "ice", 5: "wind", 6: "thunder", 7: "machine", 8: "dark",
 };
 
 /** What each of the 18 slots is for (knowledge/clips.md §5). Only labels: nothing here
  *  changes what a clip plays. */
-export const CLIP_KINDS = {
+export const CLIP_KINDS: Record<string, string> = {
   0: "idle", 1: "flinch", 2: "survive", 3: "death", 4: "evade",
   5: "basic attack", 6: "combo 2", 7: "combo 3", 8: "combo 4",
   9: "spell cast", 10: "item use", 11: "signature", 12: "DNA presentation",

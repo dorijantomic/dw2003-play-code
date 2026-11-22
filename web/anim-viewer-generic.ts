@@ -20,7 +20,7 @@ import { TimelinePlayer } from "./fight/timeline-player.js";
 import type { AnimGenericQuery, GenericFetch } from "./types/anim-viewer-generic.js";
 
 export const VERDICTS = ["works", "broken", "unsure"];
-export const VERDICT_MARK = { works: "✓", broken: "✗", unsure: "?" };
+export const VERDICT_MARK: Record<string, string> = { works: "✓", broken: "✗", unsure: "?" };
 export const RATING_KEY = "dw3.genericRatings.v1";
 export const PREVIEW_KEY = "dw3.genericFullPreview.v1";
 export const TICK_SPEED = 2;

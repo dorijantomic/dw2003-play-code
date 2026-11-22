@@ -60,7 +60,7 @@ export const TR_INTRO = 0, TR_WINDUP = 1, TR_HIT = 2, TR_MISS = 3, TR_WIN = 4, T
 // runtime-populated vtable, not stgtrain-local); other families are
 // UNCALIBRATED and fall back to the Punch value — calibrate each with one
 // real capture in web/gym-lab.html.
-export const TRANIN_ANCHORS = { default: [82, 31], "03": [79, 24], "14": [47, 35] };
+export const TRANIN_ANCHORS: Record<string, number[]> = { default: [82, 31], "03": [79, 24], "14": [47, 35] };
 export function traninAnchors(fam: string | number) {
   return TRANIN_ANCHORS[fam] ?? TRANIN_ANCHORS.default;
 }

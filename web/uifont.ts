@@ -153,7 +153,7 @@ function glyphFor(kind: number, ch: string | number) {
 // Those tokens ARE keys in map.chars; split text into per-glyph units so they
 // resolve instead of being drawn character-by-character. A few unicode aliases
 // let call sites write the arrow directly.
-const ALIASES = {
+const ALIASES: Record<string, string> = {
   "▶": "[arrow-right]", "◀": "[arrow-left]", "▲": "[arrow-up]", "▼": "[arrow-down]",
   "△": "[triangle]", "◯": "[circle]", "○": "[circle]", "□": "[square]", "✕": "[cross]",
 };

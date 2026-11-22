@@ -122,7 +122,7 @@ function render(dt) {
     const enemyYaw   = Math.PI;
 
     // Advance frame counters (60 fps target) — constrained to named clip ranges
-    const CLIP_NAMES = {idle:0, walk:1, run:2, attack:6, hit:10, win:16, lose:17};
+    const CLIP_NAMES: Record<string, number> = {idle:0, walk:1, run:2, attack:6, hit:10, win:16, lose:17};
 
     function advanceInRange(frame, dt, start, end) {
       const range = end - start;
