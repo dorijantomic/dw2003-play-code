@@ -147,6 +147,39 @@ function collectLets(prog, ck) {
   return edits;
 }
 
+// ---- pass: emptyrecs ----  const x = {} later filled only by key (x[k] = v): Record<string|number, V>
+function collectEmptyRecs(prog, ck) {
+  const edits = new Map();
+  for (const f of WEB) {
+    const sf = prog.getSourceFile(f); if (!sf) continue;
+    const decls = []; const v = (n) => { if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && !n.type && n.initializer && ts.isObjectLiteralExpression(n.initializer) && n.initializer.properties.length === 0) decls.push(n); ts.forEachChild(n, v); }; v(sf);
+    for (const dc of decls) {
+      const sym = ck.getSymbolAtLocation(dc.name); if (!sym) continue;
+      const vals = [], keys = []; let bad = false, used = 0;
+      const w = (n) => { if (bad) return;
+        if (ts.isIdentifier(n) && n !== dc.name && ck.getSymbolAtLocation(n) === sym) { used++;
+          const pa = n.parent;
+          if (ts.isPropertyAccessExpression(pa) && pa.expression === n) { bad = true; return; }
+          if (ts.isElementAccessExpression(pa) && pa.expression === n) {
+            keys.push(ck.getTypeAtLocation(pa.argumentExpression));
+            const up = pa.parent;
+            if (ts.isBinaryExpression(up) && up.left === pa && up.operatorToken.kind === ts.SyntaxKind.EqualsToken) vals.push(ck.getTypeAtLocation(up.right));
+            else if (ts.isBinaryExpression(up) && up.left === pa) { bad = true; return; } // +=, ??= ...: leave to the model
+          } else if (ts.isBinaryExpression(pa) && pa.left === n && pa.operatorToken.kind === ts.SyntaxKind.EqualsToken) { bad = true; return; }
+        }
+        ts.forEachChild(n, w); };
+      w(sf);
+      if (bad || !vals.length) continue;
+      const shown = vals.map((t) => show(ck, ck.getBaseTypeOfLiteralType(t), dc)); if (shown.some((x) => !x)) continue;
+      const u = union(shown); if (!u) continue;
+      const numKeys = keys.every((t) => (t.flags & ts.TypeFlags.NumberLike) !== 0);
+      const ty = "Record<" + (numKeys ? "number" : "string") + ", " + u + ">"; if (ty.length > MAX_LEN) continue;
+      (edits.get(f) ?? edits.set(f, []).get(f)).push({ pos: dc.name.getEnd(), text: ": " + ty, what: dc.name.text });
+    }
+  }
+  return edits;
+}
+
 // ---- pass: records ----
 function collectRecords(prog, ck) {
   const edits = new Map(), done = new Set();
@@ -196,7 +229,7 @@ let t0 = Date.now(), before = total();
 console.log("type-passes " + PASS + ": start " + before + " strict errors (" + ((Date.now() - t0) / 1000).toFixed(0) + "s)");
 for (let round = 1; round <= ROUNDS; round++) {
   const prog = LS.getProgram(), ck = prog.getTypeChecker();
-  const edits = PASS === "lets" ? collectLets(prog, ck) : PASS === "records" ? collectRecords(prog, ck) : collectCallbacks(prog, ck);
+  const edits = PASS === "lets" ? collectLets(prog, ck) : PASS === "records" ? collectRecords(prog, ck) : PASS === "emptyrecs" ? collectEmptyRecs(prog, ck) : collectCallbacks(prog, ck);
   let nE = 0; for (const es of edits.values()) nE += es.length;
   const changed = new Set(), orig = new Map(); let kept = 0;
   for (const [f, es] of edits) {

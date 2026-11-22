@@ -22,7 +22,7 @@ let enabled = true;
 let covered = false;
 let fontsOk = false;
 let fontFailed = false, fontsAt = 0, fontsTry = 0;
-const fontStatus = {};         // face -> "pending" | "ok" | "empty" | "error: ..."
+const fontStatus: Record<string, string> = {};         // face -> "pending" | "ok" | "empty" | "error: ..."
 let broken = null;            // { until } while the fail-safe is on: pixels drawn, no overlay (re-tested after BROKEN_MS)
 let offLogged = false, lastReason = "";
 const ROOT_Z = 12;            // frame.css: must stay in step
