@@ -15,6 +15,8 @@ import { emit as emitGameEvent } from "../../gameEvents.js";
 import { fusionEnabled, partyEntriesFor } from "../../fusion.js";
 import type { BattleContext, EnemyBattleRecord, PlayerRecord } from "../../types/battle.js";
 import type { BattleWinResult, BattleEndContext } from "./types.js";
+import type { FieldEncounterEnemy } from "../../types/battle.js";
+
 
 
 // moved by tools/rewrite/split-closure.mjs
@@ -260,7 +262,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // resolves the party itself and then starts the battle therefore silently
   // does nothing on the first fight of a session. This awaits the load first,
   // which is the only safe order for a caller holding just a screen id.
-  async function startScreen(screenId: number, onWin, onFlee, onLose, { mapId, lead = true }: StartScreenOptions = {}) {
+  async function startScreen(screenId: number, onWin: (result: BattleWinResult) => void, onFlee: (context: BattleEndContext) => void, onLose: (context: BattleEndContext) => void, { mapId, lead = true }: StartScreenOptions = {}) {
     await B.loadData();
     const party = partyForScreen(screenId);
     if (!party || !party.length) {
@@ -270,7 +272,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     return startParty(lead ? [party[0]] : party, onWin, onFlee, onLose, { screenId, mapId });
   }
 // Start a battle from a resolved party array (1v1: take the lead, as startRandom).
-  async function startParty(party, onWin, onFlee, onLose, { screenId, mapId }: StartPartyOptions = {}) {
+  async function startParty(party: (FieldEncounterEnemy | undefined)[], onWin: (result: BattleWinResult) => void, onFlee, onLose, { screenId, mapId }: StartPartyOptions = {}) {
     await B.loadData();
     if (!party || !party.length) return false;
     // F0x8008B798: the field's handoff runs its pre-battle presentation first —

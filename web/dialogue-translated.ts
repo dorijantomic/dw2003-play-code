@@ -14,6 +14,26 @@ import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import type { DialogueScreen } from "./types/dialogue-translated.js";
+interface RawPaintPack {
+    img: CanvasImageSource;
+}
+
+
+interface RawPaintIntent {
+    points: [number, number, number, number];
+    color: [number, number, number];
+    tpage: number;
+    clut: number;
+    uv: [number, number];
+    corners: [number, number, number, number, number, number, number, number];
+}
+
+
+interface RawPaintCommand {
+    kind: string;
+    intent: RawPaintIntent;
+}
+
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -30,7 +50,7 @@ const CONFIRM_KEY = "circle";
  */
 const FILL_TEXTURES = new Map([["45:2c57:bc", { pack: "cmfont", sx: 80, sy: 0, sw: 12, sh: 62 }]]);
 
-function paintRaw(ctx, raw, getPack) {
+function paintRaw(ctx: CanvasRenderingContext2D, raw: RawPaintCommand, getPack: (name: string) => RawPaintPack | undefined) {
     const { kind, intent } = raw;
     // inside the look C scope the balloon / band and the opening outline lines are C parts (web/ui-c/message.js): no pixels
     if (uiC.capturing() && (kind === "tailLine" || kind === "frameFill")) return true;

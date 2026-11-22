@@ -23,6 +23,8 @@ import { releaseBattleLayer } from "../../battle-layer.js";
 import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState, BattleResultPage, BattleLineSpec, BattleHeal } from "../../types/battle.js";
+import type { BattleSkill } from '../../types/battle.js';
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeFlow(B: BattleContext) {
 // ── Public API ──
@@ -343,7 +345,7 @@ function elementNameForElem1(elem1: number) {
    * "message producer"; docs/research/battle/battle-formula-leaves.md settles it as the
    * magical damage leaf). The slot records come from the shipped `fight_tech_table.json`.
    */
-  function resolveRepeatDispatch(attacker, defender, skill, sideByte, field) {
+  function resolveRepeatDispatch(attacker: BattleState, defender: BattleState, skill: BattleSkill | undefined, sideByte: number, field: number) {
     const atk = effStats(attacker), def = effStats(defender);
     const damages = [0, 0];
     const slotViews = [0, 1].map((i) => ({

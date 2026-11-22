@@ -58,7 +58,7 @@ export function runAuctionArrival(mapId) {
 function startAuctionLot(lot) {
     let answerRow = null;
     const host = {
-        playScript: (eventId, onDone) => {
+        playScript: (eventId: string, onDone: (handoff: string | null) => void) => {
             const row = auctionScriptRow(eventId);
             if (!row) { onDone(null); return; }
             if (eventId === lot.events.accepted || eventId === lot.events.pass) answerRow = row;

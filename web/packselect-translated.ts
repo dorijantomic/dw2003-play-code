@@ -11,6 +11,17 @@ import { composeWizard } from "./ui-c/screens.js";
 import { decodeGameName, encodeGameName } from "./nameentry-translated.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import type { PackSelectScreen } from "./types/packselect-translated.js";
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+
+interface PackSelectShared {
+  tables: Awaited<ReturnType<typeof fetchBytes>>;
+  font: Awaited<ReturnType<typeof loadResidentResources>>["font"];
+  members: number[];
+  cursorGlyphs: JsonValue;
+  textButtons: JsonValue;
+}
+
 
 // The picture handles the wizard asks for: the window art, the intro background
 // and the portrait / keyboard art.
@@ -20,7 +31,7 @@ const PRESS_FRAMES = 4;
 
 const DATA_LABEL = "Wizard data";
 let sharedPromise = null;
-const loadShared = () => {
+const loadShared = (): Promise<PackSelectShared> => {
     sharedPromise ??= Promise.all([
         fetchBytes("wizard/tables.bin", DATA_LABEL), loadResidentResources().then((shared) => shared.font),
         fetchJson("wizard/manifest.json", DATA_LABEL),

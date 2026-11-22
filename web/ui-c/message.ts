@@ -10,6 +10,11 @@ import { isCursorToken } from "./icons.js";
 import type { PlaceCardScene, TalkOpts } from "./types.js";
 
 import type { UiRect, PlaceCardQuad } from "./types.js";
+import type { UiPart, UiRun } from './types.js';
+type TalkCapturePart = UiPart & { part: string; rel?: typeof ID; base?: string | number };
+
+type TalkCaptureRun = UiRun & { kind: number };
+
 /** The four tail clips (one per balloon quadrant): which edge of the body they hang from and on which side their tip lies. */
 export const TAILS = Object.freeze({
     3: Object.freeze({ side: "bottom", tip: "left" }), 4: Object.freeze({ side: "bottom", tip: "right" }),
@@ -77,7 +82,7 @@ function pushName(key: string, text: string, tab: { x: number; y: number; w: num
  * web/textbox.js). `opt` = { lines: the opening animation's outline lines [{ points }], body: a balloon rect when there are no piece clips,
  * name: the speaker's name when it is not a kind 2 run (null = none) }.
  */
-export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
+export function composeTalk({ parts, runs }: { parts: TalkCapturePart[]; runs: TalkCaptureRun[] }, opt: TalkOpts = {}) {
     const out = [], used = new Set();
     // the opening: the game grows outline boxes from the speaker to the balloon (raw line primitives) -- drawn as 1 native C edge lines
     (opt.lines ?? []).forEach((l, i) => {
@@ -120,7 +125,7 @@ export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
  * Text in a window that is a message, not a question (the help counter's topic page draws its text in the Yes / No window's frame, no
  * cursor): the C message band on the window's rect, its lines in band text.
  */
-export function composeBandWindow(p, i, runs, used, out) {
+export function composeBandWindow(p: UiPart & { rel?: typeof ID }, i: number, runs: UiRun[], used, out: UiPart[]) {
     const r = clipRect(p), rel = p.rel ?? ID;
     messageBand(`mw${i}`, r, rel, out);
     const right = Math.min(320, r.x + r.w) - 4;

@@ -186,7 +186,7 @@ export function readyNow(record: EvolutionRecord | undefined, live: EvolutionLiv
  * line: { reqs: [{ ..., have, met, text }], gate: { ..., have, met, text }, unmet, ready,
  * text }. A requirement form not in the ledger reads "have 0". Pure.
  */
-export function requirementProgress(record, live, profiles) {
+export function requirementProgress(record: EvolutionRecord, live: EvolutionLive, profiles: Record<number, { name?: string }>) {
   return progressFor(record, live, namesOf(profiles));
 }
 

@@ -23,6 +23,14 @@ import { textWidth } from "./uifont.js";
 import { validateScene } from "./quest-scenes.js";
 import { installTriggers } from "./quest-triggers.js";
 import { offersAt, offerLabels } from "./quest-offers.js";
+interface QuestTurnInRef { name?: string; maps?: string[]; npc?: string; doneScene?: string; doneLines?: string[]; }
+
+interface Quest {
+    title: string;
+    id?: string;
+    offer?: { name: string; maps: string[] };
+}
+
 interface QuestDef {
     offer?: boolean;
     acceptAt?: string[];
@@ -145,7 +153,7 @@ function announceUnlocks() {
 }
 
 const placesOf = (maps) => [...new Set(maps.map(mapLabel))].join(" / ");
-const turnInRef = (d) => d.turnIn ?? d.offer ?? null;      // the NPC a finished quest is reported to, if any
+const turnInRef = (d): QuestTurnInRef | null => d.turnIn ?? d.offer ?? null;      // the NPC a finished quest is reported to, if any
 function accept(id, viaNpc = false) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "available" || !atGiver(d)) return false;
@@ -561,7 +569,7 @@ function detailText(d, s: string) {
         : s === "active" && challengeIndex(d) >= 0 && !canBegin(d) && d.objectives[challengeIndex(d)].startAt ? `Begin it at: ${placesOf(d.objectives[challengeIndex(d)].startAt)}.` : "";
     return [`${d.title}${s === "done" ? " (done)" : ""}\n${d.giver ? d.giver + ": " : ""}${d.text ?? ""}`, goals, rw ? `Reward: ${rw}` : "", where].filter(Boolean).join("\n\n");
 }
-async function showQuest(d) {
+async function showQuest(d: Quest): Promise<"leave" | null> {
     const s = statusOf(d);
     await say("Quest", detailText(d, s));
     const acts = [];

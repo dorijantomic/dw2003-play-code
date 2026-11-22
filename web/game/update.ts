@@ -148,7 +148,7 @@ export function padLoop(t) {
     requestAnimationFrame(padLoop);
 }
 
-export function frame(t) {
+export function frame(t: number) {
     // Cap the sim/render at 60fps: on >60Hz displays rAF fires faster; dt-based
     // logic stays real-time either way, but capping keeps frame pacing (and any
     // per-frame effects) identical to the 60Hz baseline the game targets.

@@ -16,6 +16,17 @@ import {
 import type { ShotNode } from "./types.js";
 
 import type { PlacementTable } from "../types/battle3d.js";
+interface ComposedShot {
+  fields: number[];
+  anchor: number[];
+  angles: [number, number, number];
+  eye: [number, number, number];
+  target: [number, number, number];
+  up: number[];
+  roll: number;
+  H: number;
+}
+
 interface FaceBoxShot {
   eye: number[];
   target: number[];
@@ -452,7 +463,7 @@ export function rollRadians(rollDeg) {
  * at constant radius, which is what an authored 180-degree yaw means; interpolating the finished
  * world position instead cuts the chord straight through the fighter.
  */
-export function composeShot(fields) {
+export function composeShot(fields): ComposedShot {
   const anchor = [fields[6], fields[7], fields[8]];
   const angles = [s16(fields[9]), s16(fields[10]), s16(fields[11])] as [number, number, number];
   // W = T(anchor) . R(angles) is the shot's own coordinate frame; eye/target are stated inside

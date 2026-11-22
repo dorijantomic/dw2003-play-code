@@ -30,7 +30,7 @@ export function readCardRuns(runs, cardY: number) {
     const mine = runs.filter((r: { x: number; y: number; }) => inRegion(r, 0, CARD_W_RUNS, cardY, cardY + CARD_H + 4));
     const row = (dyRun: number): UiRun[] => mine.filter((r: { y: number; }) => Math.abs(r.y - (cardY + dyRun)) <= 1);
     const label = (list) => list.filter((r: { right: null; x: number; }) => r.right == null && r.x < 30)[0]?.text ?? null;
-    const aligned = (list) => list.filter((r: { right: null; }) => r.right != null).sort((a: { right: number; }, b: { right: number; }) => a.right - b.right).map((r) => r.text);
+    const aligned = (list): string[] => list.filter((r: { right: null; }) => r.right != null).sort((a: { right: number; }, b: { right: number; }) => a.right - b.right).map((r) => r.text);
     const lvRow = row(11), hpRow = row(20), mpRow = row(29);
     const name = mine.filter((r: { y: number; x: number; }) => Math.abs(r.y - (cardY + 2)) <= 1 && r.x >= 40)[0]?.text ?? null;
     const lvVals = aligned(lvRow);

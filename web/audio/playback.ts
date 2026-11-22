@@ -20,7 +20,7 @@ function loadPhraseTable() {
     return P.phraseTablePromise;
   }
 /** One 16-bit mono PCM WAV -> Int16Array. The build writes these itself. */
-  function decodePcmWav(bytes) {
+  function decodePcmWav(bytes: ArrayBuffer): Int16Array<ArrayBuffer> {
     const view = new DataView(bytes);
     const u8 = new Uint8Array(bytes);
     // An ArrayBuffer is not indexable: the chunk id has to be read through a

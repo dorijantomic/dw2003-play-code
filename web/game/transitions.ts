@@ -275,7 +275,7 @@ export function drawTransitionWipe(ctx: CanvasRenderingContext2D | null, camX: n
 
 // One frame of the close: the 64x64 lattice, darkened by the level, clipped to
 // the screen AROUND the window the field still shows through.
-function paintWipeCoverAround(ctx, level: number, clear: { x: number; y: number; w: number; h: number; }) {
+function paintWipeCoverAround(ctx: CanvasRenderingContext2D | null, level: number, clear: { x: number; y: number; w: number; h: number; }) {
     const cx = clear.x * ZOOM, cy = clear.y * ZOOM;
     const cw = clear.w * ZOOM, ch = clear.h * ZOOM;
     // Four bands around the window, which is what the original's frame draws:
@@ -298,7 +298,7 @@ function paintWipeCoverAround(ctx, level: number, clear: { x: number; y: number;
 
 // One frame of the open: the same lattice and level, clipped to the INSIDE of
 // the band, so the two screen edges show the field that just arrived.
-function paintWipeCoverBand(ctx, level: number, f: { w: number; bandX: number; bandW: number; bandH: number; level: number; done: boolean; }) {
+function paintWipeCoverBand(ctx: CanvasRenderingContext2D, level: number, f: { w: number; bandX: number; bandW: number; bandH: number; level: number; done: boolean; }) {
     const bx = f.bandX * ZOOM, bw = f.bandW * ZOOM, bh = f.bandH * ZOOM;
     // The subtraction is scoped to the band itself: `subtractLayer` subtracts
     // everything the painter leaves non-black, so filling the whole screen and

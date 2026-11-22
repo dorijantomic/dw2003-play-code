@@ -66,7 +66,7 @@ const asked = new Set();
  *
  * Returns how many props are showing.
  */
-export function questPropsTick(mapId, onThisMap) {
+export function questPropsTick(mapId: string | number | null | undefined, onThisMap: QuestProp[] | null | undefined) {
     const rows = normalize(onThisMap);
     const want = new Set(rows.map((r) => r.name));
 

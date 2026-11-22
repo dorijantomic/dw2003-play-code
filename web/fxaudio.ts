@@ -1,3 +1,15 @@
+interface AmbienceLevels {
+    water?: number;
+    forest?: number;
+    city?: number;
+    birds?: number;
+}
+interface SoundLevels {
+    rain: number;
+    wind: number;
+    sand: number;
+    night: number;
+}
 // EXPERIMENT: weather and ambience sound, synthesised with WebAudio (no files):
 // rain, wind, blizzard howl, sandstorm hiss, night crickets and thunder.
 // One AudioContext of its own, created on the first key press or click (browsers
@@ -58,7 +70,7 @@ const ease = (param, v: number, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.c
 export function setWeatherVolume(v: number) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }
 
 // levels: { rain, wind (0..1), sand, night } ; on = the Sound switch
-export function setSound(on: boolean, lv) {
+export function setSound(on: boolean, lv: SoundLevels) {
     if (!ac) return;
     ease(master.gain, on ? 0.55 * level : 0, ac, 0.2);
     ease(rain.g.gain, on ? lv.rain * 0.16 : 0, ac);
@@ -159,7 +171,7 @@ function birdLoop() {
     birdTimer = setTimeout(birdLoop, 900 + Math.random() * 3200);
 }
 // lv = { water, forest, city, birds }
-export function setAmbience(on: boolean, lv) {
+export function setAmbience(on: boolean, lv: AmbienceLevels) {
     if (!ac || !buildPlace()) return;
     ease(pa.lap.g.gain, on ? (lv.water || 0) * 0.17 : 0, ac, 1.2);
     ease(pa.rustle.g.gain, 0, ac, 1.5);   // rustle removed with the wind

@@ -17,6 +17,12 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 import type { UiRect } from "./types.js";
 import type { UiPart, UiRun, UiMatrix } from "./types.js";
+/** The footer page transform: an identity matrix (only translation-free placements accepted by applyRel). */
+type FooterRel = UiMatrix & Readonly<{ a: 1; d: 1; e: 0; f: 0 }>;
+
+/** A footer page part: a drawable part plus its page transform. */
+type FooterPart = UiPart & { rel: FooterRel };
+
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
@@ -45,7 +51,7 @@ export { tokenLine };
 const FOOT_NUMBER = /^[0-9][0-9,./ ]*$/;
 const footRight = (lineRuns, j: number) => (lineRuns[j + 1] ? lineRuns[j + 1].x - 1 : j ? 318 : dx(1060));
 
-export function composeFooter(foot, runs, used: Set<unknown>, out) {
+export function composeFooter(foot: FooterPart, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = foot.rel, r = clipRect(foot);
     out.push({ key: "footer.plate", kind: "band", part: "footer", layer: "under", rect: r, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     out.push(solid("footer.tab", applyRel({ x: dx(0), y: r.y, w: N(206), h: N(4) }, rel), "var(--c-orange)", rel));
@@ -462,7 +468,7 @@ function composeFolderPlate(p: { state: string; }, i, out) {
 }
 
 /** The ITEMS bag (C3): stripes, the full-width list window with the faint word, the tab, item cells, pager, detail line, footer. */
-export const composeListPage = (c, cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
+export const composeListPage = (c: Parameters<typeof composeWindowPage>[0], cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
 
 /**
  * The shop item line on "Equip who?" (one clip): name plate | Equip / Items plate, and the price plate under the right end. The split

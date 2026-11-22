@@ -128,7 +128,7 @@ function revealSprite() {
     return rvSprite;
 }
 setReveal({
-    wants(S) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
+    wants(S: { map: { id: string }; fx: AmbienceConditions & { lightreveal?: boolean }; p: AmbienceSettings }) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
     draw(ctx: CanvasRenderingContext2D, snap: HTMLCanvasElement, S: RevealScene) {
         const dark = darkness(S.p, S.fx, S.now);
         if (dark < 0.04) return;

@@ -80,7 +80,7 @@ export function stagingRecordsReady(placementTable: PlacementTable | null | unde
  * out of whatever the staging block's neighbours happen to hold, which is not a behaviour to
  * reproduce, so this returns null and the caller keeps the last record instead of cutting one.
  */
-export function arenaShotFor(placementTable, playerFolder: string | null | undefined, enemyFolder, nearCamOverride = null) {
+export function arenaShotFor(placementTable, playerFolder: string | null | undefined, enemyFolder: string | null | undefined, nearCamOverride = null): GiantShotRef | null {
   const nearCam = nearCamOverride ?? nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
   const far = placementTable?.[modelKeyFromFolder(enemyFolder)] ?? null;
   const index = (far?.shot | 0) - 1;

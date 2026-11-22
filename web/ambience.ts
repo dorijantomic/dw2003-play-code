@@ -33,6 +33,10 @@ import { createRuleOverride } from "./host-rules.js";   // multiplayer: the host
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceConditions, AmbienceMode, AmbienceSettings } from "./types/ambience.js";
+interface SceneAmbienceProfile extends AmbienceConditions {
+    indoorLit?: boolean;
+}
+
 const VIEW_H = 240;
 
 // ---------------------------------------------------------------- settings
@@ -549,7 +553,7 @@ const sceneAllows = (kind: string) => !!sceneFx && (sceneFx.force || fx[kind] !=
 const sceneEase = (k) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
 
 /** The map's profile as this frame must read it. The same object when no scene override is on. */
-function sceneProfile(p) {
+function sceneProfile(p: SceneAmbienceProfile): SceneAmbienceProfile {
     const sc = sceneFx;
     if (!sc) return p;
     const q = { ...p } as AmbienceConditions;

@@ -345,7 +345,7 @@ function applyFleeLockDispatch(b: { statusEvents: { code: number; time: number; 
  * current MP, and the enemy's active fighter gains it (clamped at its own maximum). Page: kind 18 with payload
  * word 2 = 1, "{1} MP absorbed!" (esmfight[0x8f]), the amount in slot 1.
  */
-function applyMpAbsorbDispatch(b, record, options: PostHitDispatchOptions = {}) {
+function applyMpAbsorbDispatch(b: BattleState, record: { f9: number }, options: PostHitDispatchOptions = {}): PostHitDispatchResult {
   const src = battleRestoreTargets(b, 0)[activeSlotOf(b, 0)] ?? null;
   const dst = battleRestoreTargets(b, 1)[activeSlotOf(b, 1)] ?? null;
   if (!src || !dst) return { dispatch: 29, landed: false, page: null };

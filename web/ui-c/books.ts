@@ -20,6 +20,12 @@ import { clipRect, restOfRuns, runText } from "./generic.js";
 import { composeRows, composeFooter, runIn } from "./pages.js";
 import type { BookOpts } from "./types.js";
 import type { UiPart, UiRun } from './types.js';
+interface BookHeaderRel { readonly a: 1; readonly d: 1; readonly e: 0; readonly f: 0; }
+
+interface BookHeaderPlate extends UiRun { rel: BookHeaderRel; }
+
+interface BookHeaderRun extends UiRun { clut: number; }
+
 interface QuestCapture {
   parts: UiPart[];
   runs: UiRun[];
@@ -44,7 +50,7 @@ export function composeGlyphArrows(runs, used: Set<unknown>, out, prefix = "arro
 }
 
 /** The header plate with its title, tabs and L1 / R1 chips (see the file header). */
-export function composeBookHeader(p, runs, used: Set<unknown>, out) {
+export function composeBookHeader(p: BookHeaderPlate, runs: BookHeaderRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), mid = r.y + r.h / 2;
     out.push(plate("book.header", "header", r, rel, { shape: "sl" }));
     const mine = runs.filter((m) => !used.has(m) && !isCursorToken(m.text) && m.y + 4.5 >= r.y && m.y + 4.5 < r.y + r.h).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x);

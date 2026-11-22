@@ -11,6 +11,8 @@
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceSettings } from "./types/ambience.js";
+interface SceneryDimensions { DW: number; DH: number; DWB: number; DHB: number; }
+
 interface SceneryFx { indoor?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; sparkle?: boolean; lightning?: boolean; rain?: boolean; }
 
 interface SceneryPrefs { indoorLit?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; fogK?: number; seed: number; night?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; snowy?: boolean; }
@@ -102,7 +104,7 @@ let todLight = 1;            // 1 in daylight, lower toward dusk
 let steps = [], puffs = [], ripples = [];
 let lastStep = null, nextPuff = 0, stepSide = 1;
 
-export function resetScenery(map, p: { seed: number; }, S) {
+export function resetScenery(map: { id: number | string }, p: { seed: number; }, S: SceneryDimensions) {
     const r = rng(p.seed ^ 0x2545f491);
     sc = { id: map.id, built: false };
     const W = S.DWB, H = S.DHB;

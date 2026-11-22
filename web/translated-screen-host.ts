@@ -13,6 +13,36 @@
 
 /** `close()` runs the held onClose, the same way a finish the screen reached does. */
 import type { TranslatedScreenHostOptions } from "./types/translated-screen-host.js";
+interface TranslatedScreenSession {
+    finished?(): boolean;
+    dispose(): void;
+}
+
+
+interface TranslatedScreenOwner {
+    _open: boolean;
+    _pending?: boolean;
+    _closes?: number;
+    _request: number;
+    _session?: TranslatedScreenSession | null;
+    _onClose?: (() => void) | null;
+}
+
+
+interface TranslatedScreenBeginOptions {
+    onClose?: (() => void) | null;
+}
+
+
+interface TranslatedScreenHost {
+    begin(options?: TranslatedScreenBeginOptions): number;
+    attach(onClose: (() => void) | null | undefined): void;
+    current(token: number): boolean;
+    abandon(): boolean;
+    finish(): boolean;
+    close(): boolean;
+}
+
 
 export const CLOSE_NOTIFY = "notify";
 /** `close()` abandons the screen: the held onClose is dropped and no close is counted. */
@@ -39,7 +69,7 @@ export const DISPOSE_UNLESS_FINISHED = "unless-finished";
  *   clearSession   false to leave `_session` pointing at the closed session (default true).
  *   release(session)  runs once, while the session is still alive: read the summary, commit.
  */
-export function createTranslatedScreenHost(owner, options: TranslatedScreenHostOptions = {}) {
+export function createTranslatedScreenHost(owner: TranslatedScreenOwner, options: TranslatedScreenHostOptions = {}): TranslatedScreenHost {
     const closeMode = options.closeMode === CLOSE_NOTIFY ? CLOSE_NOTIFY : CLOSE_SILENT;
     const closeDispose = options.closeDispose ?? DISPOSE_NEVER;
     const finishDispose = options.finishDispose ?? DISPOSE_NEVER;

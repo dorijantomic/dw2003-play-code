@@ -7,6 +7,13 @@ import {
   DEPLOYED_PARTY_CAP, syncWornFromEquipment, isFormDigimonId,
 } from "./vendor/engine.js";
 import type { BattleState, DigimonRecord } from './types/battle.js';
+interface DriFormLedgerEntry {
+  id: number | string;
+  formLevel: number;
+  dvexp: number;
+  techSlots: number[];
+}
+
 interface DriEquippedFormStats { equippedForms?: number[]; }
 
 interface DriFormationStats {
@@ -108,7 +115,7 @@ export function ensureFormLedger(stats, digimonById) {
   return stats.formLedger;
 }
 
-export function formLedgerRecord(stats, formId, digimonById) {
+export function formLedgerRecord(stats: { digimonId?: number | string; formLedger?: DriFormLedgerEntry[] }, formId: string | number | undefined, digimonById: Record<string, DigimonRecord>): DriFormLedgerEntry | null {
   return ensureFormLedger(stats, digimonById).find((r) => Number(r.id) === Number(formId)) ?? null;
 }
 

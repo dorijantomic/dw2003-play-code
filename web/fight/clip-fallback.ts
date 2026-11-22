@@ -858,7 +858,7 @@ function buildSelfScript(model: ClipScriptModel, row: { m: string; d: string; t:
   return { ops, synthesized: true, camAuthored: "donor", buildKind: "self", selfCast: true };
 }
 
-function buildGapScript(model: ClipScriptModel, clip: number, row: { m: string; d: string; t: number[]; }, gap, element: number, target: string, hits = null, planted = false, tech = null) {
+function buildGapScript(model: ClipScriptModel, clip: number, row: { m: string; d: string; t: number[]; }, gap: DonorPayload, element: number, target: string, hits = null, planted = false, tech = null): ClipScript {
   const targetSide = authoredSide(model);
   const turn = !!gap.side && !!targetSide && gap.side !== targetSide;
   if (target === "self") return buildSelfScript(model, row);   // heal/support/item: never an attack body

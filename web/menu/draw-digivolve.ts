@@ -19,6 +19,9 @@ import {
 import type { MenuState } from "./types.js";
 
 import type { GameState } from "../game/types.js";
+import type { RosterMember } from "../types/battle.js";
+type RosterDetailView = RosterMember & { xp?: number; tp?: number };
+
 // SEE DIGIVOLVE — a screen of its own, not a panel on the status sheet. Every
 // number here is read from UI.screens.see_digivolve (claim
 // SEE-DIGIVOLVE-SCREEN-LAYOUT-001: pictures F0x800895c8, text F0x8008833c,
@@ -202,7 +205,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
 // x=50/x=91 (y=91+14i), TP plate 0x3c @ (0,196) value @ (45,203), Digivolve
 // window 0x22 @ (160,53) rows @ (178,71+14i), Equip window 0x23 @ (160,119)
 // rows @ (192,137+14i). (F0x8008c954 / F0x8008b520.)
-export function _drawDetail(ctx: CanvasRenderingContext2D, p, m: MenuState, state: GameState, t: number, fold = null) {
+export function _drawDetail(ctx: CanvasRenderingContext2D, p: RosterDetailView | undefined, m: MenuState, state: GameState, t: number, fold = null) {
   const D = MS.UI.screens.detail;
   const sh = MS.UI.screens.shared;
   // Every panel on this sheet is its own folding window, opened in pairs by

@@ -151,7 +151,7 @@ export function createDriNative(sfx = null) {
     /** Walker state -> the save cells the lab reads. Every owned roster slot
      *  gets a full record: owned marker, name, stats, gear, current form,
      *  equipped triple and its form ledger. */
-    function seed(read, write, state) {
+    function seed(read: (offset: number) => number, write: (offset: number, value: number, size?: number) => void, state: GameState) {
         const db = TABLES?.digimonById ?? {};
         const { v0ById } = profileMaps(read);
         const w16 = (addr: number, v) => write(addr, (Number(v) || 0) & 0xffff, 2);

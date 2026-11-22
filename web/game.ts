@@ -353,7 +353,7 @@ installChat({
     canOpen: () => state.started && !state.nameEntry && !textbox.isOpen!() && !cutscene.isActive()
         && !battle.isActive() && fade.dir === 0,
     releaseKeys: () => state.keys.clear(),
-    onSend: (text) => (isOnline() ? sendChat(text) : chatSay(text)),   // in a room the line goes to everyone and shows over every head
+    onSend: (text: string): void => (isOnline() ? sendChat(text) : chatSay(text)),   // in a room the line goes to everyone and shows over every head
     bubbleOpen: () => chatBox.isOpen!(),
     dismiss: () => { chatBox.pressConfirm!(); S.chatShownAt = performance.now() / 1000; S.chatPresses++; },
 });
@@ -441,7 +441,7 @@ battle.setEndingHandoff({
     },
 });
 
-battle.setReportHandoff({ open: (b) => openNativeReport(b, () => { battle.finishNativeReport(); }) });
+battle.setReportHandoff({ open: (b: BattleState) => openNativeReport(b, () => { battle.finishNativeReport(); }) });
 
 window.__sceneSkip = sceneSkip;
 window.__textbox = textbox;
@@ -655,7 +655,7 @@ window.__stageObjects = {
     // The s415 Deeper Crevice SCENERY LAYER's live position this blank, so a
     // verifier can read the slide's per-frame geometry without pixels.
     scrollLayers: (mapId) => scrollLayerEntries(mapId ?? currentMap().id),
-    fire: (id, sub, mapId) => fireStageObject(mapId ?? currentMap().id, id, sub ?? id),
+    fire: (id: number, sub: number | undefined, mapId: string | undefined) => fireStageObject(mapId ?? currentMap().id, id, sub ?? id),
     // The same route a cutscene SETANIM takes, with the second operand, so a
     // verifier can fire the stage overlays' own point-record actors
     // (engine/systems/point-record-actor.ts) the way their scripts do.

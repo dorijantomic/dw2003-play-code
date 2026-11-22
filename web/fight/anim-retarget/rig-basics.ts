@@ -15,7 +15,7 @@ export function sample(ch, frame: number) {
   return [lo[0] + t * (hi[0] - lo[0]), lo[1] + t * (hi[1] - lo[1]), lo[2] + t * (hi[2] - lo[2])];
 }
 
-function mat3Mul(a: number[], b) {
+function mat3Mul(a: number[], b: number[]): number[] {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
     let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k];

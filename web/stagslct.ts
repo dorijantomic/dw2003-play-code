@@ -161,7 +161,7 @@ export function createStagslctMenu(data = null) {
     return hit && hit.stage != null ? hit : null;
   }
 
-  function selectable() {
+  function selectable(): Extract<ReturnType<typeof rows>[number], { kind: "entry" }>[] {
     return rows().filter((r) => r.kind === "entry");
   }
 

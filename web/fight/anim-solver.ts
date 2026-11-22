@@ -48,6 +48,76 @@ import { bodyHeight, penetration, clearanceTolerance, rigColliders, poseCollider
 import { sharedShotMode, sharedShotTargets, SHARED_SHOT } from "./anim-collision.js";
 import type { FightAimOffsets, FightChannels, FightGate, FightMetrics, FightPlan, FightSkeleton } from "./types.js";
 import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+interface CastSolverModel extends Dw2LoadedModel {
+  solverCasts?: Record<string, CastSolveOut>;
+  __solverBakes?: number;
+}
+
+
+interface CastLaunchPoint {
+  id: string;
+  bone: string;
+  frame: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+
+interface CastPlanOut {
+  ticks: number;
+  windup: number;
+  release: number;
+  flight: number;
+  follow: number;
+  cls: string;
+  mode: string;
+  H: number;
+  targets: number[][];
+}
+
+
+interface CastGroupOut {
+  ok: boolean;
+}
+
+
+interface CastBakeOut {
+  model: CastSolverModel;
+  table: number;
+  offset: number;
+}
+
+
+interface CastReportOut {
+  pass: boolean;
+  forced: boolean;
+  shared: string | null;
+  penetration?: { badTicks: number; over: number };
+  gap?: { min?: number | null };
+}
+
+
+interface CastSolveOut {
+  ok: boolean;
+  reused?: boolean;
+  table: number | null;
+  ticks?: number;
+  offset?: number;
+  tick?: number;
+  windup?: number;
+  release?: number;
+  flight?: number;
+  follow?: number;
+  cls?: string;
+  mode?: string;
+  report?: CastReportOut;
+  group?: CastGroupOut;
+  plan?: CastPlanOut;
+  bake?: CastBakeOut;
+  launch?: CastLaunchPoint[];
+}
+
 interface HeadCastSample {
   p10?: number;
   p50?: number;
@@ -1430,7 +1500,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
  * A pair is solved ONCE and reused (K19f): the engine calls this from two entry points and every cast used
  * to append a fresh ~142 KB of keys and a new table (five casts left the frame offsets outside 16 bits).
  */
-export function solveCast(model, { tech = null, apply = true, offset = null, force = false } = {}) {
+export function solveCast(model, { tech = null, apply = true, offset = null, force = false } = {}): CastSolveOut | null {
   const group = solverGroup(model, { tech });
   if (!group.ok) return null;
   const key = techKey(tech ?? "");

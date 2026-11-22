@@ -8,6 +8,11 @@
 // data attributes they always had, so web/ambience.js still owns every handler that changes a setting.
 import { DEV_TABS, DEV_FILTERS, DEV_OPEN, tabCounts, selectRows, groupRows } from "./dev-panel-model.js";
 import { shipClass } from "./ship-list.js";
+interface DevPanelField extends Element {
+    value?: string;
+    disabled?: boolean;
+}
+
 interface DevRow {
     key: string;
     tab: string;
@@ -159,7 +164,7 @@ export function createDevView(panel, api) {
             if (el && c[t.id].total) el.textContent = `${c[t.id].on}/${c[t.id].total}`;
             total += c[t.id].total; on += c[t.id].on;
         }
-        const set = (sel: string, fn) => { const el = main.querySelector(sel); if (el) fn(el); };
+        const set = (sel: string, fn: (el: DevPanelField) => void) => { const el = main.querySelector(sel); if (el) fn(el); };
         set("[data-mode]", (e) => { e.value = fx.weatherMode; });
         set("[data-quality]", (e) => { e.value = fx.quality; });
         set("[data-tod]", (e) => { e.value = fx.todMode; });

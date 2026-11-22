@@ -45,7 +45,7 @@ const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const isName = (v) => typeof v === "string" && v.trim().length > 0;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const listOf = (v) => (Array.isArray(v) ? v : []);
-const byName = (shelf, name) => listOf(shelf).find((x) => x?.name === name) ?? null;
+const byName = (shelf, name): QuestShelfItem | null => listOf(shelf).find((x) => x?.name === name) ?? null;
 
 /**
  * What is wrong with this snapshot, as plain strings (empty = good). Checks only what a restore would put back into

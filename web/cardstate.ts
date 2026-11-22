@@ -35,6 +35,23 @@ import {
   bindBoosterStock, BOOSTER_ITEM_IDS,
 } from "./vendor/engine.js";
 import type { GameState } from "./game/types.js";
+interface CardCatalogRecord {
+  id: string;
+  name: string;
+  rarity?: string;
+}
+
+interface OpponentDeckSlot {
+  cardId: string;
+  aiClass: string;
+  setGroup: string;
+}
+
+
+interface CardOpponentRecord {
+  deck?: OpponentDeckSlot[];
+}
+
 
 let CATALOG = null;
 let catalogPromise = null;
@@ -220,7 +237,7 @@ export function grantPackForOpponent(opponent) {
 
 /** Open one held pack. Returns the six catalog records drawn, or null when the
  *  set has no stock. */
-export function openBooster(setId, rng = Math.random) {
+export function openBooster(setId: string, rng = Math.random): CardCatalogRecord[] | null {
   const pools = poolsOf(setId);
   if (!CATALOG || !pools) return null;
   const ids = openPack(collection, setId, pools, rng);
@@ -255,7 +272,7 @@ export function opponentById(id) {
 /** An opponent record's deck as the duel wants it: the 40 card ids in authored
  *  slot order, and the AI play class of each slot alongside. The class is
  *  authored PER SLOT, so the two arrays must stay parallel. */
-export function opponentDeck(record) {
+export function opponentDeck(record: CardOpponentRecord | null): { cards: string[]; aiClass: string[]; setGroup: string[] } {
   const deck = record?.deck ?? [];
   return {
     cards: deck.map((e) => e.cardId),

@@ -16,6 +16,28 @@ import { pickPauseScreen } from "./ui-c/screens.js";
 import { dimOf } from "./ui-c/geometry.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import type { StatusScreen, StatusTranslatedOpts } from "./types/status-translated.js";
+type PauseResidentResources = Awaited<ReturnType<typeof loadResidentResources>>;
+
+type PauseManifestData = Awaited<ReturnType<typeof fetchJson>>;
+
+type PauseCatalogData = Awaited<ReturnType<typeof fetchJson>>;
+
+type PauseProfileRecords = Awaited<ReturnType<typeof loadProfileRecords>>;
+
+
+interface PauseSharedData {
+  manifest: PauseManifestData;
+  tables: Uint8Array;
+  resident: Uint8Array;
+  homeData: Uint8Array;
+  profiles: PauseProfileRecords;
+  font: PauseResidentResources["font"];
+  cursorGlyphs: PauseResidentResources["cursorGlyphs"];
+  catalog: PauseCatalogData;
+  itemRecords: Uint8Array;
+  descriptors: [Uint8Array, Uint8Array];
+}
+
 
 // The picture handles the pages ask for: the pause chrome, the shared item/icon
 // sheet, and the MAP page's own three sheets per server. A handle is
@@ -34,7 +56,7 @@ const DATA_LABEL = "Pause data";
 let pauseCount = 0;
 
 let sharedPromise = null;
-const loadShared = () => {
+const loadShared = (): Promise<PauseSharedData> => {
     sharedPromise ??= (async () => {
         const [manifest, tables, resident, homeData, profiles, { font, cursorGlyphs }, catalog, itemRecords, main, extra] = await Promise.all([
             fetchJson("pause/manifest.json", DATA_LABEL), fetchBytes("pause/tables.bin", DATA_LABEL),

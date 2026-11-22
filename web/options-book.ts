@@ -10,6 +10,15 @@ import { WORD } from "./ui-kit-input.js";
 import { LIST_WINDOW, drawHeader, drawHelpBox, drawPanel, layoutTabs, listRowY, withFold } from "./ui-kit.js";
 import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { fitByWidth } from "./text-fit.js";
+interface HeaderLayout {
+    title: [number, number];
+    l1: [number, number];
+    r1: [number, number];
+    tabs: (number | undefined)[][];
+    tabStart: number;
+    tabGap: number;
+}
+
 interface OptionsView {
     progress(name: string): number;
     ticks: number;
@@ -41,7 +50,7 @@ export const OPTIONS_WINDOW = Object.freeze({
 });
 
 /** Header: "OPTIONS", then L1, the page tabs and R1 in one row, each measured so no two touch. Boxes are [x0, x1]. */
-export function headerLayout(widthOf, title: string, tabs: string[], hintW = widthOf("L1")) {
+export function headerLayout(widthOf: (text: string, scale?: number) => number, title: string, tabs: string[], hintW = widthOf("L1")): HeaderLayout {
     const titleX = 44, l1 = titleX + widthOf(title) + 8, tabStart = l1 + hintW + 8, tabGap = 8;
     const xs = layoutTabs(tabs, widthOf, tabStart, tabGap);
     const tabBoxes = tabs.map((t, i) => [xs[i], xs[i] + widthOf(t)]);

@@ -4,6 +4,8 @@
 import { applyRel } from "./geometry.js";
 import { N, ID, textPart, plate, stripes, typeWord, badgeText, tokenLine } from "./base.js";
 import type { GenericOpts, UiTextOpts } from "./types.js";
+import type { UiPart, UiRun } from "./types.js";
+
 
 /** The native rect of a claimed clip through the matrix of its draw call. */
 export const clipRect = (p) => applyRel({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 }, p.rel);
@@ -49,7 +51,7 @@ export function platePart(p, i) {
 /**
  * The generic screen: claimed plates, the backdrop when the game draws one, all text. `cfg` = { wash, word, roles(run) }.
  */
-export function composeGeneric({ parts, runs }, cfg: GenericOpts = {}) {
+export function composeGeneric({ parts, runs }: { parts: (UiPart & { part: string })[]; runs: UiRun[] }, cfg: GenericOpts = {}): (UiPart & { part: string })[] {
     const out = [];
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
     let i = 0;

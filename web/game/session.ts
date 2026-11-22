@@ -72,7 +72,7 @@ export async function startGame(mapId = null) {
 // P002PLAY is also the pack the clip rule names for the standing clip: the
 // resolver stores 0x01870070 for clip < 8, and the constructor's own `+0x9c` for
 // npc_id 2 is that same constant. So the base pack is read from the rule too.
-export function currentChar() {
+export function currentChar(): NonNullable<ReturnType<typeof playerPackMeta>> | (typeof state.manifest.characters)[number] {
     if (state.playerCharOne) return state.manifest.characters[0];
     return playerPackMeta(playerPackForClip(FIELD_IDLE_CLIP)) ?? state.manifest.characters[0];
 }

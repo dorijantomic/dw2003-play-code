@@ -11,6 +11,11 @@ import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { createMapScreenModel } from "./map-screen-model.js";
 import type { MapScreenData } from "./map-screen-model.js";
 import { partHook } from "./ui-c/capture.js";
+interface MapScreenBookView {
+    progress(name: string): number;
+    ticks: number;
+}
+
 
 /** The panel (7 columns of 40 px = 280 px, 7 bands) and, inside it, the box the areas are placed in. */
 export const MAP_PANEL = Object.freeze({ x: 20, y: 40, cols: 7, bands: 7, pivot: [160, 110] });
@@ -42,7 +47,7 @@ export function createMapScreenBook({ sfx = null, data }: MapScreenBookArgs = {}
             else for (const d of dirs) if (buttons.has(d)) { cue(model.move(d)); break; }
             return null;
         },
-        draw(ctx, view) {
+        draw(ctx: CanvasRenderingContext2D, view: MapScreenBookView) {
             const pt = view.progress("title"), pl = view.progress("list"), ph = view.progress("help");
             const title = "MAP", region = model.regionName();
             const tabStart = 44 + textWidth(title) + 16;

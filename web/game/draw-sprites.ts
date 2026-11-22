@@ -34,7 +34,7 @@ interface EntitySpriteDrawResult {
 }
 
 
-function drawSprite(meta, sheet, x, y, dir, frameIdx) {
+function drawSprite(meta, sheet: HTMLImageElement | undefined, x: number, y: number, dir: number, frameIdx: number | undefined) {
     let row = meta.rows.indexOf(dir);
     if (row === -1) {
         const fallback = _DIR_FALLBACK[dir] ?? "down";

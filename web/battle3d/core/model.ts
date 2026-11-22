@@ -125,7 +125,7 @@ function loadProjMesh(id: number) {
     return {
       ...e,
       onEffect: (rec: EffectSpawnRecord) => { B$.effectPlayer?.spawn(rec.type, rec, side); e.onEffect?.(rec); },
-      onHit: (rec) => {
+      onHit: (rec: { type: number; words?: number[] }) => {
         // Mapped op10s play common-bank sound table[type] (0x800a368c). Contact
         // markers 98/99 first resolve through the attack context's +0x70 value —
         // or through COMEX102 when the contact evaded (F0x8008c454, result 3).

@@ -26,7 +26,7 @@ export const HOST_RULES = Object.freeze({
 });
 export const HOST_RULE_KEYS = Object.freeze(Object.keys(HOST_RULES));
 
-function cleanValue(kind: string, v) {
+function cleanValue(kind: string, v): boolean | number | string | undefined {
     if (kind === "bool") return typeof v === "boolean" ? v : undefined;
     if (kind === "dial") return DIAL_MODES.includes(v) ? v : undefined;
     if (kind === "speed") return typeof v === "number" && Number.isFinite(v) ? Math.min(3, Math.max(1, Math.round(v * 4) / 4)) : undefined;

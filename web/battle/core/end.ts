@@ -49,6 +49,18 @@ import { buildFightReportRows } from "../report.js";
 import { battleMsgText } from "../../battlemsg-translated.js";
 import type { BattleEndContext, FusionDefeatArgs } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
+interface WinReportReward {
+  xp: number;
+  bits: number;
+  from: number;
+  to: number;
+}
+
+interface WinPartyEntry {
+  rec: NonNullable<BattleEndContext["playerRecords"]>[number];
+  member: NonNullable<BattleEndContext["playerRoster"]>[number];
+}
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeEnd(B: BattleContext) {
@@ -243,7 +255,7 @@ async function mpKit() {
        * (share, level-ups, DV EXP, learned techniques), exactly as a one-on-one win does. Returns the object the post-battle screen
        * opens from (the BIT and drop are paid by that screen) and the lead's summary line.
        */
-      winReport: ({ screenId, party, took }) => {
+      winReport: ({ screenId, party, took }: { screenId: BattleEndContext["screenId"]; party: WinPartyEntry[]; took: number[] }): { b: BattleEndContext; save: () => void; reward: WinReportReward } | null => {
         const recs = party.map((m) => m.rec);
         const b = {
           screenId, playerRoster: party.map((m) => m.member), playerRecords: recs, participantIndices: new Set(took),

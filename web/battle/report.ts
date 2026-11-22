@@ -1,5 +1,145 @@
 
-import type { DigimonRecord } from "../types/battle.js";// Materialize the persistent three-row fight report. The native screen shows
+import type { DigimonRecord } from "../types/battle.js";
+interface FightReportGeomPoint {
+  x: number;
+  yOff: number;
+}
+
+
+interface FightReportGeomClip extends FightReportGeomPoint {
+  clip: string;
+}
+
+
+interface FightReportGeomPortrait extends FightReportGeomPoint {
+  frames: number;
+  stepVsync: number;
+}
+
+
+interface FightReportGeomLabel extends FightReportGeomPoint {
+  str: string;
+}
+
+
+interface FightReportGeomHighlight extends FightReportGeomClip {
+  frames: number;
+  stepVsync: number;
+}
+
+
+interface FightReportGeomLevelArrow extends FightReportGeomClip {
+  pages: number;
+  rampSteps: number;
+  stepVsync: number;
+}
+
+
+interface FightReportGeomMarker extends FightReportGeomClip {
+  rampSteps: number;
+  stepVsync: number;
+}
+
+
+interface FightReportFormSlotLayout {
+  count: number;
+  stepY: number;
+  bar: FightReportGeomClip;
+  highlight?: FightReportGeomClip | null;
+  marker?: FightReportGeomMarker | null;
+  name: FightReportGeomPoint;
+  value: FightReportGeomPoint;
+}
+
+
+interface FightReportGroupLayout {
+  stepY: number;
+  plate: FightReportGeomClip;
+  portrait: FightReportGeomPortrait;
+  name: FightReportGeomPoint;
+  level_label: FightReportGeomLabel;
+  level_value: FightReportGeomPoint;
+  xp_value: FightReportGeomPoint;
+  xp_label: FightReportGeomLabel;
+  highlight?: FightReportGeomHighlight | null;
+  level_arrow?: FightReportGeomLevelArrow | null;
+}
+
+
+interface FightReportMessageLayout {
+  x: number;
+  y: number;
+  kind: number;
+}
+
+
+interface FightReportLayout {
+  group?: FightReportGroupLayout | null;
+  form_slot?: FightReportFormSlotLayout | null;
+  message: FightReportMessageLayout;
+}
+
+
+interface FightReportSlotGeom {
+  barClip: string;
+  barX: number;
+  barY: number;
+  highlightClip: string | null;
+  highlightX: number | null;
+  highlightY: number | null;
+  markerClip: string | null;
+  markerX: number | null;
+  markerY: number | null;
+  markerRamp: { rampSteps: number; stepVsync: number } | null;
+  nameX: number;
+  nameY: number;
+  valueX: number;
+  valueY: number;
+}
+
+
+interface FightReportPortraitGeom {
+  x: number;
+  y: number;
+  frames: number;
+  stepVsync: number;
+}
+
+
+interface FightReportHighlightGeom {
+  clip: string;
+  frames: number;
+  stepVsync: number;
+  x: number;
+  y: number;
+}
+
+
+interface FightReportLevelArrowGeom {
+  clip: string;
+  pages: number;
+  rampSteps: number;
+  stepVsync: number;
+  x: number;
+  y: number;
+}
+
+
+interface FightReportGroupGeom {
+  base: number;
+  plate: { clip: string; x: number; y: number };
+  portrait: FightReportPortraitGeom;
+  name: { x: number; y: number };
+  levelLabel: { str: string; x: number; y: number };
+  levelValue: { x: number; y: number };
+  xpValue: { x: number; y: number };
+  xpLabel: { str: string; x: number; y: number };
+  highlight: FightReportHighlightGeom | null;
+  levelArrow: FightReportLevelArrowGeom | null;
+  slots: FightReportSlotGeom[];
+  message: FightReportMessageLayout;
+}
+// Materialize the persistent three-row fight report. The native screen shows
 // the whole pack (not only Digimon that were tagged into the fight), while EXP
 // is added only to the participants selected by the reward resolver.
 export function buildFightReportRows(roster, records, profiles: { [k: string]: DigimonRecord; }, rewardXpByIndex = {}) {
@@ -132,7 +272,7 @@ export function buildFightReportPages({
 // rows inside a group are that Digimon's digivolve bars, not the three
 // partners. Until 2026-09-04 this returned one group and the walker drew the
 // three partners into its bars.
-export function fightReportGroupGeom(layout, groupIndex = 0) {
+export function fightReportGroupGeom(layout: FightReportLayout | null | undefined, groupIndex = 0): FightReportGroupGeom | null {
   const g = layout?.group;
   const f = layout?.form_slot;
   if (!g || !f) return null;

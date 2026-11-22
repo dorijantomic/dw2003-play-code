@@ -9,6 +9,11 @@ import { lampPoints, windowRects } from "./scenery2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+type DrawNightLightState = Omit<Scenery3State, "fx"> & {
+  fx: Scenery3Fx & { lamps?: boolean };
+  feet?: { x: number; y: number; leader?: boolean }[];
+};
+
 interface Scenery3State {
   L: { rain: number; blizzard: number; sand: number };
   t: number;
@@ -94,7 +99,7 @@ function build(S) {
 }
 
 // ----------------------------------------------------------------- lighting
-function drawNightLight(ctx, S) {
+function drawNightLight(ctx: CanvasRenderingContext2D, S: DrawNightLightState) {
     const { fx, p, now, fade, camX, camY, t } = S;
     const dark = darkness(p, fx, now);
     if (dark < 0.06) return;

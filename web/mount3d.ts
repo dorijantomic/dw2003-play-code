@@ -321,7 +321,7 @@ export function mat4Mul(a, b: Float32Array<ArrayBuffer>, out = new Float32Array(
   return out;
 }
 
-export function updateWorld(pose) {
+export function updateWorld(pose): Float32Array {
   const local = new Float32Array(16);
   const walk = (i, parent) => {
     composeTRS(pose.t.subarray(i * 3, i * 3 + 3), pose.r.subarray(i * 4, i * 4 + 4), pose.s.subarray(i * 3, i * 3 + 3), local);

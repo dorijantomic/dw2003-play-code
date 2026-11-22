@@ -165,7 +165,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
             if (session) session.dispose();
         },
 
-        diagnostics: (r): BattleFormDiagnostics => ({
+        diagnostics: (r: BattleFormRuntime): BattleFormDiagnostics => ({
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
             page: r._session?.page() ?? null,

@@ -28,7 +28,7 @@ const readJson = (path: string) => fetchJson(path, DATA_LABEL);
 const readBytes = (path) => fetchBytes(path, DATA_LABEL);
 
 let catalogPromise = null;
-function loadCatalog() {
+function loadCatalog(): Promise<ShopLoadedCatalog> {
   catalogPromise ??= readJson("shop_catalog.json").then(async (catalog): Promise<ShopLoadedCatalog> => ({
     catalog,
     itemRecords: await readBytes(catalog.itemRecords.file),

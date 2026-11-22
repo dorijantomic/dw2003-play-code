@@ -66,7 +66,7 @@ function ladderRowForRecord(scene, effect) {
 // carries the op table (file 0x1e8) and engine/systems/trigger-system.ts the gates.
 // Doors, ladders and the dive all come through here; nothing reads the step program
 // on its own any more.
-export function stepPlayback(x = state.x, y = state.y, circleHeld = true) {
+export function stepPlayback(x = state.x, y = state.y, circleHeld = true): Parameters<typeof isStageChangePlayback>[0] | null {
     const ts = S.engineTriggerSystem;
     if (!ts) return null;
     return ts.playback(currentMap().id, x, y, fieldDirectionIndex(state.dir), circleHeld);

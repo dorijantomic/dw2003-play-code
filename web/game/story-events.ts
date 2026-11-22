@@ -44,7 +44,7 @@ import { startTransition } from "./transitions.js";
 import { questSceneFxReset } from "./quest-scenes.js";
 
 /** Browser presentation of the shared engine command router. */
-export function applyStoryCommand(command) {
+export function applyStoryCommand(command: { kind: string; index: number; parameter?: number }) {
     if (command.kind === "battle") {
         state.pendingStoryBattleIndex = command.index;
         return;

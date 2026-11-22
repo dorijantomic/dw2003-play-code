@@ -58,7 +58,7 @@ export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null 
     const shopList = Array.isArray(shops) ? shops : Array.isArray(shops?.shops) ? shops.shops : [];
     const shopNames = new Map(shopList.map((s) => [Number(s.shop_id), typeof s.name === "string" ? s.name : ""]));
     return {
-        enemyName: (id) => display.get(id) ?? displayName(id),
+        enemyName: (id: number): string => display.get(id) ?? displayName(id),
         groups,
         shopName: (id) => shopNames.get(Number(id)) || "",
         obtainName: (itemId) => items[String(itemId)]?.name ?? "",
@@ -115,7 +115,7 @@ export function createItemsModel() {
     return {
         /** Current item id for this list (the first one when the remembered item is not in it); null for an empty list. */
         current(ids) { if (!ids.length) return null; if (!ids.includes(id)) { id = ids[0]; line = 0; } return id; },
-        index: (ids) => indexIn(ids),
+        index: (ids: number[]): number => indexIn(ids),
         move(ids, d: number) {
             if (!ids.length) return false;
             const from = indexIn(ids), to = Math.max(0, Math.min(ids.length - 1, from + d));

@@ -179,7 +179,7 @@ export function createSaveTranslated(sfx = null) {
         console.error("Translated save screen failed", error);
     }
 
-    function language() {
+    function language(): number {
         const selected = r._state?.languageByte;
         return Number.isInteger(selected) ? selected : 2;
     }

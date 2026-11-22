@@ -81,7 +81,7 @@ export function createGymPrimPainter(getVram: () => GymVram | null): GymPrimPain
     const stats = { sprites: 0, quads: 0, pixels: 0, skipped: 0 };
 
     /** The texel colour (a 16-bit value) for page-relative (u, v), or -1 for a missing texel. */
-    function texel(vram, page: number, clut: number, u: number, v: number) {
+    function texel(vram: GymVram, page: number, clut: number, u: number, v: number) {
         const depth = (page >> 7) & 3;
         const baseX = (page & 15) * PAGE_W;
         const baseY = ((page >> 4) & 1) * PAGE_H + ((page >> 11) & 1) * 512;

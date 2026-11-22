@@ -187,7 +187,7 @@ function boxBlur(src: Uint8Array<ArrayBuffer>, W: number, H: number, rad: number
 
 // clsImg decides WHERE the water is (the base map for a day/night variant);
 // the shader draws it over mapImg, the map on screen, so it keeps that palette.
-function buildStage(stageId, mapImg: HTMLImageElement, clsImg) {
+function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImageElement) {
     const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;

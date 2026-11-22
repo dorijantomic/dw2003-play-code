@@ -15,6 +15,12 @@ import { isCursorToken } from "./icons.js";
 import type { UiPopOpts } from "./types.js";
 import type { UiPart, UiRun } from "./types.js";
 import type { UiCapturePart } from './types.js';
+import type { UiRect } from './types.js';
+
+interface PackWinLayer { x: number; y: number; w: number; h: number; }
+
+interface PackWinBox { x: number; y: number; w: number; h: number; layers?: PackWinLayer[]; }
+
 
 
 
@@ -66,7 +72,7 @@ export function keyCells(p) {
 }
 
 /** The name slots from the clip's sheet layers (one 20 x 20 piece per letter), left to right. */
-export const slotRects = (p) => (p.layers ?? []).filter((l: { w: number; h: number; }) => l.w <= 24 && l.h <= 24).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x)
+export const slotRects = (p: PackWinBox): { nx: number; ny: number; rect: UiRect }[] => (p.layers ?? []).filter((l: { w: number; h: number; }) => l.w <= 24 && l.h <= 24).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x)
     .map((l) => ({ nx: p.x + l.x, ny: p.y + l.y, rect: { x: p.x + l.x, y: p.y + l.y, w: C7.slotW, h: C7.slotH } }));
 
 /** The glyph the key shows (the game's katakana middle dot is the dot key). */
@@ -90,7 +96,7 @@ function composeTitle(p: { x: number; y: number; }, i: string, runs, used: Set<u
  * Name entry (C7) and the partner chooser before it. `cfg.word` = the big faint word (NAME). The game's cursor clips say the focus: the key
  * cursor (39) its key, the slot cursor (40) its slot, a button drawn twice = the cursor's button, the chooser frame (32) its row.
  */
-export function composeNameEntry({ parts, runs }, cfg: { word?: string | null; } = {}) {
+export function composeNameEntry({ parts, runs }: { parts: { part: string }[]; runs: UiRun[] }, cfg: { word?: string | null; } = {}): UiPart[] {
     const out = [], used = new Set();
     const back = of(parts, "backdrop")[0];
     if (back) {
@@ -292,7 +298,7 @@ function composeSteps(p, i, parts: { part: string; }[], runs, used: Set<unknown>
 
 /** The starter pack list (stnmet 7): the C window on the clip's frame columns, its rules from the clip's thin pieces, the A / B / C tabs
  *  (the chosen one = the game's marker clip 50, orange). The partner pedestals and the partners stay pictures. */
-function composePackWin(p, i, parts, runs, used: Set<unknown>, out) {
+function composePackWin(p: PackWinBox, i: number, parts: { part: string }[], runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const b = panelBody(p), body = { x: p.x + b.x, y: p.y + b.y, w: b.w, h: b.h }, rl = rel(p);
     out.push(cWindow(`pk${i}.win`, R(body, p), rl, { part: "window" }));
     for (const l of lineArt(p, [[48, 32]]).rows.filter((q) => q.x >= b.x + 4 && q.y >= b.y + 4 && q.y + q.h <= b.y + b.h - 2))
