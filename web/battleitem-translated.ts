@@ -14,6 +14,48 @@ import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import { itemIconClip } from "./itemicons.js";
 import type { BattleItemSeed } from "./types/battleitem-translated.js";
+interface BattleItemDiagnosticsSession {
+  selection(): string | number | null;
+  page(): string | number | null;
+  rows(): readonly BattleItemRow[] | null;
+  count(): number | null;
+  ids(): readonly (string | number)[] | null;
+  ready(): boolean;
+  tree: { tasks: { size: number } };
+  vsyncInstalled(): boolean;
+  moves: readonly BattleItemMove[];
+  sounds: readonly string[];
+}
+
+interface BattleItemDiagnosticsSeed extends Omit<BattleItemSeed, "items"> {
+  items: { id: string | number; qty?: number; family?: number }[];
+}
+
+interface BattleItemDiagnosticsState {
+  _ticks: number;
+  _session?: BattleItemDiagnosticsSession;
+  _seed?: BattleItemDiagnosticsSeed;
+}
+
+interface BattleItemDiagnosticsResult {
+  ticks: number;
+  selection: string | number | null;
+  page: string | number | null;
+  rows: readonly BattleItemRow[] | null;
+  count: number | null;
+  ids: readonly (string | number)[] | null;
+  ready: boolean;
+  tasks: number;
+  vsync: boolean;
+  moves: BattleItemMove[];
+  sounds: readonly string[];
+  icons: { id: string | number; clip: ReturnType<typeof itemIconClip> }[];
+}
+
+type BattleItemRow = Record<string, string | number | boolean | null>;
+
+type BattleItemMove = Record<string, string | number | boolean | null>;
+
 
 // The row icon is pack handle 0x00286000 (CMFONT, the resident UI glyphs) and
 // the chrome is 0x00455000 (PGFGTC00, disc 1109): the original builds both
@@ -83,7 +125,7 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
             return { value: chosen };
         },
 
-        diagnostics: (r) => ({
+        diagnostics: (r: BattleItemDiagnosticsState): BattleItemDiagnosticsResult => ({
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
             page: r._session?.page() ?? null,

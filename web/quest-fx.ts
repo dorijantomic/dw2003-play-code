@@ -20,6 +20,37 @@
 // when it is skipped, on a warp, before a battle, and on every stage entry (so a load or a map change clears it too).
 
 import { questGhostClear } from "./quest-ghost.js";
+interface QuestFxSpec {
+    kind?: string;
+    name?: string;
+    sheet?: string;
+    x?: number;
+    y?: number;
+    clip?: string;
+    layer?: string;
+    fall?: number;
+    slide?: number;
+    rise?: number;
+    scale?: number;
+    ysort?: number;
+}
+
+
+interface QuestFx {
+    name: string;
+    sheet: CanvasImageSource;
+    sheetName: string;
+    x: number;
+    y: number;
+    layer: string;
+    scale: number;
+    ysort: number;
+    clip: string | null;
+    fall?: number;
+    slide?: number;
+    rise?: number;
+}
+
 
 const FIELDS_PER_SECOND = 60;          // the field's own blank rate (FIELD_TICK_RATE)
 const LAYERS = ["entity", "behind", "front"];
@@ -140,7 +171,7 @@ function currentFrame(fx) {
  * Returns the live effect, or null when the sheet did not load or the spec is unusable -- the caller then just goes on
  * (a scene never blocks on art it does not have).
  */
-export function questFxSpawn(spec) {
+export function questFxSpawn(spec): QuestFx | null {
     if (!spec || typeof spec !== "object") return null;
     const name = String(spec.name ?? spec.sheet ?? "");
     if (!name) return null;
@@ -197,7 +228,7 @@ export function questFxGet(name) {
 }
 
 /** Switch a live effect's clip: `{ name, clip, loop }`. Unknown effects and clips are skipped, not errors. */
-export function questFxPlay(spec) {
+export function questFxPlay(spec: QuestFxSpec & { loop?: boolean }) {
     const fx = live.get(String(spec?.name ?? ""));
     if (!fx) return false;
     const clip = spec?.clip != null ? fx.sheet.def.clips?.[spec.clip] : null;

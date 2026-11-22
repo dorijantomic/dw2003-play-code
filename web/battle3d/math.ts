@@ -1,5 +1,7 @@
 import { mat4Identity, mat4Scale } from "../fight/proj-layers.js";
 import { patchCopyRect } from "../vendor/engine.js";
+type Vec3Like = number[] | Float32Array;
+
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
 
@@ -17,7 +19,7 @@ export function mat4Perspective(fovY: number, aspect: number, near: number, far:
   return m;
 }
 
-export function mat4LookAt(eye, center, up) {
+export function mat4LookAt(eye: Vec3Like, center: Vec3Like, up: Vec3Like | undefined) {
   const z = normalize(sub3(eye, center));
   const x = normalize(cross3(up, z));
   const y = cross3(z, x);

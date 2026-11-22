@@ -29,7 +29,7 @@ interface PartGeom {
 }
 
 
-const pt = (list) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3)}px ${+y.toFixed(3)}px`).join(",")})`;
+const pt = (list: number[][]) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3)}px ${+y.toFixed(3)}px`).join(",")})`;
 
 /**
  * The silhouette of a plate of W x H page px. Returns { outer, inner, box } : outer = polygon of the edge layer, box = { l, t, r, b }
@@ -141,7 +141,7 @@ export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "va
 // ------------------------------------------------------------------------------------------------ the C balloon (C6)
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 /** The line p + t * d moved by `e` along its normal towards `inside`: returns [point, dir]. */
-function offsetLine(p, q, inside: number[], e): [number[], number[]] {
+function offsetLine(p: number[], q: number[], inside: number[], e: number): [number[], number[]] {
     const d = sub(q, p), len = Math.hypot(d[0]!, d[1]!) || 1;
     let n = [-d[1]! / len, d[0]! / len];
     const m = sub(inside, p);

@@ -3,6 +3,15 @@ import { evolvedMaxStats } from "../battle.js";
 import type { BattleEndContext, WinBattleRewardsArgs } from "./core/types.js";
 import type { DigimonRecord } from "../types/battle.js";
 import type { PartnerStats } from "../game/types.js";
+interface LevelUpTables {
+  exp_tier_bounds: number[];
+  exp_tier_const: number[];
+  hpmp_tier_adj: number[];
+  hpmp_rand9: number[];
+  core_tier_bounds: number[];
+  level_cap?: number;
+}
+
 
 /**
  * The Digimon a won battle PAYS — the set the reward is split between. One
@@ -154,7 +163,7 @@ export function levelUpThreshold(growthXp: number, nextLevel: number, lu) {
 }
 
 // Level after banking `exp` total EXP (may gain several levels; cap 99).
-export function levelForExp(currentLevel, exp: number, growthXp: number, lu) {
+export function levelForExp(currentLevel, exp: number, growthXp: number, lu): number {
   let lv = currentLevel;
   while (lv < (lu.level_cap ?? 99) && exp > levelUpThreshold(growthXp, lv + 1, lu)) lv++;
   return lv;

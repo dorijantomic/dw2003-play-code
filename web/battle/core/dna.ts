@@ -27,6 +27,15 @@ import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState } from "../../types/battle.js";
 import type { DigimonRecord } from "../../types/battle.js";
+import type { FightTechRow } from '../../types/battle.js';
+interface DnaImpact {
+  hit: boolean;
+  committed?: boolean;
+  damage: number;
+  lethal?: boolean;
+  record: FightTechRow;
+}
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeDna(B: BattleContext) {
 function playerTechs() {
@@ -384,7 +393,7 @@ function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
       : null;
     B.setResultPages(b, [{ text: restoreWalkerSentence(restore, { name }, who), spec }]);
   }
-function commitDnaImpact(b: BattleState, dna) {
+function commitDnaImpact(b: BattleState, dna: DnaImpact | undefined) {
     if (!dna?.hit || dna.committed) return;
     dna.committed = true;   // then the disc's special-encounter finalizer, WFIGHTMN 0x800aabf0
     dna.damage = finalizePlayerDamage(b, dna.damage); dna.lethal = dna.damage > 0 && dna.damage >= b.enemy.hp; b.enemy.hp = Math.max(0, b.enemy.hp - dna.damage);

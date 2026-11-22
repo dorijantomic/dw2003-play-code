@@ -21,6 +21,35 @@ import {
 import { loadAssetImage } from "../assets.js";
 import { sceneVariantSlotIndex, sceneVariantSlotActive } from "../ordinal-scene-variant.js";
 import { S } from "./state.js";
+interface PointRecordPatch {
+    active?: number;
+    sprite?: number;
+    ctr?: number;
+    x?: number;
+    y?: number;
+    ysort?: number;
+}
+
+
+interface PointRecordReadout {
+    sprite: number;
+    ctr: number;
+    x: number;
+    y: number;
+    ysort: number;
+}
+
+
+interface PointRecordHost {
+    write(index: string | number, patch: PointRecordPatch): void;
+    read(index: string | number): PointRecordReadout;
+    sound(packed: number): void;
+    charY(): number;
+    setCharY(fixed: number): void;
+    anchor(type: number, p1: number, p2: number): number | null;
+    anchorPos(handle: number): { x: number; y: number } | null;
+}
+
 interface PointSpriteRecord {
     readonly atlas: number;
     readonly x: number;
@@ -247,7 +276,7 @@ export const actorPositions = {}; // stageId -> { recordIndex: {x, y, ysort} }
  * moves its three records onto -- plus a read side, because s790's reveal waits
  * on a record's live `ctr`.
  */
-function pointRecordHost(stageId: string | number, records) {
+function pointRecordHost(stageId: string | number, records: readonly PointSpriteRecord[]): PointRecordHost {
     const rt = stageRuntime(stageId, records);
     return {
         write(index: string | number, patch: { active: undefined; sprite: undefined; ctr: undefined; x: undefined; y: undefined; ysort: undefined; }) {
@@ -465,7 +494,7 @@ export function ensureSheet(stageId: string | number) {
 // The blended half of a stage's sprites: every texel whose CLUT entry has the
 // STP bit, over the same rect as its plain layer. Drawn under the clip's ABR
 // mode by drawSprite; stages with none (hasSemi false) never fetch.
-export function ensureSemiSheet(stageId) {
+export function ensureSemiSheet(stageId: string): HTMLImageElement | "loading" | null {
     if (stageId in semiSheets) return semiSheets[stageId];
     if (!S.data?.[stageId]?.hasSemi) {
         semiSheets[stageId] = null;

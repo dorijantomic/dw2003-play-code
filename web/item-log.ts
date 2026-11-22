@@ -52,7 +52,7 @@ export function createItemLog(storage = defaultStorage()) {
     };
     return {
         read,
-        noteOwned: (ids) => note("owned", ids),
+        noteOwned: (ids: number[]) => note("owned", ids),
         noteSeen: (ids) => note("seen", ids),
         isOwned: (id) => !!read().owned[id],
         isSeen: (id) => !!read().seen[id],

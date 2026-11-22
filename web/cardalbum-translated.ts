@@ -15,6 +15,23 @@ import { composeWindow } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards } from "./cardstate.js";
 import type { CardAlbumScreen } from "./types/cardalbum-translated.js";
+interface AlbumCardRecord {
+  colour: number;
+  ap: number;
+  hp: number;
+  kind: number;
+  programCost: number;
+  summonCost: number;
+  level: number;
+}
+
+
+interface CardAlbumData {
+  resident: Awaited<ReturnType<typeof loadResidentResources>>;
+  banks: Map<number, Awaited<ReturnType<typeof fetchBytes>>>;
+  cards: AlbumCardRecord[];
+}
+
 
 const LABEL = "Card album";
 const PACKS = { 0x605: "stalbm" };
@@ -23,7 +40,7 @@ const COLOURS = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
 const STAGES = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
 
 let dataPromise;
-function loadData(language) {
+function loadData(language: number): Promise<CardAlbumData> {
   dataPromise ??= Promise.all([
     fetchJson("card_catalog.json", LABEL), loadResidentResources(),
   ]).then(async ([catalog, resident]) => {

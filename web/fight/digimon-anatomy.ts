@@ -66,7 +66,7 @@ export function techKey(techName: string | null) {
 }
 
 // Which arm side fires this move, reduced to 'left' | 'right' | 'both' | null.
-export function firingSide(folder: string, techName) {
+export function firingSide(folder: string, techName): "left" | "right" | "both" | null {
   const p = firingPart(folder, techName);
   if (p.mode === "left-arm") return "left";
   if (p.mode === "right-arm") return "right";
@@ -179,7 +179,7 @@ export function rankDonors(target: string, candidates, limit: number | undefined
   return limit ? out.slice(0, limit) : out;
 }
 
-function resolve(x: string) {
+function resolve(x: string): ReturnType<typeof anatomy> | null {
   if (!x) return null;
   return typeof x === "string" ? anatomy(x) : x;
 }

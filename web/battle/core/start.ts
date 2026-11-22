@@ -14,6 +14,8 @@ import type { BattleStartArgs, StartPartyOptions, StartScreenOptions } from "./t
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import { fusionEnabled, partyEntriesFor } from "../../fusion.js";
 import type { BattleContext, EnemyBattleRecord, PlayerRecord } from "../../types/battle.js";
+import type { BattleWinResult, BattleEndContext } from "./types.js";
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeStart(B: BattleContext) {
@@ -229,7 +231,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // walk-up encounters are always a SINGLE Digimon (user-confirmed in-game) — the multi-member
   // screens in the stage pool are scripted boss screens, so we fight only the lead here. The
   // sequential gauntlet (full party) is reserved for scripted battles via startParty.
-  async function startRandom(mapId: number | string, x: number, y: number, onWin, onFlee, onLose) {
+  async function startRandom(mapId: number | string, x: number, y: number, onWin: (result: BattleWinResult) => void, onFlee: (ctx: BattleEndContext) => void, onLose: (ctx: BattleEndContext) => void) {
     await B.loadData();
     const roll = B.pickEnemy(mapId, x, y);
     if (!roll) return false;

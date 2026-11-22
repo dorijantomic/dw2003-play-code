@@ -1,3 +1,20 @@
+interface ExtrasStageRecord {
+    tier?: number;
+    area?: string;
+}
+
+
+interface ExtrasAreaRecord {
+    id: string;
+    name: string;
+    tier?: number;
+}
+
+
+interface ExtrasAreaSource {
+    stages?: Record<string, ExtrasStageRecord>;
+    areas?: ExtrasAreaRecord[];
+}
 interface ExtrasStageData {
     tier: number;
 }
@@ -85,7 +102,7 @@ export function rollExtra(data, stage, rand: () => number) {
 }
 
 /** The area record of a stage, or null. */
-export function areaOf(data, stage: string) {
+export function areaOf(data: ExtrasAreaSource, stage: string): ExtrasAreaRecord | null {
     const rec = data?.stages?.[stage];
     return rec ? (data.areas ?? []).find((a) => a.id === rec.area) ?? null : null;
 }
@@ -122,7 +139,7 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
     };
     return {
         read,
-        isFound: (area, entry) => !!read()[findKey(area, entry)],
+        isFound: (area: string, entry: string) => !!read()[findKey(area, entry)],
         note(area, entry) {
             const all = read();
             const key = findKey(area, entry);

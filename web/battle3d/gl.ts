@@ -5,6 +5,9 @@ import { TEXTURE_PAGE_TEXELS, normalize } from "./math.js";
 import { S } from "./state.js";
 import type { ArenaCullLog } from "./types.js";
 import type { TexProgram } from "../types/battle3d.js";
+import type { ArenaGroupBuf } from '../types/battle3d.js';
+interface LayerBuf extends ArenaGroupBuf { ibo?: WebGLBuffer | null; }
+
 
 
 // A fighter's colour is its own texture's colour, and that is a decoded fact rather than a
@@ -326,7 +329,7 @@ export function arenaCullIndices(mvp, layer) {
 
 // Draw one arena layer through the ported cull: only the front-facing primitives
 // are drawn (the original's own post-cull set). Uses a dynamic index buffer.
-export function drawProjLayerIndexed(gl, prog, mvp, layer, tex, idx, tint = null) {
+export function drawProjLayerIndexed(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, layer: LayerBuf, tex: WebGLTexture | null, idx: number[] | null, tint = null) {
   if (!idx) { drawProjLayer(gl, prog, mvp, layer, tex, 1, tint); return; }
   if (!layer.ibo) layer.ibo = gl.createBuffer();
   gl.useProgram(prog.program);

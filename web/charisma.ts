@@ -18,6 +18,8 @@
 import { partyCharismaTotal, scaledStat, equipmentBonuses } from "./vendor/engine.js";
 import { partyRosterView, CHARID_TO_DIGID } from "./party.js";
 import type { GameState } from "./game/types.js";
+import type { RosterMember } from './types/battle.js';
+
 
 let DB = null;
 let dbPromise = null;
@@ -89,7 +91,7 @@ export function partyCharisma(state: GameState) {
 }
 
 /** The Charisma one member contributes, for the status screen / a diagnostic read-out. */
-export function memberCharisma(entry, slots) {
+export function memberCharisma(entry: RosterMember, slots: GameState['equipment']) {
   const m = charismaMemberFor(entry, slots);
   const own = m.charisma ?? (m.profile ? scaledStat(m.profile, "chr", m.level ?? 1) : null);
   return own == null ? null : Math.min(999, own + (m.buffCharisma ?? 0));

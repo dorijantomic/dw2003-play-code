@@ -68,7 +68,7 @@ export function gauntletNext(party: BattlePartyEntry[] | null | undefined, index
 // A boss-party entry may carry `size`: a multiplier on the fighter's shipped body size. The
 // field is read ONLY when the toggle is on; with it off the entries come back with no `size`
 // key at all and the renderer is never called, so every battle draws exactly as before.
-export function partyEntriesWithSize(entries, fxOn: boolean, k = 1) {
+export function partyEntriesWithSize(entries: BattlePartyEntry[], fxOn: boolean, k = 1): BattlePartyEntry[] {
   const mul = Number.isFinite(k) && k > 0 ? k : 1;
   return (entries || []).map((entry) => {
     const { size, ...rest } = entry;

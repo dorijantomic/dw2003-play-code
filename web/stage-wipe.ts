@@ -137,7 +137,7 @@ export function openFrame(frame) {
 // this open frame? It is the same rect `openFrame` reports, stated the way the
 // player meets it, so a caller painting the band and a test asking "is the
 // middle covered yet?" cannot drift apart.
-export function openCovered(frame, x, y) {
+export function openCovered(frame: number, x: number, y: number) {
     const f = openFrame(frame);
     if (f.bandW <= 0) return false;
     return x >= f.bandX && x < f.bandX + f.bandW && y >= 0 && y < f.bandH;
@@ -331,7 +331,7 @@ export function stepCheckerboard(cb, delta, held = false) {
 
 // The cell-emission order: the schedule order, one entry per consumed cell (the
 // cells the walk makes vanish, in the order the 29 records consume them).
-export function checkerboardWalk(delta) {
+export function checkerboardWalk(delta: number): { grid: number[]; order: number[]; calls: number } {
     const cb = createCheckerboard();
     const order = [];
     let guard = 0;

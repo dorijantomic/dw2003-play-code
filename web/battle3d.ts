@@ -1,3 +1,4 @@
+type BattleVec3 = [number, number, number];
 interface PlaylistOptions {
   loop?: boolean;
 }
@@ -1174,7 +1175,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     // `from`/`to` default to Armormon's basic-attack record `[0,39, 0,0,5120, 0,2048,0]`
     // AFTER the op6 handler's Y/Z negation (ActionVM._lunge) — the same vectors the live
     // attack passes, i.e. the muzzle at our own slot, not the raw words.
-    debugRenderProjectileAt(id, tick, { side = "player", from = [0, 0, -5120],
+    debugRenderProjectileAt(id: number, tick: number, { side = "player", from = [0, 0, -5120],
                                         to = [0, -2048, 0] } = {}) {
       if (!B$.effectPlayer) return false;
       B$.effectPlayer.projectiles.length = 0;
@@ -1445,7 +1446,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       const view = {
         centerX: w / 2, centerY: h / 2,
         pxScale: h / 240,                       // PSX 240-line screen -> canvas px
-        worldToScreen(pos, side) {
+        worldToScreen(pos: BattleVec3, side: number) {
           // op3 world coords are ABSOLUTE PS1 arena coordinates (Y down), and they are NOT
           // mirrored for the far-side fighter: claim
           // fight-world-effect-coordinates-are-not-mirrored-per-side-2026-08-18 reads the

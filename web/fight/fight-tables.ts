@@ -142,7 +142,7 @@ export function setSkillTable(json) {
 }
 export function skillType(techId: number) { return SKILL_TYPES?.get(techId | 0) ?? null; }
 /** Every skills row that carries this NAME (the technique name the animator passes down), or []. */
-export function skillRowsForName(name) { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
+export function skillRowsForName(name): { clip: number; attack_category?: number; type?: number }[] { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
 /** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
 export function skillRow(techId: number | null) { return SKILL_ROWS?.get(techId! | 0) ?? null; }
 /**

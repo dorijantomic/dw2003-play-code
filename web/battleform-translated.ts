@@ -14,6 +14,54 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleFormSeed } from "./types/battleform-translated.js";
+interface BattleFormRuntime {
+  _ticks: number;
+  _session?: BattleFormSession | null;
+}
+
+
+interface BattleFormSession {
+  selection(): string | null;
+  page(): string | null;
+  rows(): string[] | null;
+  panelBlock(): string | null;
+  panelRows(): string[] | null;
+  panelHeadline(): string | null;
+  rowSpecies(): string | null;
+  ready(): boolean;
+  tree: { tasks: { size: number } };
+  vsyncInstalled(): boolean;
+  moves: readonly BattleFormMenuMove[];
+  sounds: readonly BattleFormMenuSound[];
+}
+
+
+interface BattleFormMenuMove {
+  [key: string]: string | number;
+}
+
+
+interface BattleFormMenuSound {
+  [key: string]: string | number;
+}
+
+
+interface BattleFormDiagnostics {
+  ticks: number;
+  selection: string | null;
+  page: string | null;
+  rows: string[] | null;
+  panelBlock: string | null;
+  panelRows: string[] | null;
+  panelHeadline: string | null;
+  species: string | null;
+  ready: boolean;
+  tasks: number;
+  vsync: boolean;
+  moves: BattleFormMenuMove[];
+  sounds: readonly BattleFormMenuSound[];
+}
+
 
 // The panel's chrome is pack handle 0x00455000 (PGFGTC00) and its icons
 // 0x00286000 (CMFONT); the list model's marker strip is the same one the TECH
@@ -117,7 +165,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
             if (session) session.dispose();
         },
 
-        diagnostics: (r) => ({
+        diagnostics: (r): BattleFormDiagnostics => ({
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
             page: r._session?.page() ?? null,

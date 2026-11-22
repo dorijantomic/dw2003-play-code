@@ -234,7 +234,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
         /** Paint one frame's recorded picture intents and VRAM sprites; (0,0) is
          *  screen top-left. The clip path and the VRAM path are independent: a
          *  picture-empty root still paints its card faces if it has any. */
-        draw(ctx: CanvasRenderingContext2D, drawCalls, vram, cardPrims, ctxMarkers, rawIntents?) {
+        draw(ctx: CanvasRenderingContext2D, drawCalls, vram: null, cardPrims: never[], ctxMarkers: number[], rawIntents?) {
             stats.frames += 1;
             for (const prim of cardPrims ?? []) {
                 if (drawVramSprite(ctx, vram, prim)) stats.cards += 1;

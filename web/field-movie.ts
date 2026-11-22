@@ -135,7 +135,7 @@ export function createFieldMoviePlayer(onEnd, onError = console.error, createVid
     isOpen: () => active,
     /** The movie takes the whole screen, as the original's movie screen does: a
      *  black framebuffer with the picture at its own rect. */
-    draw(ctx, viewW, viewH) {
+    draw(ctx: CanvasRenderingContext2D, viewW: number, viewH: number) {
       if (!active) return false;
       ctx.save();
       ctx.fillStyle = "#000";

@@ -15,6 +15,28 @@ import { scaleEnemyStat } from "./enemy-stats.js";
 import { elementValue } from "./vendor/engine.js";
 import type { GlossaryDigimonOut } from "./types/glossary-digimon.js";
 import type { DigimonRecord } from './types/battle.js';
+interface GlossarySpecies {
+    index?: number;
+    number?: number;
+    name: string;
+    id?: string | number;
+}
+
+
+interface GlossaryPartner {
+    id?: string | number;
+    species?: string | number;
+    name?: string;
+}
+
+
+interface GlossaryRow {
+    index?: number;
+    number?: number;
+    label: string;
+    state: string;
+}
+
 interface EvolutionLine {
     digimonId?: string | number;
     records?: EvolutionRecord[];
@@ -337,7 +359,7 @@ export function headerCounts(species, log: DigimonLog): HeaderCounts {
     return { met, beaten, total: species.length, text: `Met ${met}/${species.length}  Beaten ${beaten}` };
 }
 
-export function listRows(species, log, partners) {
+export function listRows(species: GlossarySpecies[], log: DigimonLog, partners: GlossaryPartner[]): GlossaryRow[] {
     return species.map((sp) => {
         const state = speciesState(sp, log, partnerOf(sp, partners));
         return { index: sp.index, number: sp.number, label: state === "unknown" ? "???" : displayName(sp.name), state };

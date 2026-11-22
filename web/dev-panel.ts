@@ -8,6 +8,14 @@
 // data attributes they always had, so web/ambience.js still owns every handler that changes a setting.
 import { DEV_TABS, DEV_FILTERS, DEV_OPEN, tabCounts, selectRows, groupRows } from "./dev-panel-model.js";
 import { shipClass } from "./ship-list.js";
+interface DevRow {
+    key: string;
+    tab: string;
+    sub: string;
+    name: string;
+    why: string;
+}
+
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 const BADGE = {
@@ -105,7 +113,7 @@ export function createDevView(panel, api) {
     const st = { tab: "world", query: "", filter: "all", na: new Set(), note: "" };
     let built = false, main = null, tabsEl = null, searchEl = null, counts = null;
 
-    function rowHtml(r) {
+    function rowHtml(r: DevRow) {
         const cls = shipOf(r.key), b = BADGE[cls] || ["?", ""];
         const open = DEV_OPEN[r.key];
         const dial = r.key === "encounterdial"

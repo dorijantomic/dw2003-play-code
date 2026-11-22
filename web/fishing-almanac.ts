@@ -1,3 +1,12 @@
+interface AlmanacSpot { x?: number; y?: number; offset?: number; }
+
+interface AlmanacFishRecord { spots?: AlmanacSpot[]; }
+
+interface AlmanacCatch { screen: string; species: string; }
+
+interface AlmanacReward { dvexp: number; exp: number; bits: number; }
+
+interface AlmanacEntry { stage: string; name: string; spots: number; budget: number; cardmon: AlmanacCatch; water: AlmanacCatch; reward: AlmanacReward; }
 // web/fishing-almanac.js — the 46 fishing stages as one read-only table.
 //
 // Pure: no DOM, no fs, no fetch. The page (web/fishing-almanac.html) hands in
@@ -76,7 +85,7 @@ function catchAt(stageRecord, slot: string, screens) {
  * record the water catch's screen pays — the area's own number. The page shows
  * the Cardmon catch's record too, through rewardFor.
  */
-export function almanac(fish, screens, rewards, maps) {
+export function almanac(fish: Record<string, AlmanacFishRecord>, screens: Record<string, string>, rewards: Record<string, AlmanacReward>, maps: Record<string, string>): AlmanacEntry[] {
     const nameOf = mapNameLookup(maps);
     const stages = Object.keys(fish ?? {}).sort();
     return stages.map((stage) => {
@@ -96,7 +105,7 @@ export function almanac(fish, screens, rewards, maps) {
 }
 
 /** The rows whose slot-4 catch is a Cardmon party (all 46 today). */
-export function cardmonStages(rows) {
+export function cardmonStages(rows: AlmanacEntry[] | undefined): AlmanacEntry[] {
     return (rows ?? []).filter((row) => String(row?.cardmon?.species ?? "").includes("Cardmon"));
 }
 

@@ -16,7 +16,7 @@ function _smartApply(base, p) {
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2]!, 0, fwd[0]]);
     const up = [right[1]! * fwd[2]! - right[2]! * fwd[1]!, right[2]! * fwd[0]! - right[0]! * fwd[2]!, right[0]! * fwd[1]! - right[1]! * fwd[0]!];
     const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * scale;
-    const scr = (p) => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
+    const scr = (p: number[]) => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
     let near = Infinity, feet = Infinity, off = 0, corners = 0;
     const boxes = new Uint8Array(GW * GH);
     for (const f of fs) {

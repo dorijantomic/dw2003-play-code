@@ -39,7 +39,7 @@ export function wrapByWidth(text: string, widthOf, maxW: number) {
 export const BAND_TEXT_W = 280;
 
 /** `text` as at most `n` lines of `maxW` px (the help box has two): wrapped, and only if it still needs more is the last line cut. */
-export function wrapToLines(text: string, widthOf, maxW: number, n = 2) {
+export function wrapToLines(text: string, widthOf: (text: string) => number, maxW: number, n = 2) {
     const lines = wrapByWidth(text, widthOf, maxW);
     if (lines.length <= n) return lines;
     return [...lines.slice(0, n - 1), fitByWidth(lines.slice(n - 1).join(" "), widthOf, maxW)];

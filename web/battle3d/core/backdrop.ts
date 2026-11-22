@@ -7,6 +7,20 @@ import type { ArenaGroupBuf, Battle3DContext } from "../../types/battle3d.js";
 
 import type { ArenaPack } from "../../types/battle3d.js";
 import type { Battle3dTexturePage } from "./types.js";
+interface TexturePatchSourceRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+
+interface TexturePatchEntry {
+  dst: { x: number; y: number };
+  sources: TexturePatchSourceRect[];
+  frame?: number;
+}
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeBackdrop(B$: Battle3DContext) {
 function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
@@ -238,7 +252,7 @@ function patchState(side: string) {
   // its destination — the walker's stand-in for the original's per-frame VRAM copy.
   // Nothing is uploaded unless the chosen picture actually changed, which is also how
   // the original behaves: it caches the last variant per entry.
-  function blitTexturePatch(tex: WebGLTexture | null, page: Battle3dTexturePage | null, entry) {
+  function blitTexturePatch(tex: WebGLTexture | null, page: Battle3dTexturePage | null, entry: TexturePatchEntry) {
     if (!tex || !page) return false;
     const r = texturePatchRect(entry, page.scale);
     if (r.w <= 0 || r.h <= 0 || r.x0 + r.w > page.width || r.y0 + r.h > page.height) return false;

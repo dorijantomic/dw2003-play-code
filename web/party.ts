@@ -1,4 +1,8 @@
 import { ELEMENT_KEYS, elementValue, elementValues } from "./vendor/engine.js";
+interface ElementProfile {
+  resistances: Record<string, number | undefined>;
+}
+
 
 /** The six core stats, in the original's own order. */
 const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];
@@ -118,7 +122,7 @@ export function elementPointsWithGear(elemBonuses, elemResists) {
   return points;
 }
 
-export function elementValueWithGear(profile, elemBonuses, elemResists, element: string) {
+export function elementValueWithGear(profile: ElementProfile, elemBonuses: Record<string, number | undefined> | null | undefined, elemResists: Record<string, number | undefined>, element: string) {
   return elementValue(profile, elementPointsWithGear(elemBonuses, elemResists), element);
 }
 

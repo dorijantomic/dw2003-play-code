@@ -20,7 +20,7 @@ function clearLine(grid: { cell: number; cols: number; rows: number; cells: numb
     return true;
 }
 // a closed loop of 3-5 waypoints around a start point, every leg on walkable ground
-function makeLoop(grid: { cell: number; cols: number; rows: number; cells: number[]; }, start, rand: () => number) {
+function makeLoop(grid: { cell: number; cols: number; rows: number; cells: number[]; }, start, rand: () => number): number[][] | null {
     for (let attempt = 0; attempt < 30; attempt++) {
         const pts = [start], n = 3 + ((rand() * 3) | 0);
         let ok = true;

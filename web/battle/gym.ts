@@ -1,6 +1,23 @@
 import { RAND_U16 } from "../vendor/engine.js";
 import { CORE_STATS } from "./progress.js";
 import type { DigimonRecord } from "../types/battle.js";
+type GymElemDigimon = DigimonRecord & {
+  elemCur?: Record<string, number>;
+  elemGrowth?: Record<string, number>;
+};
+
+
+interface GymTrainingEffect {
+  stat: string;
+  delta: number;
+}
+
+
+interface GymTrainingResult {
+  tpCost: number;
+  effects: GymTrainingEffect[];
+}
+
 interface GymRecord {
   tp_costs: number[];
 }
@@ -39,7 +56,7 @@ export function gymStatForId(id: number) {
 //   tpChoice   = 0/1/2 (TP 1 / TP 5 / TP10), ultra = "Ultra Training Chance" challenge won
 //   dig        = { elemGrowth: {fire:1..5,...}, elemCur: {fire:0..999,...} } for brackets
 // Returns { tpCost, effects: [{ stat, delta }] } (negative delta = loss; "maxHp"/"maxMp").
-export function gymTrainingResult(drillEntry, tpChoice, ultra: boolean, dig, gym, rng = RAND_U16) {
+export function gymTrainingResult(drillEntry, tpChoice: number, ultra: boolean, dig: GymElemDigimon, gym, rng = RAND_U16): GymTrainingResult {
   const roll = ([base, range]) => base + (range ? rng()! % range : 0);
   const superDrill = drillEntry.drill >= 13;
   const variant = !ultra ? 0 : superDrill ? 2 : 1; // elem/hpmp row variant

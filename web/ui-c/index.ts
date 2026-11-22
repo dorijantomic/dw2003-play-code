@@ -165,7 +165,7 @@ export function scope(key, ctx, opts, fn: () => void) {
     return true;
 }
 
-export const hide = (key) => { layers.hide(key); reports.delete(key); };
+export const hide = (key: string) => { layers.hide(key); reports.delete(key); };
 
 /** The battle covers the whole field this frame (on) or not (off): see the header. Takes the field-level layers away at once. */
 export function cover(on: boolean) {

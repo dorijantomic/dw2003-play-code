@@ -100,7 +100,7 @@ export const heldIn = (bag, id) => (Array.isArray(bag) ? bag : []).reduce((t, s)
 /**
  * One item's page: { id, name, count, does, where }. `info(id)` = { name, desc } from the game's item table.
  */
-export function itemPage(data, id, { info, held = 0, log }) {
+export function itemPage(data: Parameters<typeof whereLines>[0], id: Parameters<typeof whereLines>[1], { info, held = 0, log }: { info?: (id: Parameters<typeof whereLines>[1]) => { name?: string; desc?: string } | null | undefined; held?: number; log: Parameters<typeof whereLines>[2] }): { id: Parameters<typeof whereLines>[1]; name: string; count: number; does: string; where: { kind: string; text: string; right?: string }[] } {
     const i = info?.(id) ?? null;
     return { id, name: i?.name || `Item ${id}`, count: held, does: String(i?.desc ?? ""), where: data ? whereLines(data, id, log) : [] };
 }

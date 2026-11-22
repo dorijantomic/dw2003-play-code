@@ -48,6 +48,18 @@ import {
 import { effectLayer } from "../../fight/effect-player.js";
 import { drawUnderEffects } from "../../fight/effect-under-gl.js";
 import type { BackdropPack, Battle3DContext } from "../../types/battle3d.js";
+interface AdvanceClip {
+  present?: boolean;
+  start_frame: number;
+  end_frame: number;
+}
+
+
+interface AdvanceModel {
+  clips?: AdvanceClip[];
+  total_frames?: number;
+}
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeRender(B$: Battle3DContext) {
@@ -121,7 +133,7 @@ function render(dt) {
       return f;
     }
 
-    function advanceFrame(frame, dt, model, animName) {
+    function advanceFrame(frame: number, dt: number, model: AdvanceModel | undefined, animName: string): number {
       if (!model || !model.clips) return (frame + dt * 60) % (model?.total_frames || 200);
       const clipIdx = CLIP_NAMES[animName] ?? 0;
       const clip = model.clips[clipIdx];

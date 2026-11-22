@@ -12,6 +12,8 @@ import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount,
 import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 import type { MpRosterRow, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
+interface MpLeaguePair { a: string; b: string; r: number; m: number; }
+
 interface MpLeagueMatch {
   a: string;
   b: string;
@@ -390,7 +392,7 @@ export function coopTry(foes, label, start, screens?: any) {
     return true;
 }
 
-function askParty(id) {
+function askParty(id: number) {
     if (partner != null) { note("You are already teamed up. Leave your party first."); return; }
     const p = peerOf(id); if (!p) return;
     if (p.away) { note(`${p.name} is away.`); return; }
@@ -535,7 +537,7 @@ const LEAGUE_NO = {
 };
 
 const lgName = (id) => (id === myId() ? myName() : (peerOf(id)?.name ?? `Tamer ${id}`));
-const matchOf = (pair) => (pair ? league?.rounds?.[pair.r]?.[pair.m] ?? null : null);
+const matchOf = (pair: MpLeaguePair | null): MpLeagueMatch | null => (pair ? league?.rounds?.[pair.r]?.[pair.m] ?? null : null);
 const leagueScore = (m, id) => (m?.g ?? []).filter((g) => g === id).length;
 /** The room's champion from its own bracket; null until the final is won, or with the switch off. */
 const champId = () => (serverChampOn() && league ? league.champ : null);

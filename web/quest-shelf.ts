@@ -122,7 +122,7 @@ export function diffSnapshots(a, b): DiffSnapshotsResult {
  * empty, already on the shelf, or the snapshot has a shape problem (exactly the problem list validateSnapshot gives).
  * The snapshot is copied, so later play cannot change a saved state. `at` defaults to now.
  */
-export function shelfAdd(shelf, name, snap, at = Date.now()) {
+export function shelfAdd(shelf: QuestShelfItem[] | null | undefined, name: string, snap, at = Date.now()): { shelf: QuestShelfItem[]; problems: string[] } {
     const items = listOf(shelf);
     if (!isName(name)) return { shelf: items, problems: ["the name is empty"] };
     const clean = name.trim();

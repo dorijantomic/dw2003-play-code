@@ -16,6 +16,8 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 import type { UiRect } from "./types.js";
+import type { UiPart, UiRun, UiMatrix } from "./types.js";
+
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
 const lbl = (key: string, str: string | undefined, rect: UiRect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
@@ -76,7 +78,7 @@ export function composeFooter(foot, runs, used: Set<unknown>, out) {
  * The item detail line (C3): a full-width band 58 dp tall centred on the game's clip, dividers at 206 / 624 / 846 dp; the item name in
  * Russo 22, the cell labels ("Equip", "Items") dim 18, their numbers Chakra Petch 700 26 right-anchored. The item icon stays art.
  */
-export function composeDetail(p, runs, used: Set<unknown>, out) {
+export function composeDetail(p, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p), h = N(58), y = r.y + (r.h - h) / 2;
     out.push({ key: "detail.band", kind: "band", part: "detail", layer: "under", rect: applyRel({ x: 0, y, w: 320, h }, rel), edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const [k, d] of [[1, 206], [2, 624], [3, 846]]) out.push(solid(`detail.div${k}`, applyRel({ x: dx(d!), y: y + N(4), w: N(4), h: h - N(8) }, rel), "var(--c-under)", rel));

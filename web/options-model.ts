@@ -10,6 +10,37 @@ import { DETAIL_OFF_LOW, DETAIL_OFF_MEDIUM } from "./detail-presets.js";
 import { shipClass } from "./ship-list.js";
 import type { AmbienceSettings } from "./types/ambience.js";
 import type { OptionsHome } from "./types/options-model.js";
+interface OptionsViewSource extends OptionsRow {
+    numeric?: boolean;
+    customLabel?: () => string;
+}
+
+
+interface OptionsViewEntry {
+    id: string;
+    label: string;
+    numeric: boolean;
+    help: string;
+    menu: boolean;
+    locked: boolean;
+    value: string;
+    custom: boolean;
+    canLeft: boolean;
+    canRight: boolean;
+}
+
+interface OptionsRow {
+  id: string;
+  label: string;
+  help: string;
+  choices: string[];
+  read: (store: OptionsHome) => number;
+  write: (store: OptionsHome, value: number) => void;
+  keys?: string[];
+  back?: boolean;
+  menu?: string;
+}
+
 
 // ---------------------------------------------------------------- key homes
 /** The 35 effect keys the one Detail choice sets (web/ambience.js groups Terrain, Weather, Atmosphere, Life, Ground, Screen). */
@@ -187,7 +218,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
             id: "detail", label: "Detail", choices: DETAIL_LABELS,
             help: "Small map effects. Original = exactly like the PlayStation game.",
             read: (s: { get: (arg0: string) => boolean; }) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
-            write: (s, i: string | number) => applyDetail(s, DETAIL_LEVELS[i]),
+            write: (s: { setMany: (values: { encounterdial: boolean; encounterDialMode: string }) => void }, i: string | number) => applyDetail(s, DETAIL_LEVELS[i]),
         },
         timeOfDay: valueRow("timeOfDay", "Time of day", "Keep the map at one time of day, or let it change by itself.", "todMode", TODS, ["Auto", "Day", "Golden", "Dusk", "Night"]),
         weather: valueRow("weather", "Weather", "Random weather, weather all the time, storms only, or clear skies.", "weatherMode", WEATHERS, ["Random", "Always", "Storms", "Clear"]),
@@ -230,7 +261,7 @@ export function createOptionsModel(store, pixelFilters) {
     let page = 0, row = 0, top = 0, open: null | { index: number; cat: number; } | null = null;          // open = the EFFECTS category that is showing its switches, or null
     const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
     const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page]!.rows.map((id) => rows[id]));
-    const here = () => pageRows()[row];
+    const here = (): OptionsRow => pageRows()[row];
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };
     const close = () => { const c = open; open = null; row = c.cat; top = 0; };
     const toggleHere = () => { const r = here(); if (lockedRow(r)) return null; const i = r.read(store); r.write(store, i === 1 ? 0 : 1); return "change"; };
@@ -243,7 +274,7 @@ export function createOptionsModel(store, pixelFilters) {
         scroll: () => ({ above: top > 0, below: top + LIST_ROWS < pageRows().length }),
         /** What the list shows now: label, current value text, and flags, for each row on screen (at most LIST_ROWS). */
         view() {
-            return pageRows().slice(top, top + LIST_ROWS).map((r) => {
+            return pageRows().slice(top, top + LIST_ROWS).map((r): OptionsViewEntry => {
                 const i = r.read(store);
                 const locked = lockedRow(r), fixed = r.menu || r.back || locked;
                 return {

@@ -76,7 +76,7 @@ function vramHalf(vram, x: number, y: number) {
     return image.pixels[i] | (image.pixels[i + 1] << 8);
 }
 
-export function createGymPrimPainter(getVram): GymPrimPainter {
+export function createGymPrimPainter(getVram: () => GymVram | null): GymPrimPainter {
     let tpage = 0;
     const stats = { sprites: 0, quads: 0, pixels: 0, skipped: 0 };
 

@@ -1,3 +1,16 @@
+interface ReplayEvent {
+  id: number;
+}
+
+
+interface ReplayRow {
+  mapId: string;
+  stage: string;
+  eventId: number;
+  firstSay: string;
+  playable: boolean;
+  elsewhere: boolean;
+}
 // web/replay-theatre.js — the story scenes of the room you are standing in, played back with
 // no writes.
 //
@@ -103,7 +116,7 @@ const firstSayOf = (ev) => (ev?.disasm ?? []).find((line) => typeof line === "st
  *   elsewhere true for a reached room they must walk to (its Play returns false)
  * Rows come in ladder order (the disc's own play order), then by event id.
  */
-export function replayRows(mapId, wstag, ladder, ordinal: number) {
+export function replayRows(mapId, wstag, ladder, ordinal: number): ReplayRow[] {
   const { byStage, names } = ladderParts(ladder);
   const reached = Number(ordinal) || 0;
   const rows = [];

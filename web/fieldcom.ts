@@ -19,7 +19,7 @@ let semiSheets = [null, null];
 let manifest = null;
 let shadowImg = null;
 
-export async function loadFieldcom(loadImage) {
+export async function loadFieldcom(loadImage: (url: string) => Promise<HTMLImageElement>) {
     // The character drop shadow is cut from the same FIELDCOM atlas (sub-entry 2,
     // u=112 v=166) but is addressed through the FIELDSTG texture-slot descriptor,
     // not the sprite directory, so it ships as its own 32x16 image. Non-fatal.

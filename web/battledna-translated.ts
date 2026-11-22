@@ -14,6 +14,106 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter, battleMenuLanguage } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleDnaSeed } from "./types/battledna-translated.js";
+interface DnaHandoff {
+  [key: string]: string | number | boolean;
+}
+
+
+interface DnaPartyStatus {
+  [key: string]: string | number | boolean;
+}
+
+
+interface DnaListDiagnostics {
+  rows: string[];
+  selection: number;
+  candidates: string[];
+  panels: string[];
+  ready: boolean;
+  chosen: number;
+}
+
+
+interface DnaPartyMember {
+  slot: number;
+  [key: string]: string | number | boolean;
+}
+
+
+interface DnaPaneDiagnostics {
+  subState: string;
+  ready: boolean;
+  species: string;
+  stripCursor: number;
+  previewOption: number;
+  optionRow: number;
+  selected: number;
+  dnaId: number;
+  price: number;
+  combatant: string;
+  handoffs: DnaHandoff[];
+  preview: string;
+  sounds: string[];
+  tasks: number;
+  vsync: boolean;
+  party: DnaPartyMember[];
+}
+
+
+interface DnaPane {
+  subState: () => string;
+  ready: () => boolean;
+  species: () => string;
+  stripCursor: () => number;
+  previewOption: () => number;
+  optionRow: () => number;
+  selected: () => number;
+  dnaId: () => number;
+  price: () => number;
+  combatant: () => string;
+  handoffs: DnaHandoff[];
+  preview: () => string;
+  sounds: string[];
+  tree: { tasks: { size: number } };
+  vsyncInstalled: () => boolean;
+  partyStatus: (slot: number) => DnaPartyStatus;
+}
+
+
+interface DnaList {
+  rows: () => string[];
+  selection: () => number;
+  candidates: () => string[];
+  panels: () => string[];
+  ready: () => boolean;
+  chosen: () => number;
+}
+
+
+interface DnaSession {
+  pane?: DnaPane | null;
+  list?: DnaList | null;
+  step: () => string;
+}
+
+
+interface DnaDiagnosticsSource {
+  _session?: DnaSession | null;
+  _answer: number;
+  _species: string;
+  _ticks: number;
+}
+
+
+interface DnaDiagnosticsResult {
+  step: string | null;
+  answer: number;
+  speciesOut: string;
+  ticks: number;
+  list: DnaListDiagnostics | null;
+  pane: DnaPaneDiagnostics | null;
+}
+
 
 // The chrome is 0x00455000 (PGFGTC00, disc 1109). The original builds the
 // handle with `lui $a0, 0x455` (fightstg.s:21516).
@@ -100,7 +200,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
         // The banks are cut per language, so the language is settled before the
         // data is asked for and the screen's own copy is what start() uses.
         beforeLoad: (r) => { r._language = battleMenuLanguage(options, "Battle DNA language index is invalid"); },
-        load: (r) => loadData(r._language),
+        load: (r: { _language: number }): Promise<void> => loadData(r._language),
         loadFailure: "battle DNA data failed to load",
         failureMessage: "translated DNA screen failed",
         failureConsole: "Translated battle DNA screen failed",
@@ -195,7 +295,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
             r.tables = () => (r._data ? { profiles: r._data.profiles, techniques: r._data.techniques } : null);
         },
 
-        diagnostics: (r) => {
+        diagnostics: (r: DnaDiagnosticsSource): DnaDiagnosticsResult => {
             const pane = r._session?.pane ?? null;
             const list = r._session?.list ?? null;
             return {

@@ -106,9 +106,9 @@ function rgbHex([r, g, b]) {
 function recordStore() {
     const half = new Map();
     const mem = {
-        read8(addr) { return (mem.read16(addr) & 0xff) | 0; },
+        read8(addr: number) { return (mem.read16(addr) & 0xff) | 0; },
         read16(addr) { return half.get(addr & ~1) | 0; },
-        read32(addr) { return (mem.read16(addr) | (mem.read16(addr + 2) << 16)) | 0; },
+        read32(addr: number) { return (mem.read16(addr) | (mem.read16(addr + 2) << 16)) | 0; },
         write16(addr, value: number) { half.set(addr & ~1, value & 0xffff); },
         write32(addr, value) { mem.write16(addr, value & 0xffff); mem.write16(addr + 2, (value >>> 16) & 0xffff); },
     };
@@ -453,7 +453,7 @@ export function battleHudPlateLabels({
             calls.push(["create", target | 0, kind | 0, x | 0, y | 0]);
             return element;
         },
-        callMethod(element, slot, args) { calls.push(["method", element | 0, slot, ...args.map((a) => a | 0)]); },
+        callMethod(element: number, slot: number, args: number[]) { calls.push(["method", element | 0, slot, ...args.map((a) => a | 0)]); },
         tick: () => 0,
         gaugeSlotIndex: () => 0,
         // [0x80044f4c] is handed the language base plus the family offset, exactly as

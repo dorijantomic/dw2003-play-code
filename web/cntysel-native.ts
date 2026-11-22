@@ -6,12 +6,14 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintScreenDim } from "./screendim.js";
 import * as uiC from "./ui-c/index.js";
 import { composeLanguage } from "./ui-c/screens.js";
+interface CountryScreenData { schema: number; dataBase: number; bytes: number[]; }
+
 const { CountryScreen, MenuPadWords, MenuDisplayClock, createTaskState, setState0, countryScreenStartupTick } = ui;
 
 export const CNTYSEL_ROOT_CB = 0x80083d18;
 export const LANGUAGE_GLOBAL = 0x8005cca8;
 let dataPromise;
-function screenData() {
+function screenData(): Promise<CountryScreenData> {
     return dataPromise ??= fetch("assets/data/country_screen.json")
         .then(r => {
             if (!r.ok) throw new Error(`Language screen data: HTTP ${r.status}`);

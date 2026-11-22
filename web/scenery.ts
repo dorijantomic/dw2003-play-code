@@ -148,7 +148,7 @@ function build(S) {
         ? scatter(S, 340, (R: number, G: number, B: number) => R > 170 && G > 195 && B > 210).map(([x, y]) => ({ x, y, ph: r(), sp: 0.25 + r() * 0.5 })) : [];
     sc.puddlesDone = false; sc.iceDone = false;
 }
-function buildPuddles(S, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
+function buildPuddles(S: GroundSceneryState, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
     sc.puddlesDone = true;
     const r = sc.rand;
     const walk = (x: number, y: number) => {
@@ -395,7 +395,7 @@ function groundType(S, f: { y: number; x: number; }, puddle, inWater) {
     return "stone";
 }
 
-function buildIce(S, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
+function buildIce(S: GroundSceneryState, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
     sc.iceDone = true;
     const r = sc.rand;
     const walk = (x: number, y: number) => {

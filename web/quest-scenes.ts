@@ -229,7 +229,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const settings = opts.fx ?? (typeof window !== "undefined" ? window.__fx : null);
     opcodes.push(`FN6A 1 ${playerId}`);                       // the camera starts on the player, as in the story scenes
     // One walk to a point: a clear line is one WALKTO, a blocked one is routed into legs (see the walk step below)
-    const emitWalk = (who, to, f: string | number | null) => {
+    const emitWalk = (who: string | number, to: (number | string)[], f: string | number | null) => {
         const from = walkStart(idOf(who));
         const legs = from && opts.walk ? opts.walk(from.x, from.y, num(to[0]), num(to[1])) : null;
         const routed = legs && legs.length && (legs.length > 1 || legs[0]![0] !== num(to[0]) || legs[0]![1] !== num(to[1]));

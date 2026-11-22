@@ -5,6 +5,34 @@ import { drawFieldShadow } from "../fieldcom.js";
 import { walkBlendNext } from "../walk-blend.js";
 import { _DIR_FALLBACK, battle, ctx, lastCam, state } from "./vars.js";
 import { S } from "./state.js";
+type SpriteClipId = string | number;
+
+
+interface SpriteClipFrame {
+    col: number;
+    mirror?: boolean;
+    bottom?: number;
+}
+
+
+interface SpriteClip {
+    frames: readonly SpriteClipFrame[];
+    fps?: number;
+}
+
+
+interface SpriteMeta {
+    clips: Record<string, SpriteClip>;
+}
+
+
+interface EntitySpriteDrawResult {
+    mode: "run" | "walk" | "clip" | "idle" | "static";
+    clipId: SpriteClipId | null;
+    frame: number | undefined;
+    dir: number;
+}
+
 
 function drawSprite(meta, sheet, x, y, dir, frameIdx) {
     let row = meta.rows.indexOf(dir);
@@ -180,7 +208,7 @@ export function drawEntitySprite(meta, sheet, clipImg: HTMLImageElement | undefi
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
 }
 
-function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null, walkBlend: WalkBlend = false) {
+function _drawEntitySpriteRaw(meta: SpriteMeta, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, dir: number, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip = null, walkBlend: WalkBlend = false): EntitySpriteDrawResult {
     // walkBlend: false = off, else the seconds already elapsed inside the current field tick (walk-blend.js).
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));

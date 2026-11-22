@@ -8,6 +8,8 @@ import { applyRel, dx, dy } from "./geometry.js";
 import { clipRect, runText, restOfRuns } from "./generic.js";
 import type { UiPart, UiRect, UiRingOpts, UiStage, UiTextOpts } from "./types.js";
 import { N, ID, textPart, plate, rowPlate, chip, corners, messageBand, bandLine, HUD, keyBox, rowChevron, ringFrame, hudBar, PAGE_KEY, ringPart, ringTexts, dockPart, popPart, turnNode, triangle } from "./base.js";
+import type { UiRun } from "./types.js";
+
 
 /**
  * C8 sizes (native). Plates: the name slab 7 / 11 in and 5 down (132 / 196 dp wide, 13 tall), the bar track 21 down (132 / 133 x 8).
@@ -174,7 +176,7 @@ export function joinNumbers(list) {
     return out;
 }
 /** Runs inside a box that are not row labels: numbers stay numbers (amber), small labels dim, as generic.runText does. */
-const boxRuns = (key: string, list, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out: UiPart[], on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
+const boxRuns = (key: string, list: UiRun[], rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out: UiPart[], on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
 
 /**
  * The battle screen. `cfg.view` = the close-up's window (native, BATTLE_UI_LAYOUT.portraitView): the bezel leaves it open.

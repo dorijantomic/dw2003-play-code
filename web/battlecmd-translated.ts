@@ -21,6 +21,66 @@ import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import type { BattleCommandSeed } from "./types/battlecmd-translated.js";
 import type { PlayerRecord, EnemyBattleRecord } from "./types/battle.js";
+interface BattleCommandDiagRecord {
+  _row: number;
+  _presses: number;
+  _ticks: number;
+  _session?: BattleCommandDiagSession;
+}
+
+interface BattleCommandDiagSession {
+  selection(): BattleCommandSelection;
+  ready(): boolean;
+  joke(): BattleCommandJoke;
+  tree: { tasks: { size: number } };
+  vsyncInstalled(): boolean;
+  moves: BattleCommandMove[];
+}
+
+interface BattleCommandSelection {
+  index: number;
+}
+
+interface BattleCommandJoke {
+  id: number;
+}
+
+interface BattleCommandMove {
+  id: number;
+}
+
+interface BattleCommandDiagnostics {
+  row: number;
+  presses: number;
+  ticks: number;
+  selection: BattleCommandSelection | null;
+  ready: boolean;
+  joke: BattleCommandJoke | null;
+  tasks: number;
+  vsync: boolean;
+  moves: BattleCommandMove[];
+}
+
+interface BattleCommandRecord {
+    _seed: BattleCommandSeed;
+    _row: number;
+    _pulseTicks: number;
+}
+
+
+interface FightCommandData {
+    tables: number[][];
+    font: CanvasImageSource;
+    banks: Int16Array[];
+    cursorGlyphs?: CanvasImageSource;
+}
+
+
+interface FightCommandSession {
+    update(dt: number): void;
+    draw(): void;
+}
+
 
 /** The row picture pack: handle 0x04550000 is disc index 1109, PGFGTC00. */
 const PACKS = { 1109: "pgfgc00" };
@@ -91,7 +151,7 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
 
         onOpen: (r: { _pulseTicks: number; }) => { r._pulseTicks = 0; },
 
-        start: (r, data, language, playSound) => {
+        start: (r: BattleCommandRecord, data: FightCommandData, language: string, playSound: (soundId: number) => void): FightCommandSession => {
             const joke = r._seed.jokeIndices;
             return new ui.FightCommandSession(language, {
                 // The joke owner always opens on its first row (F0x8009AB74 stores 0).
@@ -117,7 +177,7 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
             return { value: r._chosen };
         },
 
-        diagnostics: (r) => ({
+        diagnostics: (r: BattleCommandDiagRecord): BattleCommandDiagnostics => ({
             row: r._row,
             presses: r._presses,
             ticks: r._ticks,

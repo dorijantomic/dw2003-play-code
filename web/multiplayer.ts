@@ -24,7 +24,13 @@ import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
 import { pickRules } from "./host-rules.js";
 import type { GameState } from "./game/types.js";
-import type { MultiplayerUi, MpListener, MpTimer } from "./types/multiplayer.js";          // the host's battle settings every guest plays by
+import type { MultiplayerUi, MpListener, MpTimer } from "./types/multiplayer.js";
+interface GhostLabelInfo {
+    name: string;
+    emote: string;
+    emoteIx: number | null;
+}
+          // the host's battle settings every guest plays by
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
@@ -408,7 +414,7 @@ export function multiplayerSelf() {
 }
 
 /** Name tag, emote and speech bubble over a player; (sx, headY) is the point just above the head on the canvas (the game's balloon anchor). */
-export function drawGhostLabel(ctx, g, sx, headY) {
+export function drawGhostLabel(ctx: CanvasRenderingContext2D, g: GhostLabelInfo, sx: number, headY: number) {
     ctx.save();
     ctx.font = "bold 8px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     const w = Math.ceil(ctx.measureText(g.name).width) + 6, y = headY - 1;

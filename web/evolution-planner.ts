@@ -1,3 +1,49 @@
+interface EvolutionReqProgress {
+  id: number;
+  name: string;
+  level: number;
+  have: number;
+  met: boolean;
+  text: string;
+}
+
+
+interface EvolutionGateProgress {
+  kind: number;
+  label?: string | null;
+  threshold: number;
+  have: number | null;
+  met: boolean;
+  text: string;
+}
+
+
+interface EvolutionProgress {
+  reqs: EvolutionReqProgress[];
+  gate: EvolutionGateProgress;
+  unmet: string[];
+  ready: boolean;
+  text: string;
+}
+interface EvolutionRecord {
+  req0?: number;
+  req0Level?: number;
+  req1?: number;
+  req1Level?: number;
+  [key: string]: number | undefined;
+}
+
+interface EvolutionStats {
+  stats: Record<string, number>;
+  bonuses: Record<string, number>;
+  elemBonuses: Record<string, number>;
+}
+
+interface EvolutionLive {
+  formLevels: Record<number, number>;
+  level: number;
+  stats: EvolutionStats;
+}
 // web/evolution-planner.js — the forms a partner can still learn, and exactly what
 // each one is waiting for.
 //
@@ -121,7 +167,7 @@ export function requirementText(record, profiles) {
  * `live` = { formLevels, level, stats }: the member's ledger, battle level and the
  * stored-stat record the battle reads (stats.stats / stats.bonuses / stats.elemBonuses).
  */
-export function readyNow(record, live) {
+export function readyNow(record: EvolutionRecord | undefined, live: EvolutionLive | undefined) {
   for (const [idKey, levelKey] of [["req0", "req0Level"], ["req1", "req1Level"]]) {
     const id = Number(record?.[idKey] ?? 0);
     if (!id) continue;
@@ -144,7 +190,7 @@ export function requirementProgress(record, live, profiles) {
   return progressFor(record, live, namesOf(profiles));
 }
 
-function progressFor(record, live, nameOf) {
+function progressFor(record, live, nameOf): EvolutionProgress {
   const base = requirementsFor(record, nameOf);
   const reqs = base.reqs.map((req) => {
     const raw = formLevelOf(live?.formLevels, req.id);
@@ -413,7 +459,7 @@ function drawPage(ctx, W: number, H: number, message: string) {
  * Draw the page over the whole view (640x480 in the game). Returns false when the page
  * is closed; closed, it makes no canvas call at all.
  */
-export function plannerDraw(ctx, W = 640, H = 480) {
+export function plannerDraw(ctx: CanvasRenderingContext2D, W = 640, H = 480) {
   if (!S.open) return false;
   if (S.error) {
     drawPage(ctx, W, H, `The evolution tables could not be read: ${S.error}`);

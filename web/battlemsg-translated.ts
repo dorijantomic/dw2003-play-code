@@ -21,6 +21,8 @@ import { packReady } from "./screenpack.js";
 import { drawClip } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
 import type { BattleMsgBankFile } from "./types/battlemsg-translated.js";
+interface BattleMsgBankData { strings?: (string | number)[] }
+
 type BattleMsgScreenPack = Parameters<typeof packReady>[0];
 
 interface BattleMsgPaintPrompt {
@@ -89,7 +91,7 @@ const BANK_FILES: Record<number, BattleMsgBankFile> = {
 
 const loadedBanks = Object.create(null);
 
-function bankTable(data) {
+function bankTable(data: BattleMsgBankData | null | undefined): Readonly<Record<number, string>> {
     const table = Object.create(null);
     (data?.strings ?? []).forEach((text, index: string | number) => { table[index] = String(text); });
     return Object.freeze(table);

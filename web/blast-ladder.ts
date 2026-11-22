@@ -262,7 +262,7 @@ function drawMessage(ctx, W: number, H: number, message: string) {
  * card also reads correctly in a smaller test canvas. Returns false when the page
  * is closed — with the F2 switch off this draws nothing at all.
  */
-export function blastDraw(ctx, page = null, W = 640, H = 480) {
+export function blastDraw(ctx: CanvasRenderingContext2D, page = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (!S.cards.length) {
     drawMessage(ctx, W, H, S.error ? `The ladder could not be read: ${S.error}` : "Reading the partner table…");

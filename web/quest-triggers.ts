@@ -38,7 +38,7 @@ export const TRIGGER_STATUSES = ["available", "active", "ready", "done"];
 import type { QuestSnapshot } from "./types/quest-shelf.js";
 import type { QuestTriggerContext } from "./types/quest-triggers.js";
 const inRect = (r, x: number, y: number) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
-const read = (v) => (typeof v === "function" ? v() : v);
+const read = (v): QuestSnapshot => (typeof v === "function" ? v() : v);
 
 /**
  * The pure decision: which trigger (if any) the player just walked into. No side effects, no game and no DOM: the caller

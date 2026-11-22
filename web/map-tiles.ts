@@ -1,3 +1,10 @@
+interface MapTileEntry {
+  map: string;
+  bmp: ImageBitmap | null;
+  state: "queued" | "loading" | "ready" | "error";
+  split: Record<string, ImageBitmap>;
+  used: number;
+}
 // HD Remaster field maps drawn from tiles (always on in HD; game.js HD_MAPS).
 //
 // A whole HD map is up to 7680x5632 (90 MB PNG, 176 MB decoded) and the game used to load it, its
@@ -123,7 +130,7 @@ export class TiledMap {
 
   url(c: number, r: number) { return `assets-hd/map-tiles/${this.name}/${c}_${r}.webp`; }
 
-  entry(c: number, r: number, want: boolean) {
+  entry(c: number, r: number, want: boolean): MapTileEntry {
     const key = `${this.name}/${c}_${r}`;
     let e = cache.get(key);
     if (!e) {

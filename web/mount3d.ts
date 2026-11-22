@@ -12,6 +12,12 @@
 //
 // Nothing here reads game state: mount.js owns the riding rules.
 import * as THREE from "./lib3d/three.module.js";
+interface PoseBoundsMesh { min: number[]; max: number[]; }
+
+interface PoseBoundsModel { nodes: GltfNode[]; meshes: PoseBoundsMesh[]; }
+
+interface PoseBoundsResult { min?: number[]; max?: number[]; center?: number[]; size?: number[]; }
+
 interface MountPose {
   model?: Dw2Model;
   t: Float32Array;
@@ -370,7 +376,7 @@ const point = (m, x, y, z) => [
 ];
 
 /** World-space AABB of a pose (each mesh's local box through its node's world matrix). */
-export function poseBounds(model, pose, out: { min?: number[]; max?: number[]; center?: number[]; size?: number[] } = {}) {
+export function poseBounds(model: PoseBoundsModel, pose: MountPose, out: { min?: number[]; max?: number[]; center?: number[]; size?: number[] } = {}) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   model.nodes.forEach((node, i) => {
     if (node.mesh == null) return;

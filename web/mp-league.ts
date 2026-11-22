@@ -26,6 +26,8 @@
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
 import type { MpLeagueState } from "./types/mp-league.js";
+interface MatchScoreMatch { a: string; b: string; w?: string | null; g?: string[]; }
+
 interface MpLeaguePackExtra {
     ids: string[];
     dropped: string[];
@@ -223,7 +225,7 @@ export function report(lg, winner, games): MpReportResult {
  * "1-2"). The relay puts this in its result message and the dock prints it after the winner's name; both read it
  * here so the two can never disagree again.
  */
-export function matchScore(m) {
+export function matchScore(m: MatchScoreMatch | null | undefined) {
     if (!m || m.w == null) return "";
     const games = Array.isArray(m.g) ? m.g : [];
     const lost = m.a === m.w ? m.b : m.a;

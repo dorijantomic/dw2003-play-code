@@ -28,7 +28,7 @@ export function offersAt(defs, npcId, mapId: number, { statusOf = () => "availab
 }
 
 /** The choice rows: each title clipped to `n` characters the way quests.js clip() writes it. */
-export function offerLabels(defs, n = 28) {
+export function offerLabels(defs: { title?: string | number | null }[] | null | undefined, n = 28): string[] {
     return (defs ?? []).map((d) => clipTitle(String(d.title ?? ""), n));
 }
 

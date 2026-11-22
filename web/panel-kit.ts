@@ -1,3 +1,8 @@
+interface PanelClip {
+    semi: number;
+    stp: boolean;
+    layers: number[];
+}
 // web/panel-kit.js -- free-height panels built from the game's own pause-list tiles. Pure: no DOM, no imports.
 //
 // The pause list's row panel is not one picture. cmfont clips 0x1c (five rows), 0x1b (six) and 0x19 (seven) are each a
@@ -59,7 +64,7 @@ export function buildPanelClip(frames, cols: number, bands: number) {
  * Add the clips for 8 to `maxRows` rows to a loaded cmfont `ids` table. Returns how many were added (0 when the sheet has
  * not got the six tiles, in which case nothing changes and the list falls back to the disc's panels).
  */
-export function registerPausePanels(ids, maxRows = 12) {
+export function registerPausePanels(ids: Record<string, number | PanelClip>, maxRows = 12) {
     const frames = tileFrames(ids);
     if (!frames) return 0;
     let added = 0;

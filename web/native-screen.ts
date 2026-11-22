@@ -175,7 +175,7 @@ export function seedNativeScreenParty(seed: NativePartySeed = {}) {
 }
 
 /** Debug: the live objects (addr, callback, alive) the runtime schedules. */
-export function nativeScreenObjects() {
+export function nativeScreenObjects(): { addr: number; cb: number; alive: boolean }[] {
     return (state.current?.rt?.world?.objects ?? []).map((o) => ({ addr: o.addr >>> 0, cb: o.cb >>> 0, alive: o.alive }));
 }
 

@@ -19,7 +19,7 @@ const MAX_PARTNERS = 3;
 const DATA_LABEL = "Naming data";
 
 let sharedPromise = null;
-const loadShared = () => {
+const loadShared = (): Promise<{ tables: Uint8Array; font: Uint8Array }> => {
     sharedPromise ??= Promise.all([fetchBytes("name/tables.bin", DATA_LABEL), loadResidentResources()])
         .then(([tables, { font }]) => ({ tables, font }))
         .catch((error) => { sharedPromise = null; throw error; });

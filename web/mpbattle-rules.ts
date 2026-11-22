@@ -186,7 +186,7 @@ export class Arena {
     }
 
     /** A swap that costs no turn (the forced replacement of a fallen Digimon): only the Blast / fallen checks. */
-    afterFree(res) { this.#afterAction(null, res); return res; }
+    afterFree(res: MpRunResult): MpRunResult { this.#afterAction(null, res); return res; }
 
     // the automatic Blast (a full DV gauge), its countdown, and the fallen Digimon that must be replaced
     #afterAction(actor, res) {

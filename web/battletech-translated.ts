@@ -12,6 +12,21 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import type { BattleTechSeed } from "./types/battletech-translated.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+type BattleMenuSession = NonNullable<BattleMenuAdapterState["_session"]>;
+
+interface BattleTechDiagnostics {
+  ticks: BattleMenuAdapterState["_ticks"];
+  selection: NonNullable<ReturnType<BattleMenuSession["selection"]>> | null;
+  page: NonNullable<ReturnType<BattleMenuSession["page"]>> | null;
+  rows: NonNullable<ReturnType<BattleMenuSession["rows"]>> | null;
+  ready: boolean;
+  tasks: number;
+  vsync: boolean;
+  moves: NonNullable<BattleMenuSession["moves"]>;
+  sounds: NonNullable<BattleMenuSession["sounds"]>;
+}
+
 
 // The row icon is pack handle 0x00286000 (CMFONT, the resident UI glyphs) and
 // the chrome is 0x00455000 (PGFGTC00, disc 1109). The original builds both
@@ -73,7 +88,7 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
             return { value: chosen };
         },
 
-        diagnostics: (r) => ({
+        diagnostics: (r): BattleTechDiagnostics => ({
             ticks: r._ticks,
             selection: r._session?.selection() ?? null,
             page: r._session?.page() ?? null,

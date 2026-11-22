@@ -48,6 +48,41 @@ import { bodyHeight, penetration, clearanceTolerance, rigColliders, poseCollider
 import { sharedShotMode, sharedShotTargets, SHARED_SHOT } from "./anim-collision.js";
 import type { FightAimOffsets, FightChannels, FightGate, FightMetrics, FightPlan, FightSkeleton } from "./types.js";
 import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+interface HeadCastSample {
+  p10?: number;
+  p50?: number;
+  p90?: number;
+}
+
+
+interface HeadCastCell {
+  n?: number;
+  source?: string;
+  headLift?: HeadCastSample;
+  headLiftAboveRelease?: HeadCastSample;
+  tickToPeak?: { p50?: number };
+  holdTicks?: { p50?: number };
+  returnTicks?: { p50?: number };
+}
+
+
+interface HeadScheduleOpts {
+  windup?: number;
+}
+
+
+interface HeadSchedule {
+  lift: number;
+  rise: number;
+  hold: number;
+  fall: number;
+  cell: string | null;
+  n: number | null;
+  p10: number | null;
+  p50: number | null;
+  p90: number | null;
+}
+
 interface SolverPose {
   rot: number[][];
   pos: number[][];
@@ -276,7 +311,7 @@ export function lowestVertex(model, pose) {
  * how many ticks it takes to get there, how long it holds, and how long the return takes. Every number is
  * the cell's own median; the rise may not eat more than 60% of the wind-up and the fall may not run past it.
  */
-export function headScheduleFrom(cell, { windup = 41 } = {}) {
+export function headScheduleFrom(cell: HeadCastCell, { windup = 41 } = {}): HeadSchedule {
   // a cell whose median lift is negative (the small bodies, p50 -5.7 deg) is a head the disc does NOT lift
   // at the median: the solver holds it still rather than pitching it down, which the cell's own p10 allows.
   const lift = clamp(cell?.headLift?.p50 ?? 0, 0, 120);
@@ -1189,7 +1224,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const noise = SOLVER.clearanceNoise * plan.H;
   const propBone = new Set(rigC ? rigC.colliders.map((c, i) => (c.prop ? i : -1)).filter((i) => i >= 0) : []);
   const roleOf = (i) => (rigC ? rigC.colliders[i]?.role : null);
-  const allowed = (i, j) => {
+  const allowed = (i: number, j: number) => {
     // An "extra" collider is a part the K12 bone map does not claim as a role — a back box, a cape, a
     // wing, a decoration. Its capsule fits that shape very loosely and the lead/skeptic exchange already
     // showed the torso/extra pair overlapping in the body's own REST pose (Piedmon −0.177 h). Those pairs

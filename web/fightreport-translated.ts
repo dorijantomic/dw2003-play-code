@@ -256,7 +256,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         start: () => startSession(),
         held: () => r._state?.keys ? [...r._state.keys] : [],
         fail,
-        onFrame: (session) => payout(session),
+        onFrame: (session: FightReportScreen) => payout(session),
     });
 
     // The report is a framebuffer takeover: it fills the whole canvas, at

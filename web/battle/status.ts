@@ -22,6 +22,32 @@ import {
 import { activeSlotOf, effectiveSpd, setStatModifier } from "./plans.js";
 import { RAND_FRAC, battleRestoreTargets } from "./restore.js";
 import type { PostHitDispatchOptions } from "./core/types.js";
+import type { BattleState, BattleResultPage } from "../types/battle.js";
+interface StatusEventExpiry {
+  kind: string;
+  side: number;
+  slot: number;
+  stat?: number;
+  lock?: number;
+  ailment?: string;
+}
+
+interface DamageTermPenalty {
+  str: number;
+  def: number;
+  spd: number;
+}
+
+interface PostHitDispatchResult {
+  dispatch: number;
+  landed: boolean;
+  page?: BattleResultPage | null;
+  slot?: number;
+  amount?: number;
+  queueWord?: number;
+  penalty?: DamageTermPenalty;
+}
+
 
 /**
  * Advance the battle's status-event pool by one action and apply every expiry.
@@ -40,7 +66,7 @@ import type { PostHitDispatchOptions } from "./core/types.js";
  *
  * Exported so the category-5 tests can drive one action without the whole battle loop.
  */
-export function battleStatusEventAdvance(b, playerSpd) {
+export function battleStatusEventAdvance(b: BattleState, playerSpd: number | undefined): StatusEventExpiry[] {
   const pool = b?.statusEvents;
   if (!pool || pool.length !== STATUS_EVENT_POOL_SIZE) return [];
   // The original asks for the delay with the PLAYER side's byte whatever acted
@@ -259,7 +285,7 @@ export function applyCategory5Plan(b: { statusEvents: { code: number; time: numb
  * else `{ dispatch, landed, queueWord, penalty }`. `penalty` is the record's three
  * halfwords after the arm ran.
  */
-export function applyPostHitDispatch(b, record, options: PostHitDispatchOptions = {}) {
+export function applyPostHitDispatch(b: BattleState, record, options: PostHitDispatchOptions = {}): PostHitDispatchResult | null {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch === 13) return applyFleeLockDispatch(b, record, options);
   if (dispatch === 29) return applyMpAbsorbDispatch(b, record, options);

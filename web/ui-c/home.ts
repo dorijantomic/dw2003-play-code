@@ -70,7 +70,7 @@ export function partyCard(i: number, part, namePart, card, out, v = CARD_VARIANT
     }
 }
 
-const composeCard = (i: number, part: { y: number; }, namePart: HomeClip | null, runs: UiRun[], out) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
+const composeCard = (i: number, part: { y: number; }, namePart: HomeClip | null, runs: UiRun[], out: UiPart[]) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
 
 function composeHeader(part: HomeClip, runs: UiRun[], out) {
     const rel = part.rel, ox = part.x - STD.header.x, oy = part.y - STD.header.y, f = at(rel, ox, oy);

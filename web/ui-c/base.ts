@@ -264,7 +264,7 @@ export function ringFrame(key: string, rect, hole, rel, out: UiPart[]) {
     const need = 2 * e + ci + 1.5;
     const hc = Math.max(0, need - hx - hy, need - (W - hx - hw) - (H - hy - hh));
     const f = (n: number) => +n.toFixed(3);
-    const poly = (pts) => `M${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join("L")}Z`;
+    const poly = (pts: readonly (readonly [number, number])[]) => `M${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join("L")}Z`;
     const outer = poly([[c, 0], [W, 0], [W, H - c], [W - c, H], [0, H], [0, c]]);
     const inner = poly([[e + ci, e], [W - e, e], [W - e, H - e - ci], [W - e - ci, H - e], [e, H - e], [e, e + ci]]);
     const win = poly([[hx + hc, hy], [hx + hw, hy], [hx + hw, hy + hh - hc], [hx + hw - hc, hy + hh], [hx, hy + hh], [hx, hy + hc]]);

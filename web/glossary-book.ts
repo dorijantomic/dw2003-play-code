@@ -174,7 +174,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     };
     const cue = (ok) => { if (ok) sfx?.play?.("system02"); return ok; };
     // ---- ITEMS section
-    const plain = (s) => textWidth(s);
+    const plain = (s: string) => textWidth(s);
     const descOf = (text: string) => (text ? wrapToLines(text, plain, ITEMS_LAYOUT.textRight - ITEMS_LAYOUT.textX, MAX_DESC_LINES) : []);
     const itemIds = (it: GlossaryItemEntry): number[] => { try { return it.ids(); } catch { return []; } };
     function actItems(buttons) {

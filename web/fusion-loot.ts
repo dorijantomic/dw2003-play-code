@@ -86,7 +86,7 @@ export function dropChanceText(rate: number, disc = false) {
 }
 
 /** The fused body's loot, with the chance text for the switch that is on right now. */
-export function fusionLootRows(halves, body, enemies: { [k: string]: EnemyRecord; }, disc = false) {
+export function fusionLootRows(halves: string[], body: string, enemies: { [k: string]: EnemyRecord; }, disc = false) {
   return fusionDrops(halves, body, enemies).map(({ item, rate }) => ({
     item,
     rate,

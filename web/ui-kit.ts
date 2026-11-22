@@ -188,7 +188,7 @@ export const LIST_WINDOW = Object.freeze({ clip: 36, x: 168, y: 40, w: 160, pivo
 export const LIST_VALUE_RIGHT = 306;
 
 /** The list window for `rows` rows: the disc's 0x24 panel up to eight rows, the same tiles with more bands above that. */
-export function drawListWindow(ctx, progress, rows: number) {
+export function drawListWindow(ctx: CanvasRenderingContext2D, progress: number, rows: number) {
     withFold(ctx, progress, LIST_WINDOW.pivot[0], LIST_WINDOW.pivot[1], "x", () => {
         if (rows <= LIST_WINDOW.maxRows) drawClip(ctx, cmfont, LIST_WINDOW.clip, LIST_WINDOW.x, LIST_WINDOW.y);
         else drawPanel(ctx, LIST_WINDOW.x, LIST_WINDOW.y, 4, rows - 2);
