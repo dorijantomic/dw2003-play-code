@@ -1,4 +1,4 @@
-import type { WalkBlend } from "./types.js";
+import type { SpriteRecord, WalkBlend } from "./types.js";
 import { questGhostImage } from "../quest-ghost.js";
 import { fieldShadowVisible, FIELD_IDLE_CLIP, clipFrame, FIELD_RUN_CLIP } from "../vendor/engine.js";
 import { drawFieldShadow } from "../fieldcom.js";
@@ -8,33 +8,15 @@ import { S } from "./state.js";
 type SpriteClipId = string | number;
 
 
-interface SpriteClipFrame {
-    col: number;
-    mirror?: boolean;
-    bottom?: number;
-}
-
-
-interface SpriteClip {
-    frames: readonly SpriteClipFrame[];
-    fps?: number;
-}
-
-
-interface SpriteMeta {
-    clips: Record<string, SpriteClip>;
-}
-
-
 interface EntitySpriteDrawResult {
     mode: "run" | "walk" | "clip" | "idle" | "static";
     clipId: SpriteClipId | null;
     frame: number | undefined;
-    dir: number;
+    dir: string;
 }
 
 
-function drawSprite(meta, sheet: HTMLImageElement | undefined, x: number, y: number, dir: number, frameIdx: number | undefined) {
+function drawSprite(meta: SpriteRecord, sheet: HTMLImageElement | undefined, x: number, y: number, dir: string, frameIdx: number | undefined) {
     let row = meta.rows.indexOf(dir);
     if (row === -1) {
         const fallback = _DIR_FALLBACK[dir] ?? "down";
@@ -78,7 +60,7 @@ function drawSprite(meta, sheet: HTMLImageElement | undefined, x: number, y: num
 // X needs nothing: build_assets bakes each frame's registered offset into the sheet
 // (content left = cellW/2 + DC), which also makes the mirrored right-hand rows land on
 // `screenX - (E4 + DC)` for free.
-function spriteBottomShift(meta, dir: number, row, frameIdx: number | undefined) {
+function spriteBottomShift(meta: SpriteRecord, dir: string, row: number, frameIdx: number | undefined) {
     const byDir = meta.frameBottomShift;
     if (!byDir) return 0;
     const shifts = byDir[dir] ?? byDir[meta.rows[row]];
@@ -99,7 +81,7 @@ function spriteBottomShift(meta, dir: number, row, frameIdx: number | undefined)
 // passes 0; the parameter exists because the ground-pin is part of the decoded
 // geometry, and the engine cancels exactly this term (and nothing horizontal) so
 // a lifted actor's shadow stays on the ground while still tracking him across it.
-export function drawActorShadow(x, y, kind, clipId, actorHeightFixed = 0, groundOffsetFixed = 0) {
+export function drawActorShadow(x: number, y: number, kind: number | null, clipId: SpriteClipId | null | undefined, actorHeightFixed = 0, groundOffsetFixed = 0) {
     if (!fieldShadowVisible(kind, clipId)) return;
     drawFieldShadow(ctx, {
         screenX: x - lastCam.x,
@@ -131,7 +113,7 @@ export function drawActorShadow(x, y, kind, clipId, actorHeightFixed = 0, ground
 // `bottom` is the frame's vertical registration (the same shift `spriteBottomShift` applies
 // to the sheet path); the original's Y math has no mirror branch, so it is the same number
 // whichever way the sprite faces.
-function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, alpha = 1) {
+function drawClipFrame(meta: SpriteRecord, clipImg: HTMLImageElement, x: number, y: number, col: number, mirror: boolean, bottom = 0, alpha = 1) {
     const sx = col * meta.clipFrameW;
     const drawY = Math.round(y - lastCam.y - meta.clipFrameH) + bottom;
     // alpha < 1 = the walk blend's fading-in next frame (web/walk-blend.js): same pixels, partial opacity.
@@ -167,7 +149,7 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, al
 // game-wide, see docs/research/field/field-actor-anim-engine.md's clip-directory decode —
 // clip 1 = idle for every checked sprite). Used as the default "just standing there" clip
 // when nothing scripted (SETANIM) is overriding this entity.
-function _idleClipId(meta: SpriteMeta) {
+function _idleClipId(meta: SpriteRecord) {
     return meta.clips && meta.clips[String(FIELD_IDLE_CLIP)]
         ? String(FIELD_IDLE_CLIP)
         : null;
@@ -186,21 +168,21 @@ function _idleClipId(meta: SpriteMeta) {
 // can never show a mode that doesn't match the screen.
 // EXPERIMENT (ambience): the wet / dusty look and the reflection on water are applied here, so every
 // body that goes through this function (leader, partners, NPCs, ambient villagers) gets them.
-export function drawEntitySprite(meta, sheet, clipImg: HTMLImageElement | undefined, x, y, ...rest: SpriteFrameArgs) {
+export function drawEntitySprite(meta: SpriteRecord, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, ...rest: SpriteFrameArgs) {
     const bf = window.__bodyFx;
     if (!bf) return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
     if (bf.reflect) {
         const a = bf.reflect(x, y);
         if (a > 0.02) {
             ctx!.save();
-            ctx!.globalAlpha = a; if (!(window as any).__perfNoFilter) ctx!.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
+            ctx!.globalAlpha = a; if (!window.__perfNoFilter) ctx!.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
             ctx!.translate(0, 2 * (y - lastCam.y + 4)); ctx!.scale(1, -1);
             _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
             ctx!.restore();
         }
     }
     if (bf.filter) {
-        ctx!.save(); if (!(window as any).__perfNoFilter) ctx!.filter = bf.filter;
+        ctx!.save(); if (!window.__perfNoFilter) ctx!.filter = bf.filter;
         const r = _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
         ctx!.restore();
         return r;
@@ -208,7 +190,7 @@ export function drawEntitySprite(meta, sheet, clipImg: HTMLImageElement | undefi
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
 }
 
-function _drawEntitySpriteRaw(meta: SpriteMeta, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, dir: number, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip = null, walkBlend: WalkBlend = false): EntitySpriteDrawResult {
+function _drawEntitySpriteRaw(meta: SpriteRecord, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, dir: string, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip = null, walkBlend: WalkBlend = false): EntitySpriteDrawResult {
     // walkBlend: false = off, else the seconds already elapsed inside the current field tick (walk-blend.js).
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));
@@ -218,7 +200,7 @@ function _drawEntitySpriteRaw(meta: SpriteMeta, sheet: HTMLImageElement | undefi
             drawClipFrame(meta, clipImg, x, y, resolved.col, resolved.mirror, resolved.bottom);
             // Leader / partners walking: fade the next walk frame in over the last part of this one.
             if (walkBlend !== false && isMoving && activeClip == null) {
-                const nb = walkBlendNext(meta.clips, clipId, dir, clipTime, walkBlend as any);
+                const nb = walkBlendNext(meta.clips, clipId, dir, clipTime, walkBlend);
                 if (nb) drawClipFrame(meta, clipImg, x, y, nb.col, nb.mirror, nb.bottom, nb.w);
             }
             return {
@@ -248,7 +230,7 @@ export function devSnapshot() {
     const party = Array.isArray(state.party) ? state.party : [];
     const stats = Array.isArray(state.partyStats) ? state.partyStats : [];
     const members = party.map((charId, i) => {
-        const ch = (state.manifest?.characters ?? []).find((c) => c.id === charId);
+        const ch = (state.manifest?.characters ?? []).find((c: SpriteRecord) => c.id === charId);
         const s = stats[i];
         return {
             slot: i, charId, name: ch?.name ?? charId,

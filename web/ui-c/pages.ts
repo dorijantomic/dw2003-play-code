@@ -7,6 +7,7 @@
 // The text strings are the game's own runs; numbers on the cards are parsed back from the runs, never from game state.
 import { applyRel, dx } from "./geometry.js";
 import { textPart, at, inCard, num, ratio, readCardRuns, composePanel, composeMoney, partyCard, CARD_VARIANTS } from "./home.js";
+import type { CardColors } from "./home.js";
 import { isCursorToken } from "./icons.js";
 import { N, ID, plate, rule, rowPlate, cursor, corners, stripes, typeWord, tokenLine, TAB, tabPlate, tabTitle, CONFIRM, SPINNER, spinnerPlate, spinArrows, cardBar } from "./base.js";
 import { clipRect, platePart, restOfRuns } from "./generic.js";
@@ -16,29 +17,24 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 import type { UiRect } from "./types.js";
-import type { UiPart, UiRun, UiMatrix, UiCapturePart } from "./types.js";
+import type { UiPart, UiRun, UiMatrix, UiFooterRel, UiClaimedPart } from "./types.js";
 /** The footer page transform: an identity matrix (only translation-free placements accepted by applyRel). */
-type FooterRel = UiMatrix & Readonly<{ a: 1; d: 1; e: 0; f: 0 }>;
+type FooterRel = UiFooterRel;
 
 /** A footer page part: a drawable part plus its page transform. */
 type FooterPart = UiPart & { rel: FooterRel };
 
 /** A text run as these composers read it: the game's string at its pen, with the optional right anchor and face colour. */
-type PageRun = UiRun & { right?: number | null };
+type PageRun = UiRun;
 
 /** A claimed capture clip (position, size, layers, row) with its page transform and the part name the claim gave it. */
-type PagePart = UiPart & UiCapturePart & { part: string; rel: FooterRel };
+type PagePart = UiClaimedPart;
 
 /** What the screens hand over (screens.ts ScreenContext): the claimed parts and the runs. The parts are typed as drawable parts there, though at run time they are capture clips. */
 interface ScreenParts {
-    // ETS item 38: any[] only in this signature; every composer narrows it to PagePart[] at once (screens.ts ScreenContext types the parts as UiPart)
-    parts: any[];
+    parts: PagePart[];
     runs: UiRun[];
 }
-
-/** A run whose face is the game's colour string (types.ts UiRun.face says number, but the colour is a CSS string). */
-// ETS item 38: any only for this one member, read in two callbacks (the hint line, the row label)
-type FaceRun = PageRun & { face?: any };
 
 /** Anything that carries a page transform (and the layer its claim gave it). */
 interface RelClip {
@@ -289,7 +285,7 @@ export function composeHint(p: FooterPart, i: string | number, runs: PageRun[], 
     for (const m of mine) { const l = lines.find((q) => Math.abs(q[0].y - m.y) <= 2); if (l) l.push(m); else lines.push([m]); }
     lines.forEach((line, k) => {
         const y = r.y + (r.h - N(36) * lines.length) / 2 + k * N(36);
-        line.forEach((m: FaceRun, j) => {
+        line.forEach((m: PageRun, j) => {
             // the first run: inset 36 dp, or the game's own x when the plate has a lead in front of the text (the drill plate's stripes)
             const x = j ? m.x : Math.max(r.x + N(36), m.x), end = line[j + 1]?.x ?? r.x + r.w;
             tokenLine(j ? `hint${i}.l${k}.${j}` : `hint${i}.l${k}`, m.text, x, y, rel, out, { w: end - x - (line[j + 1] ? 2 : 8), color: m.face ?? null });   // the game's face colour (the drill gain is light blue)
@@ -363,7 +359,7 @@ export function composeRows(win: RelClip, i: string | number, runs: PageRun[], u
     // the confirm box (C5): 40 dp rows centred on the game's pen line (9 native glyph rows), Russo 26 / 40, the focused row pushed out
     const c = opt.confirm ? CONFIRM : null, h = c ? Math.min(c.rowH, pitch - 2) : pitch - 2;
     const selected = cur ? rows.reduce((b, r) => (Math.abs(r.y - cur.y) < Math.abs(b.y - cur.y) ? r : b), rows[0]!) : null;
-    rows.forEach((r: FaceRun, k) => {
+    rows.forEach((r: PageRun, k) => {
         const on = r === selected, top = c ? r.y + 4.5 - h / 2 : r.y - 1, px = body.x + 10;
         const left = c ? body.x + (on ? c.onIn : c.plainIn) : on ? px - 6 : px;
         const rect = applyRel({ x: left, y: top, w: body.x + body.w - left + 1, h }, rel);
@@ -407,7 +403,7 @@ export function composeSpinArrows(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }
 }
 
 // ------------------------------------------------------------------------------------------------ the party sidebar pages
-const COLORS = {
+const COLORS: Record<CardState, CardColors> = {
     normal: { edge: "var(--c-edge)", tabBody: "var(--c-name-body)", tabInk: null },
     on: { edge: "var(--c-orange)", tabBody: "var(--c-orange)", tabInk: "var(--c-orange-ink)" },
     locked: { edge: "var(--c-cyan)", tabBody: "var(--c-locked)", tabInk: null },
@@ -447,10 +443,10 @@ export function composeBracket(p: PagePart, out: UiPart[]) {
     out.push({ key: "swap.bracket", kind: "bracket", part: "swapBracket", layer: "over", rect: r, arrows: [7 * p.rel.d, r.h - 8 * p.rel.d], color: "var(--c-orange)", sx: p.rel.a, sy: p.rel.d });
 }
 
-function composePickerCard(i: number, card: PagePart, namePart: PagePart | null, portrait: PagePart | null, state: string, runs: PageRun[], used: Set<unknown>, out: UiPart[], hl: PagePart | null = null) {
+function composePickerCard(i: number, card: PagePart, namePart: PagePart | null, portrait: PagePart | null, state: CardState, runs: PageRun[], used: Set<unknown>, out: UiPart[], hl: PagePart | null = null) {
     const Y = card.y, rel = card.rel, f = inCard(rel, card.x, Y), c = COLORS[state], k = `card${i}`;
     runs.filter((m) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
-    partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker as unknown as typeof CARD_VARIANTS.home, c);
+    partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker, c);
     if (portrait) {
         out.push(plate(`${k}.portrait`, "portrait", f(469, 3, 128, 128), rel, { edge: c.edge }));
         if (state !== "normal") out.push(corners(`${k}.corners`, f(469 + 4, 3 + 4, 120, 120), state === "on" && hl ? cyclePulse(hl.row) : c.edge, rel));

@@ -7,13 +7,13 @@ import { composeSheetParts, composeReport as composeReportParts } from "./sheets
 import { isPauseHome, isSidebarPage, hasClip, CMFONT_DIR, STSTAT_DIR, STATUS_CLIPS } from "./claims.js";
 import { composeNameEntry, composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, composeLanguage } from "./fullpages.js";
 import { composeBook, composeQuests } from "./books.js";
-import type { UiPart, UiRun } from './types.js';
+import type { UiPart, UiRun, UiClaimedPart } from './types.js';
 interface ReportComposeCfg {
   view?: string;
 }
 
 interface ScreenContext {
-  parts: (UiPart & { part: string })[];
+  parts: UiClaimedPart[];
   runs: UiRun[];
 }
 

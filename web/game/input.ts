@@ -62,6 +62,7 @@ import {
   textbox,
 } from "./vars.js";
 import { playReplayRow } from "./auction-replay.js";
+import type { FieldKeyEvent, SceneNpc, SpriteRecord } from "./types.js";
 import { startTransition } from "./transitions.js";
 import {
   activeExitAt,
@@ -97,7 +98,7 @@ import { activeTriggerStep } from "./field-fx.js";
 // pad has no `code`, `shiftKey` or `preventDefault`, so the branches that read
 // those are keyboard-only by construction. `raw` is the untranslated lowercased
 // key ("" for a pad press) and is what the dev-tool shortcuts read.
-export function dispatchInput(k, e, raw = "") {
+export function dispatchInput(k: string, e: FieldKeyEvent, raw = "") {
     // F cycles the game stage: normal -> fill the window -> browser fullscreen.
     // The custom name-entry grid owns letter keys while it is active.
     if (k === "f" && !state.nameEntry) {
@@ -575,7 +576,7 @@ export function dispatchInput(k, e, raw = "") {
             // run through NPC talk and the step VM.)
             {
                 const cast = sceneCast(scene);
-                const visibleNpcs = cast.filter((n) => !n.cutsceneOnly);
+                const visibleNpcs = cast.filter((n: SceneNpc) => !n.cutsceneOnly);
                 // Field actors occupy a full PS1 tile; allow the front half-tile around
                 // obstacles so a player can talk without walking into the NPC/collision edge.
                 //
@@ -784,8 +785,8 @@ export function dispatchInput(k, e, raw = "") {
                     // +0xe8 = 1), so the chest holds its open frame once the
                     // authored ticks are spent. See engine/systems/box-actor.ts.
                     if (isBoxActorId(npc.npc_id)) {
-                        const boxMeta = state.manifest.npcs.find((n) => n.id === npc.sprite)
-                            ?? state.manifest.characters.find((c) => c.id === npc.sprite);
+                        const boxMeta = state.manifest.npcs.find((n: SpriteRecord) => n.id === npc.sprite)
+                            ?? state.manifest.characters.find((c: SpriteRecord) => c.id === npc.sprite);
                         const boxDur = clipDurationSeconds(boxMeta?.clips, BOX_TALK_CLIP, npc.dir ?? "down");
                         npc.activeClip = BOX_TALK_CLIP;
                         npc._animTime = 0;

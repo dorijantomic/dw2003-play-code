@@ -336,7 +336,22 @@ export function pairClearance(a: ClearanceCapsule, b: ClearanceCapsule): PairCle
  * shared shot (R3). The hand-vs-hand pair is then measured and reported (`clasp`), not counted as a
  * violation - a sheet of numbers is more useful to a reviewer than a failure the rule itself asked for.
  */
-export function penetration(model, pose, { folder = model?.folder, rig = null, tolerance = null, pairs = null, clasp = false } = {}) {
+/** The clearance bar penetration() judges against: one floor for every pair, or a floor per pair (null = the pair is fused in this body). */
+interface PenetrationBar {
+  floor?: number | undefined;
+  pairFloor?: ((i: number, j: number) => number | null) | undefined;
+}
+
+/** The options of penetration: the folder, a ready rig, the bar (a number is the same floor for every pair), the pair list and the clasp flag. */
+interface PenetrationOpts {
+  folder?: string | undefined;
+  rig?: Rig | null | undefined;
+  tolerance?: number | PenetrationBar | null | undefined;
+  pairs?: [number, number][] | null | undefined;
+  clasp?: boolean | undefined;
+}
+
+export function penetration(model, pose, { folder = model?.folder, rig = null, tolerance = null, pairs = null, clasp = false }: PenetrationOpts = {}) {
   const R = rig || rigColliders(model, folder);
   if (!R) return { ok: true, clearance: Infinity, depth: 0, tested: 0, worst: null, tolerance: 0, over: 0, violations: [], clasp: null };
   const tol = tolerance === 0 || typeof tolerance === "number"

@@ -2,6 +2,9 @@
 // (see tools/rewrite/add-types.mjs). Nothing here is emitted — node's strip mode erases the
 // declarations — so this file must never hold runtime code.
 
+/** A point or a direction in the model's pose frame. */
+export type FightVec3 = [number, number, number];
+
 /** The clearance bars one model's sampled poses gave: per collider pair ("i:j"), the tightest
  *  separation over the clip, and the floor the whole body may dip to. */
 export interface FightCollisionOut {
@@ -155,7 +158,7 @@ export interface OwnClipRec {
 export interface FightAimOffsets {
   aim: { bone: number; point: number[] } | null;
   arms: { left: number[] | null; right: number[] | null };
-  head?: number[] | null;
+  head?: number;
   lean?: number;
   root?: number[];
 }
@@ -173,7 +176,8 @@ export interface FightPlan {
   follow: number;
   frames: any[];
   H: any;
-  hand: { height: number; forward: number; lateral: number; source: any; quantile: string; unit: string; };
+  /** the hand point the class's casts measured: every member is optional (a class with no hand point falls back to rel) */
+  hand: { height?: number; forward?: number; lateral?: number; source?: string | null | undefined; quantile?: string; unit?: string; };
   head: any;
   headScale?: number;
   headSites: any;
@@ -189,7 +193,7 @@ export interface FightPlan {
   release: number;
   restTip: any;
   return: number;
-  rootCap: number;
+  rootCap: number | null;
   setSwing?: any;
   shared: any;
   sites: any;
@@ -231,10 +235,10 @@ export interface FightGate {
   clearance: boolean;
   gap: boolean;
   ground: boolean;
-  headPitch?: number;
+  headPitch?: boolean;
   idle?: boolean;
   /** how far the target is above the head bar (a head cast jumps); compare with HEAD_CAST_JUMP.p90 */
-  jump?: number;
+  jump?: boolean;
   motion: boolean;
   reachable: boolean;
 }

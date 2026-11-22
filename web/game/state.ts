@@ -1,4 +1,5 @@
 import { createScreenRouter } from "../vendor/engine.js";
+import type { SharedState } from "./types.js";
 
 // moved by hand from vars.ts: S.screenRouter's initializer needs it at load time.
 // Built once the screen table loads (init). Resolves HANDOFF screen ids → maps.
@@ -6,7 +7,7 @@ export const screenRouterOptions = {
     useAlt: () => Number(S.engine?.state.vars.get("$story.ordinal") ?? 0) === 0x2d,
 };
 
-export const S = {
+export const S: SharedState = {
   glossaryItemLoader: null,
   flyChosen: null,
   chatShownAt: 0,

@@ -4,15 +4,17 @@ import { AUCTION_STAGE, battle, choice, cutscene, fade, state, textbox } from ".
 import { S } from "./state.js";
 import { doStoryHandoff, playStoryEvent, storyDbg } from "./story-events.js";
 import { currentMap } from "./session.js";
+import type { AuctionLot, StoryEvent, StoryHandoff } from "./types.js";
+import type { ReplayRow } from "../types/replay-theatre.js";
 
 /** A wstag-shaped row for one of the auction's events, so the ordinary cutscene
  *  path plays it: its disasm, its esdmg260 text entry, and the force-exit the
  *  answer scripts carry (HANDOFF 530 → the Water Tunnel). */
-export function auctionScriptRow(eventId) {
+export function auctionScriptRow(eventId: number): StoryEvent | null {
     const au = state.auction;
     const e = au?.events?.[String(eventId)];
     if (!e) return null;
-    const handoff = (e.disasm || []).find((l) => l.startsWith("HANDOFF"));
+    const handoff = (e.disasm || []).find((l: string) => l.startsWith("HANDOFF"));
     const entry = e.entry;
     return {
         id: eventId,
@@ -27,7 +29,7 @@ export function auctionScriptRow(eventId) {
 
 /** One line of an esdmg260 entry as plain text (markup stripped, player name
  *  substituted) — the question box draws text, not pack bytes. */
-function auctionPlainLine(raw) {
+function auctionPlainLine(raw: string | undefined) {
     if (!raw) return null;
     const parsed = parseEntry(raw, state.playerName || "Junior");
     const line = parsed.pages.flat().join(" ");
@@ -38,7 +40,7 @@ function auctionPlainLine(raw) {
  *  Returns "fired" (the auction took over), "none" (nothing eligible) or "wait"
  *  (the field is busy right now — the caller retries next frame, exactly as the
  *  disc's own runStoryEvents tick does). */
-export function runAuctionArrival(mapId) {
+export function runAuctionArrival(mapId: string) {
     if (mapId !== AUCTION_STAGE) return "none";
     const au = state.auction;
     if (!au?.lots?.length || !S.engine) return "none";
@@ -55,16 +57,16 @@ export function runAuctionArrival(mapId) {
 }
 
 /** One lot, start to finish, through the engine's own driver. */
-function startAuctionLot(lot) {
-    let answerRow = null;
+function startAuctionLot(lot: AuctionLot) {
+    let answerRow: StoryEvent | null = null;
     const host = {
-        playScript: (eventId: string, onDone: (handoff: string | null) => void) => {
+        playScript: (eventId: number, onDone: (handoff?: StoryHandoff | null) => void) => {
             const row = auctionScriptRow(eventId);
             if (!row) { onDone(null); return; }
             if (eventId === lot.events.accepted || eventId === lot.events.pass) answerRow = row;
             playStoryEvent(row, (handoff) => onDone(handoff ?? null));
         },
-        askQuestion: (l, onAnswer) => {
+        askQuestion: (l: AuctionLot, onAnswer: (answer: "accept" | "pass") => void) => {
             // The question and the two answers are the lot's esdmg260 choice entry
             // (FIELDSTG_choices[N].text, entry strings 0/1/2 — claim
             // fieldstg-auction-bid-questions-2026-10-09).  The box is the walker's
@@ -76,9 +78,9 @@ function startAuctionLot(lot) {
             storyDbg("AUCTION QUESTION", prompt, "yes:", yes, "no:", no);
             choice.open!(prompt, [yes, no], (idx) => onAnswer(idx === 0 ? "accept" : "pass"));
         },
-        writeFlag: (id, value) => S.engine!.writeStoryFlag(id, value),
+        writeFlag: (id: number, value: number | boolean) => S.engine!.writeStoryFlag(id, value),
     };
-    runAuctionLot(lot, host, (handoff) => {
+    runAuctionLot(lot, host, (handoff?: StoryHandoff | null) => {
         // The answer script's own HANDOFF is the tower's force-exit (530 → s275).
         if (handoff) doStoryHandoff(answerRow, handoff);
     });
@@ -121,7 +123,7 @@ export function replayRowsNow() {
 }
 
 /** A page row -> the event record itself, tagged with the room the row named. */
-export function playReplayRow(row) {
+export function playReplayRow(row: ReplayRow) {
     const ev = (state.wstag?.[row.mapId] ?? []).find((e) => Number(e.id) === Number(row.eventId));
     if (!ev) return false;
     ev.replayMap = row.mapId;   // replayScene's own room check (only the current map may play)
@@ -135,7 +137,7 @@ export function playReplayRow(row) {
  * nothing. Only a scene of the room you are standing in may be played — another stage's scene would
  * need that stage loaded, and a load runs its arrival chain. Returns false for anything else.
  */
-export function replayScene(ev) {
+export function replayScene(ev: StoryEvent) {
     const mapId = state.manifest ? currentMap().id : null;
     if (replayRefused(ev) || !replayOnMap(ev.replayMap, mapId)) return false;
     playStoryEvent(ev, () => {});

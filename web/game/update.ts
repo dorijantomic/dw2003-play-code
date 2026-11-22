@@ -1,3 +1,4 @@
+import type { ManifestMap, SpriteRecord, StoppingActor } from "./types.js";
 import { mpbVisible } from "../mpbattle.js";
 import { tickCutContent, cutContentOpen } from "../cut-content.js";
 import { tickBlastLadder, blastOpen } from "../blast-ladder.js";
@@ -130,7 +131,7 @@ import {
 import { runStageHandoff, startTransition, stepSetupBucketTick, stepSetupTick } from "./transitions.js";
 import { triggerRandomEncounter } from "./battle-launch.js";
 
-export function padLoop(t) {
+export function padLoop(t: number) {
     const dt = S.padLastT ? Math.min((t - S.padLastT) / 1000, 0.1) : 0;
     S.padLastT = t;
     gamepad.tick(dt);
@@ -459,7 +460,7 @@ function update(dt: number) {
         if (!cb.done) {
             // Debug hold (a verifier can freeze the wipe mid-run to capture it):
             // window.__wipe28Hold = true.
-            if (!(window as any).__wipe28Hold)
+            if (!window.__wipe28Hold)
                 for (let n = 0; n < 2 && !cb.done; n++) stepCheckerboard(cb, WIPE_A28_STEP_UNIT);
         } else {
             const p = cb.pending;
@@ -517,7 +518,7 @@ function update(dt: number) {
                 return;
             }
             fade.pending = null;
-            const idx = state.manifest.maps.findIndex((mm) => mm.id === ex.to);
+            const idx = state.manifest.maps.findIndex((mm: ManifestMap) => mm.id === ex.to);
             // Capture the door we're leaving through BEFORE setMap overwrites state.
             const fromId = currentMap().id;
             const fromPos = { x: state.x, y: state.y, dir: state.dir };
@@ -1109,7 +1110,7 @@ function update(dt: number) {
                         { w: 12, h: 8 },
                     )
                     : moveWithSubSteps(
-                        (x, y, dx, dy) => moveWithCollision(grid, x, y, dx, dy, { w: 12, h: 8 }),
+                        (x: number, y: number, dx: number, dy: number) => moveWithCollision(grid, x, y, dx, dy, { w: 12, h: 8 }),
                         state.x,
                         state.y,
                         stepDx,
@@ -1330,7 +1331,7 @@ function update(dt: number) {
         state._encTick += fieldTicks.ticks;
 
         const stopDt = fieldTicks.ticks * FIELD_TICK_SECONDS;
-        const tickStopClip = (actor, meta) => {
+        const tickStopClip = (actor: StoppingActor, meta: SpriteRecord | undefined) => {
             if (!actor.stopping) return;
             actor.stopTime += stopDt;
             const duration = clipDurationSeconds(meta?.clips, FIELD_STOP_CLIP, actor.dir);
@@ -1342,7 +1343,7 @@ function update(dt: number) {
         };
         tickStopClip(state, currentChar());
         for (let i = 0; i < activeFollowerCount(); i++) {
-            tickStopClip(followers[i], followerChar(i));
+            tickStopClip(followers[i]!, followerChar(i));
         }
     }
 

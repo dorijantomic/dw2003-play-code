@@ -17,14 +17,7 @@ import { currentMap } from "./session.js";
 import { stepSetup } from "./field-steps.js";
 import { S } from "./state.js";
 import { prepareStageAssets } from "./map-load.js";
-interface StageHandoff {
-  to: string;
-  spawnX: number;
-  spawnY: number;
-  dir: string;
-  scripted?: boolean;
-  stepOp?: number;
-}
+import type { StageExit, StepPad } from "./types.js";
 
 
 // Hand the leader to the op-13 launch controller (engine/systems/launch-pad.ts):
@@ -36,7 +29,7 @@ interface StageHandoff {
 // pad controller reads out of the record it was handed (`&record[0xa]`,
 // fieldstg.s:0xc7e4 stores that pointer at controller+0x54). Nothing here is
 // per-place: a stage supplies its step program and its type-0x17 pad objects.
-function beginLaunch(pad) {
+function beginLaunch(pad: StepPad) {
     if (state.launch) return;
     // The controller picks the nearest registered type-0x17 pad by the native
     // |dx| + 2*|dy| metric, not the trigger rectangle — so the leader walks to
@@ -98,7 +91,7 @@ export function stepSetupBucketTick() {
     return state.playerDrawBucket;
 }
 
-export function startTransition(exit) {
+export function startTransition(exit: StageExit) {
     if (fade.dir !== 0 || state.diveDemo) return;
     // A launch pad never arrives here: op 13 is a SETUP opcode, so `activeExitAt`
     // does not arm a pad row and the disc's playback op 13 is its own epilogue.
@@ -168,7 +161,7 @@ export function startTransition(exit) {
 // countdown is spent (fieldstg.s:8994/:899c) — the shared tail every field stage
 // change goes through, whether the handoff came from an op-1 door (which passes 0
 // and loads at once) or from an op-14 pad handoff (which passes 0x3c and waits).
-export function runStageHandoff(exit: StageHandoff | undefined) {
+export function runStageHandoff(exit: StageExit | undefined) {
     if (exit?.to) prepareStageAssets(exit.to);
     fade.dir = 1;
     fade.pending = exit;
@@ -176,7 +169,7 @@ export function runStageHandoff(exit: StageHandoff | undefined) {
 
 // Wide overworld (web/field-view.js): black over the two side strips, as much as the frame rule says
 // they are covered (1 - wideField.sides). Box coordinates; the strips are padL wide outside the box.
-export function drawWideSideCovers(ctx: CanvasRenderingContext2D | null) {
+export function drawWideSideCovers(ctx: CanvasRenderingContext2D) {
     const padL = wideField.padL;
     // Covered = black; shown with a menu open (wide overworld) = dimmed by wideField.dim.
     const a = (1 - wideField.sides) + wideField.sides * wideField.dim;
@@ -201,7 +194,7 @@ export function drawWideSideCovers(ctx: CanvasRenderingContext2D | null) {
 // pattern"). So this draws the DECODED mechanism -- the tiles slide inward and
 // vanish -- and leaves the exact colour/blend named as open. Do not read the
 // grey here as the original's look.
-export function drawCheckerboardWipe(ctx) {
+export function drawCheckerboardWipe(ctx: CanvasRenderingContext2D) {
     const cb = state.wipe28;
     if (!cb) return;
     ctx.save();
@@ -226,7 +219,7 @@ export function drawCheckerboardWipe(ctx) {
 //
 // Native coordinates: the state, the geometry and the tile size are all 320x240
 // (VIEW_W/VIEW_H are the device buffer), so everything is scaled by ZOOM here.
-export function drawTransitionWipe(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
+export function drawTransitionWipe(ctx: CanvasRenderingContext2D, camX: number, camY: number) {
     const clock = state.wipe;
     if (clock.phase !== 1 && clock.phase !== -1) return;
 
@@ -275,20 +268,20 @@ export function drawTransitionWipe(ctx: CanvasRenderingContext2D | null, camX: n
 
 // One frame of the close: the 64x64 lattice, darkened by the level, clipped to
 // the screen AROUND the window the field still shows through.
-function paintWipeCoverAround(ctx: CanvasRenderingContext2D | null, level: number, clear: { x: number; y: number; w: number; h: number; }) {
+function paintWipeCoverAround(ctx: CanvasRenderingContext2D, level: number, clear: { x: number; y: number; w: number; h: number; }) {
     const cx = clear.x * ZOOM, cy = clear.y * ZOOM;
     const cw = clear.w * ZOOM, ch = clear.h * ZOOM;
     // Four bands around the window, which is what the original's frame draws:
     // the cover is everywhere the field does not show through.
     // With the wide overworld the field goes on padL past both box edges; the cover does too.
     const L = -wideField.padL, R = VIEW_W + wideField.padL;
-    const outside = [
+    const outside: [number, number, number, number][] = [
         [L, 0, R - L, cy],
         [L, cy + ch, R - L, VIEW_H - (cy + ch)],
         [L, cy, cx - L, ch],
         [cx + cw, cy, R - (cx + cw), ch],
     ];
-    subtractLayer(ctx, L, 0, R - L, VIEW_H, (layer) => {
+    subtractLayer(ctx, L, 0, R - L, VIEW_H, (layer: CanvasRenderingContext2D) => {
         layer.fillStyle = dimFillStyle(coverLevel(level));
         for (const [x, y, w, h] of outside)
             if (w! > 0 && h! > 0) layer.fillRect(x, y, w, h);
@@ -306,7 +299,7 @@ function paintWipeCoverBand(ctx: CanvasRenderingContext2D, level: number, f: { w
     // wipe. The painter works in the caller's own coordinates (the region is
     // shifted onto the layer's origin for it), so the rect is stated in screen
     // pixels here, not at the layer's origin.
-    subtractLayer(ctx, bx, 0, bw, bh, (layer) => {
+    subtractLayer(ctx, bx, 0, bw, bh, (layer: CanvasRenderingContext2D) => {
         layer.fillStyle = dimFillStyle(coverLevel(level));
         layer.fillRect(bx, 0, bw, bh);
     });
@@ -316,7 +309,7 @@ function paintWipeCoverBand(ctx: CanvasRenderingContext2D, level: number, f: { w
 // The lattice's 1-px seams: a line on every 64-px cell edge, drawn additively on
 // top of the cover at the RGB the rig capture measured for them once the cover is
 // at its cap, clipped to the regions the cover owns on this frame.
-function paintWipeSeams(ctx, level, regions) {
+function paintWipeSeams(ctx: CanvasRenderingContext2D, level: number, regions: [number, number, number, number][]) {
     const [r, g, b] = seamRgb(level);
     if (r! + g! + b! <= 0) return;
     ctx.save();

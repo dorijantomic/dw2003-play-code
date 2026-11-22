@@ -154,7 +154,7 @@ export interface SfxPlayerContext {
   debugVoices?: () => number;
   exclusiveId?: () => number;
   muted: boolean;
-  play?: (name: string) => void;
+  play: (name: string) => void;
   playArea?: (name: string, { sustain }?: { sustain?: boolean; }) => void;
   playBank?: (bank: string, name: string, { sustain }?: { sustain?: boolean; }) => void;
   playBankSound?: (bank: string, name: string, { sustain }?: { sustain?: boolean; }) => string | null;

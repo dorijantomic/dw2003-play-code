@@ -48,8 +48,7 @@
 import { armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChain, tailChain, wingChains, boneMap } from "./digimon-bonemap.js";
 import { authoredSide } from "./side-mirror.js";
-import type { FightSkeleton } from './types.js';
-import type { Dw2Pose } from '../types/anim-viewer-dw2.js';
+import type { FightSkeleton, FightVec3 } from './types.js';
 import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
 interface RestPoseClip {
   start_frame?: number;
@@ -78,6 +77,24 @@ interface AxisCandidates {
 }
 
 
+/** A posed skeleton as poseFromChannels builds it: one rotation (9 numbers), position and draw scale per bone, which bones are drawn, and the frame. */
+export interface ChannelPose {
+  rot: number[][];
+  pos: number[][];
+  scale: number[][];
+  visible: boolean[];
+  frame: number;
+}
+
+/** The two hand-class candidate axes firingAxis can be asked for. */
+type HandVariant = "push" | "palm";
+
+/** The options of firingAxis: the rest pose (the carried facing is measured from it; the pose itself when absent) and the hand variant. */
+interface FiringAxisOpts {
+  rest?: ChannelPose | null | undefined;
+  variant?: HandVariant | null | undefined;
+}
+
 interface FiringAxis {
   calibrated: boolean;
   emitterId: string;
@@ -97,12 +114,12 @@ export const EMITTER_CLASSES = ["prop", "hand", "head", "chest", "back", "tail",
 
 // ---------------------------------------------------------------- vector helpers
 
-export function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
-export function sub(a: number[], b: number[]) { return [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!]; }
-export function mul(a: number[], s: number) { return [a[0]! * s, a[1]! * s, a[2]! * s]; }
+export function add(a, b): FightVec3 { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+export function sub(a: number[], b: number[]): FightVec3 { return [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!]; }
+export function mul(a: number[], s: number): FightVec3 { return [a[0]! * s, a[1]! * s, a[2]! * s]; }
 export function dot(a, b: (number | undefined)[]) { return a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!; }
 export function len(a: number[]) { return Math.sqrt(dot(a, a)); }
-export function unit(a: (number | undefined)[]) { const l = len(a!!!!!!); return l > 1e-9 ? mul(a!!!!!!, 1 / l) : [0, 0, 0]; }
+export function unit(a: (number | undefined)[]): FightVec3 { const l = len(a!!!!!!); return l > 1e-9 ? mul(a!!!!!!, 1 / l) : [0, 0, 0]; }
 export function dist(a, b: number[]) { return len(sub(a, b)); }
 
 /** The angle between two vectors in degrees (0 = same direction, 180 = opposite). */
@@ -170,7 +187,7 @@ function mat3Mul(a: number[], b) {
   }
   return o;
 }
-function applyRot(R, v) {
+function applyRot(R, v): FightVec3 {
   return [R[0] * v[0] + R[3] * v[1] + R[6] * v[2],
           R[1] * v[0] + R[4] * v[1] + R[7] * v[2],
           R[2] * v[0] + R[5] * v[1] + R[8] * v[2]];
@@ -233,7 +250,7 @@ export function boneMatrix(pose, i: string | number) {
 }
 
 /** One mesh vertex of `boneIdx` in the pose frame (the renderer's vertex path, D-flip included). */
-export function vertexWorld(model, boneIdx: string | number, v: number[], pose) {
+export function vertexWorld(model, boneIdx: string | number, v: number[], pose): FightVec3 {
   const R = pose.rot[boneIdx], t = pose.pos[boneIdx];
   const s = pose.scale?.[boneIdx] || [1, 1, 1];
   const x = v[0]! * s[0], y = v[1]! * s[1], z = v[2]! * s[2];
@@ -419,7 +436,7 @@ export function emitterClass(folder: string | number, emitterId) {
  * (poseFromChannels(model, restFrame)); the direction that was +Z in the rest pose is turned by
  * R_now * R_rest^T. The result is unit length.
  */
-export function carriedFacing(boneIdx: string | number, pose, rest) {
+export function carriedFacing(boneIdx: string | number, pose, rest): FightVec3 {
   const R = pose.rot[boneIdx], R0 = rest.rot[boneIdx];
   if (!R || !R0) return [0, 0, 1];
   const local = applyRot(transpose3(R0), [0, 0, 1]);
@@ -427,7 +444,7 @@ export function carriedFacing(boneIdx: string | number, pose, rest) {
 }
 
 /** The direction of a bone CHAIN in the pose (first joint -> last joint), unit length. */
-export function chainDirection(chain, pose: { pos: { [x: string]: number[]; }; }) {
+export function chainDirection(chain, pose: { pos: { [x: string]: number[]; }; }): FightVec3 {
   if (!chain || chain.length < 2) return [0, 0, 1];
   return unit(sub(pose.pos[chain[chain.length - 1]]!, pose.pos[chain[0]]!));
 }
@@ -507,7 +524,7 @@ function handAxes(model, bone: string | number, pose, arm) {
  * `variant` picks the hand-class candidate ('push' | 'palm'); the class default comes from the
  * calibration (HAND_DEFAULT). Returns null when the site has no geometry to read.
  */
-export function firingAxis(model: FightSkeleton, folder: string | number, emitterId: string, pose, { rest = null, variant = null } = {}) {
+export function firingAxis(model: FightSkeleton, folder: string | number, emitterId: string, pose, { rest = null, variant = null }: FiringAxisOpts = {}) {
   const info = emitterClass(folder, emitterId);
   if (!info.cls || info.bone == null) return null;
   const bone = info.bone;
@@ -588,7 +605,7 @@ export function firingAxis(model: FightSkeleton, folder: string | number, emitte
 }
 
 /** The hand-class default axis, chosen by the K19b calibration on the disc's own casts. */
-export const HAND_DEFAULT = "push";
+export const HAND_DEFAULT: HandVariant = "push";
 
 /**
  * Every candidate firing axis of an ARM site, so a caller can compare them: `push` (wrist -> hand
@@ -615,9 +632,9 @@ export function armAxisCandidates(model: FightSkeleton, folder: string | number,
 }
 
 /** Both hand-class candidates, so a caller (or the calibration) can compare them. */
-export function axisVariants(model: FightSkeleton, folder: string | number, emitterId: string, pose: Dw2Pose, { rest = null } = {}): { push: FiringAxis; palm: FiringAxis } {
+export function axisVariants(model: FightSkeleton, folder: string | number, emitterId: string, pose: ChannelPose, { rest = null }: FiringAxisOpts = {}): { push: FiringAxis; palm: FiringAxis } {
   const out: Record<string, any> = {};
-  for (const v of ["push", "palm"]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
+  for (const v of ["push", "palm"] satisfies HandVariant[]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
   return { push: out.push, palm: out.palm };
 }
 
@@ -628,7 +645,7 @@ export function toLocal(model, p) {
 
 /** The model's rest pose, cached per model object (frame 0 of the model's own channels). */
 const restCache = new WeakMap();
-export function restPoseOf(model: RestPoseModel, frame = null): Dw2Pose {
+export function restPoseOf(model: RestPoseModel, frame = null): ChannelPose {
   const key = frame == null ? -1 : frame | 0;
   let e = restCache.get(model);
   if (!e) { e = new Map(); restCache.set(model, e); }
@@ -711,7 +728,7 @@ export function r1Acceptance(cls: string | number) {
  * how well the prop is conditioned). They differ by design: a raised sword's blade can point 56 deg
  * off while the arm that fires the spell points at the target.
  */
-export function aimAxisFor(model: FightSkeleton, folder: string | number, emitterId: string, pose: Dw2Pose, { rest = null } = {}): FiringAxis | null {
+export function aimAxisFor(model: FightSkeleton, folder: string | number, emitterId: string, pose: ChannelPose, { rest = null }: FiringAxisOpts = {}): FiringAxis | null {
   const fa = firingAxis(model, folder, emitterId, pose, { rest });
   if (!fa) return null;
   if (fa.cls !== "prop" && fa.cls !== "hand") return { ...fa, calibrated: true };

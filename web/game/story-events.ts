@@ -1,4 +1,5 @@
-import type { NameEntryOptions } from "./types.js";
+import type { DebugPart, EngineContent, NameEntryOptions, SceneNpc, ScriptedBattleRow, StoryEvent, StoryEventDone, StoryHandoff } from "./types.js";
+import type { ManifestMap, PartnerStats } from "./types.js";
 import {
   cardDuelCloseWrites,
   talkLaunchEventForBit,
@@ -195,7 +196,7 @@ export function openNameEntry(opts: NameEntryOptions = {}) {
 // live here, not in the headless engine, so the engine's HealParty command forwards to
 // this through its constructor hook. Same fields the battle writes back.
 export function healActiveParty() {
-    const full = (ps) => {
+    const full = (ps: PartnerStats | null | undefined) => {
         if (!ps) return;
         if (ps.maxHp != null) ps.hp = ps.maxHp;
         if (ps.maxMp != null) ps.mp = ps.maxMp;
@@ -212,7 +213,7 @@ export function healActiveParty() {
 // Prints every map ENTER, EVENT fired (auto vs talk), and WARP so the opening flow can be
 // captured from the console. An EVENT line appearing right after ENTER with no TALK in
 // between = an event auto-firing on entry (the auto-teleport bug).
-export function storyDbg(...a) {
+export function storyDbg(...a: DebugPart[]) {
     if (window.__storyDebug !== false)
         console.log("%c[STORY]", "color:#0a0;font-weight:bold", ...a);
 }
@@ -221,13 +222,13 @@ export function storyDbg(...a) {
 // POSITION-triggered PRE (the walk-up + chat cutscene) can chain straight into the battle and
 // then the POST chat — the authentic "scripted walk → talk → battle → post-talk" as ONE flow.
 // (The talk path already chains via engine-bridge re-raise; this covers the position path.)
-export function buildScriptedBattleIndex(content) {
+export function buildScriptedBattleIndex(content: EngineContent) {
     const fk = content.flagKeys || {};
-    const idx = {};
+    const idx: Record<string, ScriptedBattleRow[]> = {};
     for (const st of content.stages || []) {
         const mid = st.mapId;
         const eventOf = (id: string) => (st.events || []).find((e) => e.id === id);
-        const scriptOf = (id) => (st.scripts || []).find((s) => s.id === id);
+        const scriptOf = (id: string) => (st.scripts || []).find((s) => s.id === id);
         for (const be of st.events || []) {
             if (!/\.sb\.battle(\.|$)/.test(be.id)) continue;
             const tag = be.id.slice((mid + ".sb.battle").length); // "" or ".<actor>"
@@ -255,7 +256,7 @@ export function buildScriptedBattleIndex(content) {
 
 // If `ev` is a stage's scripted-battle PRE (matched by flag_key), drive the fight right after
 // the walk-up/chat cutscene ends, then play POST on victory. No-op if already won or no party.
-export function chainScriptedBattleFromPre(ev) {
+export function chainScriptedBattleFromPre(ev: StoryEvent) {
     const mid = currentMap().id;
     const sb = (state.sbIndex?.[mid] || []).find((b) => b.preKey === ev.flag_key);
     if (!sb) return false;
@@ -290,7 +291,7 @@ export function chainScriptedBattleFromPre(ev) {
 // talkable). A boss spawn-gate carries a {flag, expected:0} STORED guard meaning "absent once
 // this is set" (e.g. Keith s205 = ordinal==6 & 0x4016==0; the overlay sets 0x4016 on defeat).
 // Ordinal (bank 0x60) and virtual banks are skipped — only real stored guards are flipped.
-function despawnDefeatedBoss(actor) {
+function despawnDefeatedBoss(actor: number | undefined) {
     const sc = state.scenes[currentMap().id];
     if (!sc) return;
     for (const npc of sc.npcs || []) {
@@ -325,13 +326,13 @@ function playTalkEvent(bit: number) {
     const prog = state.storySteps?.[mapId.replace(/^s/, "")];
     const erec = prog?.events?.find((e) => e.event_id === eventId);
     const ev = erec
-        ? resolveTalkLaunchRecord({ byId: prog.events, byWstag: state.wstag[mapId] || [] }, eventId)
+        ? resolveTalkLaunchRecord({ byId: prog!.events, byWstag: state.wstag[mapId] || [] }, eventId)
         : null;
     if (!ev) {
         storyDbg("TALK EVENT", bit, "→ id", eventId, "unresolved on", mapId);
         return;
     }
-    storyDbg("TALK EVENT", bit, "→ id", eventId, erec.flag_key, "on", mapId);
+    storyDbg("TALK EVENT", bit, "→ id", eventId, erec!.flag_key, "on", mapId);
     playStoryEvent(ev, (handoff) => {
         // The event's OWN on_complete, through the engine — the same call the OnStep route
         // makes (web/game.js playEvent wrapper above). It runs
@@ -342,7 +343,7 @@ function playTalkEvent(bit: number) {
         // is how a walker's mid-scene could jump the step.
         S.engine!.completeEvent(eventId);
         // The event's own completion writes (same list the OnStep path applies).
-        for (const [fid, val] of erec.sets || []) storyFlags.set(fid, val ? 1 : 0);
+        for (const [fid, val] of erec!.sets || []) storyFlags.set(fid, val ? 1 : 0);
         // HANDOFF IS A SCREEN TRANSITION, wherever in the script it sits: op 3.4 is
         // `0x8008b770(id,-1,x<<8,y<<8,p)` then the runner's own `vt+0x28(2)`
         // (docs/research/scripting/field-script-engine-verified.md §3.4, file 0x25d0).
@@ -377,14 +378,14 @@ function playTalkEvent(bit: number) {
 // A native Yes/No launcher event (event-machine-synthesis-2026-08-03.md "Family B"): its
 // controller shows the question, then start_event's the Yes or No child event of the same
 // stage and finishes when that child ends. Returns false when `ev` is not one of the 8.
-function playYesNoEvent(ev, onDone) {
+function playYesNoEvent(ev: StoryEvent, onDone?: StoryEventDone) {
     const mapId = currentMap().id;
     const row = engineUi?.yesNoLauncherFor?.(Number(mapId.replace(/^s/, "")), ev.id);
     if (!row) return false;
     S.yesNoAwaitingChild = false;
-    let childHandoff = null;
+    let childHandoff: StoryHandoff | null = null;
     yesNoBox.open!(row, null, {
-        onStartEvent: (id) => {
+        onStartEvent: (id: number) => {
             S.yesNoAwaitingChild = true;
             const child = (state.wstag[mapId] || []).find((e) => e.id === id);
             if (!child) {
@@ -411,7 +412,7 @@ function playYesNoEvent(ev, onDone) {
 // event-machine-synthesis-2026-08-03.md): the controller shows eight titles, opens the chosen
 // topic's page and closes on "Return" or Cancel, starting nothing. Tried before the Yes/No boxes,
 // which are the other native family. Returns false when `ev` is not one of the five.
-function playHelpMenuEvent(ev, onDone) {
+function playHelpMenuEvent(ev: StoryEvent, onDone?: StoryEventDone) {
     const mapId = currentMap().id;
     const row = engineUi?.helpMenuFor?.(Number(mapId.replace(/^s/, "")), ev.id);
     if (!row) return false;
@@ -426,7 +427,7 @@ function playHelpMenuEvent(ev, onDone) {
 // only on a real state change and writes the arm word, exactly as wstag745 0x244/0x2c4/0x344
 // do. The pad's second-layout tile GEOMETRY is not decoded, so this arms the maze latch
 // rather than drawing a second mask; that gap is named in the module header, not filled.
-function playDungeonSwitchEvent(ev, onDone: () => void) {
+function playDungeonSwitchEvent(ev: StoryEvent, onDone: () => void) {
     const mapId = currentMap().id;
     const cmd = dungeonSwitchCommand(mapId, ev.id);
     if (!cmd) return false;
@@ -450,7 +451,7 @@ function playDungeonSwitchEvent(ev, onDone: () => void) {
 // (tools/extract_stage_layout_variants.py). The rooms are reachable because each
 // layout's grid carries a cell whose step index is the layout's own op-8
 // start_event — layout 0 byte 0x1f -> 9001, layout 1 byte 0xb5 -> 9000.
-function playGunslingerEvent(ev, onDone: () => void) {
+function playGunslingerEvent(ev: StoryEvent, onDone: () => void) {
     const mapId = currentMap().id;
     const cmd = gunslingerSwitchCommand(mapId, ev.id);
     if (!cmd) return false;
@@ -475,7 +476,7 @@ function playGunslingerEvent(ev, onDone: () => void) {
     return true;
 }
 
-export function playStoryEvent(ev, onDone) {
+export function playStoryEvent(ev: StoryEvent, onDone: StoryEventDone) {
     if (!ev.disasm?.length && playHelpMenuEvent(ev, onDone)) return;
     if (!ev.disasm?.length && playYesNoEvent(ev, onDone)) return;
     if (!ev.disasm?.length && playDungeonSwitchEvent(ev, onDone)) return;
@@ -489,7 +490,7 @@ export function playStoryEvent(ev, onDone) {
         "→ handoff_to:",
         ev.handoff_to || "(screen-route)",
         "| firstSAY:",
-        (ev.disasm || []).find((l) => l.startsWith("SAY")) || "(none)",
+        (ev.disasm || []).find((l: string) => l.startsWith("SAY")) || "(none)",
     );
     let strings = null;
     if (ev.esdmg_entry !== null && ev.esdmg_stage != null) {
@@ -552,7 +553,7 @@ export function playStoryEvent(ev, onDone) {
                     delete npc._inCutscene;
                     delete npc.activeClip;
                 }
-                scene.npcs = scene.npcs.filter((n) => !n._ephemeral);
+                scene.npcs = scene.npcs.filter((n: SceneNpc) => !n._ephemeral);
             }
             // Reset the player's cutscene state, then restore the party trail.
             delete state._inCutscene;
@@ -570,7 +571,7 @@ export function playStoryEvent(ev, onDone) {
     );
 }
 
-export function doStoryHandoff(ev, handoff) {
+export function doStoryHandoff(ev: StoryEvent, handoff: StoryHandoff) {
     // The decoded save-point handoff: every inn/tower/city save event ends in
     // `HANDOFF 0xC00|slot`, which the resident launcher loads as pro/stgmcard in
     // SAVE mode with that save point (engine/dw3/save-points.ts, and the
@@ -613,7 +614,7 @@ export function doStoryHandoff(ev, handoff) {
 
 // The routing tail of doStoryHandoff over `screenId` — the event's own handoff
 // id, or the selector a movie chain ended on (playMovieChain).
-function routeStoryHandoff(ev, handoff, screenId) {
+function routeStoryHandoff(ev: StoryEvent, handoff: StoryHandoff, screenId: number | null | undefined) {
     const routed =
         screenId != null
             ? S.screenRouter.route(screenId, currentMap().id)
@@ -624,7 +625,7 @@ function routeStoryHandoff(ev, handoff, screenId) {
         // point still governs where the player stands, exactly as before — routing
         // decides which overlay of the screen loads, not the spawn.
         const to = routed?.kind === "warp" ? routed.to : ev.handoff_to;
-        const idx = state.manifest.maps.findIndex((mm) => mm.id === to);
+        const idx = state.manifest.maps.findIndex((mm: ManifestMap) => mm.id === to);
         if (idx >= 0) {
             storyDbg(
                 "WARP (event handoff_to)",
@@ -686,7 +687,7 @@ function routeStoryHandoff(ev, handoff, screenId) {
     }
 }
 
-export function checkStageCutscene(mapId) {
+export function checkStageCutscene(mapId: string) {
     storyDbg(
         "ENTER",
         mapId,

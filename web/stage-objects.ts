@@ -73,24 +73,76 @@ import {
     clearPointSlots,
     pictureStepDraws as pictureStepActorDraws,
 } from "./effects.js";
+import type { FallingObject, FallingObjectConfig } from "../engine/systems/falling-object.ts";
+import type {
+    FixedSprite,
+    FixedSpriteDraw,
+    FixedSpriteMember,
+} from "../engine/systems/stage-fixed-sprite.ts";
+import type { SlotPlayer, SlotPlayerMember } from "../engine/systems/stage-slot-player.ts";
+import type { Ensemble, EnsembleMember, EnsembleWrite } from "../engine/systems/stage-slot-ensemble.ts";
+import type {
+    AnnotatorChildState,
+    AnnotatorConfig,
+    AnnotatorDraw,
+} from "../engine/systems/shape-annotator.ts";
+import type { AnnotatorShapeSet } from "../engine/dw3/annotator-shapes.ts";
 
-let configs = null; // stageId -> FallingObjectConfig (null until loaded)
-let fixed = null; // stageId -> FixedSpriteMember[] (null until loaded)
-let slots = null; // stageId -> SlotPlayerMember[] (null until loaded)
-let ensembles = null; // stageId -> the id -> member map (null until loaded)
-let points = null; // point_sprites.json records, for the slot chain's tags
-const live = {}; // stageId -> FallingObject[]
-const fixedLive = {}; // stageId -> FixedSprite[]
-const slotLive = {}; // stageId -> SlotPlayer[]
-const ensembleLive = {}; // stageId -> Ensemble[]
-const ensembleChains = {}; // stageId -> the display chain, loaded once per stage
-const slotChains = {}; // stageId -> the chain records (loaded once per stage)
-let playSound = null; // (packedWord) => void
+/** The two bytes of a display-slot record the writers read. */
+interface ChainRecord {
+    atlasFlag: number;
+    size: number;
+}
+
+/** One stage's entry in point_sprites.json (only the part this module reads). */
+interface PointStage {
+    records?: ChainRecord[];
+}
+
+/** A pole record: the two bytes the traffic-light writer reads. */
+interface PoleRecord {
+    type: number;
+    size: number;
+}
+
+/** A fixed still sprite with the draw jobs its last tick queued. */
+interface LiveFixedSprite extends FixedSprite {
+    jobs?: FixedSpriteDraw[];
+}
+
+/** The ensemble fields this module reads (the engine's builder returns a looser shape). */
+type LiveEnsemble = Pick<Ensemble, "id" | "mode" | "phase" | "done" | "recs" | "last">;
+
+/** One queued marker, as the flush hands it over (the pass is 0 or 1). */
+type AnnotatorMark = Omit<AnnotatorDraw, "pass"> & { pass: number };
+
+/** A running stage annotator: s805's carries the delay walk's own fields. */
+interface AnnotatorRun {
+    config: Pick<AnnotatorConfig, "stage" | "delay">;
+    states: Pick<AnnotatorChildState, "x" | "y">[];
+    index?: number;
+    hold?: number;
+    done?: boolean;
+    marks?: AnnotatorMark[];
+}
+
+let configs: Record<string, FallingObjectConfig> | null = null; // stageId -> FallingObjectConfig (null until loaded)
+let fixed: Record<string, FixedSpriteMember[]> | null = null; // stageId -> FixedSpriteMember[] (null until loaded)
+let slots: Record<string, SlotPlayerMember[]> | null = null; // stageId -> SlotPlayerMember[] (null until loaded)
+let ensembles: Record<string, Record<string, EnsembleMember>> | null = null; // stageId -> the id -> member map (null until loaded)
+let points: Record<string, PointStage> | null = null; // point_sprites.json records, for the slot chain's tags
+const live: Record<string, FallingObject[]> = {}; // stageId -> FallingObject[]
+const fixedLive: Record<string, LiveFixedSprite[]> = {}; // stageId -> FixedSprite[]
+const slotLive: Record<string, SlotPlayer[]> = {}; // stageId -> SlotPlayer[]
+const ensembleLive: Record<string, LiveEnsemble[]> = {}; // stageId -> Ensemble[]
+const ensembleChains: Record<string, ChainRecord[] | null> = {}; // stageId -> the display chain, loaded once per stage
+const slotChains: Record<string, ChainRecord[] | null> = {}; // stageId -> the chain records (loaded once per stage)
+let playSound: ((packedWord: number, stageId: string) => void) | null = null; // (packedWord) => void
 let readOrdinal = () => 0; // () => master story ordinal
 // `var`, not `let`: effects.js and this module import each other, and effects.js
 // hands this over while this module is still initialising. A `let` is in its
 // temporal dead zone at that point and the hand-over throws.
-var poleRecords = null; // stageId -> [{type, size}], handed over by effects.js
+var poleRecords: ((stageId: string) => PoleRecord[]) | null = null; // stageId -> [{type, size}], handed over by effects.js
 const claimed: Record<string, boolean> = {}; // stageId -> the pole records have gone to the writer
 
 /**
@@ -99,10 +151,10 @@ const claimed: Record<string, boolean> = {}; // stageId -> the pole records have
  * records over, and the original's writer searches them once in its state-0 arm,
  * so a second walk would be a second search.
  */
-function claimPoles(stageId) {
+function claimPoles(stageId: string) {
     claimed[stageId] = true;
 }
-const annotators = {}; // stageId -> the stage's draw-context annotator run
+const annotators: Record<string, AnnotatorRun> = {}; // stageId -> the stage's draw-context annotator run
 let annotatorRandom = () => 1; // the resident random the delay walk reads
 
 /** Load the extracted per-stage tables. Non-fatal: stages simply stay quiet. */
@@ -130,7 +182,7 @@ export async function loadFallingObjects() {
 }
 
 /** The engine's packed-sound sink, wired once by the game loop. */
-export function setStageObjectSound(fn) {
+export function setStageObjectSound(fn: (packedWord: number, stageId: string) => void) {
     playSound = fn;
     // One packed-sound sink for every actor this module owns: the rocks, the
     // fixed still sprites' builders and the street corner all hand the resident
@@ -153,27 +205,27 @@ export function setStageObjectOrdinal(fn: () => number) {
  * whose zero value ends the original's walk. web/effects.js owns that table, so
  * it hands the shape over once instead of the two modules importing each other.
  */
-export function setStageObjectPoleRecords(fn) {
+export function setStageObjectPoleRecords(fn: (stageId: string) => PoleRecord[]) {
     poleRecords = typeof fn === "function" ? fn : null;
 }
 
 /** The extracted table for a stage id ("s415" or "415"). */
-function configFor(stageId) {
+function configFor(stageId: string) {
     return configs?.[String(stageId).replace(/^s/, "")] ?? null;
 }
 
 /** The fixed still-sprite family members a stage ships, same id spelling. */
-function fixedFor(stageId) {
+function fixedFor(stageId: string) {
     return fixed?.[String(stageId).replace(/^s/, "")] ?? null;
 }
 
 /** The display-slot channel players a stage ships, same id spelling. */
-function slotsFor(stageId) {
+function slotsFor(stageId: string) {
     return slots?.[String(stageId).replace(/^s/, "")] ?? null;
 }
 
 /** The six-slot display ensembles a stage ships, keyed by registry id. */
-function ensemblesFor(stageId) {
+function ensemblesFor(stageId: string) {
     return ensembles?.[String(stageId).replace(/^s/, "")] ?? null;
 }
 
@@ -183,7 +235,7 @@ function ensemblesFor(stageId) {
  * extracted table the renderer draws, so the writer and the reader cannot
  * disagree about which record a member owns.
  */
-async function chainRecords(stageId) {
+async function chainRecords(stageId: string) {
     if (!points) {
         try {
             points = await (await fetch("assets/data/point_sprites.json")).json();
@@ -200,19 +252,19 @@ async function chainRecords(stageId) {
  * needs the chain's own bytes, so the first ensemble on a stage waits for them
  * exactly as the slot player does.
  */
-function ensembleChain(stageId) {
+function ensembleChain(stageId: string) {
     return ensembleChains[stageId];
 }
 
 /** The chain as it stands right now, from the table loaded beside the others. */
-function ensembleChainNow(stageId) {
+function ensembleChainNow(stageId: string) {
     if (ensembleChain(stageId) !== undefined) return ensembleChain(stageId);
     const recs = points?.[stageId]?.records ?? [];
     return recs.length ? recs.map((r) => ({ atlasFlag: r.atlasFlag, size: r.size })) : null;
 }
 
 /** Resolve the chain if it has not arrived yet; returns whether it is ready. */
-async function ensureEnsembleChain(stageId) {
+async function ensureEnsembleChain(stageId: string) {
     if (ensembleChain(stageId) !== undefined) return ensembleChain(stageId) != null;
     const recs = await chainRecords(stageId);
     ensembleChains[stageId] = recs.length ? recs : null;
@@ -220,8 +272,8 @@ async function ensureEnsembleChain(stageId) {
 }
 
 /** Per-stage sound hook, so a tick's bounce plays through the game's sfx. */
-function soundFor(stageId) {
-    return (word) => playSound?.(word >>> 0, stageId);
+function soundFor(stageId: string) {
+    return (word: number) => playSound?.(word >>> 0, stageId);
 }
 
 /**
@@ -230,7 +282,7 @@ function soundFor(stageId) {
  * effect registry" answer. Constructing an id that is already live is a no-op,
  * exactly as fieldstg F0x80084dd0 looks the id up before constructing.
  */
-export function fireStageObject(stageId, id, sub) {
+export function fireStageObject(stageId: string, id: number | string, sub?: number | string) {
     // THE point-record actors (engine/systems/point-record-actor.ts): all
     // fifteen members in one module -- the Asuka City download halos, the login
     // flash, the Kusanagi City / Undersea Base decor and the s805/s810/s820
@@ -344,12 +396,12 @@ export function fireStageObject(stageId, id, sub) {
  * the translated route owns the stage. Under a native stage the interpreter runs
  * the original driver and publishes its own quads, and this one stands down.
  */
-export function streetScreensActive(stageId) {
+export function streetScreensActive(stageId: string) {
     return !nativeStage(stageId);
 }
 
 /** Per-frame: advance every live actor. Call once, before the draw passes. */
-export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0, pad = 0) {
+export function tickStageObjects(stageId: string, delta = 1, camX = 0, camY = 0, pad = 0) {
     // The street cars, the street screens and the pad halos count the same blanks as the rocks.
     tickStreetVehicles(stageId, delta);
     if (streetScreensActive(stageId)) tickStreetScreens(stageId, delta);
@@ -391,7 +443,7 @@ export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0, pad = 0
     for (const o of ensembleLive[stageId] ?? []) {
         const m = ensembleFor(ensemblesFor(stageId), o.id);
         if (!m) continue;
-        tickEnsemble(o, m, delta, (slot, patch) => {
+        tickEnsemble(o, m, delta, (slot: number, patch: EnsembleWrite) => {
             const rec = o.recs[slot];
             if (rec >= 0) setPointSlot(stageId, rec, patch);
         });
@@ -418,13 +470,13 @@ export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0, pad = 0
  * returned for this frame (the render loop reads it once and hands the same
  * list to the native stage runtime). Returns the number of blanks run.
  */
-export function paceStageObjects(stageId, deltas: number[], camX = 0, camY = 0, pad = 0) {
+export function paceStageObjects(stageId: string, deltas: number[], camX = 0, camY = 0, pad = 0) {
     for (const delta of deltas) tickStageObjects(stageId, delta, camX, camY, pad);
     return deltas.length;
 }
 
 /** This frame's draw entries: {id, clip, x, y} for each rock still falling. */
-export function stageObjectDraws(stageId) {
+export function stageObjectDraws(stageId: string) {
     const out = [];
     const list = live[stageId];
     if (list?.length) out.push(...fallingObjectDraws(list));
@@ -442,13 +494,13 @@ export function stageObjectDraws(stageId) {
  * corner already carries them; the A.O.A announcement's SETANIM 801 802 is what
  * moves them onto the news tiles.
  */
-export function streetScreenQuads(stageId) {
+export function streetScreenQuads(stageId: string) {
     if (!streetScreensActive(stageId)) return [];
     return streetScreenDraws(stageId);
 }
 
 /** Live actor list for a stage (tests and the native screen lab read this). */
-export function liveStageObjects(stageId) {
+export function liveStageObjects(stageId: string) {
     return live[stageId] ?? [];
 }
 
@@ -458,12 +510,12 @@ export function liveStageObjects(stageId) {
  * the original machine code and the translated port side by side; the game
  * itself never calls it, so the two routes cannot both own an id in play.
  */
-export function fireNativeStageObject(stageId, id) {
+export function fireNativeStageObject(stageId: string, id: number | string) {
     return fireNativeEffect(id, 821, id);
 }
 
 /** Drop every actor on a stage — on stage change, and when a test resets. */
-export function clearStageObjects(stageId) {
+export function clearStageObjects(stageId?: string) {
     clearStreetVehicles(stageId);
     clearStreetScreens(stageId);
     clearPointRecordStageObjects(stageId);
@@ -511,7 +563,7 @@ export function setAnnotatorRandom(fn: () => number) {
     annotatorRandom = fn ?? (() => 1);
 }
 
-function annotatorLayer(stageId) {
+function annotatorLayer(stageId: string) {
     // The layer the service owns is sized by the stage, not by the screen: its
     // cull is a rectangle test against the layer's own window, so a 320x240 one
     // would hide every marker. The bounds come from the member's own children.
@@ -520,7 +572,7 @@ function annotatorLayer(stageId) {
     return layerForField(box.x, box.y, box.w, box.h, box.x, box.y, 0, 0);
 }
 
-function fireAnnotator(stageId, id) {
+function fireAnnotator(stageId: string, id: number | string) {
     const key = String(stageId).replace(/^s/, "");
     const member = ANNOTATOR_PORTED_MEMBERS.find((m) => m.stage === key && m.id === id);
     if (!member) return false;
@@ -530,7 +582,7 @@ function fireAnnotator(stageId, id) {
     return true;
 }
 
-function tickAnnotator(stageId, delta = 1) {
+function tickAnnotator(stageId: string, delta = 1) {
     const run = annotators[stageId];
     if (!run) return;
     if (run.config.delay) {
@@ -555,7 +607,7 @@ function tickAnnotator(stageId, delta = 1) {
  * stage's own TMPK pack (engine/dw3/annotator-shapes.ts). Null for a stage that
  * is not one of the family's, which is how the draw pass knows to draw nothing.
  */
-export function annotatorShapeSet(stageId) {
+export function annotatorShapeSet(stageId: string) {
     return annotatorShapeSetFor(String(stageId)) ??
         annotatorShapeSetFor(String(stageId).replace(/^s/, "")) ?? null;
 }
@@ -565,17 +617,17 @@ export function annotatorShapeSet(stageId) {
  * (descending y, first-in wins on a tie). Each names the shape id, the CLUT row,
  * the position, the directory and the shape's rectangles.
  */
-export function annotatorMarkers(stageId) {
+export function annotatorMarkers(stageId: string) {
     return annotators[stageId]?.marks ?? [];
 }
 
 /** True when this stage's annotator is live, so the draw pass asks for it. */
-export function annotatorActive(stageId) {
+export function annotatorActive(stageId: string) {
     return !!annotators[stageId] && !nativeStage(stageId);
 }
 
 /** The directory's own header words, for the debug dump and the check. */
-function shapeSetMeta(set) {
+function shapeSetMeta(set: AnnotatorShapeSet | null | undefined) {
     if (!set) return null;
     return {
         resource: set.resource, frames: set.frames, members: set.members,
@@ -604,7 +656,7 @@ function shapeSetMeta(set) {
 export const STAGE_AMBIENCE_EXECUTION = "translated";
 
 /** Debug/diagnostics: `window.__stageAmbience.diagnostics(mapId)`. */
-export function stageAmbienceDiagnostics(stageId) {
+export function stageAmbienceDiagnostics(stageId?: string) {
     return {
         execution: "translated",
         stage: stageId ?? null,
@@ -616,7 +668,7 @@ export function stageAmbienceDiagnostics(stageId) {
 }
 
 /** Debug/state dump for `window.__stageObjects`. */
-export function stageObjectState(stageId) {
+export function stageObjectState(stageId: string) {
     const cfg = configFor(stageId);
     return {
         stage: stageId ?? null,

@@ -45,11 +45,11 @@ import {
   sheetStatValue,
   wieldNameFor,
 } from "./logic.js";
-import type { MenuState } from "./types.js";
+import type { ClipPlace, FoldFn, MenuState, PivotPair, RosterViewEntry } from "./types.js";
 
 import type { GameState } from "../game/types.js";
 // ITEMS: "Which one?" category picker, then the 8x2 bag (F0x80092fac).
-export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, roster, t: number, fold = null) {
+export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, roster: RosterViewEntry[], t: number, fold: FoldFn | null = null) {
   const I = MS.UI.screens.items;
   if (m.itemMode === "use_target") {
     _drawHeader(ctx, "Use it on who?", fold);
@@ -72,9 +72,11 @@ export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: M
     return;
   }
 
-  const clipAt = (c) => () => drawClip(ctx, ststat, c.clip, c.x, c.y);
-  const winP = fold ? fold("itemsList", ...(I.list_window.pivot ?? [0xA0, 0x60]), "xy", clipAt(I.list_window)) : (clipAt(I.list_window)(), 1);
-  if ((fold ? fold("itemsTitle", ...(I.title_plate.pivot ?? [0xC, 0x17]), "x", clipAt(I.title_plate)) : (clipAt(I.title_plate)(), 1)) >= 1) {
+  const clipAt = (c: ClipPlace) => () => drawClip(ctx, ststat, c.clip, c.x, c.y);
+  // ETS item 9: every decoded pivot in status_ui.json is an [x, y] pair, but the JSON gives number[] (MS.UI is untyped).
+  const winP = fold ? fold("itemsList", ...(I.list_window.pivot ?? [0xA0, 0x60]) as PivotPair, "xy", clipAt(I.list_window)) : (clipAt(I.list_window)(), 1);
+  // ETS item 9: the pivot is an [x, y] pair (see the first one above).
+  if ((fold ? fold("itemsTitle", ...(I.title_plate.pivot ?? [0xC, 0x17]) as PivotPair, "x", clipAt(I.title_plate)) : (clipAt(I.title_plate)(), 1)) >= 1) {
     drawText(ctx, ITEM_CATS[m.itemCat], I.title_text.x, I.title_text.y);
   }
   const list = m.itemList!(state);
@@ -82,7 +84,8 @@ export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: M
   const perPage = G.cols * G.rows;
   const page = Math.floor((list.length ? m.itemCursor : 0) / perPage);
   const pageCount = Math.max(1, Math.ceil(list.length / perPage));
-  if (fold) fold("itemsCat", ...(I.cat_plate.pivot ?? [0x140, 0x26]), "x", clipAt(I.cat_plate));
+  // ETS item 9: the pivot is an [x, y] pair (see the first one above).
+  if (fold) fold("itemsCat", ...(I.cat_plate.pivot ?? [0x140, 0x26]) as PivotPair, "x", clipAt(I.cat_plate));
   else clipAt(I.cat_plate)();
   if (winP < 1) return;
 
@@ -149,7 +152,7 @@ export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: M
 // footer plate with item desc + wield-slot line. Grey = native palette+0xb0.
 export const GREY = { color: "rgb(136,136,152)" };
 
-export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, p, t: number, fold: (key: string, ...rest: (number | string | (() => void))[]) => number) {
+export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, p: RosterViewEntry | undefined, t: number, fold: FoldFn) {
   const E = MS.UI.screens.equip;
   const sh = MS.UI.screens.shared;
   const D = MS.UI.screens.detail;
@@ -167,8 +170,8 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
     if (D.stat_icons) drawClip(ctx, cmfont, D.stat_icons.clip, D.stat_icons.x, D.stat_icons.y);
     STAT_ROWS.forEach((stat, i) => {
       const y = D.stat_values.y_base + i * D.stat_values.pitch;
-      const after = sheetStatValue(p, preview, stat, wornSlot!);
-      const before = sheetStatValue(p, snapshot, stat, wornSlot!);
+      const after = sheetStatValue(p, preview, stat, wornSlot);
+      const before = sheetStatValue(p, snapshot, stat, wornSlot);
       // These are the STATUS SHEET's own widgets, still on screen: the equip
       // screen's ctor F0x80086498 builds no stat widget and its draw F0x80086dd4
       // never lays down the stat window, so it draws over a sheet that is still
@@ -187,7 +190,8 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
   // header plate + prompt (prompt shows while choosing a slot)
   const H = E.header_plate;
   const headerShown =
-    fold("eqHeader", ...H.pivot, "x", () => drawClip(ctx, cmfont, H.clip, H.x, H.y)) >= 1;
+    // ETS item 9: every decoded pivot in status_ui.json is an [x, y] pair, but the JSON gives number[] (MS.UI is untyped).
+    fold("eqHeader", ...H.pivot as PivotPair, "x", () => drawClip(ctx, cmfont, H.clip, H.x, H.y)) >= 1;
 
   // The sheet is STILL THERE. This screen's own ctor F0x80086498 builds no card,
   // no EXP plate and no TP plate, and its draw F0x80086dd4 lays none of them
@@ -225,8 +229,9 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
   // slots window (profile +0x3c0 order: Head/Body/Right/Left/Acc/Acc);
   // native closes it while the bag list is up (F0x80087890)
   const SW = E.slots_window;
+  // ETS item 9: the pivot is an [x, y] pair (see the first one above).
   if (m.equipFocus === "slots" &&
-      fold("eqSlots", ...SW.pivot, "x", () => drawClip(ctx, ststat, SW.clip, SW.x, SW.y)) >= 1) {
+      fold("eqSlots", ...SW.pivot as PivotPair, "x", () => drawClip(ctx, ststat, SW.clip, SW.x, SW.y)) >= 1) {
     for (let i = 0; i < E.slots.n; i++) {
       const y = E.slots.y_base + i * E.slots.pitch;
       const itemId = equipped[EQUIP_SLOT_KEYS[i]];
@@ -251,7 +256,8 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
     // own grey. The refusal colour had been open since 2026-07-10.
     const listRow = EQUIP_ROW_SLOTS.indexOf(slotKey!);
     const listLine = rosterSlotOfCharId(String(state.party?.[m.detailIdx ?? 0] ?? ""));
-    if (fold("eqList", ...LW.pivot, "x", () => drawClip(ctx, ststat, LW.clip, LW.x, LW.y)) >= 1) {
+    // ETS item 9: the pivot is an [x, y] pair (see the first one above).
+    if (fold("eqList", ...LW.pivot as PivotPair, "x", () => drawClip(ctx, ststat, LW.clip, LW.x, LW.y)) >= 1) {
       const L = E.list;
       drawText(ctx, E.slot_names[m.equipCursor], L.header.x, L.header.y, GREY);
       options!.slice(m.equipScroll, m.equipScroll + L.rows).forEach((opt, vi) => {
@@ -290,8 +296,9 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
   // current-equipment panel (top right, list mode only): "Equip" +
   // selected slot's current item (F0x80086c78)
   const DW = E.detail_window;
+  // ETS item 9: the pivot is an [x, y] pair (see the first one above).
   if (m.equipFocus === "list" &&
-      fold("eqDetail", ...DW.pivot, "x", () => drawClip(ctx, ststat, DW.clip, DW.x, DW.y)) >= 1) {
+      fold("eqDetail", ...DW.pivot as PivotPair, "x", () => drawClip(ctx, ststat, DW.clip, DW.x, DW.y)) >= 1) {
     drawText(ctx, E.detail.label.str, E.detail.label.x, E.detail.label.y, GREY);
     const curId = equipped[slotKey];
     if (curId != null) {
@@ -304,8 +311,9 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
 
   // footer plate + desc lines (list mode only — drawn inside the list
   // window's branch in F0x80086dd4)
+  // ETS item 9: the pivot is an [x, y] pair (see the first one above).
   if (m.equipFocus === "list" &&
-      fold("eqList", ...(sh.footer.pivot ?? [0, 0xD3]), "x",
+      fold("eqList", ...(sh.footer.pivot ?? [0, 0xD3]) as PivotPair, "x",
         () => drawClip(ctx, ststat, sh.footer.clip, sh.footer.x, sh.footer.y)) >= 1) {
     const sel = options![m.equipListCursor];
     const [d1, d2] = E.desc_lines;

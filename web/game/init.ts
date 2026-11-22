@@ -52,6 +52,7 @@ import { initEngine } from "./engine-init.js";
 import { loadAndSetMap, setCharacter } from "./map-load.js";
 import { manifestIndexOf, startGame } from "./session.js";
 import { openMemoryCard } from "./ui-openers.js";
+import type { ManifestMap, ManifestSprite, SpriteRecord, StageExit } from "./types.js";
 
 export async function init() {
     await initializeAssetModeUi();
@@ -102,14 +103,14 @@ export async function init() {
     state.manifest = await (await fetch("assets/manifest.json")).json();
     // Maps made after the disc join the manifest like a disc map (web/newmaps.js); none installed = nothing changes.
     state.newMaps = await loadNewMaps(
-        (url) => fetch(url).then((r) => (r.ok ? r.json() : null)),
-        (url) => fetch(url, { method: "HEAD" }).then((r) => r.ok),
+        (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null)),
+        (url: string) => fetch(url, { method: "HEAD" }).then((r) => r.ok),
     ).catch(() => ({ records: [], scenes: {}, exits: {} }));
     mergeNewMaps(state.manifest, state.newMaps);
-    S.knownStageIds = state.manifest.maps.map((m) => m.id);
+    S.knownStageIds = state.manifest.maps.map((m: ManifestMap) => m.id);
     S.manifestSprites = new Map([
-        ...state.manifest.characters.map((record) => [record.id, { record, kind: "character" }]),
-        ...(state.manifest.npcs ?? []).map((record) => [record.id, { record, kind: "npc" }]),
+        ...state.manifest.characters.map((record: SpriteRecord): [string, ManifestSprite] => [record.id, { record, kind: "character" }]),
+        ...(state.manifest.npcs ?? []).map((record: SpriteRecord): [string, ManifestSprite] => [record.id, { record, kind: "npc" }]),
     ]);
     // Global npc_id→sprite table the engine actually uses (NOT "p"+id). Tolerate 404.
     state.npcSprites = {};
@@ -130,7 +131,7 @@ export async function init() {
                 state.manifest.npcs.push(rec);
                 S.manifestSprites.set(rec.id, { record: rec, kind: "npc" });
             }
-            Object.assign(state.npcSprites, x.npc_sprites ?? {});
+            Object.assign(state.npcSprites!, x.npc_sprites ?? {});
             S.extraResidents = x.residents ?? [];
         }
     } catch {
@@ -149,7 +150,7 @@ export async function init() {
         const ep = await fetch("extra_partners.json");
         if (ep.ok) {
             for (const rec of (await ep.json()).characters ?? []) {
-                if (state.manifest.characters.some((c) => c.id === rec.id)) continue;
+                if (state.manifest.characters.some((c: SpriteRecord) => c.id === rec.id)) continue;
                 state.manifest.characters.push(rec);
                 S.manifestSprites.set(rec.id, { record: rec, kind: "character" });
             }
@@ -179,9 +180,9 @@ export async function init() {
     try {
         const sj = await fetch("assets/data/shops.json");
         if (sj.ok) {
-            const byId = {};
+            const byId: Record<number, { items: number[]; name: string; }> = {};
             for (const s of (await sj.json()).shops)
-                byId[s.shop_id] = { items: s.items.map((i) => i.id), name: s.name };
+                byId[s.shop_id] = { items: s.items.map((i: { id: number; }) => i.id), name: s.name };
             state.shops = byId;
         }
     } catch {
@@ -193,7 +194,7 @@ export async function init() {
     const npcProgramsResponse = await fetch("stage-npc-programs.json");
     if (!npcProgramsResponse.ok) throw new Error("Decoded NPC programs unavailable");
     const npcPrograms = (await npcProgramsResponse.json()).stages;
-    const sceneLoads = state.manifest.maps.map(async (m) => {
+    const sceneLoads = state.manifest.maps.map(async (m: ManifestMap) => {
         try {
             const own = newMapScene(state.newMaps, m.id);
             const res = own ? null : await fetch("assets/scenes/" + m.id + ".json");
@@ -209,7 +210,7 @@ export async function init() {
             // A places stage re-aims its exits on every arrival from these rows
             // (applyPlacePoints), so keep the build-time rows pristine: the aim
             // writes a fresh array, and an unmatched pair falls back to this one.
-            if (scene.placePoints) scene._baseExits = scene.exits.map((e) => ({ ...e }));
+            if (scene.placePoints) scene._baseExits = scene.exits.map((e: StageExit) => ({ ...e }));
             // gen_scenes.py already bakes the disasm-verified default ("down-left" — the
             // FIELDSTG constructor's unconditional entity+0x60 init, see npc-decode.md)
             // for NPCs with no SETANIM ground truth. This is just a safety net for any
@@ -552,8 +553,8 @@ export async function init() {
     installShowcase({
         select: document.getElementById("showcaseSelect"),
         apply: applyScene,
-        goTo: (id) => {
-            const i = state.manifest.maps.findIndex((m) => m.id === id);
+        goTo: (id: string) => {
+            const i = state.manifest.maps.findIndex((m: ManifestMap) => m.id === id);
             if (i < 0) return;
             mapSelect.selectedIndex = i;
             loadAndSetMap(i);
@@ -583,7 +584,7 @@ export async function init() {
     // Restore persisted charIdx from charId after manifest is loaded.
     if (state.charId) {
         const savedIdx = state.manifest.characters.findIndex(
-            (c) => c.id === state.charId,
+            (c: SpriteRecord) => c.id === state.charId,
         );
         if (savedIdx > 0) state.charIdx = savedIdx;
     }
@@ -856,7 +857,7 @@ export async function init() {
     // sequence without guessing at pixels.
     window.__titleState = () => ts;
 
-    const commitTitle = (result, launchCode = 0) => {
+    const commitTitle = (result: number, launchCode = 0) => {
         if (result === RESULT_START) {
             document.getElementById("title-newgame")!.click();
         } else if (result === RESULT_CONTINUE) {
@@ -878,7 +879,7 @@ export async function init() {
     // more per browser frame), so the title's beat counter counts 60 sixtieths
     // a second on a 60Hz panel and on a 144Hz one, as the disc does.
     let titleLastT = 0;
-    const titleFrame = (t) => {
+    const titleFrame = (t: number) => {
         if (state.started || title!.hidden) return;
         const dt = titleLastT ? Math.min((t - titleLastT) / 1000, 0.1) : 0;
         titleLastT = t;
@@ -1100,7 +1101,7 @@ S.launchTitleScreen = () => {
     } else {
         title!.hidden = false;
         title!.classList.add("native");
-        const onPick = (row, language, launchCode = 0) => {
+        const onPick = (row: number, language: number, launchCode = 0) => {
             // The screen's own commit: the language byte it wrote to the
             // original's global. The walker ships one language, so this is
             // recorded rather than used to swap assets.

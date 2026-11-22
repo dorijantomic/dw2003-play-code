@@ -16,6 +16,8 @@ import { engineFlagSeen, refreshPartyCharisma } from "./map-load.js";
 import { currentMap } from "./session.js";
 import { gameOverToTitle, startFieldBattle } from "./battle-launch.js";
 import { fieldcomTick } from "./field-fx.js";
+import type { EngineInventory, StoryEvent } from "./types.js";
+import type { VarValue } from "../../engine/core/types.js";
 
 // Construct the headless engine + its presentation bridge + OnStep trigger-system. Called
 // once from init() (awaited) before the loop starts. Seeds the banked store + ordinal from
@@ -38,8 +40,8 @@ export async function initEngine() {
         // Persist each row's once bit the moment EngineBridge/EventManager fires it,
         // so a reload does not replay an already-seen auto/talk cutscene.
         onceStore: {
-            get: (id) => engineEventDone.has(id),
-            set: (id) => {
+            get: (id: string) => engineEventDone.has(id),
+            set: (id: string) => {
                 if (engineEventDone.has(id)) return;
                 engineEventDone.add(id);
                 localStorage.setItem(
@@ -58,6 +60,8 @@ export async function initEngine() {
     // 0x80–0x92, e.g. the Blue Card gate flag 0x818e) and GiveItem grants read/write the SAME bag
     // the menu/shop/save use — no second inventory to keep in sync. evalContext() reads
     // engine.state.inventory fresh each eval, so this takes effect immediately.
+    // ETS item 9: the engine's Inventory holds a private `items` map; this adapter stands in for it and
+    // reads state.inventory instead, so the map is never touched and the adapter does not carry it.
     S.engine!.state.inventory = {
         // The scene's possession gate is F0x80015F04's "do we have any" form, which
         // counts a WORN copy as having it; a script's larger `count` is the
@@ -74,7 +78,7 @@ export async function initEngine() {
         },
         toJSON: () => state.inventory.map((s) => [s.id, s.qty ?? 1]),
         load: () => {}, // state.inventory is loaded from localStorage during state init
-    };
+    } as EngineInventory;
 
     // Seed the banked store + ordinal from persisted save, THEN register persistence so a seed
     // load doesn't echo back to storage. FlagManager.load only touches known banks; ignore junk.
@@ -91,7 +95,7 @@ export async function initEngine() {
     // original never had one, and nothing writes it now.
     const migrateVisited = () => {
         if (!state.visitedMaps!.size) return;
-        migrateVisitedMaps([...state.visitedMaps], S.fieldScreenTable, {
+        migrateVisitedMaps([...state.visitedMaps!], S.fieldScreenTable, {
             get: engineFlagSeen,
             set: (id, value) => S.engine!.state.flags.set(id, value),
         });
@@ -132,7 +136,7 @@ export async function initEngine() {
         "$roster.owned",
         rosterMaskForParty(Number(state._rosterOwned) || 0, state.party ?? []),
     );
-    S.engine!.state.vars.onChange((n: string, _o, v) => {
+    S.engine!.state.vars.onChange((n: string, _o: VarValue | undefined, v: VarValue) => {
         if (n === "$story.ordinal")
             localStorage.setItem("progressOrdinal", String(v));
         else if (n === "$party.bit") {
@@ -225,9 +229,9 @@ export async function initEngine() {
         // not unique inside a stage — the Master Room's records for events 965 and 1450
         // share 012e000a (wstag305.s:3699-3708), so the old flag_key lookup could hand the
         // step path the wrong scene. flag_key stays the fallback.
-        getEventById: (mapId: string | number, id) =>
+        getEventById: (mapId: string | number, id: number) =>
             (state.wstag[mapId] || []).find((e) => e.id === id) || null,
-        getEventByKey: (mapId: string | number, fk) =>
+        getEventByKey: (mapId: string | number, fk: string) =>
             (state.wstag[mapId] || []).find((e) => e.flag_key === fk) || null,
         flags: storyFlags,
         hostCompletesEvent: true,
@@ -236,7 +240,7 @@ export async function initEngine() {
             state.flags["evt_" + fk] = true;
             localStorage.setItem("flags", JSON.stringify(state.flags));
         },
-        playEvent: (ev, onDone: () => void) =>
+        playEvent: (ev: StoryEvent, onDone: () => void) =>
             playStoryEvent(ev, (handoff) => {
                 // The event's OWN on_complete, through the engine: it runs
                 // `<stage>.event.<id>.oncomplete` (the flag writes read out of that

@@ -66,17 +66,28 @@ import {
 } from "./draw-common.js";
 import { _drawEquip, _drawItems } from "./draw-items.js";
 import { _drawDetail, _drawSeeDigivolve } from "./draw-digivolve.js";
-import type { MenuState } from "./types.js";
+import type { MenuState, RosterViewEntry } from "./types.js";
+import type { SfxPlayerContext } from "../types/audio.js";
 
 import type { GameState } from "../game/types.js";
-import type { RosterMember, DigimonRecord } from '../types/battle.js';
-interface RosterViewEntry extends RosterMember {
-  profile?: DigimonRecord;
+import type { DigimonRecord } from '../types/battle.js';
+
+/** one pick in the equipment bag list: an item, or the Unequip row */
+interface EquipChoice {
+  unequip?: boolean;
+  id?: number;
+  name?: string;
 }
 
-export function createMenu(sfx = null) {
+/** assets/data/digimon.json, as far as the menu reads it */
+interface MenuDataJson {
+  digimon: DigimonRecord[];
+  skills: { id: number; mp_cost?: number; power?: number; }[];
+}
+
+export function createMenu(sfx: SfxPlayerContext | null = null) {
   const backdrop = createStatusBackdrop();
-  const m = {
+  const m: MenuState = {
     // top-level list cursor / drilled-in screen
     mainCursor: 0,
     cardFolderCursor: 0,
@@ -131,7 +142,7 @@ export function createMenu(sfx = null) {
     feedbackTimer: 0,
     digimonDB: null,
     skillDB: null,
-  } as MenuState;
+  };
 
   // ── window fold animation (decoded tween F0x80099d5c / F0x80099df0) ────
   // Opening ramps the window's scale 0 -> 0x1000 over the slot's `steps` and
@@ -249,7 +260,7 @@ export function createMenu(sfx = null) {
   let dataPromise: Promise<void> | null = null;
   m.ensureData = () => {
     if (!dataPromise) {
-      dataPromise = fetch("assets/data/digimon.json").then((r) => r.json()).then((dj) => {
+      dataPromise = fetch("assets/data/digimon.json").then((r) => r.json()).then((dj: MenuDataJson) => {
         m.digimonDB = Object.fromEntries(dj.digimon.map((d) => [d.id, d]));
         m.skillDB = Object.fromEntries(dj.skills.map((s) => [s.id, s]));
       });
@@ -299,7 +310,7 @@ export function createMenu(sfx = null) {
       state.partyStats = state.party.map(() => null);
     }
     let changed = false;
-    state.party.forEach((charId: string | number, i: number) => {
+    state.party.forEach((charId: string | null, i: number) => {
       if (i === 0) return; // lead uses live partnerStats
       if (!state.partyStats[i]) {
         const prof = m.digimonDB?.[CHARID_TO_DIGID[charId]];
@@ -930,7 +941,7 @@ export function createMenu(sfx = null) {
 
     if (m.screen === "equip") {
       if (m._seq!.length) return;   // a fold is running: the original reads no pad
-      const apply = (choice, slotKey: string | undefined) => {
+      const apply = (choice: EquipChoice, slotKey: string | undefined) => {
         ensureEquipment(state);
         // Build the new slot map on a COPY, then hand both to the store's one
         // record writer: it moves the worn byte by the difference the record gained

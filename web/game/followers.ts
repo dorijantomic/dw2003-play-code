@@ -15,6 +15,7 @@ import {
 } from "./vars.js";
 import { S } from "./state.js";
 import { manifestIndexOf } from "./session.js";
+import type { FormLedgerEntry, PartyRosterRow, SpawnPoint } from "./types.js";
 
 export function glossarySpecies() {             // null until the tables are in
     return glossaryLoader.get();
@@ -24,9 +25,9 @@ export function glossaryItems() {
     S.glossaryItemLoader ??= createRetryLoader(() => loadItemsData(undefined, battleHudNameBank));
     return {
         data: S.glossaryItemLoader!.get(),
-        info: (id) => ITEM_BY_ID[id] ?? null,                 // the real name and description the shop and the equip footer show
+        info: (id: number) => ITEM_BY_ID[id] ?? null,                 // the real name and description the shop and the equip footer show
         ids: () => itemLog.knownIds(),
-        held: (id) => heldCount(state, id),
+        held: (id: number) => heldCount(state, id),
     };
 }
 
@@ -75,7 +76,7 @@ export function resetFollowers() {
 // EXPERIMENT (mounts): the party steps back into the world next to the mount, at the spots web/mount.js found
 // (walkable ground, nearest first) — never a snap across the map. The trail is re-seeded at the player so the
 // followers blend back into the conga line as the player walks off.
-export function placeFollowersAt(spots) {
+export function placeFollowersAt(spots: (SpawnPoint | undefined)[] | null | undefined) {
     for (let i = 0; i < followers.length; i++) {
         const s = spots?.[i];
         if (!s) continue;
@@ -111,7 +112,7 @@ export function parkGatheredFollowers() {
 // passes to engine/dw3/evo-trees.ts (statsRecord.formLedger, .level, .stats/.bonuses/.elemBonuses).
 export function plannerPartyMembers() {
     const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
-    return view.slice(0, 3).map((row, i) => {
+    return view.slice(0, 3).map((row: PartyRosterRow, i: number) => {
         const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
         if (!record) return null;
         const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
@@ -119,7 +120,7 @@ export function plannerPartyMembers() {
             slot,
             name: row.name,
             live: {
-                formLevels: Object.fromEntries((record.formLedger ?? []).map((entry) => [Number(entry.id), Number(entry.formLevel ?? 1)])),
+                formLevels: Object.fromEntries((record.formLedger ?? []).map((entry: FormLedgerEntry) => [Number(entry.id), Number(entry.formLevel ?? 1)])),
                 level: Number(record.level ?? 1),
                 stats: record,
             },
@@ -136,7 +137,7 @@ export function noteOwnedSpecies() {
 // GLOSSARY > DIGIMON: the party as the glossary reads it. `rookie` is the starter species, `form` the species it wears now.
 export function glossaryPartners() {
     const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
-    return view.slice(0, 3).map((row, i) => {
+    return view.slice(0, 3).map((row: PartyRosterRow, i: number) => {
         const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
         if (!record) return null;
         const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
@@ -146,7 +147,7 @@ export function glossaryPartners() {
             form: row.formName,
             formId: Number(row.digimonId),
             level: Number(record.level ?? 1),
-            live: { formLevels: Object.fromEntries((record.formLedger ?? []).map((entry) => [Number(entry.id), Number(entry.formLevel ?? 1)])), level: Number(record.level ?? 1), stats: record },
+            live: { formLevels: Object.fromEntries((record.formLedger ?? []).map((entry: FormLedgerEntry) => [Number(entry.id), Number(entry.formLevel ?? 1)])), level: Number(record.level ?? 1), stats: record },
         };
     }).filter(Boolean);
 }

@@ -15,8 +15,9 @@ export interface MpFighterCommand {
 
 /** What a fight reports back to whoever started it (done({ won, fled, reward })). */
 export interface MpFightResult {
-  won: boolean;
-  fled: boolean;
+  /** a fight that could not start reports only { fled: true } */
+  won?: boolean;
+  fled?: boolean;
   reward?: unknown;
 }
 

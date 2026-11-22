@@ -1,5 +1,6 @@
 import { stageCast, fieldDirectionIndex, rectBlocked, parseEntry } from "../vendor/engine.js";
-import type { SpeechBeat } from "./types.js";
+import type { CastScene, DialogueRef, ManifestMap, QuestChaseEvent, QuestSceneEvent, QuestSceneHooks, SceneNpc, SpeechBeat } from "./types.js";
+import type { BattleWinResult } from "../battle/core/types.js";
 import { mountActorHidden } from "../mount.js";
 import { questNeededNpcs } from "../quests.js";
 import { questStandFree, standInSpot, questWalkLegs } from "../quest-walk.js";
@@ -68,41 +69,6 @@ import { S } from "./state.js";
 import { resetFollowers } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 import { startTransition } from "./transitions.js";
-interface QuestChaseEvent {
-    kind: "chase";
-    target?: string | number;
-    speed?: number;
-    lose?: number;
-}
-
-interface QuestSceneWarpEvent {
-    kind: "warp";
-    to?: string | number | null;
-    at?: [number, number] | null;
-    dir?: number;
-}
-
-type QuestSceneEvent =
-    | { kind: "fx"; sheet: string }
-    | { kind: "fxplay" }
-    | { kind: "fxmove" }
-    | { kind: "fxremove" }
-    | { kind: "fxwait"; name: string }
-    | { kind: "drop"; pixels: number; step: number }
-    | { kind: "rise"; pixels: number; step: number }
-    | { kind: "ghost" }
-    | { kind: "bucket"; value: number }
-    | { kind: "fade"; to: number; frames: number }
-    | { kind: "shake" }
-    | { kind: "weather"; weather: string; strength: number; frames: number; force?: boolean }
-    | { kind: "time"; time: string; frames: number; force?: boolean }
-    | { kind: "lightning"; count: number; force?: boolean }
-    | { kind: "sfx"; name: string }
-    | { kind: "placecard"; area: string; place: string }
-    | { kind: "chase" }
-    | { kind: "battle"; screen: number }
-    | QuestSceneWarpEvent;
-
 
 // The cast of the CURRENT stage, built ONCE at stage entry.
 //
@@ -124,16 +90,16 @@ type QuestSceneEvent =
 // conjured a phantom ephemeral at (-100,-100). Snapshot the built cast here; script
 // -spawned (ephemeral) actors join it as the scene conjures them, exactly as the
 // disc's `spawnActor` pushes onto scene.npcs.
-export function sceneCast(sc) {
+export function sceneCast(sc: CastScene | null | undefined) {
     if (!sc) return [];
     // The shared rule lives in engine/dw3/npc-manager.ts `stageCast`; this adds the
     // script-spawned (ephemeral) actors the scene conjures onto scene.npcs.
     // EXPERIMENT (mounts): a mount's quest character is off the map while F2 -> Extras -> Mount is off
-    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get!!!!!!).filter((n) => !mountActorHidden(n));
+    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get).filter((n: SceneNpc) => !mountActorHidden(n));
     const stand = questStandIns(sc, built);
-    const eph = sc.npcs.filter((n) => n._ephemeral);
+    const eph = sc.npcs.filter((n: SceneNpc) => n._ephemeral);
     if (!eph.length) return stand.length ? built.concat(stand) : built;
-    const extra = eph.filter((e) => !built.includes(e));
+    const extra = eph.filter((e: SceneNpc) => !built.includes(e));
     return extra.length || stand.length ? built.concat(extra, stand) : built;
 }
 
@@ -141,26 +107,26 @@ export function sceneCast(sc) {
 // the player's point in the story (their spawn flags say no). Then a copy of them stands at one of their own posts on this
 // map, preferring a post nobody else is standing on, so the quest can go on. Only the current map, only while needed; the
 // copies are kept on the scene so they keep their facing and state between frames. Quests off: none.
-function questStandIns(sc, built) {
+function questStandIns(sc: CastScene, built: SceneNpc[]) {
     const m = currentMap();
     if (!m || state.scenes[m.id] !== sc) return [];
     const need = questNeededNpcs(m.id);
     if (!need.length) { sc._standIns = null; return []; }
     sc._standIns ??= new Map();
     const grid = state.collision[m.id];
-    const out = [];
+    const out: SceneNpc[] = [];
     for (const npcId of need) {
-        if (built.some((n) => n.npc_id === npcId)) continue;
+        if (built.some((n: SceneNpc) => n.npc_id === npcId)) continue;
         let s = sc._standIns.get(npcId);
         if (!s) {
-            const posts = sc.npcs.filter((n) => n.npc_id === npcId && !n._ephemeral && !n._quest);
+            const posts = sc.npcs.filter((n: SceneNpc) => n.npc_id === npcId && !n._ephemeral && !n._quest);
             if (!posts.length) continue;
             // The post itself is used as it stands (the game's own NPCs stand on counters and door cells). Only when
             // someone else is standing there is the copy nudged aside, and then it must land on walkable ground and clear
             // of everyone (web/quest-walk.js standInSpot tries a few nudges around the post, else keeps the post).
-            const taken = (x, y) => built.some((n) => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20);
+            const taken = (x: number, y: number) => built.some((n: SceneNpc) => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20);
             const clear = (x: number, y: number) => !taken(x, y) && (!grid || questStandFree(grid, x, y));
-            const post = posts.find((p) => !taken(p.x, p.y)) ?? posts[0];
+            const post = posts.find((p: SceneNpc) => !taken(p.x, p.y)) ?? posts[0];
             s = { ...post, id: "qstand_" + npcId, spawn_flags: [], _questStandIn: true };
             if (taken(post.x, post.y)) {
                 const spot = standInSpot(post, clear);
@@ -207,10 +173,10 @@ export function fieldStageFilled() {
  * world position, native 0..7 facing, actor id, projector to the 320x240 screen); anything else, or a
  * failed load, uses web/textbox.js with `legacyAnchor`.
  */
-export function openTalkLine(ref, onClose, npc, legacyAnchor: () => { x: number; y: number; mode: number; }) {
+export function openTalkLine(ref: DialogueRef, onClose: () => void, npc: SceneNpc | null | undefined, legacyAnchor: () => { x: number; y: number; mode: number; }) {
     const legacy = () => textbox.open!(getDialogue(ref), onClose, legacyAnchor);
     if (!npc || !/^estalk0\d$/.test(ref?.file ?? "")) return legacy();
-    const project = (x, y) => ({
+    const project = (x: number, y: number) => ({
         sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
         sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
     });
@@ -231,11 +197,11 @@ export function openTalkLine(ref, onClose, npc, legacyAnchor: () => { x: number;
  * Extra-quest speech: the same translated box an NPC's line uses, with the line built in the disc's own text format
  * (web/dialogue-pack.js). With the NPC on this map it is their balloon, otherwise the plain bottom window. Resolves on close.
  */
-export function questSpeak(npcId, name, text) {
+export function questSpeak(npcId: string | number | null | undefined, name: string, text: string | undefined) {
     return new Promise<void>((resolve) => {
         const pages = paginate(text);
         const scene = state.scenes[currentMap()?.id];
-        const npc = npcId != null && scene ? sceneCast(scene).find((n) => n.npc_id === npcId && !n.cutsceneOnly) : null;
+        const npc = npcId != null && scene ? sceneCast(scene).find((n: SceneNpc) => n.npc_id === npcId && !n.cutsceneOnly) : null;
         const anchor = npc
             ? (() => {
                 const mode = autoBalloonMode(npc.dir, (npc.x - lastCam.x) * ZOOM, (npc.y - lastCam.y) * ZOOM, VIEW_W, VIEW_H);
@@ -243,7 +209,7 @@ export function questSpeak(npcId, name, text) {
             })()
             : null;
         const fallback = () => fallbackTextbox.open!({ name, pages }, resolve, anchor);
-        const project = (x, y) => ({
+        const project = (x: number, y: number) => ({
             sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
             sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
         });
@@ -256,7 +222,8 @@ export function questSpeak(npcId, name, text) {
     });
 }
 
-export async function playQuestScene(steps): Promise<{ answer: number | null; failed: boolean } | null> {
+// ETS item 42: the steps are quest authoring data; castOf and compileScene check them.
+export async function playQuestScene(steps: unknown[]): Promise<{ answer: number | null; failed: boolean } | null> {
     const mapId = currentMap()?.id;
     const scene = state.scenes[mapId];
     if (!scene || cutscene.isActive() || textbox.isOpen!() || battle.isActive()) {
@@ -264,19 +231,19 @@ export async function playQuestScene(steps): Promise<{ answer: number | null; fa
         questSceneFxReset();
         return null;
     }
-    const here = (id) => id === "player" || sceneCast(scene).some((n) => n.npc_id === Number(id) && !n.cutsceneOnly) || !!state.npcSprites?.[Number(id)];
+    const here = (id: string | number) => id === "player" || sceneCast(scene).some((n: SceneNpc) => n.npc_id === Number(id) && !n.cutsceneOnly) || !!state.npcSprites?.[Number(id)];
     const need = castOf(steps).filter((id) => !here(id));
     if (need.length) { console.warn(`[quest scene] ${need.join(", ")} not on ${mapId}; skipped`); questSceneFxReset(); return null; }
     const playerId = state.playerCharOne ? 1 : 2;
-    const pos = (id) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
+    const pos = (id: number) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c: SceneNpc) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
     const grid = state.collision[mapId];
     // walkable ground by the player's own foot-box test, and clear of every character the scene is not moving
     const cast = new Set(castOf(steps));
-    const others = sceneCast(scene).filter((n) => !cast.has(n.npc_id) && !n._ephemeral && (n.x || n.y));
-    const free = grid ? (x, y) => !rectBlocked(grid, x - 6, y - 8, x + 6, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30) : null;
+    const others = sceneCast(scene).filter((n: SceneNpc) => !cast.has(n.npc_id) && !n._ephemeral && (n.x || n.y));
+    const free = grid ? (x: number, y: number) => !rectBlocked(grid, x - 6, y - 8, x + 6, y) && !others.some((n: SceneNpc) => Math.hypot(n.x - x, n.y - y) < 30) : null;
     // a scripted walk steps straight at its target with no collision test (the VM's own walk driver), so the compiler asks
     // this for the legs to walk instead when the straight line crosses a wall (web/quest-walk.js over the same grid)
-    const walk = grid ? (ax, ay, bx, by) => questWalkLegs(grid, ax, ay, bx, by) : null;
+    const walk = grid ? (ax: number, ay: number, bx: number, by: number) => questWalkLegs(grid, ax, ay, bx, by) : null;
     const { opcodes, speech, events, errors } = compileScene(steps, { playerId, pos, free, walk, paths: S.questPaths });
     if (errors.length) { console.warn("[quest scene]", errors.join("; ")); questSceneFxReset(); return null; }
     // our own effect sheets, before the first frame that could use one; a missing sheet only makes its step skip
@@ -284,12 +251,12 @@ export async function playQuestScene(steps): Promise<{ answer: number | null; fa
     if (sheets.length) { try { await loadQuestFxSheets(sheets); } catch { /* a sheet that will not load is skipped */ } }
     return new Promise<{ answer: number | null; failed: boolean }>((resolve) => {
         for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
-        const hooks = { afterSay: {}, sceneEvent: (index, resume) => runQuestSceneEvent(S.questSceneEvents[index], resume) };
+        const hooks: QuestSceneHooks = { afterSay: {}, sceneEvent: (index: number, resume: () => void) => runQuestSceneEvent(S.questSceneEvents[index], resume) };
         let answer: number | null = null;
         for (const [n, s] of Object.entries(speech) as [string, SpeechBeat][]) {
             hooks.afterSay[n] = s.ask
                 ? (resume: () => void) => choice.open!(s.ask!, s.options!, (i) => { answer = i; resume(); })
-                : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
+                : (resume: () => void) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
         }
         S.cutsceneEsdmgRef = null;
         state._questScene = true;
@@ -304,7 +271,7 @@ export async function playQuestScene(steps): Promise<{ answer: number | null; fa
                 if (npc._origX !== undefined) { npc.x = npc._origX; npc.y = npc._origY; }
                 delete npc._origX; delete npc._origY; delete npc._inCutscene; delete npc.activeClip; delete npc._cutTarget;
             }
-            scene.npcs = scene.npcs.filter((n) => !n._ephemeral);
+            scene.npcs = scene.npcs.filter((n: SceneNpc) => !n._ephemeral);
             delete state._inCutscene; delete state._cutTarget; delete state.activeClip;
             state._animTime = 0;
             resetFollowers();
@@ -380,7 +347,7 @@ export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resum
             const mapId = currentMap().id;
             let settled = false;
             const goOn = () => { if (!settled) { settled = true; done(); } };
-            startFieldBattle(() => Promise.resolve(battle.startScreen(Number(ev.screen), (res) => {
+            startFieldBattle(() => Promise.resolve(battle.startScreen(Number(ev.screen), (res: BattleWinResult) => {
                 presentVictory(res);
                 goOn();
             }, goOn, () => {
@@ -408,8 +375,8 @@ export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resum
                 const routed = S.screenRouter.route(to, from);
                 to = routed?.kind === "warp" ? routed.to : null;
             }
-            const idx = to != null && state.manifest.maps.some((m) => m.id === String(to))
-                ? state.manifest.maps.findIndex((m) => m.id === String(to))
+            const idx = to != null && state.manifest.maps.some((m: ManifestMap) => m.id === String(to))
+                ? state.manifest.maps.findIndex((m: ManifestMap) => m.id === String(to))
                 : -1;
             if (idx < 0) { console.warn(`[quest scene] no map for warp ${JSON.stringify(ev.to)}; skipped`); return done(); }
             startTransition({
@@ -437,7 +404,7 @@ export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resum
 function startQuestChase(ev: QuestChaseEvent, done: () => void): void {
     const scene = state.scenes[currentMap()?.id];
     const fxTarget = typeof ev.target === "string";
-    const npc = fxTarget ? null : scene ? sceneCast(scene).find((n) => n.npc_id === Number(ev.target)) : null;
+    const npc = fxTarget ? null : scene ? sceneCast(scene).find((n: SceneNpc) => n.npc_id === Number(ev.target)) : null;
     const fx = fxTarget ? questFxGet(ev.target) : null;
     if (!npc && !fx) {
         console.warn(`[quest scene] chase target ${JSON.stringify(ev.target)} is not here; the step is skipped`);
@@ -469,7 +436,7 @@ export function tickQuestChase(dt: number) {
 }
 
 /** The chase is decided: the result is the scene's answer, and a loss ends the rest of the scene right here. */
-function endQuestChase(result) {
+function endQuestChase(result: number | null) {
     const c = S.questChase;
     if (!c || c.settled) return;
     c.settled = true;
@@ -523,7 +490,7 @@ export function questSceneFxReset() {
     state.playerDrawBucket = ENTITY_BUCKET;
 }
 
-function getDialogue(ref) {
+function getDialogue(ref: DialogueRef) {
     return parseEntry(
         state.dialogues[ref.file][String(ref.index)],
         state.playerName,

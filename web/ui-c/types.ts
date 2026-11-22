@@ -97,10 +97,18 @@ export interface UiRun {
   y: number;
   /** the width the game gave the run, when it gave one */
   w?: number;
-  /** the face byte the run was drawn with */
-  face?: number | null;
+  /** the face colour the run was drawn with (a CSS colour string), null when none */
+  face?: string | null;
+  /** the right edge the run is anchored to, when it is right-aligned */
+  right?: number | null;
   [field: string]: unknown;
 }
+
+/** The page transform of a claimed clip: an identity matrix (only translation-free placements accepted by applyRel). */
+export type UiFooterRel = UiMatrix & Readonly<{ a: 1; d: 1; e: 0; f: 0 }>;
+
+/** A claimed capture clip as the screens hand it to the composers: a drawable part plus the clip's position, size, layers and row, its page transform and the part name the claim gave it. */
+export type UiClaimedPart = UiPart & UiCapturePart & { part: string; rel: UiFooterRel };
 
 /** The visible stage in native units. */
 export interface UiStage {
@@ -219,9 +227,9 @@ export interface UiTextOpts {
   lineDp?: number;
   color?: string | null;
   align?: string;
-  spacing?: number;
+  spacing?: number | undefined;
   maxDp?: number;
-  rel?: UiMatrix;
+  rel?: UiMatrix | undefined;
   cls?: string;
   rect?: UiRect;
   right?: number;

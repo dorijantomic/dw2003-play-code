@@ -109,7 +109,7 @@ interface SpeciesFile { digimon: { id: number; name: string }[]; }
 interface RoamEnemy { name: string; screen: number; level: number; }
 type RoamTable = Record<string, RoamEnemy[]>;
 
-interface QuestBattleResult { enemyFled?: boolean; won?: boolean; fled?: boolean; }   // a field fight reports enemyFled, a co-op fight won and fled
+export interface QuestBattleResult { enemyFled?: boolean; won?: boolean; fled?: boolean; }   // a field fight reports enemyFled, a co-op fight won and fled
 interface QuestBattleOpts {
     screenId?: number | undefined;
     challenge?: (number | undefined)[];
@@ -123,7 +123,7 @@ interface QuestHost {
     giveItem: (name: string, count?: number) => boolean;
     giveBits: (n: number) => void;
     startBattle: (party: QuestFoe[], opts: QuestBattleOpts) => boolean;
-    readFlag: (id: number) => number | undefined;
+    readFlag: (id: number) => number | null | undefined;
     partyLevel: () => number;
     partnerIds: () => string[];
     npcsHere: () => number[];

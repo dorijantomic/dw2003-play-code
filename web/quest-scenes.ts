@@ -579,7 +579,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
 
 /** Everyone a scene moves or speaks as (npc ids; "player" excluded): the caller checks they can be found on the map. */
 export function castOf(steps) {
-    const ids = new Set();
+    const ids = new Set<number>();
     for (const s of steps ?? []) {
         for (const k of ["walk", "arrive", "face", "put", "look", "say"]) {
             if (k in s && s[k] != null && !isPlayer(s[k]) && Number.isFinite(Number(s[k]))) ids.add(Number(s[k]));

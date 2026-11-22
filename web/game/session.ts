@@ -8,13 +8,13 @@ import { grantNewPartners, prepareStageAssets, setMap } from "./map-load.js";
 import { checkStageCutscene } from "./story-events.js";
 import { frame } from "./update.js";
 import { playerPackMeta } from "./fishing-tree.js";
-import type { GameState } from "./types.js";
+import type { FlagGate, GameState, ManifestMap, SpriteRecord, StageExit } from "./types.js";
 
 
 export function saveFieldLocation() {
     if (!state.started || !state.manifest) return;
     const entranceReturn = state.scenes[currentMap().id]?.exits?.find(
-        (exit) => exit._entranceReturn,
+        (exit: StageExit) => exit._entranceReturn,
     );
     localStorage.setItem(FIELD_LOCATION_KEY, encodeFieldLocation({
         mapId: currentMap().id,
@@ -41,7 +41,7 @@ export function scheduleFieldLocationSave() {
     }, 750);
 }
 
-export async function startGame(mapId = null) {
+export async function startGame(mapId: string | null = null) {
     state.playerName ||= "Junior";
     // EXPERIMENT (mounts): a save load (or a fresh start) begins on foot.
     mountForceDismount();
@@ -49,10 +49,10 @@ export async function startGame(mapId = null) {
         ? null
         : decodeFieldLocation(localStorage.getItem(FIELD_LOCATION_KEY), S.knownStageIds);
     const targetId = mapId ?? saved?.mapId ?? S.knownStageIds[0];
-    const idx = state.manifest.maps.findIndex((m) => m.id === targetId);
+    const idx = state.manifest.maps.findIndex((m: ManifestMap) => m.id === targetId);
     if (saved?.entranceReturn) {
         const scene = state.scenes[targetId];
-        scene.exits = (scene.exits ?? []).filter((exit) => !exit._entranceReturn);
+        scene.exits = (scene.exits ?? []).filter((exit: StageExit) => !exit._entranceReturn);
         scene.exits.push(saved.entranceReturn);
     }
     await prepareStageAssets(targetId);
@@ -80,15 +80,15 @@ export function currentChar(): NonNullable<ReturnType<typeof playerPackMeta>> | 
 // Stage entry: does a charId-1 record of this stage's cast list pass? Records are
 // tried in cast-list order; a list passes iff every get_flag(id) == expected
 // (F0x80016924). tools/extract_player_cast_one.py. Missing data: null.
-export function evaluatePlayerCharOne(stageId) {
+export function evaluatePlayerCharOne(stageId: string) {
     const lists = state.playerCastOne?.[stageId];
     if (state.playerCastOne == null) return null;
     if (!lists) return false;
-    return lists.some((list) => list.every((c) => storyFlags.matches(c.id, c.expected)));
+    return lists.some((list: FlagGate[]) => list.every((c: FlagGate) => storyFlags.matches(c.id, c.expected)));
 }
 
 export function manifestIndexOf(charId: string | null | undefined) {
-    return state.manifest.characters.findIndex((c) => c.id === charId);
+    return state.manifest.characters.findIndex((c: SpriteRecord) => c.id === charId);
 }
 
 export function currentMap(): GameState["manifest"]["maps"][number] {

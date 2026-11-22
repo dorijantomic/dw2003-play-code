@@ -98,11 +98,11 @@ export interface CastSolverModel extends SolverModel {
 }
 
 /** One emitter site of a technique, with the geometry class and the arm it sits on. */
-interface SolverSite {
+export interface SolverSite {
   id: string;
   cls: string;
-  /** the bone, as launch-plan.js types it */
-  bone: string;
+  /** the bone index */
+  bone: number;
   chain: number[] | null;
   side: "left" | "right" | null;
   equip: ReturnType<typeof armEquip> | null;
@@ -153,7 +153,7 @@ interface TraceRow {
 
 /** One tick of a plan: where each arm's wrist goes, or the bone a centre shot leaves from, plus lean, head pitch and root. */
 interface SolverFrame {
-  aim: { bone: string; point: number[] } | null;
+  aim: { bone: number; point: number[] } | null;
   arms: { left: number[] | null; right: number[] | null };
   head?: number;
   lean?: number;
@@ -172,13 +172,6 @@ interface SolverGate {
   jump?: boolean;
   idle?: boolean;
   body?: boolean;
-}
-
-/** A firing axis as the solver reads it: the unit axis and the point it leaves from. */
-interface SolverAxis {
-  axis: Vec3;
-  origin: Vec3;
-  cls: string;
 }
 
 /** What bakeSolverPose returns. */
@@ -806,7 +799,7 @@ export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null
     return frames;
   };
 
-  const plan = {
+  const plan: FightPlan = {
     ok: true, cls, mode: group.mode, size, H, floorY, torso: [torsoX, null, torsoZ], ticks, windup, drive,
     release, flight, follow, return: ret, frames, targets, origins, apex: apexOf(1), overshoot, shared, baseFrame,
     rel, hand, wu, isArm, sites: group.sites, apexUp, apexBack, restTip, muzzleTargets,
@@ -814,8 +807,7 @@ export function planCast(model: SolverModel, group: SolverGroupOk, { tick = null
     // the aim may start at (after the head has come back down, so the aim never eats the lift)
     head: headPlan, headSites, rootCap, aimStart: headPlan ? Math.min(windup, headPlan.rise + headPlan.hold + headPlan.fall) : 0,
     swing: { base: SOLVER.swingBase, cap: SOLVER.swingCap, scale: 1 },
-    // ETS item 9: every FightPlan field is set here, but types.ts types hand as all-required and rootCap as number; this plan holds optional hand fields and a null rootCap.
-  } as FightPlan;
+  };
   /** Widen (or reset) the outward swing: the apex moves out on each site's own side, the release stays. */
   plan.setSwing = (scale: number) => {
     plan.swing.scale = scale;
@@ -1087,8 +1079,7 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
     const fromToDraw = (u: Vec3, v: Vec3): Mat3 => fromTo(toMat(u), toMat(v));
     const measure = (site: SolverSite, aimPoint: Vec3) => {
       const poseNow = { rot: W.map(flatOf), pos: P.map((p) => p.slice()) };
-      // ETS item 9: firingAxis reads its axis and origin off three-component rows, but types them number[].
-      const fa = firingAxis(target, folder, site.id, poseNow, { rest }) as SolverAxis | null;
+      const fa = firingAxis(target, folder, site.id, poseNow, { rest });
       if (!fa || !len3(fa.axis)) return null;
       const wantDir = unit3(sub3(aimPoint, fa.origin));
       const want = len3(wantDir) ? wantDir : fa.axis;
@@ -1131,7 +1122,7 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
     // about its own head, so the firing point never travels (K19f: Kokatorimon's mouth moved 0.000 h in
     // every axis). The chain that moves it is the path from the body's root down to it, and the effector
     // is the firing TIP (launch-plan's own tip arithmetic), not the bone head.
-    const tipPrev = new Map(plan.sites.map((s: SolverSite) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
+    const tipPrev = new Map<number, number | null>(plan.sites.map((s: SolverSite) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
     const driveChainOf = (bone: number) => {
       const chain: (number | undefined)[] = [];
       let p = parent[bone], guard = 0;
@@ -1147,8 +1138,7 @@ export function bakeSolverPose(target: SolverModel, plan: SolverPlan, { offset =
       for (let pass = 0; pass < passes; pass++) {
         for (let k = chain.length - 1; k >= 0; k--) {
           const j = chain[k]!;
-          // ETS item 9: tipOf builds its tip from three-component rows, but types it number[].
-          const tip = tipOf(P, target, s.bone, prev!) as Vec3 | null;
+          const tip = tipOf(P, target, s.bone, prev);
           if (!tip) continue;
           const u = sub3(tip, P[j]), v = sub3(point, P[j]);
           if (len3(u) < 1e-6 || len3(v) < 1e-6) continue;
@@ -1415,8 +1405,7 @@ function targetPoint(model: SolverModel, plan: FightPlan): Vec3 {
 
 /** The firing TIP of one site under a pose — the same point launch-plan writes the launch op from. */
 function tipAt(pose: SolverPose, model: SolverModel, folder: string, s: SolverSite): Vec3 | null {
-  // ETS item 40: tipOf builds its tip from three-component rows, but types it number[]; the cast stays in this small function.
-  return tipOf(pose.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone)) as Vec3 | null;
+  return tipOf(pose.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone));
 }
 
 /**
@@ -1438,8 +1427,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
   const relPose = poseFromChannels(bake.model, off + plan.release);
   const aim: AimRow[] = [];
   for (const [i, s] of plan.sites.entries()) {
-    // ETS item 9: firingAxis reads its axis and origin off three-component rows, but types them number[].
-    const fa = firingAxis(bake.model, folder, s.id, relPose) as SolverAxis | null;
+    const fa = firingAxis(bake.model, folder, s.id, relPose);
     if (!fa) { aim.push({ id: s.id, error: null }); continue; }
     const e = aimError(fa.axis, fa.origin, plan.aimPoints?.[i] ?? plan.aimPoint);
     aim.push({ id: s.id, cls: fa.cls, origin: fa.origin, axis: fa.axis, error: e.full, yaw: e.yaw, pitch: e.pitch });
@@ -1522,8 +1510,7 @@ export function verifyBake(model: SolverModel, plan: SolverPlan, bake: BakeOut, 
   // idle may not be judged against a floor the idle itself has already left (K20b item 3)
   const idleFramesB = idlePlaylist(bake.model, plan.baseFrame ?? 0);
   const idleFloorAt = (t: number) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
-  // ETS item 9: firingAxis reads its origin off a three-component row, but types it number[].
-  const orig = (pose: SolverPose, s: SolverSite): Vec3 | null => (firingAxis(bake.model, folder, s.id, pose) as SolverAxis | null)?.origin ?? null;
+  const orig = (pose: SolverPose, s: SolverSite): Vec3 | null => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
   const t0 = plan.sites.map((s: SolverSite) => orig(neutral, s));
   let travel = 0, groundWorst = 0, groundTick: number | null = null, penTicks = 0, worstPen = null, gapMin = Infinity;
   for (const t of at) {

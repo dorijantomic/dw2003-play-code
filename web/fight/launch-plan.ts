@@ -21,12 +21,29 @@ import { shotsFor, emitters, armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
-import type { LaunchOpsSpec } from "./types.js";
+import type { LaunchOpsSpec, FightVec3 } from "./types.js";
 import type { Dw2LoadedModel } from "../types/anim-viewer-dw2.js";
 interface PoseSample {
   frame: number;
   pos: ReturnType<typeof restPose>["pos"];
   rot: ReturnType<typeof restPose>["rot"];
+}
+
+/** The options of the tip readers: the table whose frames are scanned, the poses to scan instead, and the bone before this one in its limb chain. */
+interface BoneTipOpts {
+  table?: string | number | null | undefined;
+  window?: PoseSample[] | null | undefined;
+  prev?: number | null | undefined;
+}
+
+/** The options of launchPointsFor: the body, the technique, whether the disc presents it with its volley clip, and the table(s) or frame the points are read at. */
+interface LaunchPointsOpts {
+  folder?: string | number | undefined;
+  tech?: string | null | undefined;
+  volley?: boolean | undefined;
+  table?: number | null | undefined;
+  tables?: number[] | null | undefined;
+  frame?: number | null | undefined;
 }
 
 interface TipPointModel {
@@ -36,7 +53,7 @@ interface TipPointModel {
 interface TipPointPoint {
   source: string;
   id: string;
-  bone: string;
+  bone: number;
 }
 
 
@@ -71,12 +88,12 @@ const EMPTY = Object.freeze({ mode: "none", shots: 0, points: [], limbs: [], bas
 
 /** The model's own CENTRE emitters, in the order a shot should leave from one: a mouth fires, a head/chest
  *  hatch next, then the body itself. Used when a side-specific bone would be a guess. */
-function centreBone(m) {
+function centreBone(m): number | null {
   return m.f?.mouth ?? m.f?.head ?? m.f?.chest ?? m.f?.eyes ?? m.f?.["whole-body"] ?? m.t ?? m.r ?? null;
 }
 
 /** The body's own launch site: the whole-body emitter, else the torso/root bone. */
-function bodyBone(m) {
+function bodyBone(m): number | null {
   return m.f?.["whole-body"] ?? m.t ?? m.r ?? null;
 }
 
@@ -94,7 +111,7 @@ export function bodyEmitterBone(folder: string | number) { return BONEMAP[folder
  *     that arm would be a guess: the shot leaves from the body's centre emitter instead.
  *   * no arm chain - 23 rigs have no arm chain to fire from: the body emitter is the honest site.
  */
-export function emitterBone(folder: string | number, id: string) {
+export function emitterBone(folder: string | number, id: string): number | null {
   const m = BONEMAP[folder];
   if (!m || !id) return null;
   const part = String(id).replace(/-\d+$/, "");
@@ -190,7 +207,7 @@ export function poseWindow(model: Parameters<typeof bodyWindow>[0], tables: Para
  *      this pack ships carry a self-referential slot, so this rarely fires);
  *   3. none - the bone's own point (a root/torso emitter has no limb to extend along).
  */
-export function tipOf(pos, model, bone: string | number, prevBone = null) {
+export function tipOf(pos, model, bone: string | number, prevBone: number | null = null): FightVec3 | null {
   const p = pos?.[bone];
   if (!p) return null;
   let q = prevBone != null ? pos?.[prevBone] : null;
@@ -203,7 +220,7 @@ export function tipOf(pos, model, bone: string | number, prevBone = null) {
 }
 
 /** The bone before `bone` in the anatomy's own limb chain for emitter `id`, or null. */
-export function chainPrevBone(folder: string | number, id: string, bone: string) {
+export function chainPrevBone(folder: string | number, id: string, bone: number): number | null {
   const part = String(id ?? "").replace(/-\d+$/, "");
   const side = part === "left-arm" ? "left" : part === "right-arm" ? "right"
     : part === "both-arms" ? "left" : null;
@@ -227,7 +244,7 @@ export function chainPrevBone(folder: string | number, id: string, bone: string)
  * (C12 measured the closest approach at 6493 units). Reaching forward first, high second, picks the
  * extended pose the flight is authored for.
  */
-export function boneTip(model, bone: string | number | null, { table = null, window = null, prev = null } = {}) {
+export function boneTip(model, bone: string | number | null, { table = null, window = null, prev = null }: BoneTipOpts = {}) {
   if (!model || bone == null) return null;
   const poses = window ?? poseWindow(model, table);
   let best = null;
@@ -263,7 +280,7 @@ export function emitterSide(id: string) {
  *   * bare hand, no data, or a prop worn on the torso/back -> null, and the caller keeps the bone tip.
  * No species names, no per-model pins: the verdict is K17's data and the vertices are the model's own.
  */
-export function propTipPoint(model, folder: string | number, side: string, { window = null } = {}) {
+export function propTipPoint(model, folder: string | number, side: string, { window = null }: { window?: PoseSample[] | null | undefined } = {}) {
   if (!model || !folder || !side) return null;
   const equip = armEquip(folder, side);
   if (!equip || equip.class === "none" || equip.class === "bare") return null;
@@ -321,7 +338,7 @@ function scaleAt(ch3, frame: number) {
  * The point an emitter's shot leaves from: the WEAPON's tip when the arm carries a prop (C15), else the
  * limb's own tip as before.
  */
-export function emitterTip(model, folder: string | number, id, bone: string | number | null, { window = null, prev = null } = {}) {
+export function emitterTip(model, folder: string | number, id, bone: string | number | null, { window = null, prev = null }: BoneTipOpts = {}) {
   const side = emitterSide(id);
   const prop = side ? propTipPoint(model, folder, side, { window }) : null;
   if (prop) return { frame: prop.frame, x: prop.x, y: prop.y, z: prop.z, source: "prop", propBone: prop.bone, equip: prop.equip };
@@ -330,7 +347,7 @@ export function emitterTip(model, folder: string | number, id, bone: string | nu
 }
 
 /** The point a plan point was taken from, recomputed for a frame: the C11/C15 cross-check. */
-export function tipPointFor(model: TipPointModel, point: TipPointPoint, frame = null): number[] | null {
+export function tipPointFor(model: TipPointModel, point: TipPointPoint, frame: number | null = null): number[] | null {
   if (!model || !point) return null;
   const { folder } = model;
   const window = frame == null ? null : [{ frame, pos: restPose(model, frame).pos, rot: restPose(model, frame).rot }];
@@ -360,7 +377,7 @@ export function tipPointFor(model: TipPointModel, point: TipPointPoint, frame = 
  *
  * opts.volley forces the one-per-emitter reading for a move the disc presents with its volley clip.
  */
-export function launchPointsFor(model, { folder = model?.folder, tech = null, volley = false, table = null, tables = null, frame = null } = {}) {
+export function launchPointsFor(model, { folder = model?.folder, tech = null, volley = false, table = null, tables = null, frame = null }: LaunchPointsOpts = {}) {
   if (!model || !folder) return { ...EMPTY };
   const rule = shotsFor(folder, tech, { volley: !!volley });
   const mode = rule.mode;

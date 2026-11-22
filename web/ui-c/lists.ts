@@ -20,7 +20,7 @@ const isNum = (t) => /^[0-9][0-9,]*$/.test(String(t).trim());
 
 // ------------------------------------------------------------------------------------------------ window + tab
 /** The list window. Full width (>= 300 native) = the C3 band; narrower = the chamfered frame. `cfg.word` = the faint word inside it. */
-export function composeListWin(p, i, out, cfg: { word?: string | null; } = {}) {
+export function composeListWin(p, i, out, cfg: { word?: string | null | undefined; } = {}) {
     const rel = p.rel, r = clipRect(p);
     const band = (p.w ?? r.w) >= 300;
     out.push(plate(`lw${i}.plate`, "listWindow", r, rel, { shape: band ? "bandCh" : "ch" }));

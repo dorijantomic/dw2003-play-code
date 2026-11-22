@@ -62,8 +62,8 @@ import { reseedLiveTree } from "./fishing-tree.js";
 import { stepPlayback } from "./field-steps.js";
 import { fieldcomTick } from "./field-fx.js";
 import { applyStoryCommand } from "./story-events.js";
-interface ActiveExit {
-    to: string | number;
+import type { CollisionGrid, ManifestMap, PlacePoint, SpawnPoint, StageExit } from "./types.js";
+interface ActiveExit extends StageExit {
     aimed?: boolean;
     routeWords?: readonly number[];
     gondola?: boolean;
@@ -102,7 +102,7 @@ function updateHud() {
     }
 }
 
-export function setCharacter(i) {
+export function setCharacter(i: number) {
     state.charIdx =
         (i + state.manifest.characters.length) %
         state.manifest.characters.length;
@@ -117,7 +117,7 @@ export function setCharacter(i) {
     updateHud();
 }
 
-function findFreeSpot(grid, x: number, y: number) {
+function findFreeSpot(grid: CollisionGrid | null | undefined, x: number, y: number) {
     if (!grid) return { x, y };
     for (let radius = 0; radius < 600; radius += 8) {
         for (let a = 0; a < 16; a++) {
@@ -130,7 +130,7 @@ function findFreeSpot(grid, x: number, y: number) {
     return { x, y };
 }
 
-export function ensureSpriteAssets(id) {
+export function ensureSpriteAssets(id: string | null | undefined) {
     if (!id || state.charImgs[id] || state.npcImgs[id]) return Promise.resolve();
     if (spriteLoadPromises.has(id)) return spriteLoadPromises.get(id);
     const entry = S.manifestSprites.get(id);
@@ -150,7 +150,7 @@ export function ensureSpriteAssets(id) {
     return promise;
 }
 
-export function requestLeaderSheet(id, now = performance.now()) {
+export function requestLeaderSheet(id: string | null | undefined, now = performance.now()) {
     if (!id) return;
     retainedSpriteIds.add(id);
     if (now < (leaderSheetRetryAt.get(id) ?? 0)) return;
@@ -158,13 +158,13 @@ export function requestLeaderSheet(id, now = performance.now()) {
     ensureSpriteAssets(id);
 }
 
-export async function loadCollisionForStage(id) {
+export async function loadCollisionForStage(id: string) {
     if (state.collision[id]) return state.collision[id];
     if (collisionLoadPromises.has(id)) return collisionLoadPromises.get(id);
-    const m = state.manifest.maps.find((map) => map.id === id);
+    const m = state.manifest.maps.find((map: ManifestMap) => map.id === id);
     if (!m) return null;
     const promise = (async () => {
-        let grid = null;
+        let grid: CollisionGrid | null = null;
         const local = localStorage.getItem("collision/" + id);
         if (local) {
             try {
@@ -193,13 +193,13 @@ export async function loadCollisionForStage(id) {
 }
 
 // HD maps (see HD_MAPS): "assets/maps/s540.png" -> "s540".
-function mapPictureName(url) {
+function mapPictureName(url: string) {
     const m = String(url).match(/assets\/maps\/([^/?#]+)\.png/);
     return m ? m[1] : null;
 }
 
-function loadNativeImage(url) {
-    return new Promise((resolve, reject) => {
+function loadNativeImage(url: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
         img.onerror = () => reject(new Error(`failed to load ${url}`));
@@ -208,12 +208,12 @@ function loadNativeImage(url) {
 }
 
 // The picture a stage holds: the native one when its HD copy is drawn from tiles, else the asset mode's.
-function loadMapPicture(url) {
+function loadMapPicture(url: string) {
     return HD_MAPS && tiledMap(mapPictureName(url)) ? loadNativeImage(url) : loadImage(url);
 }
 
 // HD full picture (no tiles): the terrain effects get a native copy (state.mapNativeImgs).
-function keepNativeCopy(id, part: string, url, img) {
+function keepNativeCopy(id: string, part: string, url: string, img: HTMLImageElement) {
     if (!HD_MAPS || assetImageScale(img) <= 1) return;
     loadNativeImage(url).then((n) => {
         if (retainedStageIds.has(id)) (state.mapNativeImgs[id] ??= {})[part] = n;
@@ -221,13 +221,13 @@ function keepNativeCopy(id, part: string, url, img) {
 }
 
 // The picture the terrain effects read: native in HD (null while its copy loads).
-export function effectsMapImg(id, part = "base") {
+export function effectsMapImg(id: string, part = "base") {
     const img = part === "fg" ? state.mapFgImgs[id] : state.mapImgs[id];
     if (!HD_MAPS || !(img instanceof Image) || assetImageScale(img) <= 1) return img;
     return state.mapNativeImgs[id]?.[part] ?? null;
 }
 
-export function drawMapPicture(img, tm, kind: string | null, ox: number, oy: number) {
+export function drawMapPicture(img: HTMLImageElement, tm: ReturnType<typeof tiledMap>, kind: string | null, ox: number, oy: number) {
     if (!tm) { ctx!.drawImage(img, ox, oy); return; }
     const key = `${tm.name}:${kind}`;
     if (!tilesComplete.get(key)) ctx!.drawImage(img, ox, oy);
@@ -236,12 +236,12 @@ export function drawMapPicture(img, tm, kind: string | null, ox: number, oy: num
     tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M - FIELD_VIEW_PAD, -oy - M, FIELD_VIEW_W + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
 }
 
-export function ensureMapImg(id) {
+export function ensureMapImg(id: string) {
     // HD: which maps are tiled decides what to load, so wait for the tile index once.
     if (HD_MAPS && !tileIndexReady()) return loadTileIndex().then(() => ensureMapImg(id));
     // The fg check sits before the early return: the overlay index can finish
     // loading after the map image did, and render() re-calls ensureMapImg.
-    const mapMeta = state.manifest.maps.find((x) => x.id === id);
+    const mapMeta = state.manifest.maps.find((x: ManifestMap) => x.id === id);
     const overlayId = state.mapOverlays?.[id]
         ? id
         : (mapMeta?.assetSource && state.mapOverlays?.[mapMeta.assetSource]
@@ -373,7 +373,7 @@ function persistentSpriteIds() {
     return ids;
 }
 
-export function prepareStageAssets(id) {
+export function prepareStageAssets(id: string) {
     if (!S.knownStageIds.includes(id)) return Promise.resolve();
     retainedStageIds.add(id);
     const sprites = stageSpriteIds([id], state.scenes);
@@ -398,7 +398,7 @@ export function prepareStageAssets(id) {
     return promise;
 }
 
-function activateStageNeighborhood(id) {
+function activateStageNeighborhood(id: string) {
     const keep = new Set(stageWorkingSet(id, state.scenes, S.knownStageIds));
     retainedStageIds.clear();
     for (const stageId of keep) retainedStageIds.add(stageId);
@@ -465,7 +465,7 @@ function activateStageNeighborhood(id) {
 // s9xx shadow records) the op-1 handoff itself uses — with the baked base stage as
 // the fallback for a screen the table does not carry. Ledger:
 // places-copy-place-points-family-2026-10-10, places-game-place-producers-2026-10-10.
-function applyPlacePoints(mapId) {
+function applyPlacePoints(mapId: string) {
     const scene = state.scenes[mapId];
     const table = scene?.placePoints;
     if (!table || !scene._baseExits) return;
@@ -474,7 +474,7 @@ function applyPlacePoints(mapId) {
         table,
         state.entryKey ?? 0,
         state.entryCompanion ?? 0,
-        (point) => {
+        (point: PlacePoint) => {
             let to = point.to ?? null;
             const routed = S.screenRouter?.route(point.screen, mapId);
             if (routed?.kind === "warp") to = routed.to;
@@ -484,7 +484,7 @@ function applyPlacePoints(mapId) {
     );
 }
 
-export async function loadAndSetMap(i, spawn = null) {
+export async function loadAndSetMap(i: number, spawn: SpawnPoint | null = null) {
     const idx = (i + state.manifest.maps.length) % state.manifest.maps.length;
     await prepareStageAssets(state.manifest.maps[idx].id);
     setMap(idx, spawn);
@@ -509,7 +509,7 @@ export function grantNewPartners() {
     return true;
 }
 
-export function setMap(i, spawn = null) {
+export function setMap(i: number, spawn: SpawnPoint | null = null) {
     // EXPERIMENT (mounts): a map change always puts the player back on their own feet (no riding across a
     // doorway, no mount left standing on the old map).
     mountForceDismount();
@@ -606,7 +606,7 @@ export function setMap(i, spawn = null) {
     // fallback for a missing data file.
     const castRecords = state.stageCastLists?.[m.id];
     const castPlayer = castRecords
-        ? castPlayerRecord(castRecords, (id, expected) => storyFlags.matches(id, expected))
+        ? castPlayerRecord(castRecords, (id: number, expected: number) => storyFlags.matches(id, expected))
         : undefined;
     if (castRecords) {
         // The stage's own list decides, including "no candidate -> Junior (2)".
@@ -670,15 +670,15 @@ export function setMap(i, spawn = null) {
     queueMicrotask(() => activateStageNeighborhood(m.id));
 }
 
-export function addEntranceReturn(destId, arriveX, arriveY, fromId, fromPos: { x: number; y: number; dir: string; }) {
+export function addEntranceReturn(destId: string, arriveX: number, arriveY: number, fromId: string, fromPos: { x: number; y: number; dir: string; }) {
     const scene = state.scenes[destId];
     if (!scene) return;
     scene.exits = scene.exits ?? [];
     // Position depends on THIS arrival — drop any prior synthesized return first.
-    scene.exits = scene.exits.filter((e) => !e._entranceReturn);
+    scene.exits = scene.exits.filter((e: StageExit) => !e._entranceReturn);
     // A real static exit back to the origin already covers the return (normal
     // two-way doors, and the Water-Tunnel side of the tower) — don't duplicate it.
-    if (scene.exits.some((e) => e.to === fromId)) return;
+    if (scene.exits.some((e: StageExit) => e.to === fromId)) return;
     scene.exits.push({
         x: Math.round(arriveX) - 16,
         y: Math.round(arriveY) - 16,
@@ -696,7 +696,7 @@ export function addEntranceReturn(destId, arriveX, arriveY, fromId, fromPos: { x
 // store: the engine's banked flags, which the field entry writes on every arrival
 // (0x1E00 + screen id). The page reads it through F0x8009A6B8's own flag id,
 // 0x2000 | (ps1 & 0xff) — the same number over the field screen range.
-export function engineFlagSeen(id) {
+export function engineFlagSeen(id: number) {
     return S.engine ? S.engine.state.flags.get(id, 1) === true : false;
 }
 
@@ -739,7 +739,7 @@ export function refreshPartyCharisma() {
 export function activeExitAt(x = state.x, y = state.y): ActiveExit | null {
     const exits = state.scenes[currentMap().id]?.exits ?? [];
     const hit = hitRect(
-        exits.filter((exit) => exitGatePasses(exit, storyFlags.get)),
+        exits.filter((exit: StageExit) => exitGatePasses(exit, storyFlags.get)),
         x,
         y,
     );
@@ -812,7 +812,7 @@ function swappedStepDestination(pb) {
     return routed?.kind === "warp" ? routed.to : null;
 }
 
-export function applyStoryFlag(id, expected) {
+export function applyStoryFlag(id: number, expected: number | boolean) {
     const bank = (id >> 8) & 0xfe;
     if (bank === CARD_COLLECTION_BANK) {
         const cardId = id & 0x1ff;

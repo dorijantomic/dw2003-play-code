@@ -4,7 +4,8 @@ import { drawText, drawCursor } from "../uifont.js";
 import { ITEM_CATS, VSYNC, mapHoldSpeed, ststat, topItems, visitedPs1Stages } from "./pure.js";
 import { MS } from "./state.js";
 import { gold } from "./draw-common.js";
-import type { MapSeenRow, MenuState } from "./types.js";
+import type { MapCursorConfig, MapSeenRow, MenuState } from "./types.js";
+import type { SfxPlayerContext } from "../types/audio.js";
 
 import type { GameState } from "../game/types.js";
 // ── the world MAP screen (draw F0x80098b84, decoded + rig-verified 2026-07-11) ──
@@ -18,7 +19,7 @@ import type { GameState } from "../game/types.js";
 // until it crosses the screen-centre pan pivot; ON the pivot the map scrolls
 // instead, and hitting the scroll limit nudges the cursor past the pivot so
 // it resumes free movement.
-export function _mapMove(m: MenuState, C, dx: number | undefined, dy: number | undefined) {
+export function _mapMove(m: MenuState, C: MapCursorConfig, dx: number | undefined, dy: number | undefined) {
   const s = m.mapSpd;
   if (dx! < 0) {
     if (m.mapCX! > C.pan_x) m.mapCX = Math.max(C.pan_x, m.mapCX! - s!);
@@ -85,7 +86,7 @@ export function _stepHeldLists(m: MenuState, state: GameState, sfx: { play: (arg
 
 // F0x800986c0, called every vsync from the map root: poll held left/right
 // and up/down separately, 2 then 4 after MAP_HOLD_FRAMES, 0 on release.
-function _stepMapHeld(m: MenuState, C, state: GameState) {
+function _stepMapHeld(m: MenuState, C: MapCursorConfig, state: GameState) {
   const keys = state.keys;
   if (!keys) return;
   const vsync = 1 / VSYNC;
@@ -113,7 +114,7 @@ function _stepMapHeld(m: MenuState, C, state: GameState) {
   }
 }
 
-export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, t: number, sfx = null) {
+export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, t: number, sfx: SfxPlayerContext | null = null) {
   const M = MS.UI.screens.map;
   const C = M.cursor;
   // walker map id -> {ps1, server, loc} (composed through screen_table).
@@ -147,8 +148,9 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   // visited location markers on THIS server: every place the flag store says you have
   // been composes to a {server, loc} via walker_map (native: flag 0x2000|(ps1&0xff)
   // per stage, filler F0x8009a6b8). The current map's own marker always shows.
-  const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen!!!!!!));
+  const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen));
   const vis = new Set();
+  // ETS item 9: walker_map rows are {ps1, server, loc}; MS.UI is the untyped status_ui.json, so Object.values gives any.
   for (const row of Object.values(M.walker_map) as MapSeenRow[]) {
     if (seenPs1.has(row.ps1) && row.server === server && row.loc) vis.add(row.loc);
   }

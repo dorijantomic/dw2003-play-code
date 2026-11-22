@@ -1,7 +1,7 @@
 import { screenIdForStage, listScrollbarThumb } from "../vendor/engine.js";
 import { loadPack } from "../screenpack.js";
 import { MS } from "./state.js";
-import type { MapSeenRow, MenuState } from "./types.js";
+import type { CoreStatKey, ElementKey, MapSeenRow, MenuState, RosterViewEntry } from "./types.js";
 import type { GameState } from "../game/types.js";
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
@@ -50,7 +50,7 @@ export function topItems(m: MenuState) {
 // esstatus strings 1-4, the party-card LV/HP/MP/"/" widgets at
 // status_ui.json card_labels.static. The chrome clips are window frames; the
 // letters are drawn as text, not baked into the art.
-export const CARD_STAT_LABELS = Object.freeze({ 1: "LV", 2: "HP", 3: "MP", 4: "/" });
+export const CARD_STAT_LABELS: Readonly<Record<number, string>> = Object.freeze({ 1: "LV", 2: "HP", 3: "MP", 4: "/" });
 
 // esstatus 17/18 — SORT uses the shared header plate, not a right-hand window
 // (pause-menu-screen-tree §3 / F0x80096590).
@@ -75,6 +75,15 @@ export function mapPs1Id(state: GameState, ui = MS.UI) {
   return wm?.ps1 ?? 0x200;
 }
 
+/** The decoded field screen table, as far as the stage lookup reads it (data/screen_table.json). */
+type FieldScreenTable = Record<string, { stage?: number | null; alt?: { stage?: number | null; }; }>;
+
+/** The engine's banked flag store, as far as the map migration uses it. */
+interface MapFlagStore {
+  get: (id: number) => boolean | null;
+  set: (id: number, value: boolean) => void;
+}
+
 /** The one flag both MAP pages ask about: F0x8009A6B8 reads
  *  get_flag((stage & 0xff) | 0x2000, 1), and the field entry writes
  *  0x1E00 + screenId (pro/fieldstg.s .L0x00008008-.L0x00008028). Over every field
@@ -87,11 +96,11 @@ export const mapSeenFlag = (ps1: number | undefined) => 0x2000 | (ps1! & 0xff);
  *  engine's banked store — the same store the field entry writes. Without one (the
  *  ui-lab and the unit tests, where no engine exists) the old saved list is read
  *  instead; nothing writes that list any more, so it only ever holds an old save. */
-export function visitedPs1Stages(state: GameState, ui = MS.UI, hasFlag = null) {
-  const walker = ui?.screens?.map?.walker_map ?? {};
+export function visitedPs1Stages(state: GameState, ui = MS.UI, hasFlag: ((flagId: number) => boolean | null) | null = null) {
+  const walker: Record<string, MapSeenRow> = ui?.screens?.map?.walker_map ?? {};
   const seen = new Set();
   if (hasFlag) {
-    for (const row of Object.values(walker) as MapSeenRow[]) {
+    for (const row of Object.values(walker)) {
       if (Number.isInteger(row?.ps1) && hasFlag(mapSeenFlag(row.ps1))) seen.add(row.ps1);
     }
   } else {
@@ -108,7 +117,7 @@ export function visitedPs1Stages(state: GameState, ui = MS.UI, hasFlag = null) {
 /** What the translated MAP page needs from the walker: the PS1 stage id it stands in and
  *  the PS1 ids of every map already visited (the page's own "seen" flag is
  *  0x2000|(id & 0xff), filled by F0x8009A6B8). */
-export function pauseMapContext(state, ui = MS.UI, hasFlag = null) {
+export function pauseMapContext(state: GameState, ui = MS.UI, hasFlag: ((flagId: number) => boolean | null) | null = null) {
   return { stage: mapPs1Id(state, ui), seen: visitedPs1Stages(state, ui, hasFlag) };
 }
 
@@ -118,7 +127,7 @@ export function pauseMapContext(state, ui = MS.UI, hasFlag = null) {
  *  that are still clear, and is done. `table` is the decoded field screen table, and
  *  the screen id comes from the same resolver the field entry uses, never the stage
  *  number. `flags` is the engine's banked store. */
-export function migrateVisitedMaps(visited, table, flags) {
+export function migrateVisitedMaps(visited: Iterable<string> | null | undefined, table: FieldScreenTable | null | undefined, flags: MapFlagStore) {
   for (const stage of visited ?? []) {
     const screenId = screenIdForStage(table, `s${stageKey(stage)}`);
     if (screenId == null) continue;
@@ -179,7 +188,7 @@ export function equipScrollbarThumb(bagLength: number, index: number, geom = EQU
 // Portrait table is 8 partner-rookie sequences (ids 1–8). Champion forms are
 // not in the extracted table — use that partner's rookie clip rather than a
 // blank pedestal.
-export function portraitSequenceFor(p, sequences) {
+export function portraitSequenceFor(p: Pick<RosterViewEntry, "digimonId" | "rookieId"> | undefined, sequences: Record<string, number[]> | undefined) {
   const seq = sequences?.[String(p?.digimonId)];
   if (seq?.length) return seq;
   return sequences?.[String(p?.rookieId)] ?? null;
@@ -190,9 +199,9 @@ export const EQUIP_SLOTS = ["Head", "Body", "Right", "Left", "Accessory", "Acces
 // Real engine EquipSlot keys, index-aligned with EQUIP_SLOTS above.
 export const EQUIP_SLOT_KEYS = ["head", "body", "right", "left", "acc0", "acc1"];
 
-export const STAT_ROWS = ["str", "def", "spt", "wis", "spd", "chr"];
+export const STAT_ROWS: CoreStatKey[] = ["str", "def", "spt", "wis", "spd", "chr"];
 
-export const RES_ROWS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
+export const RES_ROWS: ElementKey[] = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 
 // Real ITEMS-screen categories (esstatus.toml strings 22-26). The overlay
 // opens on "Which one?" (string 0x1A) and only then the 2-column bag; L1/R1

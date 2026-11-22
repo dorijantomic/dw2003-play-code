@@ -92,6 +92,13 @@ export interface DigimonRecord {
   is_starter: boolean;
 }
 
+/** one form the partner can digivolve to right now (web/battle/core/records.ts availableEvolutions) */
+export interface EvolutionOption {
+  to: string;
+  formId: number;
+  equipped: boolean;
+}
+
 /** one technique row of digimon.json's skill list, with the three bytes battle.ts merges on from fight_tech_table.json */
 export interface BattleSkill {
   id: number;
@@ -404,7 +411,7 @@ export interface BattleContext {
   armIntroLine: (b: BattleState) => number;
   armPendingImpact: (b: BattleState, commit: any) => void;
   attackSpec: (b: BattleState, name?: string) => BattleLineSpec | null;
-  availableEvolutions: (state: GameState, rosterIndex?: number) => any[];
+  availableEvolutions: (state: GameState, rosterIndex?: number) => EvolutionOption[];
   battle: BattleState;
   BATTLE_REF_H?: number;
   BATTLE_REF_W?: number;

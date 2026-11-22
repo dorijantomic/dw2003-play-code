@@ -46,7 +46,8 @@ import {
 import { currentMap } from "./session.js";
 import { questSpeak } from "./quest-scenes.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
-import type { GameState } from './types.js';
+import type { CollisionGrid, GameState, ManifestMap, SceneNpc, SpriteRecord } from './types.js';
+import type { BattleWinResult } from "../battle/core/types.js";
 type FishingExtraEntry =
   | { kind: "item"; item: string; name?: string }
   | { kind: "bits"; bits: number };
@@ -104,7 +105,7 @@ export function fishingSpotHere() {
  * second scene while one runs, because the field lock is up for the first.
  * Returns true when the press was consumed.
  */
-export function startBlockInteraction(npc) {
+export function startBlockInteraction(npc: SceneNpc) {
     if (state.blockEngage) return true;
     const ix = engageBlock(npc.npc_id);
     if (!ix) return false;
@@ -113,7 +114,7 @@ export function startBlockInteraction(npc) {
 }
 
 /** Cast at `spot`, spending one of this map's sixteen catches. */
-export function startFishingCast(spot) {
+export function startFishingCast(spot: { dx: number; dy: number; }) {
     const r = startFishing(state.fishingBudget ?? FISHING_BUDGET, () =>
         Math.floor(Math.random() * 0x10000),
     );
@@ -161,7 +162,7 @@ export function fishingSpriteMeta() {
  * the tree kick all reach their pack by the same table instead of by name.
  */
 export function playerPackMeta(packId: string): NonNullable<GameState["manifest"]["npcs"]>[number] | undefined {
-    return state.manifest.npcs?.find((n) => n.id === packId);
+    return state.manifest.npcs?.find((n: SpriteRecord) => n.id === packId);
 }
 
 /**
@@ -171,7 +172,7 @@ export function playerPackMeta(packId: string): NonNullable<GameState["manifest"
  * found-flags (dw.fishfinds.v1) for the Angler's almanac.
  */
 function awardFishingExtra({ area: areaId, entry }: { area: string; entry: FishingExtraEntry }) {
-    const area = (state.fishingExtras.areas ?? []).find((a) => a.id === areaId);
+    const area = (state.fishingExtras.areas ?? []).find((a: { id: string; }) => a.id === areaId);
     if (!area) return;
     let tries = 0;
     const go = () => {
@@ -193,7 +194,7 @@ function awardFishingExtra({ area: areaId, entry }: { area: string; entry: Fishi
     go();
 }
 
-export function startFishingCatch(mapId, slot) {
+export function startFishingCatch(mapId: string, slot: number) {
     const rec = state.fishingSpots?.[mapId]?.catch?.[String(slot)];
     if (!rec) return;
     // The disc catch above is untouched. On top of it, ONE separate roll against
@@ -202,7 +203,7 @@ export function startFishingCatch(mapId, slot) {
     const extra = state.fishingExtras ? rollExtra(state.fishingExtras, mapId, Math.random) : null;
     startFieldBattle(() => battle.startScreen(
         rec.screenId,
-        (res) => presentVictory(res, () => { if (extra && !res?.enemyFled) awardFishingExtra(extra); }),
+        (res: BattleWinResult) => presentVictory(res, () => { if (extra && !res?.enemyFled) awardFishingExtra(extra); }),
         null, // flee: the cast is already spent
         gameOverToTitle,
         { mapId },
@@ -221,15 +222,15 @@ function treeStage(mapId = currentMap().id) {
  * same live NPC list and tree table the draw uses, so what blocks is what you
  * see. The player is never in the list.
  */
-function fieldPointOccupied(m, px, py) {
+function fieldPointOccupied(m: ManifestMap, px: number, py: number) {
     // A quest prop marked "solid" (the world a finished quest left changed) blocks like a standing actor -- it answers the
     // same occupancy query, so the disc's own pushback does the rest (web/quest-props.js).
     if (questPropSolidAt(m.id, px, py)) return true;
     const scene = state.scenes[m.id];
     const npcs = scene?.npcs
-        ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get!!!!!!)
+        ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get)
         : [];
-    if (actorFootprintBlocked(npcs, (n) => npcHalfWidth(n.npc_id), px, py)) return true;
+    if (actorFootprintBlocked(npcs, (n: SceneNpc) => npcHalfWidth(n.npc_id), px, py)) return true;
     const trees = treeStage(m.id)?.trees ?? null;
     return !!(trees && treeIndexAt(trees, { x: px, y: py }) != null);
 }
@@ -246,19 +247,19 @@ function fieldPointOccupied(m, px, py) {
  * band (`terrainGateBlocks`; only Submarimon carries a height, actor+0x64).
  * Returns the vector to SUBTRACT (F0x8008de0c's arg3/arg4).
  */
-export function fieldStepObstaclePush(m, grid, x: number, y: number, magnitudeFixed, heightFixed) {
+export function fieldStepObstaclePush(m: ManifestMap, grid: CollisionGrid | null | undefined, x: number, y: number, magnitudeFixed: number, heightFixed: number) {
     return fieldProbePushback(
         fieldDirectionIndex(state.dir),
         magnitudeFixed,
         x,
         y,
-        (px, py) => fieldPointOccupied(m, px, py)
+        (px: number, py: number) => fieldPointOccupied(m, px, py)
             || (grid ? terrainGateBlocks(grid, px, py, heightFixed) : false),
     );
 }
 
 /** Whether the player's 12×8 foot box at (x,y) overlaps a blocked walkmesh cell. */
-export function boxStuck(grid, x, y) {
+export function boxStuck(grid: CollisionGrid | null | undefined, x: number, y: number) {
     return !!grid && rectBlocked(grid, x - 6, y - 8, x + 6, y);
 }
 
@@ -268,7 +269,7 @@ export function boxStuck(grid, x, y) {
  * that id, and only a mismatch sets the re-roll flag `[0x26d8]`). Coming back to
  * the same map — walking in from a battle — keeps the marker where it was.
  */
-export function reseedLiveTree(mapId) {
+export function reseedLiveTree(mapId: string) {
     const stage = treeStage(mapId);
     if (!stage) {
         state.treeLive = null;
@@ -357,12 +358,12 @@ function treeKickSpriteMeta() {
  * (rate-0) encounter block, the same block the ambush tiles and fishing read.
  * Slot 3 is the near roll (102/128), slot 6 the far one (26/128).
  */
-function startTreeEncounter(mapId, slot) {
+function startTreeEncounter(mapId: string, slot: number) {
     const rec = state.treeStages?.[mapId]?.encounters?.[String(slot)];
     if (!rec) return;
     startFieldBattle(() => battle.startScreen(
         rec.screenId,
-        (res) => presentVictory(res),
+        (res: BattleWinResult) => presentVictory(res),
         null, // flee: the tree has already dropped it
         gameOverToTitle,
         { mapId },

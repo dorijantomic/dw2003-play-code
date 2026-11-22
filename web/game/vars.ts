@@ -79,7 +79,7 @@ import { openFly } from "./ui-openers.js";
 import { checkStageCutscene, storyDbg } from "./story-events.js";
 import { runQuestSceneEvent, sceneCast } from "./quest-scenes.js";
 import { dispatchInput } from "./input.js";
-import type { Closeable, Follower, GameState } from "./types.js";
+import type { Closeable, FadeState, Follower, GameState, ManifestMap, SceneNpc, SpriteRecord, TrailPoint } from "./types.js";
 import type { RosterMember } from "../types/battle.js";
 
 
@@ -111,12 +111,12 @@ export const glossaryStage = createStage({
 export const books = createBookHost({
     sfx,
     factories: {
-        glossary: (args) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
-        options: (args) => createOptionsBook(args),
+        glossary: (args: { sfx: typeof sfx; }) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
+        options: (args: { sfx: typeof sfx; }) => createOptionsBook(args),
         // FLY (quest zz_fly): the visited fly points; the chosen one is flown to after the pause list has gone (openBook).
-        fly: (args) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { S.flyChosen = p; } }),
+        fly: (args: { sfx: typeof sfx; }) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { S.flyChosen = p; } }),
         // OPTIONS > GAME > Map screen: New. Read once when it opens: the manifest names, the scenes' exits, the visited flag, the current map.
-        mapscreen: (args) => createMapScreenBook({
+        mapscreen: (args: { sfx: typeof sfx; }) => createMapScreenBook({
             sfx: args.sfx,
             data: () => ({
                 maps: state.manifest.maps, scenes: state.scenes, currentId: currentMap().id,
@@ -126,7 +126,7 @@ export const books = createBookHost({
     },
 });
 
-export const PACKED_JINGLES = {
+export const PACKED_JINGLES: Record<string, string> = {
     "0x010c0000": "digi_en0",
     "0x010c0001": "digi_en1",
     "0x010c0002": "digi_en2",
@@ -189,7 +189,7 @@ export const endCard = createEndCardTranslated({ stopSound: () => sfx.stopAll!()
 // (the story bubble's own model) puffs up, holds, then deflates — see the block
 // in render().
 
-export const fade = { alpha: 0, dir: 0, pending: null }; // dir: 1 fading out, -1 fading in
+export const fade: FadeState = { alpha: 0, dir: 0, pending: null }; // dir: 1 fading out, -1 fading in
 
 // The stage-change wipe runs on the original's own frame counter (web/stage-wipe.js,
 // translated from fieldstg F0x8008A5E4); the shared fade's alpha is taken from it so
@@ -231,7 +231,8 @@ export const DIGMON_SPRITE_ID = 326;
 
 export const canvas = document.getElementById("game") as HTMLCanvasElement;
 
-export const ctx = canvas.getContext("2d");
+// ETS item 9: the game canvas is only ever asked for a 2d context, so it is never null.
+export const ctx = canvas.getContext("2d")!;
 
 export const fieldCanvasResolution = createCanvasResolutionController(canvas, ctx, {
     logicalWidth: VIEW_W,
@@ -434,7 +435,7 @@ export const backToCardFolders = () => returnToPauseCardFolders({ state, status,
 // GLOSSARY / OPTIONS: the pause list ended on that row (status-translated onBook); the book runs over the frozen field and the list
 // comes back on the same row when it shuts. The confirm that chose the row is still down: the host ignores it until it is let go.
 // If a button is still down after the host's release cap, the reopened list ignores it until it is let go (blockUntilReleased).
-const openBook = (book, row) => {
+const openBook = (book: string, row: number) => {
     if (book === "fly") { openFly(row); return; }
     books.open(book, (held) => {
         pauseHome(row);
@@ -448,9 +449,9 @@ export const flyFree = () => !!state.started && !battle.isActive() && !cutscene.
     && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry && !mpbVisible() && !state.handoffHold && !state.launch
     && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm && !state._questScene;
 
-const flySeen = (id) => { const sid = screenIdForStage(S.fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); };
+const flySeen = (id: string) => { const sid = screenIdForStage(S.fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); };
 
-export const flySeenAny = (id) => flyCopiesOf(state.manifest?.maps ?? [], state.scenes, id).some(flySeen);   // any copy of the place walked into
+export const flySeenAny = (id: string) => flyCopiesOf(state.manifest?.maps ?? [], state.scenes, id).some(flySeen);   // any copy of the place walked into
 
 export const currentFlyPlaces = () => flyPlaces({ maps: state.manifest?.maps ?? [], seen: flySeen, currentId: currentMap()?.id ?? null, scenes: state.scenes });
 
@@ -543,7 +544,7 @@ export const stagslctMenu = createStagslctMenu();
 // (sfx.playBankSound) and the title theme through the music player.
 export const soundTest = createSoundTest({
     sfx,
-    music: { play: (track) => bgm.play!(track), stop: () => bgm.play!(null) },
+    music: { play: (track: string) => bgm.play!(track), stop: () => bgm.play!(null) },
 });
 
 // Fully translated language screen; the adapter retains its historical name.
@@ -553,23 +554,23 @@ export const cntyselNative = createCntyselNative(sfx, bgm);
 // Story scene-skipper (dev): jump to any master-ordinal beat. All mutation routes through
 // the same game functions a real play uses, so jumps reproduce on-screen behaviour faithfully.
 export const sceneSkip = createSceneSkip({
-    setOrdinal: (n) => {
+    setOrdinal: (n: number) => {
         state.progressOrdinal = n;
     },
     getOrdinal: () => state.progressOrdinal,
-    clearFlag: (id) => {
+    clearFlag: (id: number) => {
         try {
             if (S.engine) S.engine.state.flags.set(id, false);
         } catch {
             /* virtual bank — skip */
         }
     },
-    warpToStage: (stageId) => {
-        const idx = state.manifest.maps.findIndex((m) => m.id === stageId);
+    warpToStage: (stageId: string) => {
+        const idx = state.manifest.maps.findIndex((m: ManifestMap) => m.id === stageId);
         if (idx >= 0) loadAndSetMap(idx);
     },
     fireStageEnter: (stageId: string) => checkStageCutscene(stageId),
-    talk: (npcId) => !!(S.engineBridge && S.engineBridge.onTalk(npcId)),
+    talk: (npcId: number) => !!(S.engineBridge && S.engineBridge.onTalk(npcId)),
 });
 
 export const editor = createEditor(canvas, () => ({
@@ -781,14 +782,14 @@ export const followers: Follower[] = [
     { x: 0, y: 0, dir: "down", animTime: 0, stopping: false, stopTime: 0 },
 ];
 
-export const partnerHistory = [];
+export const partnerHistory: TrailPoint[] = [];
 
 export const DIR8_CS = ["down", "down", "left", "left", "up", "up", "right", "right"];
 
 // Populated in-place by init() once findings load; read by the cutscene opts closure.
 export const EMOTE_KINDS = {};
 
-export const getNpcResolver = (actorId) => {
+export const getNpcResolver = (actorId: number) => {
     // Script actor ids are charIds (resolver 0x80084d8c). The player is charId 2
     // (Junior), or 1 on a stage whose cast list builds P001PLAY; the engine
     // resolves that id itself (cutscene.playerActorId). The other of 1/2 names
@@ -799,14 +800,14 @@ export const getNpcResolver = (actorId) => {
     if (!scene) return null;
     return (
         sceneCast(scene).find(
-            (n) => n.npc_id === actorId,
+            (n: SceneNpc) => n.npc_id === actorId,
         ) ?? null
     );
 };
 
 const cutsceneTextbox = {
     isOpen: () => textbox.isOpen!(),
-    open: (parsed, onClose) => {
+    open: (parsed: Parameters<NonNullable<typeof fallbackTextbox.open>>[0], onClose: (() => void) | null | undefined) => {
         const spk = cutscene.speakingActor;
         const mode = cutscene.speakingMode;
         const line = cutscene.speakingLine;
@@ -828,7 +829,7 @@ const cutsceneTextbox = {
                 // textbox draws post-zoom in screen px — scale world coords up.
                 e ? { x: (e.x - lastCam.x) * ZOOM, y: (e.y - lastCam.y) * ZOOM, mode } : null);
         if (!S.cutsceneEsdmgRef || line == null) return legacy();
-        const project = (x, y) => ({
+        const project = (x: number, y: number) => ({
             sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
             sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
         });
@@ -851,7 +852,7 @@ export const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResol
     // tools/extract_player_cast_one.py.
     playerCastOne: () => state.playerCharOne,
     emoteKinds: EMOTE_KINDS,
-    movementTerrainCode: (entity) => {
+    movementTerrainCode: (entity: { x: number; y: number; }) => {
         const grid = state.collision[currentMap().id];
         return grid ? terrainCodeAt(grid, entity.x, entity.y) : 0;
     },
@@ -888,15 +889,15 @@ export const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResol
     // The extra quests' own scene events (web/quest-scenes.js `SCENEEVENT <n>`): our effect art, the screen fade, a
     // mid-scene fight, the player's Y drive and a warp. The table is the current quest scene's; the host performs the
     // event and resumes the scene when it is really done (see runQuestSceneEvent).
-    sceneEvent: (index, resume) => runQuestSceneEvent(S.questSceneEvents[index], resume),
-    spawnActor: (actorId) => {
+    sceneEvent: (index: number, resume: () => void) => runQuestSceneEvent(S.questSceneEvents[index], resume),
+    spawnActor: (actorId: number) => {
         const scene = state.scenes[currentMap().id];
         if (!scene) return null;
         const pid = state.npcSprites![actorId];
         if (!pid) return null;
         const spr =
-            state.manifest.npcs?.find((n) => n.id === pid) ??
-            state.manifest.characters?.find((c) => c.id === pid);
+            state.manifest.npcs?.find((n: SpriteRecord) => n.id === pid) ??
+            state.manifest.characters?.find((c: SpriteRecord) => c.id === pid);
         if (!spr) return null;
         ensureSpriteAssets(spr.id);
         const e = ephemeralActorRecord(actorId, spr.id);
@@ -997,7 +998,7 @@ export const tilesComplete = new Map();   // "<tiled map>:<kind>" -> last frame 
 // can't be a static scene record; baking one would give a Water-Tunnel-entering
 // player a phantom Asuka-City exit. We instead synthesize it from HOW you arrived.
 // See docs/research/field/door-warp-decode.md §s260.
-export const _REV_DIR = { up: "down", down: "up", left: "right", right: "left" };
+export const _REV_DIR: Record<string, string> = { up: "down", down: "up", left: "right", right: "left" };
 
 // Durable home of the engine's per-event `once` bits. The original keeps a once-only
 // entry's fired marker in the save context, so a stage-entry or talk cutscene fires
@@ -1009,8 +1010,8 @@ export const engineEventDone = new Set();
 // banked store. set() guards virtual banks (FlagManager throws on those) and persists via the
 // engine's onChange (registered in initEngine). Reads clear (0) before the engine exists.
 const flagBackend = {
-    get: (id) => (S.engine ? (S.engine.state.flags.get(id, 1) ? 1 : 0) : 0),
-    set: (id, val) => {
+    get: (id: number) => (S.engine ? (S.engine.state.flags.get(id, 1) ? 1 : 0) : 0),
+    set: (id: number, val: number | boolean) => {
         if (S.engine) {
             try {
                 S.engine.state.flags.set(id, !!val);
@@ -1147,7 +1148,7 @@ export const AUCTION_STAGE = "s260";
 // 632 → s927, the room Kurt is in, not the empty s233), and the victory line
 // hands back to the finale desk (screen 631 → s926).
 /** The 25 save points' launcher codes `0xC00 | slot` (0xC01..0xC19). */
-export const isSavePointHandoffId = (id) => id >= 0xc01 && id <= 0xc19;
+export const isSavePointHandoffId = (id: number) => id >= 0xc01 && id <= 0xc19;
 
 // Joystick. The Gamepad API has no press events, so the pad is read once per
 // frame in `frame()` and diffed; a press is fed to the SAME dispatcher the
@@ -1167,10 +1168,10 @@ export const gamepad = attachGamepad({
     },
 });
 
-export let fpsGaps = [];
+export let fpsGaps: number[] = [];
 
 // Fallback for sprites (NPCs) whose row list doesn't include diagonal directions
-export const _DIR_FALLBACK = {
+export const _DIR_FALLBACK: Record<string, string> = {
     "down-left": "left",
     "down-right": "right",
     "up-left": "left",
@@ -1178,7 +1179,7 @@ export const _DIR_FALLBACK = {
 };
 
 // Unit vectors for the "V" debug overlay's facing arrow.
-export const _DIR8_VEC = {
+export const _DIR8_VEC: Record<string, [number, number]> = {
     down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0],
     "down-left": [-0.7, 0.7], "down-right": [0.7, 0.7],
     "up-left": [-0.7, -0.7], "up-right": [0.7, -0.7],

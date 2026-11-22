@@ -7,8 +7,9 @@ import { mountForceDismount } from "../mount.js";
 import { PRACTICE_BOT_ID, battle, choice, cutscene, fade, mpIdle, state, textbox } from "./vars.js";
 import { currentMap } from "./session.js";
 import { S } from "./state.js";
-import type { MpLaunchOptions, MpPracticeOptions } from "../mpbattle/types.js";
-import type { QuestBattleOptions } from "./types.js";
+import type { MpFightResult, MpLaunchOptions, MpPracticeOptions } from "../mpbattle/types.js";
+import type { BattleWinResult } from "../battle/core/types.js";
+import type { MpKitMember, QuestBattleOptions } from "./types.js";
 import type { MpFoe } from '../types/mpsocial.js';
 
 
@@ -19,7 +20,7 @@ import type { MpFoe } from '../types/mpsocial.js';
 // The fight-report overlay already showed EXP / Level / Tech / Digivolve learned.
 // A newly unlocked form is in the ledger (and auto-equipped if a slot was free);
 // the player turns it on from STATUS, not from a second field prompt.
-export function presentVictory(_res, after?: any) {
+export function presentVictory(_res: BattleWinResult, after?: () => void) {
     after?.();
 }
 
@@ -39,7 +40,7 @@ export function presentVictory(_res, after?: any) {
 // catch and a scripted story fight all play this ONE wipe. `update()` steps the
 // shared schedule (web/stage-wipe.js) and runs `pending.run()` when it is spent;
 // the old walker cut straight to the battle at every one of these sites.
-export function startFieldBattle(run) {
+export function startFieldBattle(run: () => void) {
     state.wipe28 = { ...createCheckerboard(), pending: { run } };
 }
 
@@ -47,7 +48,7 @@ export function startFieldBattle(run) {
 // through the same hand-off a random encounter uses, with the same guards. A LOSS returns to the field with the
 // party restored (see below) instead of going to the title screen, because the title route belongs to the
 // story's own fights.
-export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose }: QuestBattleOptions = {}) {
+export function startQuestBattle(party: MpFoe[], { screenId = null, onWin, onFlee, onLose }: QuestBattleOptions = {}) {
     if (
         fieldPartySize(state.party) === 0 ||
         battle.isActive() ||
@@ -68,14 +69,14 @@ export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose
         state.partyStats = JSON.parse(before.party);
     };
     startFieldBattle(() =>
-        battle.startParty(party, (res) => presentVictory(res, () => onWin?.(res)), () => onFlee?.(), () => { restoreParty(); onLose?.(); }, { screenId, mapId }));
+        battle.startParty(party, (res: BattleWinResult) => presentVictory(res, () => onWin?.(res)), () => onFlee?.(), () => { restoreParty(); onLose?.(); }, { screenId, mapId }));
     return true;
 }
 
 // EXPERIMENT (multiplayer): a many-vs-many fight. I am its host: it runs on the same field hand-off as any other fight.
 export function mpbLaunch({ foes, withId, label, screenId, challenge, opts }: MpLaunchOptions) {
     if (!mpIdle() || fieldPartySize(state.party) === 0) return false;
-    const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
+    const done = (r: MpFightResult) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
     startFieldBattle(() => {
         mpbHost({ foes, ids: [myId(), withId], label, screenId, challenge, done }).then((ok) => { if (!ok) done({ fled: true }); });
     });
@@ -84,10 +85,10 @@ export function mpbLaunch({ foes, withId, label, screenId, challenge, opts }: Mp
 
 export function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, opts }: MpPracticeOptions = {}) {
     if (!mpIdle() || fieldPartySize(state.party) === 0 || !foes?.length) return false;
-    const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
+    const done = (r: MpFightResult) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
     startFieldBattle(async () => {
         const kit = await battle.mpKit();
-        const recs = kit.party().map((m) => m.rec);
+        const recs = kit.party().map((m: MpKitMember) => m.rec);
         const order = recs.length > 1 ? [...recs.slice(1), recs[0]] : recs;
         const bots = [{ id: PRACTICE_BOT_ID, name: "Partner", party: order }];
         mpbHost({ foes, ids: [myId() ?? 1], label, screenId, challenge: null, done, bots }).then((ok) => { if (!ok) done({ fled: true }); });
@@ -95,7 +96,7 @@ export function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, 
     return true;
 }
 
-async function mpPracticeRandom(mapId, x: number, y: number) {
+async function mpPracticeRandom(mapId: string, x: number, y: number) {
     const a = await battle.rollEncounter(mapId, x, y);
     if (!a) return;
     const b = await battle.rollEncounter(mapId, x, y);
@@ -104,7 +105,7 @@ async function mpPracticeRandom(mapId, x: number, y: number) {
 
 // EXPERIMENT (multiplayer co-op): a wild fight while teamed up spawns two Digimon from the same area's pool; the partner is
 // invited to the same fight and the enemy's HP is shared. If the roll finds nothing there is no fight, as usual.
-async function mpCoopRandom(mapId, x: number, y: number) {
+async function mpCoopRandom(mapId: string, x: number, y: number) {
     coopRolling(true);
     try {
         const a = await battle.rollEncounter(mapId, x, y);
@@ -116,7 +117,7 @@ async function mpCoopRandom(mapId, x: number, y: number) {
     } finally { coopRolling(false); }
 }
 
-export function triggerRandomEncounter(mapId, x: number, y: number) {
+export function triggerRandomEncounter(mapId: string, x: number, y: number) {
     // EXPERIMENT (mounts): a wild fight always starts on foot.
     mountForceDismount();
     if (
@@ -133,7 +134,7 @@ export function triggerRandomEncounter(mapId, x: number, y: number) {
     if (coopReady()) { mpCoopRandom(mapId, x, y); return; }   // teamed up: two wild Digimon, and your partner can join
     if (window.__fx?.practice2v2) { mpPracticeRandom(mapId, x, y); return; }   // F2 -> Extras -> Practice 2 vs 2 (test, off by default)
     startFieldBattle(() =>
-        battle.startRandom(mapId, x, y, (res) => presentVictory(res), null, gameOverToTitle));
+        battle.startRandom(mapId, x, y, (res: BattleWinResult) => presentVictory(res), null, gameOverToTitle));
 }
 
 // The decoded loss route, once for every battle kind. wfightmn's loss branch

@@ -16,6 +16,26 @@ import { EQUIP_SLOT_KEYS, RES_ROWS, STAT_ROWS } from "./pure.js";
 
 import type { GameState } from "../game/types.js";
 import type { DigimonRecord } from "../types/battle.js";
+import type { CoreStatKey, ElementKey, MenuSkillRow, RosterViewEntry } from "./types.js";
+
+/** The item row useMessage reads (ITEM_BY_ID[id]). */
+interface UseMessageItem {
+  effect?: string;
+  value?: number;
+}
+
+/** The partner numbers useMessage compares: a snapshot before the item and the live block after it. */
+interface UseMessageStats {
+  hp?: number;
+  mp?: number;
+  bonuses?: Record<string, number | undefined>;
+}
+
+/** What the engine's useItem hands back, as far as the message reads it. */
+interface UseMessageResult {
+  clipped?: boolean;
+  amount?: number;
+}
 
 export function clampIndex(i: number, n: number) {
   if (n <= 0) return 0;
@@ -61,7 +81,7 @@ export const ITEM_CAT_KINDS = [1, 0x80000002, 0x80000003, 0x80000004, 0];
 // before/after difference here. `before`/`after` are still the fallback for a
 // result that carries no amount. The clipped HEAL arm is the exception: its
 // constant 0x52 carries no figure at all (see below).
-export function useMessage(item, before, after, result) {
+export function useMessage(item: UseMessageItem | undefined, before: UseMessageStats | undefined, after: UseMessageStats | undefined, result: UseMessageResult | undefined) {
   const eff = item?.effect ?? "";
   if (eff === "full_hp") return "HP healed to maximum.";
   if (eff === "hp") {
@@ -83,18 +103,18 @@ export function useMessage(item, before, after, result) {
     elem_thunder: "Thunder Tolerance increased by {1}.", elem_machine: "Machine Tolerance increased by {1}.",
     elem_dark: "Dark Tolerance increased by {1}.",
   };
-  if (eff === "tp") return `TP increased by ${item.value}.`;
+  if (eff === "tp") return `TP increased by ${item!.value}.`;
   if (STAT_MSG[eff]) {
     const key = eff.startsWith("stat_") ? eff.slice(5) : null;
     // Permanent boosts live in `bonuses` (the chip contribution), so compare
     // that key only; the old top-level fallback read a different number and
     // produced a nonsense delta once a new bonus key appeared.
     const delta = Number.isFinite(Number(result?.amount))
-      ? Number(result.amount)
+      ? Number(result!.amount)
       : key
         ? (Number(after?.bonuses?.[key] ?? 0) - Number(before?.bonuses?.[key] ?? 0))
-        : Number(item.value);
-    return STAT_MSG[eff].replace("{1}", String(Number.isFinite(delta) ? delta : item.value));
+        : Number(item!.value);
+    return STAT_MSG[eff].replace("{1}", String(Number.isFinite(delta) ? delta : item!.value));
   }
   return "No effect.";
 }
@@ -102,7 +122,7 @@ export function useMessage(item, before, after, result) {
 // SORT = real formation change: swap two party slots everywhere index-aligned
 // state lives (party, partyStats incl. the lead's live partnerStats, equipment).
 export function swapFormation(state: GameState, a: number, b: number) {
-  const swap = (arr) => { if (Array.isArray(arr)) { const t = arr[a]; arr[a] = arr[b]; arr[b] = t; } };
+  const swap = <T,>(arr: (T | undefined)[] | undefined) => { if (Array.isArray(arr)) { const t = arr[a]; arr[a] = arr[b]; arr[b] = t; } };
   // materialize the lead's live stats into the array view before swapping
   if (state.partyStats) state.partyStats[0] = state.partnerStats ?? state.partyStats[0];
   swap(state.party); swap(state.partyStats); swap(state.equipment);
@@ -124,7 +144,7 @@ export function swapFormation(state: GameState, a: number, b: number) {
 // The six technique slots of one digivolution, as F0x80089bf0 state 0x2B reads
 // them: exactly six, low 13 bits are the technique id, zero means empty. The
 // cursor may only rest on a non-empty slot.
-export function formTechSlots(stats: Record<string, number>, formId: string, digimonDB: Record<string, DigimonRecord> | undefined) {
+export function formTechSlots(stats: Record<string, number>, formId: string | number | undefined, digimonDB: Record<string, DigimonRecord> | null | undefined) {
   const record = formLedgerRecord(stats, formId, digimonDB ?? {});
   const words = record?.techSlots ?? [];
   return Array.from({ length: 6 }, (_, i) => (Number(words[i] ?? 0) & 0x1fff) || 0);
@@ -148,7 +168,7 @@ export function formTechSlots(stats: Record<string, number>, formId: string, dig
 // Fire happens to be element 2 AND most fire moves are attack_cat 2, which is
 // why Kotemon's "Hot Head" landed on the right clip (0x39) under the old
 // reading and hid the mistake.
-export function techBadgeClip(tech) {
+export function techBadgeClip(tech: Pick<MenuSkillRow, "attack_cat"> | undefined) {
   const cat = Number(tech?.attack_cat);
   return Number.isFinite(cat) && cat > 0 ? 0x37 + cat : null;
 }
@@ -165,14 +185,14 @@ export function ownTechSlots(profile: DigimonRecord | undefined) {
 // roster record's current-form field (+0x04) against the highlighted form id
 // (F0x8008886c); the walker persists that same field as stats.digimonId, which
 // partyRosterView surfaces as the entry's digimonId.
-export function isCurrentForm(rosterEntry, evo) {
+export function isCurrentForm(rosterEntry: Pick<RosterViewEntry, "digimonId"> | undefined, evo: { formId?: number; } | undefined) {
   const cur = Number(rosterEntry?.digimonId ?? 0);
   const target = Number(evo?.formId ?? 0);
   return cur !== 0 && target !== 0 && cur === target;
 }
 
 // The action label the original draws for the highlighted digivolve row.
-export function battleDigivolveLabel(rosterEntry, evo) {
+export function battleDigivolveLabel(rosterEntry: Pick<RosterViewEntry, "digimonId"> | undefined, evo: { formId?: number; } | undefined) {
   return isCurrentForm(rosterEntry, evo) ? "Battle Digivolve Off" : "Battle Digivolve On";
 }
 
@@ -192,10 +212,10 @@ export function battleDigivolveLabel(rosterEntry, evo) {
  * Accessory, Two-handed, Accessory. `names` is `status_ui.json`'s
  * `wield_names`, in that order. Returns null when there is no such item.
  */
-export function wieldNameFor(eq, names) {
+export function wieldNameFor(eq: { statBytes?: number[]; } | undefined, names: string[] | undefined) {
   const idx = eq?.statBytes?.[2];
-  if (!Array.isArray(names) || !Number.isInteger(idx) || idx < 1 || idx > names.length) return null;
-  return names[idx - 1] ?? null;
+  if (!Array.isArray(names) || !Number.isInteger(idx) || idx! < 1 || idx! > names.length) return null;
+  return names[idx! - 1] ?? null;
 }
 
 export function equippedCountOf(state: GameState, itemId: number) {
@@ -205,7 +225,7 @@ export function equippedCountOf(state: GameState, itemId: number) {
 
 export function ensureEquipment(state: GameState) {
   if (!Array.isArray(state.equipment) || state.equipment.length !== (state.party?.length ?? 0)) {
-    state.equipment = (state.party ?? []).map((_, i: string | number) => state.equipment?.[i] ?? {});
+    state.equipment = (state.party ?? []).map((_, i: number) => state.equipment?.[i] ?? {});
     // The wearer record was replaced wholesale, so the stored worn byte array is
     // rebuilt from it (the invariant the original's four writers keep).
     syncWornFromEquipment(state);
@@ -248,14 +268,14 @@ export function equipPickOptions(state: GameState, partyIdx: number, slotKey: st
   const eqName = equippedId != null
     ? ITEM_BY_ID[equippedId]?.name ?? EQUIPMENT_BY_ID[equippedId]?.name ?? "?"
     : null;
-  return pauseEquipListIds(line, row, (id) => heldCount(state, id) !== 0).map((id) => (
+  return pauseEquipListIds(line, row, (id: number) => heldCount(state, id) !== 0).map((id) => (
     id === -1
       ? { unequip: true, name: eqName != null ? `Unequip (${eqName})` : "Unequip" }
       : { id, name: ITEM_BY_ID[id]?.name ?? EQUIPMENT_BY_ID[id]?.name }
   ));
 }
 
-export function previewEquipment(state: GameState, m: { detailIdx: string | number; equipCursor: string | number; equipFocus: string; }) {
+export function previewEquipment(state: GameState, m: { detailIdx: number; equipCursor: number; equipFocus: string; }) {
   const equipped = { ...(state.equipment[m.detailIdx] ?? {}) };
   const slotKey = EQUIP_SLOT_KEYS[m.equipCursor];
   const snapshot = { ...equipped };
@@ -264,7 +284,7 @@ export function previewEquipment(state: GameState, m: { detailIdx: string | numb
   return { snapshot, preview };
 }
 
-export function sheetStatValue(p, slots: Record<string, number>, stat: string, rosterSlot = null) {
+export function sheetStatValue(p: RosterViewEntry | undefined, slots: Record<string, number>, stat: CoreStatKey, rosterSlot: number | null | undefined = null) {
   // The total the original's roster record would hold: stored + the permanent
   // chip rise (the walker keeps chips in `bonuses` — engine/dw3/items.ts writes
   // the rise there — and the record itself already carries them on the disc),
@@ -292,7 +312,7 @@ export function sheetStatValue(p, slots: Record<string, number>, stat: string, r
  * elementValue) so the sheet, the shop, the gym and the battle divisor cannot
  * drift apart. The sheet never floors, because F0x8008C1C0 only caps.
  */
-export function sheetResValue(p, slots: Record<string, number>, res: string) {
+export function sheetResValue(p: RosterViewEntry | undefined, slots: Record<string, number>, res: ElementKey) {
   const b = equipmentBonuses(slots);
   const i = RES_ROWS.indexOf(res);
   // The base is the record's own halfword — partyRosterView's `elements`, i.e.
@@ -316,10 +336,10 @@ export function sheetResValue(p, slots: Record<string, number>, res: string) {
 // onward) and per-resistance field (+0xe onward), clamping the sum at 999. With
 // no candidate the species part is simply absent. These two helpers exist so the
 // fold cannot drift from the sheet's: they call the sheet's own readers.
-export function seeDigivolvePanelStat(p, slots: Record<string, number>, stat: string, rosterSlot: number | null | undefined, formProfile = null) {
-  return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot!) + Number(formProfile?.[stat] ?? 0));
+export function seeDigivolvePanelStat(p: RosterViewEntry | undefined, slots: Record<string, number>, stat: CoreStatKey, rosterSlot: number | null | undefined, formProfile: DigimonRecord | null | undefined = null) {
+  return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot) + Number(formProfile?.[stat] ?? 0));
 }
 
-export function seeDigivolvePanelRes(p, slots: Record<string, number>, res: string, formProfile = null) {
+export function seeDigivolvePanelRes(p: RosterViewEntry | undefined, slots: Record<string, number>, res: ElementKey, formProfile: DigimonRecord | null | undefined = null) {
   return Math.min(999, sheetResValue(p, slots, res) + Number(formProfile?.resistances?.[res] ?? 0));
 }

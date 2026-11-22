@@ -1,5 +1,4 @@
 import { questDone } from "../quests.js";
-import type { FieldMovieHost } from "./types.js";
 import type { FightReportOptions } from "../types/fightreport-translated.js";
 import { FLY_QUEST, flyBlock, FLY_POINTS, flyCopyFor, arrivalSpot } from "../fly-points.js";
 import {
@@ -54,7 +53,7 @@ export function openCardShopFolder() {
     cardDeck.open!();
 }
 
-export function openFly(row) {
+export function openFly(row: number) {
     const block = !questDone(FLY_QUEST) ? "Not now." : flyBlock({ openAir: flyAirNow(), free: flyFree() });
     if (block) { questSpeak(null, "", block); return; }
     books.open("fly", () => {
@@ -65,7 +64,7 @@ export function openFly(row) {
 }
 
 /** Fly to a fly point: resolves "ok" or why not. Every rule is re-checked here, whoever asks (the book, the window.__fly hook). */
-export async function flyTo(id) {
+export async function flyTo(id: string) {
     if (!FLY_POINTS.includes(id) || !questDone(FLY_QUEST)) return "no";
     if (!flyFree() || state.menuOpen || books.isOpen()) return "busy";
     if (!flyAirNow()) return "air";
@@ -125,7 +124,7 @@ export function openFightReport(opts: FightReportOptions = {}) {
 // which launches the same code family with value 0
 // (docs/research/ui/stdwtitl-title-menu-2026-08-14.md — 0x2D7 = Start,
 // 0xC00 = Continue), handled at the title below.
-export function openMemoryCard(mode, onClose = null, atSavePoint = undefined) {
+export function openMemoryCard(mode: "save" | "load", onClose: (() => void) | null = null, atSavePoint: ReturnType<typeof savePointForStage> | undefined = undefined) {
     const map = currentMap();
     // The caller may name the save point explicitly (the decoded HANDOFF);
     // otherwise the map decides, so the inn-zone save and the lab behave as
@@ -153,12 +152,12 @@ export function openMemoryCard(mode, onClose = null, atSavePoint = undefined) {
 // re-pointed to 0x276 at master ordinal 0x2d (engine/dw3/screen-routing.ts
 // movieReturnScreen, the same rule the router applies below). Returns the
 // first selector that is not a movie (0 when the chain is malformed).
-export async function playMovieChain(launchCode) {
+export async function playMovieChain(launchCode: number) {
     let selector = launchCode | 0;
     for (let step = 0; step < ENDING_CHAIN_MAX_STEPS; step++) {
         if (movieRow(selector) == null) break;
         await new Promise<void>((resolve) => {
-            (S as FieldMovieHost).fieldMovieDone = resolve;
+            S.fieldMovieDone = resolve;
             fieldMovie.open(selector).then((row) => {
                 if (!row) { S.fieldMovieDone = null; resolve(); } // unknown code: never strand
             });
@@ -170,7 +169,7 @@ export async function playMovieChain(launchCode) {
     return selector;
 }
 
-export async function playEndingChain(launchCode) {
+export async function playEndingChain(launchCode: number) {
     const selector = await playMovieChain(launchCode);
     const routed = S.screenRouter.route(selector, currentMap().id);
     if (routed?.kind === "warp") {

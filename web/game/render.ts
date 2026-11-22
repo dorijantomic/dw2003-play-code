@@ -1,5 +1,5 @@
 import * as uiC from "../ui-c/index.js";
-import type { FootPoint } from "./types.js";
+import type { FollowerDraw, FootPoint, SpriteRecord } from "./types.js";
 import { assetMode, ASSET_MODE_HD, isLoadedAsset } from "../assets.js";
 import {
   widePadFor,
@@ -210,7 +210,7 @@ export function render() {
     // Declared here (above the map band) so the leader's own drawable can be a
     // hoisted function the under-map band calls before the ground goes down.
     const drawables = [];
-    const debugInfos = [];
+    const debugInfos: AnimDebugRow[] = [];
 
     // THE LIVE FIELD CHARACTER, before anything reads the camera.  Three stage
     // objects move it -- s926's rising row, s680's sub-891 drive and s261's two
@@ -599,7 +599,7 @@ export function render() {
             // which is exactly `progress` in all four phases.
             const climbGroundOffsetFixed = cl
                 && (cl.phase === "mount" || cl.phase === "dismount" || cl.phase === "climb")
-                && !(window as any).__noClimbShadowOffset
+                && !window.__noClimbShadowOffset
                 ? Math.round(cl.progress * 256) : 0;
             // EXPERIMENT (mounts): on the mount the rider casts no shadow of its own; the mount's lies on the ground
             if (!mountHidesRiderShadow()) drawActorShadow(
@@ -640,7 +640,7 @@ export function render() {
             const df = state.diveForm;
             const dfSheet = df && state.npcImgs[df.sprite];
             if (df && dfSheet) {
-                const dfRec = state.manifest.npcs?.find((n) => n.id === df.sprite);
+                const dfRec = state.manifest.npcs?.find((n: SpriteRecord) => n.id === df.sprite);
                 // The block interaction's engager clip: mode 0x4d latched clip
                 // 0x45 (p123digm's drill dive) for 36 blanks, and it ends when
                 // the machine's engager arm sees the clip complete. While it
@@ -740,7 +740,7 @@ export function render() {
     // bucket reaches the under-map band the whole party is routed behind the
     // ground with him — the Protocol Ruins tunnel (s375).
     function partyFollowerDraws() {
-        const out = [];
+        const out: FollowerDraw[] = [];
         if (state._questScene) return out;   // a quest scene: your partners step out of sight, so nothing walks through them
         if (mountHidesFollowers()) return out;   // EXPERIMENT (mounts): nobody trails you on a mount
         const drawCount = activeFollowerCount();
@@ -750,11 +750,11 @@ export function render() {
             const pc = followerChar(i);
             const ps = pc && state.charImgs[pc.id];
             if (!pc || !ps) continue;
-            out.push({ i, f, pc, ps });
+            out.push({ i, f: f!, pc, ps });
         }
         return out;
     }
-    function drawPartyFollower({ i, f, pc, ps }) {
+    function drawPartyFollower({ i, f, pc, ps }: FollowerDraw) {
         if (window.__hideParty) return; // debug A/B switch, see drawPlayerActor
         const pdir = f.dir;
         // A chase hands the field to the player: the party runs with them there, exactly as in ordinary walking.
@@ -823,8 +823,8 @@ export function render() {
                 continue;
             }
             const npcMeta =
-                state.manifest.npcs.find((n) => n.id === npc.sprite) ??
-                state.manifest.characters.find((c) => c.id === npc.sprite);
+                state.manifest.npcs.find((n: SpriteRecord) => n.id === npc.sprite) ??
+                state.manifest.characters.find((c: SpriteRecord) => c.id === npc.sprite);
             const npcSheet =
                 state.npcImgs[npc.sprite] ?? state.charImgs[npc.sprite];
             if (npcMeta && npcSheet) {

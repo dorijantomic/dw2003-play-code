@@ -9,7 +9,7 @@ import { openDamageLab } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> 
 import { openReplay, replayPress, replayTake, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { areaOf } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { underwaterInfo } from "./fishing-underwater.js"; // fishing: a 3D underwater inset while the line is in the water (reads state.fishing only)
-import type { Closeable, DevBattleOptions, FieldMovieHost, TransitionQuadScreen } from "./game/types.js";
+import type { Closeable, DevBattleOptions, StoryEvent, TransitionQuadScreen } from "./game/types.js";
 
 import { installFxPanel, ambienceSceneState, isOpenAirMapName } from "./ambience.js";
 import { loadTileIndex } from "./map-tiles.js";
@@ -47,6 +47,7 @@ import { loadCatalog, loadStarter, ensureStarterFolder, cards, persistCollection
 import { buildFightReportPages } from "./battle.js";
 import { restoreWindowFill } from "./fullscreen.js";
 import type { BattleState } from './types/battle.js';
+import type { BlockEngagement } from "../engine/systems/block-actor.js";
 
 restoreWindowFill(document);
 import { loadPlaceCardTranslated } from "./placecard-translated.js";
@@ -168,6 +169,16 @@ import { dispatchInput } from "./game/input.js";
 import { padLoop } from "./game/update.js";
 import { devSnapshot } from "./game/draw-sprites.js";
 import { init } from "./game/init.js";   // FLY row: quest zz_fly, visited towns only
+// The shapes this file reads off the untyped stores (state.manifest, scene casts, saved party stats, the shop file).
+interface ManifestMap { id: string; name?: string; }
+interface CastNpc { npc_id: number; sprite: string; x: number; y: number; slot: number; n: number; cutsceneOnly?: boolean; }
+interface FormLedgerEntry { id: number | string; }
+interface ShopRow { id?: number; }
+interface FishingSpot { dx: number; dy: number; }
+interface MpbSnapshot { lead: string; party: string; bits: number; }
+interface MpbJoinSetup { ch?: number[]; }
+interface MpbJoinResult { won?: boolean; fled?: boolean; }
+interface Point { x: number; y: number; }
 window.__bgm = bgm;
 window.__sfx = sfx;
 bgm.setVolume!(window.__fx?.musicVolume);       // OPTIONS volumes (web/volume-levels.js): 1 = the game's own gain
@@ -188,26 +199,27 @@ installMpBattle({
     sfx, bgm, mapId: () => currentMap()?.id ?? null, languageByte: () => state.languageByte,
     openReport: (b: BattleState, onClose: () => void) => openNativeReport(b, onClose),
     myId: () => myId() ?? 1, myName: () => myName() || state.playerName || "Tamer",
-    practice: (o) => mpbPractice(o),
-    nameOf: (id) => peerOf(id)?.name ?? myName(),
-    send: (ids, d) => sendMpb(ids, d),
+    practice: (o: Parameters<typeof mpbPractice>[0]) => mpbPractice(o),
+    nameOf: (id: number) => peerOf(id)?.name ?? myName(),
+    send: (ids: number[], d: unknown) => sendMpb(ids, d),
     releaseKeys: () => state.keys.clear(),
     snapshot: () => ({ lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null), bits: state.bits! | 0 }),
-    restore: (sn) => {
+    restore: (sn: MpbSnapshot) => {
         state.partnerStats = JSON.parse(sn.lead); state.partyStats = JSON.parse(sn.party); state.bits = sn.bits;
         localStorage.setItem("partnerStats", sn.lead); localStorage.setItem("partyStats", sn.party); localStorage.setItem("bits", String(sn.bits));
     },
     canJoin: () => mpIdle() && fieldPartySize(state.party) > 0,
     // a friend's quest challenge that I join counts for my own quest too
-    joinDone: (setup) => (r) => { if (r.won && !r.fled && setup.ch?.length) questsCreditChallenge(setup.ch); },
+    joinDone: (setup: MpbJoinSetup) => (r: MpbJoinResult) => { if (r.won && !r.fled && setup.ch?.length) questsCreditChallenge(setup.ch); },
 });
 
 installSocial({
-    stageEl: document.getElementById("stage"),
+    // ETS item 9: the page always has the #stage element
+    stageEl: document.getElementById("stage")!,
     api: {
         card: mpCard,
         currentMapId: () => state.manifest?.maps?.[state.mapIdx]?.id ?? null,
-        mapName: (id) => state.manifest?.maps?.find((m) => m.id === id)?.name ?? null,
+        mapName: (id) => state.manifest?.maps?.find((m: ManifestMap) => m.id === id)?.name ?? null,
         busy: () => !!state.started && (battle.isActive() || cutscene.isActive() || fade.dir !== 0 || mpbVisible()),
         releaseKeys: () => state.keys.clear(),
         // "Go to the other player" (web/mpsocial.js, web/mp-goto.js): where I stand, whether I may be moved now, and the move itself.
@@ -281,10 +293,10 @@ installQuests({
         : (startQuestBattle(foes, opts) || (opts?.onFlee?.(), false))), opts?.challenge) ? true : startQuestBattle(party, opts)),
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
-    npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
+    npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n: CastNpc) => !n.cutsceneOnly).map((n: CastNpc) => n.npc_id) : []; },
     // Speech goes through the game's own conversation box (translated, same balloon and font as a real NPC); the list and
     // the yes/no questions are the game's choice widget. Both resolve when the player is done.
-    speak: (npcId: number, name: string, text: string) => questSpeak(npcId, name, text),
+    speak: (npcId: number | null, name: string, text: string) => questSpeak(npcId, name, text),
     scene: (steps: Parameters<typeof playQuestScene>[0]) => playQuestScene(steps),
     countItem: (name) => { const it = ITEM_BY_NAME?.[name]; return it ? heldCount(state, it.id) : 0; },
     takeItem: (name, n) => {
@@ -294,7 +306,7 @@ installQuests({
         localStorage.setItem("inventory", JSON.stringify(state.inventory));
         return true;
     },
-    ownsForm: (id) => [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats : [])].some((p) => p?.formLedger?.some((f) => Number(f.id) === id)),
+    ownsForm: (id) => [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats : [])].some((p) => p?.formLedger?.some((f: FormLedgerEntry) => Number(f.id) === id)),
     ask: (prompt, options) => new Promise((resolve) => choice.open!(prompt, options, resolve)),
     onDone: (title) => socialQuestDone(title),
     idle: () =>
@@ -320,22 +332,22 @@ if (!window.__dwInstalled && /[?&]questlab=1\b/.test(location.search)) import(".
 // on (it is at the start), a quest unlocked a mount (the quest layer's own done state, never a story flag) and the
 // player's own DW2 models are installed (`hasModel`). `canStand` is this file's own foot-box test, so a dismount spot is the game's walkable ground.
 installMount({
-    groundShadow: (c, x, y, w, h, alpha) => drawGroundShadow(c, x, y, w, h, alpha),
+    groundShadow: (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, alpha: number) => drawGroundShadow(c, x, y, w, h, alpha),
     state: () => state,
     enabled: () => window.__fx?.mount === true,
-    hasModel: (url) => fetch(url, { method: "HEAD", cache: "no-store" }).then((r) => r.ok).catch(() => false),
-    questDone: (id) => questDone(id),
-    canStand: (x, y) => {
+    hasModel: (url: string) => fetch(url, { method: "HEAD", cache: "no-store" }).then((r) => r.ok).catch(() => false),
+    questDone: (id: string) => questDone(id),
+    canStand: (x: number, y: number) => {
         const grid = state.collision[currentMap()?.id];
         return !!grid && !boxStuck(grid, x, y)
             && x >= 12 && y >= 8 && x <= currentMap().width - 12 && y <= currentMap().height - 8;
     },
     resetFollowers: () => resetFollowers(),
-    placeFollowers: (spots) => placeFollowersAt(spots),
-    sfx: (id) => sfx.play!(id),
+    placeFollowers: (spots: Point[]) => placeFollowersAt(spots),
+    sfx: (id: string) => sfx.play!(id),
     // no riding indoors: the same open-air / indoor split the ambience layer uses (web/ambience.js isOpenAirMapName)
     indoor: () => { const n = currentMap()?.name; return !!n && !isOpenAirMapName(n); },
-    say: (text) => { questSpeak(null, "", text); },
+    say: (text: string) => { questSpeak(null, "", text); },
     fieldReady: () => !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!()
         && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry
         && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm
@@ -413,10 +425,10 @@ menu.cardFolderUnlocked = () => carriesFolderBag(state);
 menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open!(backToCardFolders); };
 menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open!(backToCardFolders); };
 // Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
-window.__fly = { places: () => currentFlyPlaces(), copy: (id: string) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
+window.__fly = { places: () => currentFlyPlaces(), copy: (id: string) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id: string) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
-window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys as any));
-window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys as any));
+window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys));
+window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));
 // East Sector - Duel Island, the card-duel venue (docs/research/story-
 // progression/GAME_WALKTHROUGH.md).
 Promise.all([loadCatalog(), loadStarter()]).then(() => { ensureStarterFolder(); persistCollection(); });
@@ -424,7 +436,7 @@ battle.setFieldMovieHandoff(async () => {
     const handoff = battleHandoff(state.progressOrdinal);
     if (!handoff.movie) return; // not ordinal 43: straight to the battle
     await new Promise<void>((resolve) => {
-        (S as FieldMovieHost).fieldMovieDone = resolve;
+        S.fieldMovieDone = resolve;
         fieldMovie.open(handoff.selector).then((row) => {
             if (!row) { S.fieldMovieDone = null; resolve(); } // unknown code: never strand the fight
         });
@@ -433,7 +445,7 @@ battle.setFieldMovieHandoff(async () => {
 window.__fieldMovie = () => fieldMovie.diagnostics();
 
 battle.setEndingHandoff({
-    play: (b) => {
+    play: (b: BattleState) => {
         playEndingChain(b._winLaunchCode ?? FINALE_WIN_ENDING_MOVIE)
             .catch((error) => console.error("[battle] ending chain", error))
             .then(() => battle.finishEnding());
@@ -526,7 +538,7 @@ window.__planner = {
     cursor: () => plannerCursor(),
     selection: () => plannerSelection(),
     members: () => plannerPartyMembers(),
-    press: (button) => plannerPress(String(button)),
+    press: (button: unknown) => plannerPress(String(button)),
 };
 // The `ghost` step's live actors, on the state itself: `_questGhosts` is a Map of actor -> { alpha, tint } (empty when
 // nothing is ghosted). A verifier reads its keys; web/quest-ghost.js empties it in place on every scene exit.
@@ -552,7 +564,7 @@ window.__assetLocality = () => ({
 });
 // Debug-only: lets a headless verifier drop the player onto a screen and read
 // the follower count, to check the Digi-Egg form swap without walking there.
-window.__setMap = (i, spawn = null) => loadAndSetMap(i, spawn!);
+window.__setMap = (i, spawn = null) => loadAndSetMap(i, spawn);
 window.__activeFollowerCount = () => activeFollowerCount();
 // Debug-only: what a Space press would talk to from where the player stands.
 // Lets a headless verifier (tools/verify_inn.mjs) prove it is addressing the
@@ -561,7 +573,7 @@ window.__talkTarget = () => {
     const scene = state.scenes[currentMap()?.id];
     if (!scene) return null;
     const cast = sceneCast(scene);
-    const visible = cast.filter((n) => !n.cutsceneOnly);
+    const visible = cast.filter((n: CastNpc) => !n.cutsceneOnly);
     const npc = nearestFacingNpc(talkCandidates(visible), state.x, state.y, state.dir, 48);
     // The same target rules the live press applies (F0x8008E2CC): refuse ids and the
     // id-redirect table (over the whole built cast, as the disc's find_entity is), so a
@@ -575,7 +587,7 @@ window.__talkTarget = () => {
     };
 };
 window.__blockActors = () => {
-    const shape = (ix) => ix && ({
+    const shape = (ix: BlockEngagement | null) => ix && ({
         targetId: ix.targetId, bit: ix.bit, busy: ix.busy, ticks: ix.ticks,
         engagerSub: ix.engagerSub, engagerLeft: ix.engagerLeft,
         targetSub: ix.targetSub, targetTimer: ix.targetTimer, targetLeft: ix.targetLeft,
@@ -592,13 +604,13 @@ window.__blockActors = () => {
 window.__launchPads = { setEnabled: setLaunchPadsEnabled, list: launchPads, debug: launchPadDebug };
 // The stage overlays' own ported actors (the s415 rockfall). The bounce plays
 // through the same packed-sound sink every other field cue uses.
-setStageObjectSound((word) => sfx.playPacked!(word, { overlap: true }));
+setStageObjectSound((word: number) => sfx.playPacked!(word, { overlap: true }));
 // The same sink for a stage overlay's own decor actor (engine/systems/point-record-actor.ts).
-setPointRecordActorSound((word) => sfx.playPacked!(word, { overlap: true }));
+setPointRecordActorSound((word: number) => sfx.playPacked!(word, { overlap: true }));
 // The pad flashes' cues are music stems (env205 digi_en0..2, env011 login_dl),
 // not samples: the actor plays them at its own fire and this sink maps the
 // packed word through the same PACKED_JINGLES table into the jingle player.
-setPointRecordActorMusic((word) => {
+setPointRecordActorMusic((word: number) => {
     const stem = PACKED_JINGLES[`0x${(word >>> 0).toString(16).padStart(8, "0")}`];
     if (stem) bgm?.playJingle?.(stem);
 });
@@ -616,7 +628,7 @@ setPointRecordOrdinal(() => Number(state.progressOrdinal ?? 0) || 0);
 // the first-visit (slides) or revisit (still) branch -- the same store every
 // other gate in the walker reads.  The closure is lazy, so naming `storyFlags`
 // here (declared below) is safe: it is only read when a stage builds the layer.
-setPointRecordFlag((id) => Number(storyFlags.get(id) ?? 0) || 0);
+setPointRecordFlag((id: number) => Number(storyFlags.get(id) ?? 0) || 0);
 // The character anchor of the `picture-steps` stage object (s785's 0x327):
 // the overlay's own `find(5, operand, -1)`, where the operand is the script's
 // own and the `+0x4` field the find matches is the actor's id -- so the
@@ -626,35 +638,35 @@ setPointRecordFlag((id) => Number(storyFlags.get(id) ?? 0) || 0);
 // there is a floor of the 16.8 world coordinate, so the pixel handed over is a
 // floor too.
 setPointRecordAnchor(
-    (stageId, type, p1) => {
+    (stageId: string, type: number, p1: number) => {
         if (type !== 5) return null;
         const scene = state.scenes[stageId];
         if (!scene) return null;
         return (
             sceneCast(scene)
-                .find((n) => n.npc_id === p1) ?? null
+                .find((n: CastNpc) => n.npc_id === p1) ?? null
         );
     },
-    (npc) => (npc ? { x: Math.floor(npc.x), y: Math.floor(npc.y) } : null),
+    (npc: CastNpc | null) => (npc ? { x: Math.floor(npc.x), y: Math.floor(npc.y) } : null),
 );
 // Debug-only: what the translated stage actors are doing right now, so a
 // headless verifier can read the rock's own state and its draw entries.
 window.__stageObjects = {
-    state: (mapId) => stageObjectState(mapId ?? currentMap().id),
-    draws: (mapId) => stageObjectDraws(mapId ?? currentMap().id),
+    state: (mapId: string | undefined) => stageObjectState(mapId ?? currentMap().id),
+    draws: (mapId: string | undefined) => stageObjectDraws(mapId ?? currentMap().id),
     screens: (mapId: string | undefined): TransitionQuadScreen[] => streetScreenQuads(mapId ?? currentMap().id),
-    glows: (mapId) => streetGlowProbe(mapId ?? currentMap().id),
-    stinger: (mapId) => stingerPopupProbe(mapId ?? currentMap().id),
+    glows: (mapId: string | undefined) => streetGlowProbe(mapId ?? currentMap().id),
+    stinger: (mapId: string | undefined) => stingerPopupProbe(mapId ?? currentMap().id),
     // The two stage users of the resident 2D draw-context service (s805 0x349
     // and s820 0x34d): this blank's SHAPE REQUESTS, in the order the service's
     // flush hands them over. Nothing draws them yet -- the shapes' texels live
     // in a pack member this repository has not extracted
     // (docs/research/field/draw-context-service-2026-10-04.md section 5.5).
-    annotator: (mapId) => annotatorMarkers(mapId ?? currentMap().id),
-    annotatorActive: (mapId) => annotatorActive(mapId ?? currentMap().id),
+    annotator: (mapId: string | undefined) => annotatorMarkers(mapId ?? currentMap().id),
+    annotatorActive: (mapId: string | undefined) => annotatorActive(mapId ?? currentMap().id),
     // The s415 Deeper Crevice SCENERY LAYER's live position this blank, so a
     // verifier can read the slide's per-frame geometry without pixels.
-    scrollLayers: (mapId) => scrollLayerEntries(mapId ?? currentMap().id),
+    scrollLayers: (mapId: string | undefined) => scrollLayerEntries(mapId ?? currentMap().id),
     fire: (id: number, sub: number | undefined, mapId: string | undefined) => fireStageObject(mapId ?? currentMap().id, id, sub ?? id),
     // The same route a cutscene SETANIM takes, with the second operand, so a
     // verifier can fire the stage overlays' own point-record actors
@@ -663,7 +675,7 @@ window.__stageObjects = {
     // Rockfall oracle only: run the same id through the MIPS interpreter so a
     // verifier can compare the original machine code's frames with the port's.
     nativeFire: (id: string, mapId: string | undefined): void => fireNativeStageObject(mapId ?? currentMap().id, id),
-    clear: (mapId) => clearStageObjects(mapId),
+    clear: (mapId: string | undefined) => clearStageObjects(mapId),
 };
 // Debug-only: the stage overlays' own point-record actors and the point
 // records they drive, so tools/verify_point_record_actors.mjs can read the
@@ -681,14 +693,14 @@ window.__footstepCount = () => S.footstepCount;
 // ambience.mjs can refuse any other mark.
 window.__stageAmbience = {
     execution: STAGE_AMBIENCE_EXECUTION,
-    diagnostics: (mapId) => stageAmbienceDiagnostics(mapId ?? currentMap().id),
+    diagnostics: (mapId: string | undefined) => stageAmbienceDiagnostics(mapId ?? currentMap().id),
 };
 // Debug-only: lets a headless verifier read the encounter selection for a map
 // without walking the player there, to check the entry-key wiring end to end.
 window.__encounter = {
     ready: () => battle.loadData(),
-    rateLevel: (mapId, x, y) => battle.encounterRateLevel(mapId, x, y),
-    pick: (mapId, x, y) => battle.pickEnemy(mapId, x, y),
+    rateLevel: (mapId: string, x: number, y: number) => battle.encounterRateLevel(mapId, x, y),
+    pick: (mapId: string, x: number, y: number) => battle.pickEnemy(mapId, x, y),
 };
 // Debug-only: drive the ordinary field->battle handoff (the step counter's own
 // function) from a verifier without walking the counter down.
@@ -910,8 +922,8 @@ window.__labOpen = (name, arg) => {
                 // shops.json rows are {id,name} objects; the shop takes raw ids
                 // (same normalize as the in-game zone path at :920). The native
                 // shop selects its own stock by shop id.
-                itemLog.noteSeen(s0.items.map((i) => i.id ?? i));   // GLOSSARY > ITEMS: the shop rows were shown
-                shop.open!(s0.items.map((i) => i.id ?? i), null, { name: s0.name, state, shopId: which });
+                itemLog.noteSeen(s0.items.map((i: ShopRow) => i.id ?? i));   // GLOSSARY > ITEMS: the shop rows were shown
+                shop.open!(s0.items.map((i: ShopRow) => i.id ?? i), null, { name: s0.name, state, shopId: which });
             });
             break;
         }
@@ -956,7 +968,7 @@ window.__labOpen = (name, arg) => {
             window.__reportNative = fightReportNative;
             break;
         case "cntysel":
-            cntyselNative.open((row, language) => {
+            cntyselNative.open((row: string, language: number) => {
                 window.__labLanguage = row;
                 window.__labLanguageByte = language;
             });
@@ -993,7 +1005,7 @@ document.addEventListener("visibilitychange", () => {
 // Script hook for the underwater view: drive one cast live. cast() uses the real spot under the
 // player (or an explicit {dx,dy}); strike() is the same edge the circle button sends.
 window.__fishingUw = {
-    cast(spot) { if (state.fishing) return false; const sp = spot ?? fishingSpotHere(); if (!sp) return false; startFishingCast(sp); return true; },
+    cast(spot: FishingSpot | null | undefined) { if (state.fishing) return false; const sp = spot ?? fishingSpotHere(); if (!sp) return false; startFishingCast(sp); return true; },
     strike() { if (!state.fishing) return false; state.fishing.strike = true; return true; },
     info() { return { ...underwaterInfo(), run: state.fishing ? { ...state.fishing.run } : null }; },
 };
@@ -1142,8 +1154,8 @@ window.__npcsHere = () => {
     const sc = state.scenes[currentMap().id];
     if (!sc) return console.log("no scene for", currentMap().id);
     const rows = sceneCast(sc)
-        .filter((n) => !n.cutsceneOnly)
-        .map((n) => ({
+        .filter((n: CastNpc) => !n.cutsceneOnly)
+        .map((n: CastNpc) => ({
             npc_id: n.npc_id,
             sprite: n.sprite,
             x: n.x,
@@ -1163,8 +1175,8 @@ window.__npcsHere = () => {
 window.__variantsAt = (x = state.x, y = state.y, r = 40) => {
     const sc = state.scenes[currentMap().id];
     const rows = (sc?.npcs || [])
-        .filter((n) => Math.hypot(n.x - x, n.y - y) <= r)
-        .map((n) => ({
+        .filter((n: CastNpc) => Math.hypot(n.x - x, n.y - y) <= r)
+        .map((n: CastNpc) => ({
             chapter_n: n.n,
             npc_id: n.npc_id,
             sprite: n.sprite,
@@ -1174,10 +1186,10 @@ window.__variantsAt = (x = state.x, y = state.y, r = 40) => {
             shown_now: chapterNpcs(
                 sc.npcs,
                 state.chapter,
-                storyFlags.get!!!!!!,
+                storyFlags.get,
             ).includes(n),
         }))
-        .sort((a, b) => a.slot - b.slot);
+        .sort((a: { slot: number }, b: { slot: number }) => a.slot - b.slot);
     console.log(
         `%c[VARIANTS within ${r}px of ${Math.round(x)},${Math.round(y)} on ${currentMap().id}] chapter=${state.chapter}`,
         "color:#a0a;font-weight:bold",
@@ -1207,9 +1219,9 @@ window.__tp = (x, y) => {
     if (x == null) {
         const sc = state.scenes[currentMap().id];
         const n = sceneCast(sc)
-            .filter((z) => !z.cutsceneOnly)
+            .filter((z: CastNpc) => !z.cutsceneOnly)
             .sort(
-                (a, b) =>
+                (a: CastNpc, b: CastNpc) =>
                     Math.hypot(a.x - state.x, a.y - state.y) -
                     Math.hypot(b.x - state.x, b.y - state.y),
             )[0];
@@ -1237,9 +1249,9 @@ window.__replay = {
     open: () => replayOpen(),
     view: () => replayView(),
     rows: () => replayRowsNow(),
-    press: (button) => replayPress(String(button)),
+    press: (button: unknown) => replayPress(String(button)),
     take: () => replayTake(),
-    scene: (ev) => replayScene(ev),
+    scene: (ev: StoryEvent) => replayScene(ev),
 };
 
 window.addEventListener("keydown", (e) => {
@@ -1265,7 +1277,7 @@ requestAnimationFrame(padLoop);
  * false when its switch is off, the game has not started, or the field is busy (a fight, a scene).
  * Escape (the "cross" press) closes every one of them.
  */
-window.__openExtra = (name) => {
+window.__openExtra = (name: string) => {
     const fx = window.__fx || {};
     if (!state.started || state.titleScreen || state.endScreen) return false;
     if (!replayFieldFree()) return false;
@@ -1283,11 +1295,11 @@ window.__openExtra = (name) => {
 window.__dev = {
     // Jump to a stage by manifest id ("s200") or index, optionally at a pixel.
     // Runs the game's own loadAndSetMap so the arrival is the ordinary one.
-    jump: (mapIdOrIndex, x = null, y = null) => {
+    jump: (mapIdOrIndex: number | string, x: number | null = null, y: number | null = null) => {
         const maps = state.manifest?.maps ?? [];
         const idx = typeof mapIdOrIndex === "number"
             ? mapIdOrIndex
-            : maps.findIndex((m) => m.id === String(mapIdOrIndex));
+            : maps.findIndex((m: ManifestMap) => m.id === String(mapIdOrIndex));
         if (idx < 0 || idx >= maps.length) return false;
         loadAndSetMap(idx, x != null && y != null ? { x, y } : null);
         if (x != null && y != null) { state.x = x; state.y = y; }
@@ -1306,13 +1318,13 @@ window.__dev = {
         onLose: opts.onLose ?? null,
     }),
     // Start a battle from a global scripted screen id (field_encounters.json).
-    startScreenBattle: (screenId, opts: DevBattleOptions = {}) => battle.startScreen(
+    startScreenBattle: (screenId: number | string, opts: DevBattleOptions = {}) => battle.startScreen(
         Number(screenId), opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
         { mapId: opts.mapId ?? currentMap().id, lead: opts.lead ?? true },
     ),
     // Start a battle from a resolved party (the same startParty the field uses): entries are
     // {name, level, hp, mp, stat_scale, fuseInto?}. Used by the dev toolset's Fusion Lab boss list.
-    startPartyBattle: (party, opts: DevBattleOptions = {}) => battle.startParty(
+    startPartyBattle: (party: Parameters<typeof battle.startParty>[0], opts: DevBattleOptions = {}) => battle.startParty(
         party, opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
         { mapId: opts.mapId ?? currentMap().id },
     ),
@@ -1320,9 +1332,9 @@ window.__dev = {
     // Events normally fire from a controller (step VM / talk launcher / flag);
     // this bypasses the gate and plays the script, which is what a tester wants.
     // Loads the event's own stage first when the player is elsewhere.
-    playEvent: async (mapId, eventId) => {
+    playEvent: async (mapId: string, eventId: number | string) => {
         if (mapId && currentMap().id !== mapId) {
-            const idx = state.manifest.maps.findIndex((m) => m.id === mapId);
+            const idx = state.manifest.maps.findIndex((m: ManifestMap) => m.id === mapId);
             if (idx < 0) return false;
             await loadAndSetMap(idx);
         }
@@ -1332,7 +1344,7 @@ window.__dev = {
         return true;
     },
     // Set a story flag through the real set_flag path (banked commands included).
-    setFlag: (id, val = true) => { applyStoryFlag(Number(id), val ? 1 : 0); return true; },
+    setFlag: (id: number | string, val = true) => { applyStoryFlag(Number(id), val ? 1 : 0); return true; },
     snapshot: () => devSnapshot(),
     get battle() { return battle; },
     get renderer() { return window.__battle3d ?? null; },

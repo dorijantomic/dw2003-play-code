@@ -10,6 +10,7 @@ interface AnimDebugRow {
   sprite: string;
   /** the clip/mode readout printed beside the sprite; shape is per-draw, so it stays loose */
   info: any;
+  npc_id?: number;
 }
 
 interface Window {
@@ -19,11 +20,11 @@ interface Window {
   __ambLamps: number;
   __animReport: () => unknown;
   __applyPreset: (name: string) => void;
-  __applyStoryFlag: (id: number, expected?: number | boolean) => void;
+  __applyStoryFlag: (id: number, expected: number | boolean) => void;
   __armSparkle: (program?: number) => void;
   __assetLocality: () => { retainedStages: unknown[]; readyStages: unknown[]; retainedSprites: unknown[]; };
-  __auctionArrival: (mapId: number) => "none" | "wait" | "fired";
-  __auctionScriptRow: unknown;
+  __auctionArrival: (mapId: string) => "none" | "wait" | "fired";
+  __auctionScriptRow: (eventId: number) => import("../game/types.js").StoryEvent | null;
   __battle: BattleContext;
   __battle3d: { setDataField?: (on: boolean, value?: number) => void; } | null;
   __battleAtmos: any;
@@ -74,7 +75,7 @@ interface Window {
   __engineTriggerSystem: unknown;
   __extraRoster: any;
   __extraRosterInstalled: boolean;
-  __fade: { alpha: number; dir: number; pending: boolean; };
+  __fade: import("../game/types.js").FadeState;
   __fallbackTextbox: unknown;
   __feet: FootPoint[];
   __fieldCanvasResolution: unknown;
@@ -167,14 +168,18 @@ interface Window {
   __openExtra: any;
   __openMapScreen: () => boolean;
   __packSelectNative: import("./packselect-translated.js").PackSelectScreen | null;
-  __partyCharisma: () => number;
+  __partyCharisma: () => number | null;
   __perfCut: number;
-  __perfHook: (updateMs: number, renderMs: number) => void;
+  __perfHook?: (updateMs: number, renderMs: number) => void;
+  /** dev-only switches the field reads (web/perf-test.ts, the dev panels) */
+  __perfNoFilter?: boolean;
+  __noClimbShadowOffset?: boolean;
+  __wipe28Hold?: boolean;
   __perfTestResults: PerfTestResults;
   __photo: { screenshot: () => boolean; toggleRecord: () => boolean; setPhoto: (on: boolean) => void; };
   __planner: unknown;
   __playQuestScene: (steps: unknown[]) => Promise<unknown>;
-  __playStoryEvent: (ev: unknown, onDone?: () => void) => void;
+  __playStoryEvent: (ev: import("../game/types.js").StoryEvent, onDone: import("../game/types.js").StoryEventDone) => void;
   __pointRecordActors: { state: (mapId: number) => unknown; records: (mapId: number) => unknown[]; };
   __pos: () => number[];
   __questChase: () => unknown;
@@ -186,20 +191,20 @@ interface Window {
   __reuseOut: unknown;
   __saveNative: unknown;
   __sc2Debug: { dragonflies: number; fishes: number; critters: number; devil: boolean; weed: boolean; breath: number; lamps: number; water: number; meadow: number; gust: boolean; };
-  __sceneEd: { armed: boolean; dragStart: { x: number; y: number; } | null; lastMouse: { x: number; y: number; }; };
+  __sceneEd: import("./sceneEditor.js").SceneEditorState;
   __sceneSkip: import("./sceneSkip.js").SceneSkipState | null;
   __seamPatchInfo: (id: string) => { regions: unknown; pixels: unknown; } | undefined;
   __setChapter: (n: number) => number;
   __setFx: (key: string, value: unknown) => void;
   __setFxMany: (values: Record<string, unknown>) => void;
-  __setMap: (i: number | string, spawn?: string | null) => Promise<void>;
+  __setMap: (i: number, spawn?: import("../game/types.js").SpawnPoint | null) => Promise<void>;
   __sfx: any;
   __shop: import("./shop-translated.js").ShopTranslatedScreen | null;
   __shopTranslated: import("./shop-translated.js").ShopTranslatedScreen | null;
   __showcase: unknown;
   __showLadders: unknown;
   __stageAmbience: unknown;
-  __stageEnter: (mapId: number) => void;
+  __stageEnter: (mapId: string) => void;
   __stageObjects: unknown;
   __state: GameState;
   __status: unknown;
@@ -217,7 +222,7 @@ interface Window {
   __variantsAt: (x?: number, y?: number, r?: number) => unknown;
   __weatherForce: string | undefined;
   __wideField: { camK: number; sides: number; dim: number; staged: boolean; t: number; padL: number; };
-  __wipe28: () => { done: boolean; index: number; calls: number; quads: number; };
+  __wipe28: () => { done: boolean; index: number; calls: number; quads: number; } | null;
   __wire: { data: {}; thumbs: {}; maps: {}; wiring: unknown; src: unknown; door: unknown; scale: number; spawn: any; };
   __worldGlobe: any;
   __yesNoBox: import("./yesno-translated.js").YesNoScreen | null;

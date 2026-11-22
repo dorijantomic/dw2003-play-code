@@ -175,7 +175,9 @@ let league: MpLeagueNight | null = null, leaguePair: MpLeaguePair | null = null,
 
 // ------------------------------------------------------------ small helpers
 // ETS item 38: the kids are nodes, strings, numbers or false/null; each is checked in the body (nodeType), never returned
-const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, ...kids: any[]): HTMLElementTagNameMap[K] => {
+/** A kid that is not a node: a string, a number or anything else that prints itself; it has no nodeType (typed false so that a truthy nodeType narrows the kid to a Node, in the loose config too). */
+interface Printable { readonly nodeType?: false; toString(): string }
+const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, ...kids: (Node | Printable | false | null | undefined)[]): HTMLElementTagNameMap[K] => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     for (const k of kids) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }

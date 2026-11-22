@@ -22,15 +22,15 @@ import { loadCollisionForStage } from "./map-load.js";
 import { runStageHandoff } from "./transitions.js";
 import { S } from "./state.js";
 import { currentMap } from "./session.js";
-import type { ChatPack, GameState } from "./types.js";
+import type { ChatPack, GameState, ManifestMap, PartyRosterRow } from "./types.js";
 
 // EXPERIMENT (multiplayer): the chat / feed / players / inspect / trade box. It reads the game's state and moves items only
 // through the game's own item store; it never writes a story flag.
 export function mpCard() {
     if (!state.started || !state.manifest) return null;
     const roster = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
-    const party = roster.slice(0, 4).map((r) => {
-        const st = {};
+    const party = roster.slice(0, 4).map((r: PartyRosterRow) => {
+        const st: Record<string, number> = {};
         for (const [k, v] of Object.entries(r.stats ?? {})) {
             if (typeof v === "number" && k.length <= 6 && !/^(hp|mp|maxhp|maxmp)$/i.test(k) && Object.keys(st).length < 8) st[k] = v + (r.bonuses?.[k] ?? 0);
         }
@@ -45,14 +45,14 @@ export function mpCard() {
 // The ordinary map change to a spot beside (x, y) on `mapId` (runStageHandoff scripted:true: the same wipe and load as an exit; setMap
 // then gathers my followers on me). Used by the online "Go to" (warpNear) and by FLY (flyTo). `idle()` is asked before and after the
 // collision loads. The spot comes from pickSpotNear on that map's own collision grid, so never a wall. Resolves "ok", "busy", "nomap" or "noroom".
-export async function warpToMap(mapId, x, y, idle: (() => boolean) | (() => boolean), dir = null) {
-    const idx = state.manifest?.maps?.findIndex((m) => m.id === mapId) ?? -1;
+export async function warpToMap(mapId: string, x: number, y: number, idle: (() => boolean) | (() => boolean), dir: string | null = null) {
+    const idx = state.manifest?.maps?.findIndex((m: ManifestMap) => m.id === mapId) ?? -1;
     if (idx < 0) return "nomap";
     if (!idle()) return "busy";
     const grid = await loadCollisionForStage(mapId);
     if (!idle()) return "busy";            // the game moved on while the map's collision loaded
     const m = state.manifest.maps[idx];
-    const spot = pickSpotNear((px, py) => !grid || !rectBlocked(grid, px - 6, py - 8, px + 6, py), x, y, { w: m.width, h: m.height });
+    const spot = pickSpotNear((px: number, py: number) => !grid || !rectBlocked(grid, px - 6, py - 8, px + 6, py), x, y, { w: m.width, h: m.height });
     if (!spot) return "noroom";
     const dx = x - spot.x, dy = y - spot.y;
     runStageHandoff({ to: mapId, spawnX: spot.x, spawnY: spot.y, scripted: true, dir: dir ?? (Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up")) });
@@ -67,10 +67,10 @@ export function chatSay(text: string) {
     const pack = buildChatPack(text, String(state.playerName || "")) as ChatPack;
     S.chatPages = pack.pages;
     chatBox.open!({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
-        (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
+        (x: number, y: number) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 
-export function mpBalloonSay(id, name, text) {
+export function mpBalloonSay(id: number, name: string, text: string) {
     let b = mpBalloons.get(id);
     if (!b) { b = { box: createDialogueTranslated(sfx), actor: { x: 0, y: 0, actorId: 0 }, at: 0 }; mpBalloons.set(id, b); }
     b.box.close();
@@ -80,7 +80,7 @@ export function mpBalloonSay(id, name, text) {
     const pack = buildChatPack(text, String(name || "")) as ChatPack;
     b.pages = pack.pages; b.presses = 0;
     b.box.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: b.actor }, null,
-        (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
+        (x: number, y: number) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 
 function mpBalloonTick(dt: number) {

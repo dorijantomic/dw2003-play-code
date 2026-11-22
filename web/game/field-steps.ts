@@ -33,31 +33,26 @@ import { S } from "./state.js";
 import { currentMap } from "./session.js";
 import { activeFollowerCount } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
-
-import type { FlagStore } from "./types.js";
-interface NpcDialogueFlag {
-    id: string;
-    expected: number;
-}
-
+import type { DialogueRef, FlagGate, IceSlide, SceneLadder, TrapPads } from "./types.js";
+import type { BattleWinResult } from "../battle/core/types.js";
 
 interface NpcDialogueState {
-    gate?: string;
-    id: number;
-    on_close?: NpcDialogueFlag[];
+    gate?: FlagGate[];
+    dialogue: DialogueRef;
+    on_close?: FlagGate[];
 }
 
 
 interface DialogueNpc {
-    dialogue?: string[];
-    dialogue_state?: NpcDialogueState[];
-    ifFlag?: string;
+    dialogue?: DialogueRef;
+    dialogue_states?: NpcDialogueState[];
+    ifFlag?: { flag: string; dialogue: DialogueRef; };
 }
 
 
 interface NpcDialoguePick {
-    dialogue: string[];
-    on_close?: NpcDialogueFlag[];
+    dialogue: DialogueRef;
+    on_close?: FlagGate[];
 }
 
 // The rail the PLAYBACK executor's record names. The op-2/op-3 handler passes
@@ -67,7 +62,7 @@ interface NpcDialoguePick {
 // exactly these values (id and both endpoint coordinates); the other three are the
 // rows whose bottom cell is armed by an op-8/op-6 tile, which the disc never mounts
 // either. Matched by id first, then by the endpoint's own coordinates.
-function ladderRowForRecord(scene, effect) {
+function ladderRowForRecord(scene: { ladders?: SceneLadder[] } | null | undefined, effect: NonNullable<NonNullable<ReturnType<typeof stepPlayback>>["effect"]>) {
     const args = effect?.actorCall?.args;
     if (!args) return null;
     const id = effect?.op === 3 ? null : args[3] / 16 + 1; // op 2/3 carry (param0-1)*16
@@ -75,7 +70,7 @@ function ladderRowForRecord(scene, effect) {
     const y = args[2];
     let byCoord = null;
     for (const L of scene?.ladders ?? []) {
-        for (const [pt, isTop] of [[L.bottom, false], [L.top, true]]) {
+        for (const [pt, isTop] of [[L.bottom, false], [L.top, true]] as const) {
             if (pt.x !== x || pt.y !== y) continue;
             if (!byCoord) byCoord = { L, pt, isTop };
             if (id !== null && L.id === id) return { L, pt, isTop };
@@ -180,7 +175,7 @@ export function startPadHandoff() {
     return true;
 }
 
-export function startLadderClimb(scene) {
+export function startLadderClimb(scene: { ladders?: SceneLadder[] } | null | undefined) {
     // EXPERIMENT (mounts): you cannot climb a ladder from the saddle — step off first.
     mountForceDismount();
     // Which rail, which end and which side all come from the step record now. The
@@ -255,13 +250,13 @@ export function startLadderClimb(scene) {
 // its field position is followers[i] and its stored stats are the same slot the
 // status menu shows: index 0 is the LEAD (state.partnerStats, the block battles
 // level), 1.. are the trailing members' own persisted slots.
-export function fireTrapPositionOf(partyIndex) {
+export function fireTrapPositionOf(partyIndex: number) {
     if (partyIndex >= activeFollowerCount()) return null;  // slot not walking
     const f = followers[partyIndex];
     return f ? { x: f.x, y: f.y } : null;
 }
 
-export function forcePartyMemberToOneHp(partyIndex) {
+export function forcePartyMemberToOneHp(partyIndex: number) {
     const stats = partyIndex === 0
         ? state.partnerStats
         : state.partyStats?.[partyIndex];
@@ -279,12 +274,12 @@ export function forcePartyMemberToOneHp(partyIndex) {
 // scripted encounter block, so this is the ordinary field-battle path with the
 // roll replaced by a fixed screen — same 1v1 rule as a wild walk-up encounter
 // (every one of the fourteen resolves to a single Digimon).
-export function startAmbush(mapId, tile) {
+export function startAmbush(mapId: string, tile: { screenId: number; }) {
     // EXPERIMENT (mounts): a fight always starts on foot (the field hands over to the battle screen).
     mountForceDismount();
     startFieldBattle(() => battle.startScreen(
         tile.screenId,
-        (res) => presentVictory(res),
+        (res: BattleWinResult) => presentVictory(res),
         null, // flee: the tile has already latched, so it does not re-fire
         gameOverToTitle,
         { mapId },
@@ -318,7 +313,7 @@ export async function flushStoryBattle() {
             if (npc != null && !S.engineBridge.isBusy()) S.engineBridge.onTalk(npc);
         }
     };
-    startFieldBattle(() => battle.startScreen(screenId, (res) => {
+    startFieldBattle(() => battle.startScreen(screenId, (res: BattleWinResult) => {
         presentVictory(res);
         if (wonFlag != null) S.engine!.state.flags.set(wonFlag, true);
         advanceStory();
@@ -434,19 +429,19 @@ export function tickClimb(dt: number) {
 
 // Bug-maze trap pads: returns the reset point {x,y,dir} if (x,y) is on a bugged
 // floor cell, else null. `pads` is the scene's trapPads block (cell-grid mask).
-export function hitTrapPad(pads, x: number, y: number) {
+export function hitTrapPad(pads: TrapPads | null | undefined, x: number, y: number) {
     if (!pads) return null;
     const c = Math.floor(x / pads.cell),
         r = Math.floor(y / pads.cell);
     if (r < 0 || r >= pads.rows || c < 0 || c >= pads.cols) return null;
-    return pads.mask[r][c] === "1" ? pads.reset : null;
+    return pads.mask[r]![c] === "1" ? pads.reset : null;
 }
 
 // Ice Dungeon slippery floor: classify the tile under (x,y) from the scene's
 // `iceSlide` block (gen_scenes.ice_slide_regions -- the type-7 trigger cells whose
 // step record is op 11 / op 12). Returns {start:dirIndex} on a glide-entry cell,
 // {stop:true} on a stop cell, else null. See engine/systems/ice-slide.ts.
-export function iceSlideCellAt(slide, x: number, y: number) {
+export function iceSlideCellAt(slide: IceSlide | null | undefined, x: number, y: number) {
     if (!slide) return null;
     const c = Math.floor(x / slide.cell),
         r = Math.floor(y / slide.cell);
@@ -460,6 +455,6 @@ export function iceSlideCellAt(slide, x: number, y: number) {
 // as estalk00[id]; its `on_close` set_flags are applied when the box closes (advancing the
 // NPC's state). Manual/ifFlag NPCs (hand-authored `dialogue`, no states) fall back.
 // Returns a state-shaped object { dialogue, on_close? } or null (non-speaking variant).
-export function pickDialogueFor(npc: DialogueNpc, flags: FlagStore): NpcDialoguePick | null {
+export function pickDialogueFor(npc: DialogueNpc, flags: Record<string, boolean>): NpcDialoguePick | null {
     return selectNpcDialogue(npc, storyFlags.get, flags);
 }

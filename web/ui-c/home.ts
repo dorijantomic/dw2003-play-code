@@ -42,13 +42,30 @@ export function readCardRuns(runs, cardY: number) {
  * The party card, ONE component for every screen that shows it. `v` = the variant's C numbers (design px): C1 home and C2 picker differ
  * only in these. `c` = the state colours { edge, tabBody, tabInk } (plain / focused / held). `card` = the card's runs (readCardRuns).
  */
-export const CARD_VARIANTS = Object.freeze({
-    home: Object.freeze({ plate: [0, 500], slotX: 24, barW: 120, numX: 370, numW: [96, 88], abs: true }),
-    picker: Object.freeze({ plate: [-24, 493], slotX: 40, barW: 104, numX: 352, numW: [92, 86], abs: false }),
+export interface CardVariant {
+    /** the plate's x offset and width (design px) */
+    plate: readonly [number, number];
+    slotX: number;
+    barW: number;
+    numX: number;
+    /** the HP and the MP number widths */
+    numW: readonly [number, number];
+    /** whether the plate x is placed absolutely (dx) instead of inside the card */
+    abs: boolean;
+}
+/** The state colours of a card: its edge, the name tab's body and the name's ink (null = the default ink). */
+export interface CardColors {
+    edge: string;
+    tabBody: string;
+    tabInk: string | null;
+}
+export const CARD_VARIANTS: Readonly<{ home: CardVariant; picker: CardVariant }> = Object.freeze({
+    home: Object.freeze<CardVariant>({ plate: [0, 500], slotX: 24, barW: 120, numX: 370, numW: [96, 88], abs: true }),
+    picker: Object.freeze<CardVariant>({ plate: [-24, 493], slotX: 40, barW: 104, numX: 352, numW: [92, 86], abs: false }),
 });
-export const CARD_PLAIN = Object.freeze({ edge: "var(--c-edge)", tabBody: "var(--c-name-body)", tabInk: null });
+export const CARD_PLAIN: CardColors = Object.freeze({ edge: "var(--c-edge)", tabBody: "var(--c-name-body)", tabInk: null });
 
-export function partyCard(i: number, part, namePart: HomeClip | null, card, out, v = CARD_VARIANTS.home, c = CARD_PLAIN) {
+export function partyCard(i: number, part, namePart: HomeClip | null, card, out, v: CardVariant = CARD_VARIANTS.home, c: CardColors = CARD_PLAIN) {
     const Y = part.y, rel = part.rel, ox = part.x, f = inCard(rel, ox, Y), k = `card${i}`;
     const plateRect = v.abs ? applyRel({ x: dx(v.plate[0]!) + ox, y: Y, w: N(v.plate[1]), h: N(126) }, rel) : f(v.plate[0], 0, v.plate[1], 126);
     out.push(plate(`${k}.plate`, "card", plateRect, rel, { shape: "sr", edge: c.edge }));

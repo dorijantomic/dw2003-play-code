@@ -41,7 +41,7 @@ export function fieldPartySize(party: (string | null)[], cap = 3) {
 // Starter-pack manifest character id -> digimon.json id (mirrors battle.js's internal
 // map; kept here as the single source of truth so the status menu can resolve the same
 // party members without depending on battle.js's private closure state).
-export const CHARID_TO_DIGID = {
+export const CHARID_TO_DIGID: Record<string, number> = {
   "p003pken": 1,  // Kotemon
   "p004kogu": 2,  // Kumamon
   "p005koet": 3,  // Monmon
@@ -122,7 +122,7 @@ export function elementPointsWithGear(elemBonuses, elemResists) {
   return points;
 }
 
-export function elementValueWithGear(profile: ElementProfile, elemBonuses: Record<string, number | undefined> | null | undefined, elemResists: Record<string, number | undefined>, element: string) {
+export function elementValueWithGear(profile: ElementProfile | null | undefined, elemBonuses: Record<string, number | undefined> | null | undefined, elemResists: Record<string, number | undefined>, element: string) {
   return elementValue(profile, elementPointsWithGear(elemBonuses, elemResists), element);
 }
 

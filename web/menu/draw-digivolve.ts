@@ -16,11 +16,10 @@ import {
   sheetStatValue,
   techBadgeClip,
 } from "./logic.js";
-import type { MenuState } from "./types.js";
+import type { FoldFn, FoldNode, MenuState, RosterViewEntry } from "./types.js";
+import type { EvolutionOption } from "../types/battle.js";
 
 import type { GameState } from "../game/types.js";
-import type { RosterMember } from "../types/battle.js";
-type RosterDetailView = RosterMember & { xp?: number; tp?: number };
 
 // SEE DIGIVOLVE — a screen of its own, not a panel on the status sheet. Every
 // number here is read from UI.screens.see_digivolve (claim
@@ -39,14 +38,14 @@ type RosterDetailView = RosterMember & { xp?: number; tp?: number };
 //
 // The candidate's name at form_name is NOT on screen while the list is up:
 // F0x8008886c fills and hides it in the same call as the two action rows.
-export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState, state: GameState, t: number, fold = null) {
+export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p: RosterViewEntry | undefined, m: MenuState, state: GameState, t: number, fold: FoldFn | null = null) {
   const S = MS.UI.screens.see_digivolve;
   const evos = window.__battle?.availableEvolutions?.(state, m.detailIdx) ?? [];
   const step = m.detailStep;
   // Which of the two right-hand windows is up. The candidate list and the
   // action pair are DIFFERENT windows over the same corner (clips 0x24 and
   // 0x26); the screen shuts one before it opens the other.
-  const win = (key: string, node, axis: string, fn) => (fold
+  const win = (key: string, node: FoldNode, axis: string, fn: () => void) => (fold
     ? fold(key, node.pivot?.[0] ?? 0, node.pivot?.[1] ?? 0, axis ?? "x", fn)
     : (fn(), 1));
   // The whole lower panel — its band, its icon column and every widget on it —
@@ -139,7 +138,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
   if (win("dvList", S.window, "x",
       () => drawClip(ctx, ststat, S.window.clip, S.window.x, S.window.y)) >= 1
       && m._isOpen!("dvList")) {
-    evos.slice(0, S.list_rows.n).forEach((e, i: number) => {
+    evos.slice(0, S.list_rows.n).forEach((e: EvolutionOption, i: number) => {
       const y = S.list_rows.y_base + i * S.list_rows.pitch;
       if (!m.dvHome && i === m.detailSel) drawCursor(ctx, t * VSYNC, S.list_rows.cursor_x, y, gold);
       // NOT gold for being the current form. Capture 03-choose-digivolve.png
@@ -205,13 +204,13 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
 // x=50/x=91 (y=91+14i), TP plate 0x3c @ (0,196) value @ (45,203), Digivolve
 // window 0x22 @ (160,53) rows @ (178,71+14i), Equip window 0x23 @ (160,119)
 // rows @ (192,137+14i). (F0x8008c954 / F0x8008b520.)
-export function _drawDetail(ctx: CanvasRenderingContext2D, p: RosterDetailView | undefined, m: MenuState, state: GameState, t: number, fold = null) {
+export function _drawDetail(ctx: CanvasRenderingContext2D, p: RosterViewEntry | undefined, m: MenuState, state: GameState, t: number, fold: FoldFn | null = null) {
   const D = MS.UI.screens.detail;
   const sh = MS.UI.screens.shared;
   // Every panel on this sheet is its own folding window, opened in pairs by
   // F0x8008d684: card + name tab, then EXP plate + Digivolve panel, then stat
   // window + Equip panel. `win` draws one of them through its decoded pivot.
-  const win = (key: string, node, fn) => (fold
+  const win = (key: string, node: FoldNode, fn: () => void) => (fold
     ? fold(key, node.pivot?.[0] ?? 0, node.pivot?.[1] ?? 0, "x", fn)
     : (fn(), 1));
 
@@ -255,7 +254,7 @@ export function _drawDetail(ctx: CanvasRenderingContext2D, p: RosterDetailView |
     // fallback before any battle stats exist.
     // Right-anchored in the number font, as the original draws them: each value
     // ENDS at the decoded x so it never runs into the next baked icon column.
-    valueText(ctx, String(sheetStatValue(p, wornSlots, stat, wornSlot!)), D.stat_values.x, y, white);
+    valueText(ctx, String(sheetStatValue(p, wornSlots, stat, wornSlot)), D.stat_values.x, y, white);
   });
   RES_ROWS.forEach((res, i) => {
     const y = D.res_values.y_base + i * D.res_values.pitch;
@@ -282,7 +281,7 @@ export function _drawDetail(ctx: CanvasRenderingContext2D, p: RosterDetailView |
   if (win("shDv", D.digivolve_window,
       () => drawClip(ctx, ststat, D.digivolve_window.clip, D.digivolve_window.x, D.digivolve_window.y)) >= 1) {
     drawText(ctx, "Digivolve", D.digivolve_header.x, D.digivolve_header.y);
-    evos.slice(0, D.digivolve_rows.n).forEach((e, i: number) => {
+    evos.slice(0, D.digivolve_rows.n).forEach((e: EvolutionOption, i: number) => {
       const y = D.digivolve_rows.y_base + i * D.digivolve_rows.pitch;
       drawText(ctx, e.to ?? "", D.digivolve_rows.x, y);   // see _drawSeeDigivolve: not gold
     });
