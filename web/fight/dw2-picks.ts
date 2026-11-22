@@ -52,7 +52,7 @@ export async function ensureDw2Picks() {
 }
 
 /** Tests and the viewer set the picks directly. */
-export function setDw2Picks(raw) { picks = cleanPicks(raw); loading = Promise.resolve(picks); }
+export function setDw2Picks(raw: string[]) { picks = cleanPicks(raw); loading = Promise.resolve(picks); }
 
 /** "dw2" | "dw3" | null for one body's clip slot. */
 export function dw2Pick(folder: string | number, slot: number | null) {

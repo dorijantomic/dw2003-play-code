@@ -1,6 +1,17 @@
 import { boneMap as k16BoneMap } from "../digimon-bonemap.js";
 import { TAU, normaliseRoots, rolesOf, sample } from "./rig-basics.js";
 import type { K16Rig } from "./types.js";
+type K16Vec3 = [number, number, number];
+
+interface K16TwoBoneResult {
+  elbow: K16Vec3;
+  tip: K16Vec3;
+  reach: number;
+  clamped: boolean;
+  straight?: boolean;
+  bendDir: number[] | null;
+}
+
 
 // ── K16: the math retarget — role based, scale aware, rest-frame conjugation, IK reach ───────────
 //
@@ -396,7 +407,7 @@ export function shouldMirror(T, S, source, clip, lo: number, hi: number) {
 /** Bounded analytic two-bone IK: shoulder S0, wanted tip H, link lengths a (S0..elbow) and b.
  *  `hint` is the current elbow direction and `plane` the previous frame's bend direction: near a
  *  straight limb the bend plane is undefined, and without continuity the knee/elbow pops sideways. */
-function k16TwoBone(S0, H, a, b, hint, plane = null) {
+function k16TwoBone(S0: K16Vec3, H: K16Vec3, a: number, b: number, hint: K16Vec3 | null, plane = null): K16TwoBoneResult {
   const d0 = k16sub(H, S0);
   const d = k16norm(d0);
   const maxR = (a + b) * K16.reachSlack;

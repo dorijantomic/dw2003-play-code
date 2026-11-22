@@ -23,6 +23,15 @@ import { buildDirectoryBlock, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 import { fetchBytes, fetchJson, loadResidentResources, loadProfileRecords } from "./resident-data.js";
 import type { SaveResult, SaveScreen } from "./types/save-translated.js";
+interface MemcardData {
+    tables: Uint8Array;
+    font: Uint8Array;
+    cursorGlyphs: Uint8Array;
+    profiles: readonly Uint8Array[];
+    textButtons: Uint8Array;
+    banks: Map<number, Uint8Array>;
+}
+
 
 /** The card art: 0x029D0000 is disc index 669 (STMCRDCS), 0x02860000 is 646 (CMFONT). */
 const PACKS = { 669: "stmcrd", 646: "cmfont" };
@@ -32,7 +41,7 @@ const BANKS = [[0x78, "memcard"], [0xa9, "memcard"], [0x94, "shop-banks"]];
 const DATA_LABEL = "Memory card data";
 
 const dataByLanguage = new Map();
-function loadData(language) {
+function loadData(language): Promise<MemcardData> {
     if (!dataByLanguage.has(language)) {
         dataByLanguage.set(language, Promise.all([
             fetchJson("memcard/manifest.json", DATA_LABEL),

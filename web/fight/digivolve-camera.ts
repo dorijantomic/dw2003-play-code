@@ -23,6 +23,51 @@
 // the snap at 0x1000) is the already-ported code in battle-camera.js. Nothing is re-derived here.
 
 import { fieldsFromShot, CAMERA_FRAME_DELTA } from "./battle-camera.js";
+import type { CameraRecord } from '../types/battle3d.js';
+import type { ShotNode } from './types.js';
+interface RevertSchedule {
+  swapFrame?: number;
+  shotIndex?: number;
+  fadeFrame?: number;
+  hideFrame?: number;
+  cutFrame?: number;
+  returnFrame: number;
+  returnFadeFrames?: number;
+}
+
+interface RevertCameraArgs {
+  camRec: CameraRecord;
+  shotTen: () => ShotNode | undefined;
+  arena: () => ShotNode | undefined;
+  schedule: RevertSchedule;
+  setEnemyVisible: (visible: boolean) => void;
+  setMotion: ((motion: number) => void) | undefined;
+  weak?: boolean | (() => boolean);
+}
+
+interface RevertCam {
+  preStep(frame: number): void;
+  elapsed(frame: number | undefined): number;
+  update(frame: number): void;
+  owns(): boolean;
+  atOrigin(): boolean;
+  stop(): void;
+}
+
+interface FormChangeArenaShot {
+  eye: number[];
+  target: number[];
+  H: number;
+  roll?: number;
+}
+
+interface FormChangeCam {
+  preStep(frame: number | undefined): void;
+  elapsed(frame: number | undefined): number;
+  update(frame: number | undefined): void;
+  owns(): boolean;
+}
+
 
 // FRAME ORDER (normal_battle.h: camera child 0x08 runs before the change / entrance task 0x1C;
 // registry.c runChildTasks in index order; battle_camera.c set/fade only STORE and the camera
@@ -40,7 +85,7 @@ import { fieldsFromShot, CAMERA_FRAME_DELTA } from "./battle-camera.js";
  * @param {{preStep:Function, elapsed:Function, update:Function, owns:Function}} cam
  * @param {number} frame   the presentation frame
  */
-export function stepFormChangeFrame(camRec, cam, frame: number | undefined) {
+export function stepFormChangeFrame(camRec, cam, frame: number | undefined): { shot: ReturnType<CameraRecord['sample']> | null; fields: ReturnType<CameraRecord['live']> } {
   cam.preStep(frame);                                 // work armed before the presentation's f0
   const n = cam.elapsed(frame);                       // presentation frames since the last step
   if (n > 0) camRec.tick(n * CAMERA_FRAME_DELTA);     // 1) the camera task
@@ -60,7 +105,7 @@ export function stepFormChangeFrame(camRec, cam, frame: number | undefined) {
  * @param {() => ({eye:number[],target:number[],H:number,roll?:number}|null)} arena  the enemy view
  * @param {(visible:boolean) => void} setEnemyVisible
  */
-export function skipFormChange(camRec, cam: { stop: () => void; }, arena, setEnemyVisible: ((visible: boolean) => void) | undefined) {
+export function skipFormChange(camRec: CameraRecord, cam: { stop: () => void; }, arena: () => FormChangeArenaShot | null, setEnemyVisible: ((visible: boolean) => void) | undefined) {
   cam?.stop();
   const target = arena();
   if (target) camRec.cut(fieldsFromShot(target), { issuer: DV_ISSUER });
@@ -241,7 +286,7 @@ export function revertFlashLevel(frame: number) {
   return 0xFF - 4 * (f - 114);
 }
 
-export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyVisible, setMotion, weak = false as boolean | (() => boolean) }) {
+export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyVisible, setMotion, weak = false as boolean | (() => boolean) }: RevertCameraArgs) {
   let last = -1;
   let started = false;
   let hidden = false;

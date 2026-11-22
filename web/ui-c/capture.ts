@@ -8,6 +8,10 @@
 import { claimFor } from "./claims.js";
 import { relative } from "./geometry.js";
 import type { UiCapturePart } from "./types.js";
+interface UiCaptureLayer { dx: number; dy: number; w: number; h: number; }
+interface UiCaptureSpriteIds { layers?: UiCaptureLayer[]; }
+interface UiCapturePackDef { name: string; ids?: Record<string, UiCaptureSpriteIds>; }
+
 
 let cur = null;
 
@@ -46,7 +50,7 @@ export function end() {
  */
 /** The battle's list rows (technique / item) carry the game's own little row icons (cmfont 57, 95, 97): the arc rows replace them (the element chip, the quantity), so they are taken and not drawn. */
 const battleIconClaim = (pack: string, id: string | number) => (pack === "cmfont" && [57, 95, 97].includes(Number(String(id).split("#")[0])) ? { part: "rowIcon", layer: "under" } : null);
-export function clipHook(ctx, p, id: string | number, x: number, y: number, draw, drawW = null) {
+export function clipHook(ctx: CanvasRenderingContext2D, p: UiCapturePackDef, id: string | number, x: number, y: number, draw: (c: CanvasRenderingContext2D) => void, drawW = null) {
     const s = cur;
     if (!s || s.inArt || ctx !== s.ctx) return false;
     const m = ctx.getTransform();

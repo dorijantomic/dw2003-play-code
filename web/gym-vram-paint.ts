@@ -1,3 +1,54 @@
+interface GymVramImage {
+  x: number;
+  y: number;
+  w: number;
+  pixels: ArrayLike<number>;
+}
+
+interface GymVram {
+  find(x: number, y: number): GymVramImage | null | undefined;
+}
+
+interface GymPaintStats {
+  sprites: number;
+  quads: number;
+  pixels: number;
+  skipped: number;
+}
+
+interface GymArgs extends Array<number> {
+  0: number;
+  1: number;
+  2: number;
+  3: number;
+  4: number;
+  5: number;
+  6: number;
+  7: number;
+  8: number;
+  9: number;
+  10: number;
+  11: number;
+  12: number;
+  13: number;
+  14: number;
+  15: number;
+  16: number;
+  17: number;
+  18: number;
+  slice(start?: number, end?: number): GymArgs;
+}
+
+interface GymPrimCall {
+  method: string;
+  args: GymArgs;
+}
+
+interface GymPrimPainter {
+  stats: GymPaintStats;
+  beginFrame(): void;
+  paint(ctx: CanvasRenderingContext2D, call: GymPrimCall): void;
+}
 // Software painter for the gym's sprite-actor primitives.
 //
 // The translated gym's two sprite actors (engine/dw3/ui/native/gym-actor.ts) emit what the
@@ -25,7 +76,7 @@ function vramHalf(vram, x: number, y: number) {
     return image.pixels[i] | (image.pixels[i + 1] << 8);
 }
 
-export function createGymPrimPainter(getVram) {
+export function createGymPrimPainter(getVram): GymPrimPainter {
     let tpage = 0;
     const stats = { sprites: 0, quads: 0, pixels: 0, skipped: 0 };
 

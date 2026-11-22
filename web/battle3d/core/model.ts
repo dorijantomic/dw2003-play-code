@@ -13,6 +13,10 @@ import type { Battle3DContext } from "../../types/battle3d.js";
 
 import type { BattleSide } from "../../types/audio.js";
 import type { SkelBufs } from "../../types/battle3d.js";
+interface EffectSpawnRecord {
+  type: string;
+}
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeModel(B$: Battle3DContext) {
 function contactSoundTypeFor(techId: number) {
@@ -120,7 +124,7 @@ function loadProjMesh(id: number) {
     const e = extra || {};
     return {
       ...e,
-      onEffect: (rec) => { B$.effectPlayer?.spawn(rec.type, rec, side); e.onEffect?.(rec); },
+      onEffect: (rec: EffectSpawnRecord) => { B$.effectPlayer?.spawn(rec.type, rec, side); e.onEffect?.(rec); },
       onHit: (rec) => {
         // Mapped op10s play common-bank sound table[type] (0x800a368c). Contact
         // markers 98/99 first resolve through the attack context's +0x70 value —

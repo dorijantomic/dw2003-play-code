@@ -17,6 +17,15 @@ import { currentMap } from "./session.js";
 import { stepSetup } from "./field-steps.js";
 import { S } from "./state.js";
 import { prepareStageAssets } from "./map-load.js";
+interface StageHandoff {
+  to: string;
+  spawnX: number;
+  spawnY: number;
+  dir: string;
+  scripted?: boolean;
+  stepOp?: number;
+}
+
 
 // Hand the leader to the op-13 launch controller (engine/systems/launch-pad.ts):
 // no fade, no screen change — the pad walk, the pad's state-2 animation and the
@@ -159,7 +168,7 @@ export function startTransition(exit) {
 // countdown is spent (fieldstg.s:8994/:899c) — the shared tail every field stage
 // change goes through, whether the handoff came from an op-1 door (which passes 0
 // and loads at once) or from an op-14 pad handoff (which passes 0x3c and waits).
-export function runStageHandoff(exit) {
+export function runStageHandoff(exit: StageHandoff | undefined) {
     if (exit?.to) prepareStageAssets(exit.to);
     fade.dir = 1;
     fade.pending = exit;

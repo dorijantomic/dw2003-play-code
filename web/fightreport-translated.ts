@@ -33,6 +33,21 @@ import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } fro
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import type { FightReportScreen } from "./types/fightreport-translated.js";
+import type { DigimonRecord } from './types/battle.js';
+interface ReportManifest {
+    textButtons: { bytes: number[] };
+}
+
+interface FightReportData {
+    manifest: ReportManifest;
+    tables: Uint8Array;
+    profiles: Map<number, DigimonRecord>;
+    font: Uint8Array;
+    cursorGlyphs: Uint8Array;
+    textButtons: Uint8Array;
+    banks: Map<number, Uint8Array>;
+}
+
 interface ScreenCompose {
     text: (x: number, y: number, text: string) => void;
 }
@@ -57,7 +72,7 @@ interface FightReportOpts {
 const DATA_LABEL = "Fight report data";
 
 const dataByLanguage = new Map();
-function loadData(language) {
+function loadData(language): Promise<FightReportData> {
     if (!dataByLanguage.has(language)) {
         dataByLanguage.set(language, Promise.all([
             fetchJson("report/manifest.json", DATA_LABEL),
@@ -253,7 +268,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         fitNativeScreen(ctx);
-        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc): string[] => composeReport(sc, { view: reportView() }) } });
+        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc: ScreenCompose): string[] => composeReport(sc, { view: reportView() }) } });
         ctx.restore();
     };
 

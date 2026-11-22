@@ -12,6 +12,22 @@ import { normalizeDvGauge } from "./layout.js";
 import type { BattlePartyEntry } from "./core/types.js";
 
 import type { DigimonRecord, BattleState } from "../types/battle.js";
+interface FormChangeView {
+  activeSlot: () => number;
+  liveFormId: (slot: string | number) => number;
+  writeLiveFormId: (slot: string | number, id: string | number) => void;
+  reservedSecondForm: (slot: string | number) => number;
+  reservedFormId: (slot: string | number) => number;
+  clearReservedSecondForm: () => void;
+  setFormFlag: (slot: string | number, k: string | number, value: number) => void;
+  clearFormGauge: (rosterKey: string | number) => void;
+  findTimelineIndex: () => number;
+  clearTimelineCounter: () => void;
+  rosterKey: (slot: string | number) => number;
+  equippedForms: (slot: string | number, dest: (number | undefined)[]) => number;
+  rosterSpecies: (slot: string | number) => number;
+}
+
 /**
  * The disc's per-form learn/load pass, one battle's worth: F0x8008670C until it
  * answers 0, then F0x80086844 until it answers 0. Each service fills ONE slot,
@@ -183,7 +199,7 @@ export function equippedTriple(forms) {
  * acts on: F0x800A69F0's flag stores are indexed by it, and its lookups resolve
  * that position to the member's own equipped triple.
  */
-function formChangeView(b, position: number, profile = null) {
+function formChangeView(b, position: number, profile = null): FormChangeView {
   return {
     activeSlot: () => position,
     liveFormId: (slot: string | number) => Number(b.playerRecords[slot]?.profile?.id ?? -1),

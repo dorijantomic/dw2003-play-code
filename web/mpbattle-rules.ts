@@ -39,6 +39,16 @@ import {
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { battleMsgText } from "./battlemsg-translated.js";
 import type { MpAttackResult, MpEnemyAttackResult, MpRunResult, MpTagResult } from "./types/mpbattle-rules.js";
+import type { PlayerRecord } from './types/battle.js';
+import type { EnemyBattleRecord } from './types/battle.js';
+interface MpBattleFoe { key: string; i: number; fled?: boolean; rec: EnemyBattleRecord; }
+
+interface MpBattlePlayer {
+  key: string;
+  fled?: boolean;
+  rec: PlayerRecord;
+}
+
 
 export const SPREAD_FACTOR = 0.65;
 export const SPREAD_MP = 40;                 // a magical technique that costs at least this much hits everyone
@@ -107,14 +117,14 @@ export class Arena {
 
     // ---------------------------------------------------------- who is standing
     get players() { return this.P; }
-    alivePlayers() { return this.P.filter((p) => p.rec.hp > 0 && !p.fled); }
+    alivePlayers(): MpBattlePlayer[] { return this.P.filter((p) => p.rec.hp > 0 && !p.fled); }
     #reserve(p) { return p.party.some((r: { hp: number; }, i) => i !== p.act && r.hp > 0); }
     /** Players still in the fight: the Digimon out is up, or a reserve can take its place. */
     standing() { return this.P.filter((p) => !p.fled && (p.rec.hp > 0 || this.#reserve(p))); }
     /** A player whose Digimon fell and who must pick the next one before anything else happens. */
     forcedTag() { return this.P.find((p) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
     waveFoes() { return this.E.filter((e: { i: number; }) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
-    aliveFoes() { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
+    aliveFoes(): MpBattleFoe[] { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
     byKey(key: string) { return this.P.find((p) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
     recAt(side: number, slot: number) { return ((side | 0) < 1 ? this.P[slot | 0] : this.E[slot | 0])?.rec ?? null; }
     waves() { return Math.ceil(this.E.length / this.waveSize); }

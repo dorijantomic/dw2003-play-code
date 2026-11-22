@@ -14,6 +14,31 @@
 // Pure: no DOM, no storage, no fs, no clock beyond the `at` stamp shelfAdd() writes.
 
 import type { QuestSnapshot } from "./types/quest-shelf.js";
+interface QuestShelfItem {
+    name: string;
+    at: number;
+    snap: QuestSnapshot;
+}
+
+interface DiffRow {
+    kind: string;
+    id: string;
+    from: boolean | number | string | null;
+    to: boolean | number | string | null;
+}
+
+interface DiffSnapshotsResult {
+    addedActive: string[];
+    removedActive: string[];
+    addedDone: string[];
+    removedDone: string[];
+    visitedAdded: string[];
+    visitedRemoved: string[];
+    metAdded: string[];
+    picksChanged: string[];
+    rows: DiffRow[];
+}
+
 
 const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
@@ -61,7 +86,7 @@ export function validateSnapshot(s: QuestSnapshot) {
  * change, in a fixed order (active, done, visited, met, picks): `from`/`to` are the records for active and done,
  * false/true for visited and met, and the two pick numbers for picks. A state with itself is all zeros.
  */
-export function diffSnapshots(a, b) {
+export function diffSnapshots(a, b): DiffSnapshotsResult {
     const A = isObject(a) ? a : {}, B = isObject(b) ? b : {};
     const activeA = isObject(A.active) ? A.active : {}, activeB = isObject(B.active) ? B.active : {};
     const doneA = isObject(A.done) ? A.done : {}, doneB = isObject(B.done) ? B.done : {};
@@ -108,7 +133,7 @@ export function shelfAdd(shelf, name, snap, at = Date.now()) {
 }
 
 /** Rename one shelf item; same refusals as shelfAdd, and the snapshot and time are kept. */
-export function shelfRename(shelf, from, to) {
+export function shelfRename(shelf: QuestShelfItem[] | null, from: string, to: string): { shelf: QuestShelfItem[]; problems: string[] } {
     const items = listOf(shelf);
     const item = byName(items, from);
     if (!item) return { shelf: items, problems: [`no state named "${from}"`] };

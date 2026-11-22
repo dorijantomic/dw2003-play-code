@@ -47,6 +47,16 @@ import { headCastFor, HEAD_CAST_JUMP, HEAD_CAST_IDLE } from "./head-cast-constan
 import { bodyHeight, penetration, clearanceTolerance, rigColliders, poseCollider, pairClearance, allowedPairs } from "./anim-collision.js";
 import { sharedShotMode, sharedShotTargets, SHARED_SHOT } from "./anim-collision.js";
 import type { FightAimOffsets, FightChannels, FightGate, FightMetrics, FightPlan, FightSkeleton } from "./types.js";
+import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+interface SolverPose {
+  rot: number[][];
+  pos: number[][];
+  scale: number[][];
+  visible: boolean[];
+  frame: number;
+}
+
+
 
 const TAU = (Math.PI * 2) / 4096;
 
@@ -227,7 +237,7 @@ function chan(ch, frame) {
 }
 
 /** The rest pose in the shape firing-axis.js takes ({rot: flat column-major, pos}). */
-export function poseOf(model, frame = 0, blend = null) { return poseFromChannels(model, frame, { blend }); }
+export function poseOf(model: Dw2LoadedModel, frame = 0, blend = null): SolverPose { return poseFromChannels(model, frame, { blend }); }
 
 /** k16's row-major 3x3 -> the flat column-major the renderer/firing-axis use. */
 const flatOf = (M) => [M[0][0], M[1][0], M[2][0], M[0][1], M[1][1], M[2][1], M[0][2], M[1][2], M[2][2]];
@@ -536,7 +546,7 @@ const len3 = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit3 = (a) => { const l = len3(a); return l > 1e-9 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0]; };
 const ID3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 const rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
-const fromTo = (u, v) => {
+const fromTo = (u: number[], v: number[]) => {
   const a = unit3(u), b = unit3(v);
   if (!len3(a) || !len3(b)) return ID3;
   const c = a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
@@ -564,7 +574,7 @@ const axisOf = (M) => {
 };
 const clampRot = (M, max) => { const { axis, ang } = axisOf(M); return ang <= max ? M : axisAngle(axis, max); };
 /** The same rotation, scaled to `k` of its angle — the aim's fade in/out over the cast. */
-const scaleRot = (M, k: number) => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
+const scaleRot = (M, k: number): number[][] => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
 const localOf = (c0, c1, c2) => {
   const Rz = [[Math.cos(c2 * TAU), -Math.sin(c2 * TAU), 0], [Math.sin(c2 * TAU), Math.cos(c2 * TAU), 0], [0, 0, 1]];
   const Ry = [[Math.cos(c1 * TAU), 0, Math.sin(c1 * TAU)], [0, 1, 0], [-Math.sin(c1 * TAU), 0, Math.cos(c1 * TAU)]];
@@ -638,7 +648,7 @@ function withHold(own, added, holdAt: number) {
  * playback order. The engine plays one entry per tick, so walking this list at one entry per tick is the
  * idle's own rate — that is what a cast must keep playing underneath (K20b item 3).
  */
-export function idlePlaylist(model, fallback = null) {
+export function idlePlaylist(model: Dw2LoadedModel & { timeline?: { table?: { value?: number }[] }[] }, fallback = null): number[] {
   const tab = model?.timeline?.[1]?.table ?? [];
   const out = tab.map((e) => e?.value | 0).filter((v) => v >= 0 && v < 0x8000);
   if (out.length) return out;
@@ -836,7 +846,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       return chain;
     };
     /** Rotate the joints that CARRY a centre emitter until its firing tip reaches `point`. */
-    const ccdTip = (chain, s, point, passes) => {
+    const ccdTip = (chain: number[], s: { bone: string }, point: number[], passes: number) => {
       const prev = tipPrev.get(s.bone) ?? null;
       for (let pass = 0; pass < passes; pass++) {
         for (let k = chain.length - 1; k >= 0; k--) {
@@ -1107,7 +1117,7 @@ function targetPoint(model, plan: FightPlan) {
 }
 
 /** The firing TIP of one site under a pose — the same point launch-plan writes the launch op from. */
-function tipAt(pose, model, folder, s) {
+function tipAt(pose: SolverPose, model: Dw2LoadedModel, folder, s: { id: string; bone: string }): number[] | null {
   return tipOf(pose.pos, model, s.bone, chainPrevBone(folder, s.id, s.bone));
 }
 
@@ -1213,7 +1223,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   // idle may not be judged against a floor the idle itself has already left (K20b item 3)
   const idleFramesB = idlePlaylist(bake.model, plan.baseFrame ?? 0);
   const idleFloorAt = (t) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
-  const orig = (pose, s) => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
+  const orig = (pose: SolverPose, s: FightPlan["sites"][number]): { x: number; y: number; z: number } | null => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
   const t0 = plan.sites.map((s) => orig(neutral, s));
   let travel = 0, groundWorst = 0, groundTick: number | null = null, penTicks = 0, worstPen = null, gapMin = Infinity;
   for (const t of at) {
@@ -1514,7 +1524,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   return out;
 }
 
-function hdrRoot(model) {
+function hdrRoot(model: Dw2LoadedModel): number {
   return rigOf(model).root ?? 0;
 }
 

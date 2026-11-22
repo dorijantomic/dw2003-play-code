@@ -50,6 +50,25 @@ import { BONEMAP, armChain, tailChain, wingChains, boneMap } from "./digimon-bon
 import { authoredSide } from "./side-mirror.js";
 import type { FightSkeleton } from './types.js';
 import type { Dw2Pose } from '../types/anim-viewer-dw2.js';
+import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+interface AxisSigma {
+  axis: (number | undefined)[];
+  sigma: number;
+}
+
+interface PcaFrame {
+  mean: number[];
+  axes: AxisSigma[];
+}
+
+interface AxisCandidates {
+  push: number[];
+  long: number[];
+  thin: number[];
+  pca: PcaFrame;
+}
+
+
 interface FiringAxis {
   calibrated: boolean;
   emitterId: string;
@@ -569,7 +588,7 @@ export const HAND_DEFAULT = "push";
  * unit vectors in the pose frame; none is right for every arm design, which is why the K19b
  * calibration measured them against the disc's own casts and firingAxis() picks by class.
  */
-export function armAxisCandidates(model, folder: string | number, emitterId, pose) {
+export function armAxisCandidates(model: FightSkeleton, folder: string | number, emitterId: string, pose): AxisCandidates | null {
   const info = emitterClass(folder, emitterId);
   if (!info.bone) return null;
   const bone = info.bone;
@@ -600,7 +619,7 @@ export function toLocal(model, p) {
 
 /** The model's rest pose, cached per model object (frame 0 of the model's own channels). */
 const restCache = new WeakMap();
-export function restPoseOf(model, frame = null) {
+export function restPoseOf(model, frame = null): Dw2Pose {
   const key = frame == null ? -1 : frame | 0;
   let e = restCache.get(model);
   if (!e) { e = new Map(); restCache.set(model, e); }

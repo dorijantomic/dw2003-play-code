@@ -1,3 +1,25 @@
+interface BodyFromTableOpts {
+  turn: boolean;
+  element: number;
+  clip: number;
+  hits?: number | null;
+  launch?: LaunchSpec;
+}
+interface DonorPayload {
+  script: ClipScript;
+  side?: string;
+}
+
+interface DonorScriptModel extends ClipScriptModel {
+  donorClips?: Record<string, DonorPayload | undefined>;
+}
+interface OwnClipPlan {
+  slot?: number;
+  kind: string;
+  moveKind?: string | null;
+  tech?: string | null;
+  why?: string;
+}
 interface ClipScriptOp {
   op: number;
   words?: number[];
@@ -231,7 +253,7 @@ export function victimAnchor(model) {
   return { x: 0, y: -896, z: authoredSide(model) === "enemy" ? -VICTIM_LINE : VICTIM_LINE };
 }
 /** The caster's own point: the mirror of victimAnchor, on the fighter that plays the script. */
-export function selfAnchor(model) {
+export function selfAnchor(model: DonorScriptModel) {
   const v = victimAnchor(model);
   return { x: v.x, y: v.y, z: -v.z };
 }
@@ -712,7 +734,7 @@ function castFromDonor(model, clip: number, gap, { turn, element, hits, launch =
  * victim and need no cut. Both the spark and the reaction are what make the blow readable on the defender:
  * without the op1 records the enemy took damage and never played its death clip (BRIEF4 Phase 4c).
  */
-function bodyFromTable(model, table: number, donorScript, { turn, element, clip, hits = null, launch = {} }) {
+function bodyFromTable(model: DonorScriptModel, table: number, donorScript: ClipScript | undefined, { turn, element, clip, hits = null, launch = {} }: BodyFromTableOpts): ClipScript {
   const frames = tableFrames(model, table);
   // op11 counts FRAMES and the action tick advances 2 of them (op11Wait, engine.js:20520): a wind-up of
   // ~half the table and a follow-through of one full table length play the body once, at an authored pace.
@@ -992,7 +1014,7 @@ const finalBeat = (model) => [
  * around it survives) - the same shape withHits builds, but anchored on the body's own moments rather
  * than on a fixed 10-tick spacing from the strike.
  */
-function withOwnClip(model, clip: number, plan, { element = 1, hits = null } = {}) {
+function withOwnClip(model: ClipScriptModel, clip: number, plan: OwnClipPlan, { element = 1, hits = null } = {}): ClipScript | null {
   const src = model?.actions?.[plan.slot];
   if (!hasOps(src)) return null;
   const contacts = clipContacts(clip, hits);
@@ -1099,7 +1121,7 @@ function withOwnClip(model, clip: number, plan, { element = 1, hits = null } = {
   return built;
 }
 
-function donorPayload(model, clip: string | number, row) {
+function donorPayload(model: DonorScriptModel, clip: string | number, row: { d: number }): DonorPayload | null {
   const prepared = model.donorClips?.[clip];
   if (prepared) return prepared;
   const anim = donorAnims.get(row.d);

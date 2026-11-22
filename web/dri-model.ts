@@ -7,6 +7,43 @@ import {
   DEPLOYED_PARTY_CAP, syncWornFromEquipment, isFormDigimonId,
 } from "./vendor/engine.js";
 import type { BattleState, DigimonRecord } from './types/battle.js';
+interface DriEquippedFormStats { equippedForms?: number[]; }
+
+interface DriFormationStats {
+  digimonId?: number | string;
+}
+
+interface DriFormationCharacter {
+  id: string | number;
+  digimonId?: number | string;
+}
+
+interface DriFormationManifest {
+  characters?: DriFormationCharacter[];
+}
+
+interface DriFormationState {
+  party: (string | number)[];
+  partyStats?: (DriFormationStats | null)[];
+  equipment?: (string | number | null)[];
+  partnerStats: DriFormationStats | null;
+  charId?: string | number;
+  charIdx?: number;
+  manifest?: DriFormationManifest;
+}
+
+interface DriSwitchSlot {
+  index: number;
+  charId: string | number | null;
+  profile: DigimonRecord | null;
+  stats: Record<string, number> | null;
+  empty?: boolean;
+}
+
+interface DriFormRecord { id: number | string; }
+
+interface DriState { party: { [x: string]: string | number }; }
+
 interface StandingChoice { profile: DigimonRecord; formId: number; doNothing?: boolean; }
 
 
@@ -75,7 +112,7 @@ export function formLedgerRecord(stats, formId, digimonById) {
   return ensureFormLedger(stats, digimonById).find((r) => Number(r.id) === Number(formId)) ?? null;
 }
 
-function ensureEquippedForms(stats, digimonById) {
+function ensureEquippedForms(stats: DriEquippedFormStats, digimonById: Record<string, DigimonRecord>): number[] {
   ensureFormLedger(stats, digimonById);
   if (!Array.isArray(stats.equippedForms)) stats.equippedForms = [];
   return stats.equippedForms;
@@ -105,7 +142,7 @@ export function driRoster(state, digimonById) {
 // that count). The packed party puts the standing partners at the front
 // (claim party-lab-count-and-pack-2026-09-14), so the walker's dense party plus
 // one empty entry per free pedestal is that list.
-export function driSwitchSlots(state, digimonById) {
+export function driSwitchSlots(state: DriState, digimonById: { [digId: number]: DigimonRecord }): DriSwitchSlot[] {
   const slots = driRoster(state, digimonById).slice(0, DEPLOYED_PARTY_CAP);
   for (let i = slots.length; i < DEPLOYED_PARTY_CAP; i++) {
     slots.push({ index: i, charId: null, profile: null, stats: null, empty: true });
@@ -113,7 +150,7 @@ export function driSwitchSlots(state, digimonById) {
   return slots;
 }
 
-export function swapDriFormation(state, a: string | number, b: string | number) {
+export function swapDriFormation(state: DriFormationState, a: string | number, b: string | number) {
   if (a === b) return false;
   if (!state.partyStats) state.partyStats = (state.party ?? []).map(() => null);
   state.partyStats[0] = state.partnerStats;
@@ -234,7 +271,7 @@ export function setStandingForm(state, index: number, formId, digimonById) {
   return true;
 }
 
-export function acquiredDriForms(state, index, digimonById) {
+export function acquiredDriForms(state: DriState, index: number, digimonById: { [id: number]: DigimonRecord | undefined }): Array<{ record: DriFormRecord; profile: DigimonRecord }> {
   const stats = driStatsAt(state, index, digimonById);
   if (!stats) return [];
   const seen = new Set();
@@ -267,7 +304,7 @@ export function standingChoicesFromStats(stats, starter, digimonById) {
   return rows;
 }
 
-export function standingChoices(state, index, digimonById): StandingChoice[] {
+export function standingChoices(state: DriState, index: number, digimonById: Map<number, DigimonRecord>): StandingChoice[] {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return [];
@@ -276,7 +313,7 @@ export function standingChoices(state, index, digimonById): StandingChoice[] {
 
 // Change-type: write one of the three equipped slots. Duplicate ids are
 // refused. A form that is the one they are standing as is refused ("can't").
-export function setEquippedForm(stats, slot: number, formId, currentFormId) {
+export function setEquippedForm(stats: Record<string, number> | null, slot: number, formId: number | string, currentFormId: number | string | null) {
   if (!stats || slot < 0 || slot > 2) return "invalid";
   const equipped = ensureEquippedForms(stats, {});
   while (equipped.length < 3) equipped.push(0);
@@ -297,14 +334,14 @@ export function firstOpenEquipSlot(stats) {
 
 // Kept for callers that still pass a species name. The lab no longer restats
 // or unlocks here — it only changes who they are standing as.
-export function applyDriEvolution(state, index: number, target: string, digimonById) {
+export function applyDriEvolution(state: DriState, index: number, target: string, digimonById: Record<number, DigimonRecord>) {
   const profile = (Object.values(digimonById) as { id: any; name: string }[]).find((d) => d.name === target);
   if (!profile) return false;
   return setStandingForm(state, index, profile.id, digimonById);
 }
 
 // The DRI chooser is the selected form's six ledger slots, including flags.
-export function loadableDriTechs(state, index, digimonById) {
+export function loadableDriTechs(state: DriState, index: number, digimonById: Record<string, DigimonRecord>): number[] {
   const stats = driStatsAt(state, index, digimonById);
   const current = driDigimonAt(state, index, digimonById);
   const record = formLedgerRecord(stats, current?.id, digimonById);

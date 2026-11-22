@@ -31,6 +31,21 @@ import { roleOfBone, armChains } from "./digimon-bonemap.js";
 import { armEquip } from "./digimon-anatomy.js";
 import { restPose } from "./anim-retarget.js";
 import type { FightCollisionOut } from "./types.js";
+interface SharedShotOpts {
+  points?: ShotPoint[] | undefined;
+  mode?: SharedShotMode | null;
+  height?: number | null;
+  aim?: number[];
+  origin?: ShotPoint | null;
+  rule?: SharedShotRule;
+}
+
+interface RigPoint { x: number; y: number; z: number; }
+interface RigBone { parent_slot?: number | null; verts?: RigPoint[]; }
+interface RigModel { folder?: string; num_bones?: number | null; bones: RigBone[]; }
+interface RigCollider { bone: number; role: string; prop: boolean; hand: boolean; compact: number; c: RigPoint; a: RigPoint; b: RigPoint; radius: number; halfLen: number; }
+interface Rig { folder: string | undefined; model: RigModel; colliders: RigCollider[]; parent: number[]; depth: number[]; n: number; }
+
 type SharedShotMode = "combined" | "spread";
 
 interface ShotPoint {
@@ -174,7 +189,7 @@ const RIGS = new WeakMap();
  * segment, a hand block or a weapon, so the mesh's principal axis and its radial spread are the honest
  * shape. Bones with no vertices (joints) get no collider: they cannot be seen passing through anything.
  */
-export function rigColliders(model, folder = model?.folder) {
+export function rigColliders(model: RigModel | null, folder = model?.folder): Rig | null {
   if (!model) return null;
   const cached = RIGS.get(model);
   if (cached) return cached;
@@ -508,7 +523,7 @@ const isArmSite = (p) => /arm|hand|claw|fist/.test(String(p?.site ?? p?.role ?? 
  *                    ±half its own arm span), and every shot is at least `minSeparation` from its
  *                    neighbour, so two shots never draw on top of each other.
  */
-export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1], origin = null, rule = SHARED_SHOT }): SharedShotTargets {
+export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1], origin = null, rule = SHARED_SHOT }: SharedShotOpts): SharedShotTargets {
   const pts = (points || []).filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
   const H = height || 1;
   const gap = (rule.combinedGap ?? SHARED_SHOT.combinedGap) * H;

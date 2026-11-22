@@ -2,6 +2,8 @@ import { MODEL_SCALE } from "../math.js";
 import { loadTexturePixels, createProgram } from "../gl.js";
 import { VERT_COL_SRC, FRAG_COL_SRC } from "../shaders.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
+interface AtmosSky { rain: number; snow: number; sand: number; night: number }
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeAtmos(B$: Battle3DContext) {
@@ -35,7 +37,7 @@ function _atmosFrame(eye, look) {
     return { rain, snow, sand, night, dt, camDist,
       gradeSub: mult.map((v) => 1 - v - flash), fogCol, fogP: [start, 1 / Math.max(1e-3, end - start), fogMax] };
   }
-function _atmosArena(atm, world, eye, look, fov, aspect, scale) {
+function _atmosArena(atm: AtmosSky | null, world: Float32Array, eye: number[], look: number[], fov: number, aspect: number, scale: number) {
     B$.gl!.useProgram(B$.texP!.program);
     if (!atm) {
       B$.gl!.uniformMatrix4fv(B$.texP!.uSkyM, false, new Float32Array(16));

@@ -384,7 +384,7 @@ export function roleOfBone(folder: string | number, index: number) {
 //   side (dom), then its right arm, then its left arm;
 //   any other missing emitter (no mouth/tail/wing bone) -> the whole body (root), then the torso.
 // `null` only for a `self` move (no launcher) or an unknown model.
-export function launchBone(folder: string | number, techName) {
+export function launchBone(folder: string | number, techName: string): { mode: string; bone: string | null; source: string } | null {
   const m = BONEMAP[folder];
   if (!m) return null;
   const p = firingPart(folder, techName);

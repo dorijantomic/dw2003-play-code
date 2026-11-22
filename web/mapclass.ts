@@ -22,7 +22,7 @@ function ensureVariants() {
 }
 
 // The image whose pixels decide where grass/water go, or null while it loads.
-export function classSource(stageId: string, mapImg: HTMLImageElement) {
+export function classSource(stageId: string, mapImg: HTMLImageElement): HTMLImageElement | null {
     ensureVariants();
     if (variants === null) return null;
     const base = variants[stageId];

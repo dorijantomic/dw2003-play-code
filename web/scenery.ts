@@ -11,6 +11,53 @@
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceSettings } from "./types/ambience.js";
+interface SceneryFx { indoor?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; sparkle?: boolean; lightning?: boolean; rain?: boolean; }
+
+interface SceneryPrefs { indoorLit?: boolean; tod?: boolean; heat?: boolean; shafts?: boolean; fog?: boolean; fogK?: number; seed: number; night?: boolean; pollen?: boolean; butterflies?: boolean; birds?: boolean; snowy?: boolean; }
+
+interface SceneryLevels { rain: number; blizzard: number; sand: number; }
+
+interface SceneryState { map: { id: number | string }; fx: SceneryFx; p: SceneryPrefs; L: SceneryLevels; t: number; dt: number; fade: number; camX: number; camY: number; Q: number; now: number; wrapX: (v: number, cam: number) => number; wrapY: (v: number, cam: number) => number; wrapXB: (v: number, cam: number) => number; wrapYB: (v: number, cam: number) => number; wrapRange: (x: number, span: number, margin: number) => number; onThunder: (delayMs: number) => void; }
+
+interface GroundGrid {
+    cell: number;
+    cols: number;
+    rows: number;
+    cells: number[];
+}
+
+interface GroundFoot {
+    id: number;
+    x: number;
+    y: number;
+    moving?: boolean;
+    leader?: boolean;
+}
+
+interface GroundSceneryState {
+    map: { id: number | string };
+    fx: { puddles?: boolean; steps?: boolean };
+    p: { rainy?: boolean; snowy?: boolean; sandy?: boolean };
+    L: { rain: number };
+    t: number;
+    dt?: number;
+    camX: number;
+    camY: number;
+    now: number;
+    feet?: GroundFoot[];
+    grid: () => GroundGrid | undefined;
+    isWater: (x: number, y: number) => boolean;
+    onStep: (type: string, volume: number) => void;
+    DW?: number;
+    DH?: number;
+    DWB?: number;
+    DHB?: number;
+    wrapX?: (x: number, cam: number) => number;
+    wrapY?: (y: number, cam: number) => number;
+    wrapXB?: (x: number, cam: number) => number;
+    wrapYB?: (y: number, cam: number) => number;
+}
+
 const VIEW_H = 240;
 
 // ------------------------------------------------------------------ helpers
@@ -143,7 +190,7 @@ function drawIndoorMood(ctx: CanvasRenderingContext2D, S) {
     if (snap) revealer.draw(ctx, snap, S);
 }
 
-export function drawScenery(ctx: CanvasRenderingContext2D, S) {
+export function drawScenery(ctx: CanvasRenderingContext2D, S: SceneryState) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, fade, camX, camY, Q, now } = S;
     if (!sc.built) build(S);
@@ -359,7 +406,7 @@ function buildIce(S, grid: { cell: number; cols: number; rows: number; cells: nu
         .map(([x, y]) => ({ x, y, rx: 8 + r() * 14, ph: r() * 6.28, rot: (r() - 0.5) * 0.4 }));
 }
 
-export function groundScenery(ctx, S) {
+export function groundScenery(ctx: CanvasRenderingContext2D, S: GroundSceneryState) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, camX, camY, now } = S;
     if (!sc.built) build(S);

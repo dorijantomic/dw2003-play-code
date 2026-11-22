@@ -197,7 +197,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     const enemyPips = [];
     const actor = !data ? null : (data.st === 6 ? "enemy" : [2, 3, 4, 5, 11, 13, 15].includes(data.st) ? "player" : null);
     // keep clear of the ring: a plate that would start inside it starts right of it
-    const clear = (r) => (lay && r.x < ringRight ? { ...r, x: ringRight, w: Math.max(8, r.w - (ringRight - r.x)) } : r);
+    const clear = (r: UiRect): UiRect => (lay && r.x < ringRight ? { ...r, x: ringRight, w: Math.max(8, r.w - (ringRight - r.x)) } : r);
     const focus = parts.filter((p: { part: string; }) => p.part === "focus").map((p: { x: number; w: number; y: number; h: number; }) => ({ p, at: { x: p.x + p.w / 2, y: p.y + p.h / 2 }, hit: false }));
     const isOn = (r) => { let on = false; for (const f of focus) if (inside(r, f.at.x, f.at.y)) { f.hit = true; on = true; } return on; };
     const tracks = {};

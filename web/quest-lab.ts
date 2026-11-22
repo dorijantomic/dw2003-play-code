@@ -128,7 +128,7 @@ function shelfLoad() {
   } catch { return []; }
 }
 
-function shelfStore(shelf) {
+function shelfStore(shelf: QuestSnapshot[]) {
   try { localStorage.setItem("dw.quests.shelf.v1", JSON.stringify(shelfExport(shelf))); } catch { /* private window */ }
 }
 

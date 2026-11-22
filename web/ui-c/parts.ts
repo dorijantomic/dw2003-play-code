@@ -5,6 +5,8 @@ import { chevronSvg } from "./icons.js";
 import { ROLES, FACE, fitRun, measureText } from "./text.js";
 import { fillVic } from "./vic.js";
 import type { UiPart } from './types.js';
+interface BalloonTail { side: string; b0: number; b1: number; tip: number[]; }
+
 interface PartRect {
   left: number;
   top: number;
@@ -159,7 +161,7 @@ const atY = ([p, d], y) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * 
  * `e` px, and an optional tail { side, b0, b1, tip } on the top or bottom edge. Returns { outer, inner } as point lists. The inner line runs
  * `e` px inside the outer one everywhere, the tail too (its sides are offset along their normals, so a slanted tail keeps the same edge).
  */
-export function balloonShape(b: { l: number; t: number; w: number; h: number; }, tail, e, c: number) {
+export function balloonShape(b: { l: number; t: number; w: number; h: number; }, tail: BalloonTail | null, e: number, c: number): { outer: number[][]; inner: (number[] | undefined)[] } {
     const { l, t, w, h } = b, r = l + w, bo = t + h;
     const ci = c - e / 2;   // the inner chamfer (C6: 24 outer, the inner diagonal 22 + 4 down / right)
     const outer = [], inner = [];

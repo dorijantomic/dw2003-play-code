@@ -1,4 +1,6 @@
 import type { K16Rig, RigBasicsModel, RigSampleOut } from "./types.js";
+interface ReachChain { from: number; tip: number; limbRoot: boolean; root?: number; seq?: number[]; }
+
 export const TAU = (Math.PI * 2) / 4096;
 
 export function sample(ch, frame: number) {
@@ -145,7 +147,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
   const topY = Math.min(...pose.pos.map((p) => p[1]));
   // a limb-rooted chain starts on the body's centre line, so its side/reach are the TIP's
   const sideX = (ch) => (ch.limbRoot ? pose.pos[ch.tip][0] : pose.pos[ch.from][0]);
-  const reachX = (ch) => Math.abs(sideX(ch));
+  const reachX = (ch: ReachChain) => Math.abs(sideX(ch));
   const feet = chains.filter((ch) => tipY(ch) > maxY - 0.12 * H
     && (ch.limbRoot ? reachX(ch) > 0.03 * W : Math.abs(pose.pos[ch.from][0]) > 0.03 * W));
   const legs = feet.map((ch) => ({ side: sideX(ch) < 0 ? "left" : "right", chain: ch.seq }));

@@ -6,6 +6,12 @@
 // decide nothing) and info pages (blast ladder) are not.
 import { DIAL_MODES } from "./encounter-dial.js";
 import type { AmbienceSettings } from "./types/ambience.js";
+type HostRuleValue = string | number | boolean | null | undefined | HostRuleValue[] | HostRuleRecord;
+interface HostRuleRecord {
+    [key: string]: HostRuleValue;
+}
+type CleanRulesResult = Partial<Record<string, string | number>>;
+
 
 /** Key -> kind of value. "bool" = a switch, "dial" = one of DIAL_MODES, "speed" = a number 1..3 (the Faster battles slider). */
 export const HOST_RULES = Object.freeze({
@@ -28,7 +34,7 @@ function cleanValue(kind: string, v) {
 }
 
 /** Anything -> a plain object with only the known keys that hold a valid small value. Never throws. */
-export function cleanRules(o) {
+export function cleanRules(o: HostRuleValue) {
     const out = {};
     if (!o || typeof o !== "object" || Array.isArray(o)) return out;
     for (const k of HOST_RULE_KEYS) {

@@ -14,6 +14,8 @@ import { composeHint, composeRows, runIn, takeIn } from "./pages.js";
 import { isCursorToken } from "./icons.js";
 import type { UiPopOpts } from "./types.js";
 import type { UiPart, UiRun } from "./types.js";
+import type { UiCapturePart } from './types.js';
+
 
 
 /** The native rect of a part's pixels (draw position + the clip's bounds), before its matrix. */
@@ -206,7 +208,7 @@ const panelBody = (p) => {
  * ("SAVING"), the dividers from the panel's line art (the prompt divider with the orange lead), the prompt lines (badges + text, pieces at
  * the game's x), the slot box rows (C5 confirm rows), the slot info line art with its pictures, the info texts (units orange).
  */
-export function composeMemcard({ parts, runs }) {
+export function composeMemcard({ parts, runs }: { parts: Record<string, UiCapturePart[]>; runs: UiRun[] }): UiPart[] {
     const out = [], used = new Set();
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x));
@@ -316,7 +318,7 @@ function composeConfirmBoxes(parts, out) {
 
 /** The Digimon Online message window: a family C window on the clip's body pieces (the circuit wires stay pictures), the text Chakra 30.
  *  Also the wizard's other pages (step header, pack list, confirm boxes), which are all drawn inside this one scope. */
-export function composeNet({ parts, runs }) {
+export function composeNet({ parts, runs }: { parts: { part: string }[]; runs: UiRun[] }): UiPart[] {
     const out = [], used = new Set();
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x, "backdrop.stripes", { light: FAMILY_C.stripe, dark: FAMILY_C.stripeDark }));
@@ -359,7 +361,7 @@ export function composeWizard(c: { parts: { part: string }[]; runs: UiRun[] }): 
 }
 
 /** The pause MAP page: the place-name window (family A, the chamfered C frame) and its name in Russo 30. The map is the game's picture. */
-export function composeMapPage({ parts, runs }) {
+export function composeMapPage({ parts, runs }: { parts: UiCapturePart[]; runs: UiRun[] }): UiPart[] {
     const out = [], used = new Set();
     of(parts, "mapName").forEach((p: { x: number; y: number; }, i) => {
         // the frame without the clip's own drop shadow (measured on the game's pixels: frame 10..246 x 20..56 of the 9..253 x 20..60 clip)
@@ -379,7 +381,7 @@ export function composeMapPage({ parts, runs }) {
  * The language page: C7 stripes, the header band, the right column and the logo band as family C plates (square: they run off the
  * screen), the cursor's row as the C7 focus plate (orange edge, amber body) under the flag and word pictures, orange corners round it.
  */
-export function composeLanguage({ parts, runs }) {
+export function composeLanguage({ parts, runs }: { parts: Record<string, { x: number; y: number; }[]>; runs: UiRun[]; }): UiCapturePart[] {
     const out = [];
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x, "backdrop.stripes", { light: FAMILY_C.stripe, dark: FAMILY_C.stripeDark }));
@@ -395,4 +397,4 @@ export function composeLanguage({ parts, runs }) {
 }
 
 /** The END card: its only clip is the END logo, a picture (kept in its own pixels by the scope). */
-export const composeEnd = ({ runs }) => { const out = []; restOfRuns(runs, null, ID, out, "end"); return out; };
+export const composeEnd = ({ runs }: { runs: UiRun[] }): UiPart[] => { const out = []; restOfRuns(runs, null, ID, out, "end"); return out; };

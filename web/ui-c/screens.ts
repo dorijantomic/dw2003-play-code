@@ -15,7 +15,7 @@ interface ScreenContext {
 
 
 
-export const composeProbe = (c) => composeGeneric(c, {});
+export const composeProbe = (c: ScreenContext): (UiPart & { part: string })[] => composeGeneric(c, {});
 
 /** C4: the big faint word sits right of the stat window (470 dp), 600 dp down, 130 dp tall. */
 export const STATUS_WORD = Object.freeze({ word: "STATUS", at: Object.freeze({ x: dx(470), y: 600 / 3 }), sizeDp: 130 });
@@ -39,7 +39,7 @@ export function composeStatusPage({ parts, runs }) {
 export function pickPauseScreen(calls, _entry: string | null) {
     if (isPauseHome(calls)) return { id: "home", compose: composePauseHome };
     // the ITEMS bag: the full-width list window (ststat 46), no party cards
-    if (hasClip(calls, STSTAT_DIR, 46)) return { id: "bag", compose: (c) => composeListPage(c, { word: "ITEMS" }) };
+    if (hasClip(calls, STSTAT_DIR, 46)) return { id: "bag", compose: (c: ScreenContext) => composeListPage(c, { word: "ITEMS" }) };
     // the MAP page: its place-name window (ststat 59) over the game's map picture
     if (hasClip(calls, STSTAT_DIR, 59)) return { id: "map", compose: composeMapPage };
     if (isSidebarPage(calls)) {
@@ -54,14 +54,14 @@ export function pickPauseScreen(calls, _entry: string | null) {
 
 export const composeWindow = (c) => composeWindowPage(c, {});
 /** The help counter: its cmfont 69 window carries the topic text (no cursor) = the C message band (T6). */
-export const composeHelp = (c) => composeWindowPage(c, { messageWindow: true });
+export const composeHelp = (c: ScreenContext) => composeWindowPage(c, { messageWindow: true });
 /** The fight report (STFRPT): sheets.js, the highlight in the game's colour cycle. */
 export const composeReport = (c, cfg = {}) => composeReportParts(c, { pulse: cyclePulse, ...cfg });
 export { composeCapsule };
 
 // ------------------------------------------------------------------------------------------------ full-screen pages (T7, fullpages.js)
 /** Name entry: the partner chooser and the keyboard (NAME word). */
-export const composeName = (c): UiPart[] => composeNameEntry(c, { word: "NAME" });
+export const composeName = (c: ScreenContext): UiPart[] => composeNameEntry(c, { word: "NAME" });
 /** The deck screens: the folder rename is the name keyboard (a keyboard part), every other deck page the window page. */
 export const composeDeck = (c: { parts: (UiPart & { part: string })[]; runs: UiRun[] }): UiPart[] => (c.parts.some((p: { part: string; }) => p.part === "keyboard") ? composeNameEntry(c, { word: "NAME" }) : composeWindow(c));
 /** The language page: its frames and backdrop claimed (claims.js cntselwn), the flags and words the game's pictures. */
@@ -71,5 +71,5 @@ export { composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, 
 /** A book (web/book-host.js): `look` = the book's own cfg ({ rows: false } for the map book); the runs are uifont drawText (clut 7 = dim). */
 export const composeBookScreen = (look = {}) => (c): UiPart[] => composeBook(c, { dimClut: true, ...look });
 /** The Digivolve Demo setup page (web/menu.js, the one page that still draws through the old menu module): the sidebar page family. */
-export const composeDemo = (c) => composePausePage(c, {});
+export const composeDemo = (c: ScreenContext): UiPart[] => composePausePage(c, {});
 export { composeQuests };

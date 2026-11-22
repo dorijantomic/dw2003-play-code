@@ -22,6 +22,12 @@ import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
 import type { LaunchOpsSpec } from "./types.js";
+interface PoseSample {
+  frame: number;
+  pos: ReturnType<typeof restPose>["pos"];
+  rot: ReturnType<typeof restPose>["rot"];
+}
+
 interface TipPointModel {
   folder: string;
 }
@@ -55,7 +61,7 @@ export function homeLine(model) {
  * and z again — so the same physical point arrives as [p.x, p.y, p.z - home]. C11 compares on either side
  * with this function, which is why the invariant holds for near and far alike.
  */
-export function launchFrom(model, point, { mirrored = false } = {}) {
+export function launchFrom(model: TipPointModel, point: { x: number; y: number; z: number }, { mirrored = false } = {}): [number, number, number] {
   const home = homeLine(model);
   return mirrored ? [point.x, point.y, point.z - home] : [-point.x, point.y, home - point.z];
 }
@@ -161,7 +167,7 @@ export function bodyWindow(model, tables) {
  * The model's own poses over a body's frame window: `samples` evenly spaced frames, each with every
  * bone's world position (the renderer's own rest-pose arithmetic, anim-retarget.restPose).
  */
-export function poseWindow(model, tables, samples = 16) {
+export function poseWindow(model: Parameters<typeof bodyWindow>[0], tables: Parameters<typeof bodyWindow>[1], samples = 16): PoseSample[] {
   const w = bodyWindow(model, tables);
   const frames = [];
   if (w) for (let k = 0; k < samples; k++) frames.push(Math.round(w.lo + ((w.hi - w.lo) * k) / Math.max(1, samples - 1)));

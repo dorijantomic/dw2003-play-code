@@ -28,6 +28,41 @@ import { clearActionAffinity } from "../restore.js";
 import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState } from "../../types/battle.js";
+interface BattleEntranceEndSpec {
+  kind: number;
+  payload: number[];
+  name: string;
+}
+
+interface BattleEntranceArgs {
+  side: number;
+  name: string;
+  endMessage?: string;
+  endSpec?: BattleEntranceEndSpec | null;
+  onSwap?: (() => void) | null;
+  onDone?: (() => void) | null;
+  onTaskEnd?: (() => boolean) | null;
+}
+
+interface BattleEntranceShow {
+  program: string;
+  frame: number;
+  target: null;
+  swapped: boolean;
+  healed: boolean;
+  state: null;
+  sounded: boolean;
+  endMessage: string;
+  endSpec: BattleEntranceEndSpec | null;
+  swapName: string;
+  entranceSide: number;
+  onSwap: (() => void) | null;
+  onDone: (() => void) | null;
+  onTaskEnd: (() => boolean) | null;
+  taskEnded: boolean;
+  entrance: { folder: string | null; ready: boolean };
+}
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeOpening(B: BattleContext) {
 function _battleTargetSize() {
@@ -381,7 +416,7 @@ async function _init3DRenderer(b: BattleState) {
    * flash over f178, final fade + other model shown + motion 1 (2 weak) f299. `onDone` runs when the window ends.
    * `name` is the entering fighter's model (species name or id). The clock waits until that model is loaded.
    */
-  function startEntrance(b: BattleState, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }) {
+  function startEntrance(b: BattleState, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }: BattleEntranceArgs): BattleEntranceShow {
     const show = {
       program: side ? FormChangeProgram.ENTRANCE_ENEMY : FormChangeProgram.BLAST_REVERT,
       frame: 0, target: null, swapped: false, healed: false, state: null, sounded: false,

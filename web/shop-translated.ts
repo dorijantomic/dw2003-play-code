@@ -15,6 +15,10 @@ import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js
 import { composeWindow } from "./ui-c/screens.js";
 import type { ShopOpenOpts } from "./types/shop.js";
 import type { ShopTranslatedOptions, ShopTranslatedScreen } from "./types/shop-translated.js";
+interface ShopCatalogRecord { file: string; }
+interface ShopCatalog { itemRecords: ShopCatalogRecord; itemDescriptors: ShopCatalogRecord[]; }
+interface ShopLoadedCatalog { catalog: ShopCatalog; itemRecords: Uint8Array<ArrayBuffer>; descriptors: Uint8Array<ArrayBuffer>[]; font: Uint8Array<ArrayBufferLike>; }
+
 
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };
@@ -25,7 +29,7 @@ const readBytes = (path) => fetchBytes(path, DATA_LABEL);
 
 let catalogPromise = null;
 function loadCatalog() {
-  catalogPromise ??= readJson("shop_catalog.json").then(async (catalog) => ({
+  catalogPromise ??= readJson("shop_catalog.json").then(async (catalog): Promise<ShopLoadedCatalog> => ({
     catalog,
     itemRecords: await readBytes(catalog.itemRecords.file),
     descriptors: await Promise.all(catalog.itemDescriptors.map((row) => readBytes(row.file))),

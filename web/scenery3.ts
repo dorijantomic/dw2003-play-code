@@ -9,6 +9,17 @@ import { lampPoints, windowRects } from "./scenery2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+interface Scenery3State {
+  L: { rain: number; blizzard: number; sand: number };
+  t: number;
+  dt: number;
+  now: number;
+  fade: number;
+  camX: number;
+  camY: number;
+  Q: number;
+}
+
 interface Scenery3Fx {
     rainwater?: boolean;
     wildlife?: boolean;
@@ -180,7 +191,7 @@ function drawLens(ctx, S) {
 }
 
 // ------------------------------------------------------------- wildlife
-function drawWildlife(ctx, S) {
+function drawWildlife(ctx: CanvasRenderingContext2D, S: Scenery3State) {
     const { p, L, t, dt, now, fade, camX, camY, Q } = S;
     const calm = L.rain < 0.35 && L.blizzard < 0.2 && L.sand < 0.4;
     // frogs: sit still, puff their throats, now and then hop

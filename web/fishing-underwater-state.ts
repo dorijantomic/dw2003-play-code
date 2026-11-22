@@ -1,3 +1,14 @@
+interface ExtrasData {
+  stages?: Record<string | number, { area: string }>;
+  areas?: { id: string; theme: string }[];
+}
+
+interface FishingTheme {
+  surface: string;
+  mid: string;
+  deep: string;
+  light: string;
+}
 // web/fishing-underwater-state.js — the pure half of the underwater fishing view.
 //
 // NEW CONTENT of this project, on for everyone (no option row, no URL flag).
@@ -93,7 +104,7 @@ export function themeIdFor(extrasData, stage: string | number) {
 }
 
 /** The theme record of a stage. */
-export function themeFor(extrasData, stage: string | number) {
+export function themeFor(extrasData: ExtrasData | undefined, stage: string | number): FishingTheme {
     return THEMES[themeIdFor(extrasData, stage)];
 }
 

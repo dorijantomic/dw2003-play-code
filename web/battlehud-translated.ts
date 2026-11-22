@@ -30,6 +30,21 @@ import { battleAilmentByte } from "./battlecmd-translated.js";
 import type { BattleHudPipsOptions, RecordMemory } from "./types/battlehud-translated.js";
 
 import type { BattleState } from "./types/battle.js";
+interface BattleHudPartyMember {
+    hp: number;
+    maxHp: number;
+    ailments: Record<string, number>;
+    statusBits: number;
+}
+
+interface BattleHudPip {
+    side: number;
+    index: number;
+    cel: number;
+    x: number;
+    y: number;
+}
+
 interface DvPaintPart {
     cel: number;
     x: number;
@@ -117,7 +132,7 @@ function writeRecord(mem: RecordMemory, sideIndex: number, slot, member) {
  * Run the ported marker loop and return the markers the original would have drawn:
  * `{side, index, cel, x, y}` per member, in the original's order.
  */
-export function battleHudPartyPips(players, enemies, options: BattleHudPipsOptions = {}) {
+export function battleHudPartyPips(players, enemies: (BattleHudPartyMember | null)[], options: BattleHudPipsOptions = {}): BattleHudPip[] {
     const mem = recordStore() as RecordMemory;
     mem.write8 = (addr, value) => mem.write16(addr, value & 0xffff);
     players.forEach((m, i) => writeRecord(mem, 0, i, m));

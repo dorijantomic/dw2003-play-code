@@ -149,7 +149,7 @@ export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: M
 // footer plate with item desc + wield-slot line. Grey = native palette+0xb0.
 export const GREY = { color: "rgb(136,136,152)" };
 
-export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, p, t: number, fold) {
+export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, p, t: number, fold: (key: string, ...rest: (number | string | (() => void))[]) => number) {
   const E = MS.UI.screens.equip;
   const sh = MS.UI.screens.shared;
   const D = MS.UI.screens.detail;

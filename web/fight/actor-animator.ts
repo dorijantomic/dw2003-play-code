@@ -358,7 +358,7 @@ export class ActorAnimator {
   // Debug (fight-action-lab): play an ORDERED SEQUENCE of timeline tables back-to-back via
   // PlaylistPlayer — the assembled action the user composes from the palette. loop=true rebuilds it
   // when the playlist ends so the action repeats for study. Not used by the live game.
-  debugPlayPlaylist(tables, { loop = true } = {}) {
+  debugPlayPlaylist(tables: ConstructorParameters<typeof PlaylistPlayer>[0], { loop = true } = {}) {
     this.vm = null;
     const list = (tables || []).filter((t) => t && t.length);
     this._dbgLoop = loop ? list : null;

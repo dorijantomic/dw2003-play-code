@@ -16,6 +16,9 @@ import { isCursorToken } from "./icons.js";
 import { N, ID, textPart, plate, rule, rowPlate, cursor, corners, elementChip, ELEMENTS, stripes, TAB, tabPlate, tabTitle } from "./base.js";
 import { restOfRuns } from "./generic.js";
 import type { UiRect, UiSheetDef, UiTextOpts } from "./types.js";
+import type { UiPart } from "./types.js";
+interface RowRun extends SheetRun { face?: string; }
+
 interface SheetRun {
   x: number;
   y: number;
@@ -44,7 +47,7 @@ const label = (key: string, m, rect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>,
 const number = (key: string, m, right: number, y: number, h: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) => textPart(key, "number", m.text, applyRel({ x: right - N(o.wDp ?? 90), y, w: N(o.wDp ?? 90), h }, rel), o.sizeDp ?? 22, o.lineDp ?? Math.round(h * 3), { align: "right", color: o.color ?? m.face ?? "var(--c-ink)", rel, maxDp: o.wDp ?? 90 });
 
 /** One text run placed in a row of `top` / `h` (native): numbers right-anchored at the game's right edge, the rest a label at the pen x. */
-function rowText(key: string, m, top: number, h: number, right: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, ink: string | null, out) {
+function rowText(key: string, m: RowRun, top: number, h: number, right: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, ink: string | null, out: UiPart[]) {
     if (m.right != null && isNum(m.text)) out.push(number(`${key}.n${Math.round(m.right)}`, m, m.right, top, h, rel, { color: ink ?? m.face ?? "var(--c-ink)" }));
     else out.push(label(`${key}.t${Math.round(m.x)}`, m, { x: m.x, y: top, w: Math.max(8, right - m.x), h }, rel, { color: ink ?? m.face ?? null, maxDp: Math.max(40, (right - m.x) * 3 - 8) }));
 }

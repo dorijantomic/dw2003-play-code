@@ -8,14 +8,22 @@
 import { ui } from "./vendor/engine.js";
 import { fetchBytes, fetchJson } from "./resident-data.js";
 import type { WfightLoaderOptions, WorldFightScreen } from "./types/wfight-translated.js";
+interface WfightManifestResource {
+    id: string;
+    file?: string;
+}
+interface WfightManifest {
+    resources: WfightManifestResource[];
+}
+
 
 /** The loader's data directory under assets/data/. */
 const LOADER_DIR = "wfight";
 const DATA_LABEL = "Battle loader data";
 
 let dataPromise = null;
-function loadData() {
-    dataPromise ??= fetchJson(`${LOADER_DIR}/manifest.json`, DATA_LABEL).then(async (manifest) => {
+function loadData(): Promise<{ manifest: WfightManifest; packs: Map<string, Uint8Array> }> {
+    dataPromise ??= fetchJson(`${LOADER_DIR}/manifest.json`, DATA_LABEL).then(async (manifest): Promise<{ manifest: WfightManifest; packs: Map<string, Uint8Array> }> => {
         const shipped = manifest.resources.filter((r) => r.file);
         const files = await Promise.all(shipped.map((r) => fetchBytes(`${LOADER_DIR}/${r.file}`, DATA_LABEL)));
         return { manifest, packs: new Map(shipped.map((r, i: string | number) => [r.id, files[i]])) };

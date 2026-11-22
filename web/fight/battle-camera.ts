@@ -31,7 +31,7 @@ const dot3   = (a: number[], b) => a[0]!*b[0] + a[1]!*b[1] + a[2]!*b[2];
 const norm3  = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
 
 // Right-handed, column-major view matrix (identical convention to battle3d.mat4LookAt).
-export function buildView(eye, target, up = [0, 1, 0], roll = 0) {
+export function buildView(eye: number[], target: number[], up = [0, 1, 0], roll = 0) {
   const z = norm3(sub3(eye, target));   // view backward
   let x = norm3(cross3(up, z));         // right
   let y = cross3(z, x);                 // up'
@@ -458,7 +458,7 @@ export function composeShot(fields) {
   // W = T(anchor) . R(angles) is the shot's own coordinate frame; eye/target are stated inside
   // it. R is the identity for a shot that authors no angles, so this reduces to the anchor add.
   const R = (angles[0] || angles[1] || angles[2]) ? rotMatrixYXZ(...angles) : null;
-  const place = (v) => {
+  const place = (v: [number, number, number]): [number, number, number] => {
     const p = R ? rotApply(R, v) : v;
     return [p[0] + anchor[0], p[1] + anchor[1], p[2] + anchor[2]];
   };
@@ -542,7 +542,7 @@ export function op5GlideT(t, rate, delta) {
 }
 
 /** How many frames of `delta` the glide actually takes for `duration`. */
-export function op5GlideFrames(duration, delta = CAMERA_FRAME_DELTA) {
+export function op5GlideFrames(duration: number, delta = CAMERA_FRAME_DELTA) {
   const r = op5GlideRate(duration);
   let t = 0, n = 0;
   while (t < 0x1000 && n < 1e6) { t = op5GlideT(t, r, delta); n++; }
@@ -728,7 +728,7 @@ export function createCameraRecord(resolvePreset) {
     },
 
     /** The live record: what the frame draws, and what a move starts from. */
-    live() {
+    live(): number[] | null {
       if (!rec) return null;
       if (rec.kind === "move") {
         return rec.progress >= 0x1000

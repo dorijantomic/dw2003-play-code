@@ -26,6 +26,67 @@
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
 import type { MpLeagueState } from "./types/mp-league.js";
+interface MpLeaguePackExtra {
+    ids: string[];
+    dropped: string[];
+    asked?: boolean;
+    champ?: boolean;
+}
+
+type MpLeaguePackable = MpLeagueReportState & MpLeaguePackExtra;
+
+interface MpLeaguePacked {
+    b: number;
+    i: string[];
+    d: string[];
+    r: number;
+    f: string;
+    k: 0 | 1;
+    c: boolean | undefined;
+    R: (string | null)[][][];
+}
+
+interface MpForfeitMatch extends MpLeagueMatch { wo?: boolean; }
+type MpForfeitLeague = Omit<MpLeagueReportState, "rounds"> & {
+    rounds: MpForfeitMatch[][];
+    ids: string[];
+    dropped: string[];
+};
+
+interface MpStandingRow { id: string; wins: number; losses: number; games: number; round: number; dropped: boolean; champ: boolean; out: boolean; }
+
+interface MpLeagueMatch {
+    a: string;
+    b: string;
+    w?: string | null;
+    dead?: boolean;
+    g: string[];
+}
+
+type MpLeagueReportState = MpLeagueState & {
+    rounds: MpLeagueMatch[][];
+    r: number;
+    bestOf: number;
+    phase: string;
+};
+
+interface MpReportRefused {
+    refused: "done" | "no_fight" | "not_in_match" | "dropped" | "no_games" | "too_many_games" | "wrong_winner" | "already_over";
+}
+
+interface MpReportAccepted {
+    ok: true;
+    ended: boolean;
+    a: string;
+    b: string;
+    winner: string | null | undefined;
+    games: string[];
+    r: number;
+    m: number;
+}
+
+type MpReportResult = MpReportAccepted | MpReportRefused;
+
 
 export const MIN_TAMERS = 2;
 export const MAX_TAMERS = 8;
@@ -130,7 +191,7 @@ export function nextPairing(lg) {
  * (e.g. [a, b, a] = a lost, won, won: 2-1). A best-of-three fight ends when a side has two games. Reports are
  * refused when they cannot be true (a fourth game, a game after the fight was over, a winner who did not win).
  */
-export function report(lg, winner, games) {
+export function report(lg, winner, games): MpReportResult {
     if (!lg || lg.phase !== "play") return { refused: lg?.phase === "done" ? "done" : "no_fight" };
     const round = lg.rounds[lg.r] ?? [];
     const index = round.findIndex((m) => m.w == null && !m.dead && !out(lg, m.a) && !out(lg, m.b));
@@ -170,7 +231,7 @@ export function matchScore(m) {
 }
 
 /** A tamer leaves the night: their open fight goes to the opponent, and no later pairing calls them again. */
-export function forfeit(lg, id) {
+export function forfeit(lg: MpForfeitLeague, id: string): { refused: string } | { ok: true; id: string; to: string | null } {
     if (!lg || !has(lg.ids, id)) return { refused: "unknown" };
     if (has(lg.dropped, id)) return { refused: "dropped" };
     lg.dropped.push(id);
@@ -186,7 +247,7 @@ export function forfeit(lg, id) {
 }
 
 /** Everyone in the night, best first: the champion, then those still standing, then by the round they left in. */
-export function standings(lg) {
+export function standings(lg): MpStandingRow[] {
     if (!lg) return [];
     const rows = lg.ids.map((id) => {
         let wins = 0, losses = 0, games = 0, round = -1;
@@ -217,7 +278,7 @@ export function champ(lg) {
 // cap even with three- or four-digit tamer ids. A night travels packed: short keys on the league, and each match
 // as [a, b, winner, ...gameWinners] (a null b is a bye or an empty slot; a match with no tamer left is
 // [null, null]). The flags come back on unpack, so the dock and the room work with the same readable object.
-export function packLeague(lg) {
+export function packLeague(lg: MpLeaguePackable): MpLeaguePacked | null {
     if (!lg) return null;
     return {
         b: lg.bestOf,

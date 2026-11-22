@@ -124,7 +124,7 @@ export function drawClip(ctx, p, id, x, y, scale = 1) {
  * tail asks for the raw art. See
  * docs/research/ui/dialogue-window-placement-decoded-2026-07-02.md.
  */
-export function drawClipOpaque(ctx, p, id: number, x: number, y: number, scale = 1) {
+export function drawClipOpaque(ctx: CanvasRenderingContext2D, p, id: number, x: number, y: number, scale = 1) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClipOpaque(c, p, id, x, y, scale))) return true;
   const clip = p?.ids?.[String(id)];
   if (!clip || !p.img) return false;

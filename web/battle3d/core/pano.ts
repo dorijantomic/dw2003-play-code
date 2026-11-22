@@ -11,6 +11,8 @@ import {
 import { MODEL_SCALE, mat4Perspective, mat4LookAt, ps1ToRenderMatrix } from "../math.js";
 import { mat4Mul, mat4Translate, mat4Scale } from "../../fight/proj-layers.js";
 import type { Battle3DContext, PanoProjectOptions, PanoState } from "../../types/battle3d.js";
+type Vec3 = Float32Array | number[];
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePano(B$: Battle3DContext) {
@@ -262,7 +264,7 @@ function _panoMeshBuild(meta, vals: number[] | Float32Array<ArrayBuffer>) {
     }
     return best;
   }
-function _drawPano(p, bdPV, eye: number[], atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
+function _drawPano(p: PanoState, bdPV: number[] | Float32Array<ArrayBuffer>, eye: number[], atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
     const M = new Float32Array([B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, eye[0], eye[1], eye[2], 1]);
     const depth = B$.gl!.isEnabled(B$.gl!.DEPTH_TEST);
     B$.gl!.disable(B$.gl!.DEPTH_TEST); B$.gl!.depthMask(false); B$.gl!.disable(B$.gl!.BLEND);
@@ -281,7 +283,7 @@ function _drawPano(p, bdPV, eye: number[], atm: { gradeSub: Iterable<number>; fo
   }
 // opts.ortho = half-size of a square straight view (no perspective) for the top-down floor; opts.far = how deep it
   // reaches from the eye (with ortho, everything above the eye is left out: walls cut at that height).
-  function captureArenaFace(eye, look, up, size = 1024, opts: PanoProjectOptions = {}) {
+  function captureArenaFace(eye: Float32Array | number[], look: Float32Array | number[], up: Float32Array | number[], size = 1024, opts: PanoProjectOptions = {}) {
     if (!B$.activeArena?.groups?.length) return null;
     if (!B$._capFbo || B$._capFbo.size !== size) {
       const fb = B$.gl!.createFramebuffer(), tx = B$.gl!.createTexture(), rb = B$.gl!.createRenderbuffer();

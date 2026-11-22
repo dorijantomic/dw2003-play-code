@@ -349,7 +349,7 @@ export function createDriNative(sfx = null) {
         moduleId: MODULE_ID,
         hostOptions: {
             playPackedSound,
-            seed: ({ read, write }) => seed(read, write, d._state ?? {}),
+            seed: ({ read, write }: { read: (offset: number) => number; write: (offset: number, value: number) => void }) => seed(read, write, d._state ?? {}),
         },
         // The lab's profile table has to be in memory before the boot: the
         // screen packs the party map itself, and seeding needs the id map.

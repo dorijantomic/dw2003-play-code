@@ -1,5 +1,16 @@
 import { RAND_U16 } from "../vendor/engine.js";
 import { CORE_STATS } from "./progress.js";
+import type { DigimonRecord } from "../types/battle.js";
+interface GymRecord {
+  tp_costs: number[];
+}
+
+interface GymDrillEntry {
+  id: number;
+  stat: string;
+  reps: number;
+}
+
 
 // Gym drill catalog for a gym rank (1..14): [{ drill, primary, secondary }].
 export function gymDrillsForRank(rank: number, gym) {
@@ -108,7 +119,7 @@ export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
 // "Failed..." (estraini 71, F0x80087334 `arg4==0 && arg5==0` branch).
 //   repResults   = the ordinary reps (3, or 5 for a super/starred drill or an "As is" pick)
 //   challengeWon = null (no bonus rep) | true (won → +1 ultra roll) | false (lost → nothing)
-export function gymSessionResult(drillEntry, tpChoice, repResults, challengeWon: boolean, dig, gym, rng = RAND_U16) {
+export function gymSessionResult(drillEntry: GymDrillEntry, tpChoice: number, repResults: boolean[], challengeWon: boolean, dig: DigimonRecord, gym: GymRecord, rng = RAND_U16): { tpCost: number; effects: { stat: string; delta: number }[] } {
   const totals = new Map();
   const add = (fx) => { for (const { stat, delta } of fx) totals.set(stat, (totals.get(stat) ?? 0) + delta); };
   for (const ok of repResults) if (ok) add(gymTrainingResult(drillEntry, tpChoice, false, dig, gym, rng).effects);

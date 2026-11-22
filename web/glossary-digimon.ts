@@ -14,6 +14,35 @@ import { scaledHp, scaledMp, scaledStat } from "./battle.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import { elementValue } from "./vendor/engine.js";
 import type { GlossaryDigimonOut } from "./types/glossary-digimon.js";
+import type { DigimonRecord } from './types/battle.js';
+interface EvolutionLine {
+    digimonId?: string | number;
+    records?: EvolutionRecord[];
+}
+
+interface EvolutionLinesFile extends Array<EvolutionLine> {
+    lines?: EvolutionLine[] | null;
+}
+
+interface LineIndex {
+    lines: EvolutionLine[];
+    reach: Map<string | number, Set<number>>;
+    rootSlot: Map<string | number, number>;
+}
+
+interface EvolutionPlannerRow {
+    to: number;
+    name: { id?: string | number; name?: string };
+    index: number;
+    ready: boolean;
+    unmet: string[];
+    text: string;
+}
+
+interface HeaderCounts { met: number; beaten: number; total: number; text: string; }
+
+interface EvolutionRecord { from?: string | number; to?: string | number; level?: number; stats?: Record<string, number>; dna?: (string | number)[]; item?: string | number | null; time?: string | null; happiness?: number; mistakes?: number; }
+
 interface DigimonLogState {
     met: Record<string, number>;
     beaten: Record<string, number>;
@@ -82,7 +111,7 @@ export function ownNumbers(sp, partner, profiles = null) {
 }
 
 /** One evolutions.json record's needs in short plain words ("From Agumon Lv 20, STR 280"), parsed by the planner's own requirementText. */
-function needText(record, profiles) {
+function needText(record: EvolutionRecord, profiles: DigimonRecord[]) {
     const rq = requirementText(record, profiles);
     const gate = rq.gate.kind === 0 ? null : rq.gate.kind === 7 ? `Partner Lv ${rq.gate.threshold}` : `${rq.gate.label} ${rq.gate.threshold}`;
     const forms = rq.reqs.map((r) => `${r.name} Lv ${r.level}`);
@@ -127,7 +156,7 @@ function techniqueNames(partner, wild, skillById) {
 }
 
 /** Lines of evolutions.json that can reach each profile id, and the root (starter) id of each line. */
-function lineIndex(evolutions) {
+function lineIndex(evolutions: EvolutionLinesFile | null): LineIndex {
     const lines = Array.isArray(evolutions?.lines) ? evolutions.lines : [];
     const reach = new Map(), rootSlot = new Map();
     lines.forEach((line, slot) => {
@@ -272,7 +301,7 @@ export function partnerOf(sp, partners) {
     return null;
 }
 
-const namesOf = (sp) => sp.names ?? [sp.name];
+const namesOf = (sp): string[] => sp.names ?? [sp.name];
 const sumOf = (sp, fn) => namesOf(sp).reduce((t, n) => t + (fn(n) || 0), 0);
 /** Owned = a form you have worn (the log's `owned` set). */
 export const ownedOf = (sp, log) => namesOf(sp).some((n) => log.ownedCount?.(n) > 0);
@@ -299,7 +328,7 @@ export function logSnapshot(log: DigimonLog): DigimonLog {
     return { metCount: (n) => s.met[n] || 0, beatenCount: (n) => s.beaten[n] || 0, ownedCount: (n) => owned[n] || 0, totals: () => ({ met: Object.keys(s.met).length, beaten: Object.keys(s.beaten).length }) };
 }
 
-export function headerCounts(species, log) {
+export function headerCounts(species, log: DigimonLog): HeaderCounts {
     let met = 0, beaten = 0;
     for (const sp of species) {
         if (metOf(sp, log) > 0) met++;
@@ -337,7 +366,7 @@ export function pageOne(sp, state, log, partner) {
 // ---------------------------------------------------------------- page 2
 
 /** The partner's next form: the one READY now, else the one with the fewest unmet gates (table order breaks ties). */
-export function nextForm(rows) {
+export function nextForm(rows: EvolutionPlannerRow[] | undefined): EvolutionPlannerRow | null {
     if (!rows?.length) return null;
     return rows.find((r) => r.ready) ?? rows.reduce((best, r) => (r.unmet.length < best.unmet.length ? r : best), rows[0]);
 }

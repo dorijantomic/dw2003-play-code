@@ -312,7 +312,7 @@ export function questReachArea(grid: QuestReachGrid, seeds = [], links = []) {
 }
 
 /** Whether a point is in that reachable area (its own cell, or the nearest standable cell within a few). */
-export function questReachable(grid, reach, x, y, limit = 4) {
+export function questReachable(grid: QuestReachGrid | undefined, reach: Uint8Array | undefined, x: number, y: number, limit = 4) {
     if (!grid || !reach) return true;
     const [c0, r0] = cellOf(grid, x, y);
     if (questCellFree(grid, c0, r0)) return !!reach[r0! * grid.cols + c0!];

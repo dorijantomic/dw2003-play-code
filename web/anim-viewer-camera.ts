@@ -17,6 +17,10 @@
 // derived from yaw, NOT from a cross product with world up, so it stays finite at the poles
 // (straight above/below) where a lookAt(up=+Y) is degenerate — that is the "no gimbal flip" rule.
 import type { AnimViewerCamera, FreeCameraOptions } from "./types/anim-viewer-camera.js";
+import type { CameraBounds } from "./types/anim-viewer-camera.js";
+import type { CameraUrlState } from "./types/anim-viewer-camera.js";
+
+
 
 export const DEG = Math.PI / 180;
 const EPS = 1e-9;
@@ -246,7 +250,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Home: pivot on the Digimon, 3/4 view, framed. */
-  function reset(bounds, aspect = 4 / 3) {
+  function reset(bounds: CameraBounds | undefined, aspect = 4 / 3) {
     cam.autoOrbitSpeed = 0;
     cam.lockPoint = null;
     setPreset("threeQuarter");
@@ -281,7 +285,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Advance damping / auto-orbit / lock. `dt` seconds. */
-  function update(dt) {
+  function update(dt: number) {
     if (!(dt > 0)) dt = 0;
     if (cam.autoOrbitSpeed) cam.targetYaw += cam.autoOrbitSpeed * DEG * dt;
     if (cam.lockPoint && !cam.flyMode) {
@@ -386,7 +390,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Re-pivot on the nearest point under the cursor: the model box, else the ground plane y=groundY. */
-  function pivotAt(ndc, aspect, bounds = null, groundY = null) {
+  function pivotAt(ndc: { x: number; y: number }, aspect: number, bounds = null, groundY = null) {
     const o = eye(), d = rayAt(ndc, aspect);
     const box = boxOf(bounds || cam.lastBounds);
     if (box) {
@@ -426,7 +430,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
       fov: r(cam.fovDeg, 1), ortho: cam.ortho ? 1 : 0, lock: cam.lockPoint ? 1 : 0,
     };
   }
-  function setState(s) {
+  function setState(s: CameraUrlState | null | undefined) {
     if (!s) return false;
     const num = (v) => (v == null || v === "" ? null : +v);
     if (num(s.yaw) != null) cam.yaw = cam.targetYaw = num(s.yaw)! * DEG;

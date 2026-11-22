@@ -11,6 +11,15 @@
 // The odds are the disc's, not a percentage: a rate byte of 128 means 129 in 1024 per win.
 import type { CodexRow, CodexSkill, StageEncounters } from "./types/codex-data.js";
 import type { DigimonRecord } from './types/battle.js';
+interface DropRecord {
+  droppers: DigimonRecord[];
+  stages: string[];
+}
+interface DropEntry extends DropRecord {
+  item: string;
+}
+type DropIndex = Record<string, DropRecord>;
+
 
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
@@ -394,7 +403,7 @@ export function dropEntry(index, item) {
  * otherwise every name containing the text; an empty query is every item. An invented item
  * is an empty list, never a made-up row. Pure.
  */
-export function dropSearch(index, query = "") {
+export function dropSearch(index: DropIndex, query = ""): (DropEntry | null)[] {
   const names = dropItems(index);
   const q = String(query ?? "").trim().toLowerCase();
   if (!q) return names.map((n) => dropEntry(index, n));

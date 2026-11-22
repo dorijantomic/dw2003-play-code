@@ -151,7 +151,7 @@ async function run(img, name) {
 }
 
 /** The 4x filtered copy of a native sheet (Promise<Image>), or null for "off" / an unknown name. */
-export function filteredSheet(img, name) {
+export function filteredSheet(img, name): Promise<HTMLImageElement> | null {
   if (!img || !SPRITE_FILTERS[name] || name === "off") return null;
   let per = cache.get(img);
   if (!per) cache.set(img, per = new Map());

@@ -11,6 +11,17 @@
 // The placement comes from spriteGeometry()/spriteCorners() in effect-player.js, the same maths the
 // 2D pass (drawEffects) uses.
 import { effectClip, spriteGeometry, spriteCorners } from "./effect-player.js";
+interface UnderGlResources {
+  prog: WebGLProgram;
+  aP: number;
+  aT: number;
+  uTex: WebGLUniformLocation;
+  uBox: WebGLUniformLocation;
+  uK: WebGLUniformLocation;
+  buf: WebGLBuffer;
+  tex: WeakMap<TexImageSource, WebGLTexture>;
+}
+
 interface UnderEffectSprite {
   /** archive key into manifest.archives and images */
   arch: string | number;
@@ -44,7 +55,7 @@ const FS = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\npr
 
 const perGl = new WeakMap();     // gl -> { prog, aP, aT, uTex, buf, tex: WeakMap(image -> texture) }
 
-function resources(gl: WebGLRenderingContext) {
+function resources(gl: WebGLRenderingContext): UnderGlResources {
   let r = perGl.get(gl);
   if (r) return r;
   const sh = (type: number, src: string) => {

@@ -21,6 +21,24 @@ import {
 import { loadAssetImage } from "../assets.js";
 import { sceneVariantSlotIndex, sceneVariantSlotActive } from "../ordinal-scene-variant.js";
 import { S } from "./state.js";
+interface PointSpriteRecord {
+    readonly atlas: number;
+    readonly x: number;
+    readonly y: number;
+    readonly z?: number;
+    readonly width?: number;
+    readonly height?: number;
+    readonly scale?: number;
+    readonly rotation?: number;
+    readonly flipX?: boolean;
+    readonly flipY?: boolean;
+    readonly palette?: number;
+    readonly tile?: number;
+    readonly layer?: number;
+    readonly blend?: number;
+    readonly hidden?: boolean;
+}
+
 
 let actorData = null; // point_record_actors.json -- the ONE table
 
@@ -294,7 +312,7 @@ function pointRecordHost(stageId: string | number, records) {
 }
 
 /** The stage's point-sprite records, for an actor claiming them by atlas byte. */
-export function pointSpriteRecords(stageId: string | number) {
+export function pointSpriteRecords(stageId: string | number): PointSpriteRecord[] | null {
     return S.data?.[stageId]?.records ?? null;
 }
 

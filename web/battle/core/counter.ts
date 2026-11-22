@@ -199,7 +199,7 @@ function applyCounter(b: BattleState, c) {
     return true;
   }
 /** The battle loop's call into the pool; the body is the exported advance below. */
-  function statusEventQueueAdvance(b, playerSpd) {
+  function statusEventQueueAdvance(b: BattleState, playerSpd: number) {
     return battleStatusEventAdvance(b, playerSpd);
   }
 // Our Digimon swings back (Counter Crest). The outcome is decided here, so the page can name it; the

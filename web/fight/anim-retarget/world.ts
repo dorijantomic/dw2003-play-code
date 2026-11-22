@@ -13,6 +13,15 @@ import {
 } from "./k16-rig.js";
 import { sample, shiftPlaylistEntry } from "./rig-basics.js";
 import type { RetargetWorldModel } from "./types.js";
+import type { RigChain } from "./types.js";
+interface ChainFeature {
+  cen: number[];
+  ext: number[];
+  len: number;
+  depth: number;
+  tip: number[] | null | undefined;
+}
+
 
 /**
  * K23 — the WORLD-SPACE bake: every part's motion is transferred as a rotation in WORLD space, and the parts are
@@ -135,7 +144,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     return out;
   };
   const chT = chainsOf(target), chS = chainsOf(source);
-  const featOf = (chain, c, P: (number[] | null)[], Z, D, deg?: number) => {
+  const featOf = (chain: number[], c: { parts: { sz: number[] }[]; H: number }, P: (number[] | null)[], Z: (number[] | null)[], D: number[], deg?: number): ChainFeature | null => {
     const pts = chain.filter((i) => P[i]);
     if (!pts.length) return null;
     const cen = [0, 0, 0], lo3 = [Infinity, Infinity, Infinity], hi3 = [-Infinity, -Infinity, -Infinity];
@@ -148,7 +157,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     return { cen, ext: [hi3[0]! - lo3[0]!, hi3[1]! - lo3[1]!, hi3[2]! - lo3[2]!], len: pts.length, depth: D[chain[0]], tip: P[pts[pts.length - 1]] };
   };
   const pair = (deg: number) => {
-    const fT = chT.map((ch) => featOf(ch, ct, pt, zt, dT)), fS = chS.map((ch) => featOf(ch, cs, ps, zs, dS, deg));
+    const fT = chT.map((ch): ChainFeature | null => featOf(ch, ct, pt, zt, dT)), fS = chS.map((ch) => featOf(ch, cs, ps, zs, dS, deg));
     const cand = [];
     for (let a = 0; a < chT.length; a++) if (fT[a]) for (let b = 0; b < chS.length; b++) if (fS[b]) {
       const x = fT[a], y = fS[b];

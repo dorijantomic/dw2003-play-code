@@ -19,6 +19,29 @@ import { VISIBLE, createGlossaryModel } from "./glossary-model.js";
 import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glossary-items.js";
 import { drawItemIcon } from "./itemicons.js";
 import { artHook } from "./ui-c/capture.js";
+interface GlossaryItemEntry { ids(): number[]; }
+
+interface GlossaryCard {
+    sp: GlossarySpecies;
+    state: string;
+    partner: GlossarySpecies | null;
+    lead: GlossarySpecies | null;
+}
+
+interface GlossaryBookModel {
+    reveal(count: number): number;
+}
+
+interface GlossaryArtStage {
+    draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, dt?: number): boolean;
+}
+
+interface GlossaryBookView {
+    progress(name: "list" | "model" | "title" | "footer"): number;
+    ticks: number;
+    dt?: number;
+}
+
 interface GlossarySpecies {
   name: string;
 }
@@ -109,7 +132,7 @@ export function fitCounts(text: string, widthOf, maxW: number) {
 }
 
 /** Card text lines for page 1: title, the level line (when there is one), then the record wrapped over the rows left. */
-export function cardLines({ title, row1, record }, widthOf, maxW: number, rows: number) {
+export function cardLines({ title, row1, record }: { title: string; row1: string; record: string }, widthOf: (text: string) => number, maxW: number, rows: number) {
     const out = [fitByWidth(title, widthOf, maxW)];
     if (row1) out.push(fitByWidth(row1, widthOf, maxW));
     const left = rows - out.length;
@@ -153,7 +176,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     // ---- ITEMS section
     const plain = (s) => textWidth(s);
     const descOf = (text: string) => (text ? wrapToLines(text, plain, ITEMS_LAYOUT.textRight - ITEMS_LAYOUT.textX, MAX_DESC_LINES) : []);
-    const itemIds = (it) => { try { return it.ids(); } catch { return []; } };
+    const itemIds = (it: GlossaryItemEntry): number[] => { try { return it.ids(); } catch { return []; } };
     function actItems(buttons) {
         if (buttons.has(WORD.prev)) { section = SECTION_DIGIMON; sfx?.playPacked?.(SFX_CLOSE); const d = data(); if (d && model) show(d); return; }
         const it = getItems?.();
@@ -236,7 +259,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
             model?.tickReveal();
         },
         close() { stage?.close?.(); },
-        draw(ctx, view) {
+        draw(ctx: CanvasRenderingContext2D, view: { progress(name: "title" | "list" | "model" | "footer"): number; ticks: number }) {
             const d = data();
             const L = GLOSSARY_LAYOUT;
             const pt = view.progress("title"), pl = view.progress("list"), pm = view.progress("model"), pf = view.progress("footer");
@@ -270,7 +293,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     };
 }
 
-function drawPageOne(ctx, pm, pf, c, log, model, stage, view, w) {
+function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: GlossaryCard, log: Parameters<typeof pageOne>[2], model: GlossaryBookModel, stage: GlossaryArtStage | null, view: GlossaryBookView, w: (s: string, k?: number) => number) {
     const L = GLOSSARY_LAYOUT;
     const p1 = pageOne(c.sp, c.state, log, c.partner);
     withFold(ctx, pm, L.model.x, L.model.y + L.model.h / 2, "x", () => {

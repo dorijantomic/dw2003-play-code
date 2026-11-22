@@ -154,7 +154,7 @@ export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
     const busy = () => !read(ctx.idle) || !!read(ctx.dialogBusy) || !!read(ctx.battle);
     return {
         /** One field frame. prevX/prevY are null when the player has just arrived on this map. */
-        tick(mapId, prevX, prevY, nowX, nowY) {
+        tick(mapId: string, prevX: number | null, prevY: number | null, nowX: number, nowY: number) {
             if (!read(ctx.enabled)) return null;             // off: no state read, no rectangle, no scene
             if (!mapId) return null;
             // Arrival rows come first: a map load is their condition, and a fresh load must not be skipped by the

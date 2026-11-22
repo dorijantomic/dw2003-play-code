@@ -12,6 +12,8 @@ import type { AttackOptions, Battle3DContext } from "../../types/battle3d.js";
 import type { ArenaGroupBuf, ArenaPack } from "../../types/battle3d.js";
 import type { BattleSide } from "../../types/audio.js";
 import type { AnimHooks } from "../../types/battle3d.js";
+interface RockCoverCam { eye: number[]; look: number[]; up?: number[]; fovDeg?: number; H?: number; roll?: number; defeatYaw?: number; defeatDelta?: number; }
+
 // moved by tools/rewrite/split-closure.mjs
 export function makeFighters(B$: Battle3DContext) {
 function _layoutExtras() {
@@ -39,7 +41,7 @@ function _layoutExtras() {
     // (tools/verify_smart_cam.mjs: meft1009 near rock on the fighters 5% at the lowered scale, 0% at full)
     B$.arenaScale = window.__fx?.smartcam ? Math.min(B$.MULTI_ARENA_MAX!, scale) : _arenaScaleClear(Math.min(B$.MULTI_ARENA_MAX!, scale));
   }
-function _rockCover(groups: ArenaGroupBuf[], s: number, cam, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) {
+function _rockCover(groups: ArenaGroupBuf[], s: number, cam: RockCoverCam, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) {
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
     const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0]!, a[1]!, a[2]!) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2]!, 0, fwd[0]]);

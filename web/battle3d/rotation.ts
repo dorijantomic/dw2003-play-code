@@ -274,7 +274,7 @@ export function interpChannel(channel, frame) {
 // A ch2 rotation at `frame` as {q, m}: the quaternion of the SAME rotation the matrix carries.
 // At a key both come straight from the key (m is ps1AnglesToMat3, bit-identical to the linear
 // path); between keys the quaternion is the shortest-path slerp and m its matrix.
-function ch2RotationAt(channel, frame) {
+function ch2RotationAt(channel: [number, number, number][] | undefined, frame: number) {
   const s = channelSpan(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
   const keyAt = (k) => ({ q: ch2ToQuat(k[0], k[1], k[2]), m: ps1AnglesToMat3(k[2], k[1], k[0]) });

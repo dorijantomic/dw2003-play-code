@@ -1,6 +1,12 @@
 import { renderPhraseNote, PHRASE_SAMPLE_RATE as SAMPLE_RATE } from "../vendor/engine.js";
 import type { AudioEngine } from "../types/audio.js";
 import type { PhraseVoice } from "./types.js";
+interface VoiceMeta {
+  dedup?: boolean;
+  rate?: number;
+  loop?: { start: number; end: number };
+}
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePlayback(P: AudioEngine) {
@@ -210,7 +216,7 @@ function stopVoice(slotKey: string | null) {
   // to ring out (the Fire-Dungeon trap: three explosions half a second apart
   // out of a sound over a second long). With the corrected model this is only
   // a deliberate override, no longer a workaround for category arbitration.
-  function startVoice(name: string, meta, bank: string | null | undefined, sustain = false, overlap = false) {
+  function startVoice(name: string, meta: VoiceMeta, bank: string | null | undefined, sustain = false, overlap = false) {
     const slotKey = overlap ? null : slotKeyFor(name, meta, bank);
     // Bit 30 goes through the ONE exclusive-track register: a different id
     // first stops the register's holder through its own stop entry, and the

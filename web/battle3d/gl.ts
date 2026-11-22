@@ -4,6 +4,8 @@ import { mat4Identity } from "../fight/proj-layers.js";
 import { TEXTURE_PAGE_TEXELS, normalize } from "./math.js";
 import { S } from "./state.js";
 import type { ArenaCullLog } from "./types.js";
+import type { TexProgram } from "../types/battle3d.js";
+
 
 // A fighter's colour is its own texture's colour, and that is a decoded fact rather than a
 // default. The fight-scene draw that submits a fighter's triangles is
@@ -35,7 +37,7 @@ export const FIGHTER_TINT = [1, 1, 1, 1];
 const FIGHTER_TINTS = { player: FIGHTER_TINT, enemy: FIGHTER_TINT, extra: FIGHTER_TINT };
 
 /** The tint a side draws with: the game's own FIGHTER_TINT unless a fusion set one. */
-export function fighterTint(side: string) {
+export function fighterTint(side: string): [number, number, number, number] {
   return FIGHTER_TINTS[side] ?? FIGHTER_TINT;
 }
 
@@ -111,7 +113,7 @@ export function compileShader(gl, type, src) {
   return s;
 }
 
-export function createProgram(gl, vsrc, fsrc) {
+export function createProgram(gl: WebGLRenderingContext, vsrc: string, fsrc: string): WebGLProgram {
   const p = gl.createProgram();
   gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vsrc));
   gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fsrc));
@@ -214,8 +216,8 @@ export function makeQuadBuffers(gl, verts, uvs) {
 // look correct, while wider characters will appear stretched. This is improved
 // when UV decoding is completed.
 
-function drawBillboard(gl, prog, mvp, viewEye, worldPos,
-                       widthUnits, heightUnits, tex, alpha, tint) {
+function drawBillboard(gl: WebGLRenderingContext, prog: TexProgram, mvp: Float32Array, viewEye, worldPos: [number, number, number],
+                       widthUnits: number, heightUnits: number, tex: WebGLTexture, alpha: number, tint: [number, number, number]) {
   // Compute billboard right/up vectors (always face camera)
   const camRight = normalize([mvp[0], mvp[4], mvp[8]]);
   const worldUp = [0, 1, 0];

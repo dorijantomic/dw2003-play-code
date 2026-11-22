@@ -1,3 +1,4 @@
+import type { OwnClipRec } from './types.js';
 // op6 projectile-mesh layer transforms — the 3D mesh effect path (MEFT packs).
 //
 // This is the port of the original's per-frame layer builder. The chain, all read from
@@ -227,7 +228,7 @@ function clipEntry(clip, i: number) {
  * on the tick after the cursor reaches the terminator, so this is two less than the stream
  * length.
  */
-export function clipTicks(clip) {
+export function clipTicks(clip: OwnClipRec) {
   const n = clipStreamLength(clip);
   return n > 2 ? n - 2 : 0;
 }

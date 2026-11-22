@@ -12,6 +12,57 @@
 //
 // Nothing here reads game state: mount.js owns the riding rules.
 import * as THREE from "./lib3d/three.module.js";
+interface MountPose {
+  model?: Dw2Model;
+  t: Float32Array;
+  r: Float32Array;
+  s: Float32Array;
+  world: Float32Array;
+}
+
+interface GaitLeg {
+  sign: number;
+  hip: number;
+  axis: string;
+  chain?: number[];
+}
+
+interface GaitRig {
+  body: number;
+  height: number;
+}
+
+interface GaitOptions {
+  swing?: number;
+  lift?: number;
+  bob?: number;
+}
+
+interface Walk {
+  kind: string;
+  name: string;
+  idle: string;
+}
+
+interface Still {
+  clip: string;
+  at?: number;
+}
+
+interface MountRenderOptions {
+  x: number;
+  y: number;
+  dir?: string;
+  phase?: number;
+  moving?: boolean;
+  size?: number;
+  timeSec?: number;
+  walk?: Walk | null;
+  still?: Still | null;
+  seat?: number | null;
+  hide?: number[] | null;
+}
+
 interface RigLeg { end: number; }
 interface MeasureRig { legs: RigLeg[]; height?: number; forwardAxis: string; }
 interface ClipWalkStats { clip: string; dur: number; ticks: number; inPlace: boolean; loops: boolean; loopErr: number; bodyTravel: number; feet: number; usableFeet: number; alternation: number; walk: boolean; why?: string; }
@@ -485,7 +536,7 @@ export function quatMul(a, b) {
  * the hip swinging ±swing and the knee bending while the leg is in the air, plus the body's own bob.
  * `phase` is 0..1 of the cycle. Pure: no three.js, no clock, unit-testable.
  */
-export function applyGait(pose, rig, legs, phase: number, { swing = 0.28, lift = 0.45, bob = 0.02 } = {}) {
+export function applyGait(pose: MountPose, rig: GaitRig, legs: GaitLeg[], phase: number, { swing = 0.28, lift = 0.45, bob = 0.02 } = {}): MountPose {
   const order = [0, 0.5, 0.25, 0.75];            // the phases of the four legs, front pair first
   legs.forEach((L, i) => {
     const p = (phase + (order[i] ?? i / 4)) % 1;
@@ -505,7 +556,7 @@ export function applyGait(pose, rig, legs, phase: number, { swing = 0.28, lift =
 }
 
 /** Where each foot is (model space) for a given gait phase — the footfall proof. */
-export function gaitFootfalls(model, rig, legs, steps = 16) {
+export function gaitFootfalls(model: Dw2Model, rig: GaitRig, legs: (GaitLeg & RigLeg)[], steps = 16): [number, number, number][][] {
   const out = [];
   for (let i = 0; i < steps; i++) {
     const pose = bindPose(model);
@@ -749,7 +800,7 @@ function standFloor(asset, walk) {
   return asset._floor[walk.idle];
 }
 
-export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = false, size = 64, timeSec = 0, walk = null, still = null, seat = null, hide = null }) {
+export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = false, size = 64, timeSec = 0, walk = null, still = null, seat = null, hide = null }: MountRenderOptions): HTMLCanvasElement | null {
   if (!asset || !ensureRenderer()) return null;
   const { model, rig, legs, group } = asset;
   // A model whose own clip passed the walk test (clipWalkStats) walks with that clip; otherwise the gait

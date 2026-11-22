@@ -5,6 +5,11 @@ import { LIST_WINDOW, drawHeader, drawHelpBox, drawListWindow, listRowY } from "
 import { drawCursor, drawText } from "./uifont.js";
 import { FLY_ROW_LABEL, NO_PLACE_LINE, createFlyModel } from "./fly-points.js";
 import type { FlyPlace } from "./fly-points.js";
+interface FlyBookView {
+    progress: (name: string) => number;
+    ticks: number;
+}
+
 
 /** What the book is handed: the sound kit, `data()` for the places, `choose(place)` for the pick. */
 interface FlyBookArgs {
@@ -27,7 +32,7 @@ export function createFlyBook({ sfx = null, data, choose }: FlyBookArgs = {} as 
             if (d && model.move(d)) sfx?.play?.("system02");
             return null;
         },
-        draw(ctx, view) {
+        draw(ctx: CanvasRenderingContext2D, view: FlyBookView) {
             const pt = view.progress("title"), pl = view.progress("list"), ph = view.progress("help");
             drawHeader(ctx, pt, FLY_ROW_LABEL);
             drawListWindow(ctx, pl, Math.max(2, model.count()));

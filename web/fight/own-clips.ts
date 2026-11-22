@@ -308,7 +308,7 @@ export function ownClipPlan(model: OwnClipModel, clip: number, { tech = null, ta
  * it has no script for — the DW2 body cannot carry the thrown mesh, and the operator's rule is that
  * such a body plays its own attack for every technique.
  */
-export function ownClipsBlockDw2(model, clip: string | number | null, { tech = null, target = "enemy" } = {}) {
+export function ownClipsBlockDw2(model: OwnClipModel, clip: string | number | null, { tech = null, target = "enemy" } = {}) {
   if (!ownClipsEnabled() || !model || clip == null || !tech || target === "self") return false;
   if (hasOps(model.actions?.[clip])) return false;
   return ownClipInventory(model).throws;

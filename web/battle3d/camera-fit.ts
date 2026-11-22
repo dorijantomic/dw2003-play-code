@@ -4,6 +4,24 @@ import { buildBoneWorldMatrices } from "./rotation.js";
 import { posedVertex } from "./skeleton.js";
 import { cross3, dot3, normalize, sub3 } from "./math.js";
 import type { GiantShotOptions, PlacementTable } from "../types/battle3d.js";
+interface GiantNearCameraInput {
+  eye: [number, number, number][];
+  look: number[][];
+  view: number[];
+}
+
+interface GiantNearCameraOutput {
+  eye: number[][];
+  look: number[][];
+  view: number[];
+}
+
+interface GiantNearCameraFitResult {
+  cam: GiantNearCameraOutput | null;
+  shots: (GiantShotFit | null)[];
+  changed: boolean;
+}
+
 interface GiantShotRef {
   eye: [number, number, number];
   target: number[];
@@ -313,7 +331,7 @@ export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number
 /** A fitted near-shot table (fitNearCamera) refitted for a giant: per shot, `giantShotFor`. Returns
  *  the same `cam` object and `changed: false` when every shot already framed the body, so a model
  *  the reference framing holds is untouched. */
-export function fitGiantNearCamera(cam, slot, rest: { h: number; w: number; } | null, target = null, opts = {}) {
+export function fitGiantNearCamera(cam: GiantNearCameraInput | null, slot: { x: number; y: number; z: number }, rest: { h: number; w: number; } | null, target = null, opts = {}): GiantNearCameraFitResult {
   if (!cam?.eye?.length) return { cam, shots: [], changed: false };
   const shots = [];
   let changed = false;
