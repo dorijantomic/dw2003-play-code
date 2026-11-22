@@ -173,7 +173,7 @@ function enemyAttack(techId: number, opts: AttackOptions = {}) {
   }
 // The victory gesture: the model's own table 44, else (DW2 motion on, ?dw2motion=1) the DW2 victory clip I merged by
   // dw2-motion.js (DW2 plays I only when a battle is won: ~/dw3-knowledge/dw2-clips.md). model.dw2Motion exists only when it is on.
-  function victoryTable(model) {
+  function victoryTable(model: { timeline?: ({ table?: DnaScriptOp[] } | undefined)[]; dw2Motion?: { I?: { table: number } | null } | null }): DnaScriptOp[] | null {
     const own = model?.timeline?.[44]?.table;
     if (own?.length) return own;
     const m = model?.dw2Motion?.I;

@@ -1,3 +1,8 @@
+interface AlmanacCatchSlot { screenId?: string | null; }
+
+interface AlmanacStageRecord extends AlmanacFishRecord { catch?: Record<string, AlmanacCatchSlot | undefined>; }
+
+interface AlmanacEncounterParty { length?: number; }
 interface AlmanacSpot { x?: number; y?: number; offset?: number; }
 
 interface AlmanacFishRecord { spots?: AlmanacSpot[]; }
@@ -68,7 +73,7 @@ function mapNameLookup(maps: Record<string, string>) {
  * field_encounters.screens. A slot the stage does not carry, or a screen the
  * encounters table does not know, leaves the missing half null.
  */
-function catchAt(stageRecord, slot: string, screens) {
+function catchAt(stageRecord: AlmanacStageRecord, slot: string, screens: Record<string, AlmanacEncounterParty | undefined>): { screen: string | null; species: string | null } {
     const record = stageRecord?.catch?.[slot];
     if (!record || record.screenId == null) return { screen: null, species: null };
     const party = screens?.[String(record.screenId)];

@@ -164,7 +164,7 @@ export function tpPlate(p, i, runs: SheetRun[], used: Set<unknown>, out) {
 
 // ------------------------------------------------------------------------------------------------ status sheet windows
 /** The C4 header window ("See Digivolve" / "See Equipment"): starts at 616 dp (the card covers the clip's left part), rows from its text. */
-export function composeHeaderWin(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, runs, used: Set<unknown>, out) {
+export function composeHeaderWin(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i: number, runs: SheetRun[], used: Set<unknown>, out: UiPart[]) {
     const b = localRect(p), x = Math.max(b.x, SHEET.headerX);
     textWindow(`hw${i}`, toRight(x, b.y, b.h - 2, b.x + b.w), runs, used, out, p.rel);
 }

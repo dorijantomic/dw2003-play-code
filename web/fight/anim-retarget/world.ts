@@ -214,7 +214,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const keys2 = new Map(), keys1 = new Map(), prev = new Map();
   let travelMax = 0;
   // the middle of each part's mass in its OWN frame (null when it sits on the origin: then it has no direction)
-  const centreOf = (model, H: number) => model.bones.map((b) => {
+  const centreOf = (model: RetargetWorldModel, H: number): (number[] | null)[] => model.bones.map((b) => {
     const vs = b.verts || [];
     if (!vs.length) return null;
     const c = [0, 0, 0];

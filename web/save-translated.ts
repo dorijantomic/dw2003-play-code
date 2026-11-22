@@ -79,7 +79,7 @@ export function createSaveTranslated(sfx = null) {
         return {
             slots, saved,
             present: () => true,
-            directory: (file) => buildDirectoryBlock(slots.map((s) => s?.record ?? null), slotForFile(file)),
+            directory: (file: Parameters<typeof slotForFile>[0]) => buildDirectoryBlock(slots.map((s) => s?.record ?? null), slotForFile(file)),
             image: (file) => {
                 const image = slots[slotForFile(file)]?.image;
                 return image ? Uint8Array.from(image) : null;

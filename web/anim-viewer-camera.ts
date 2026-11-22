@@ -370,7 +370,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   }
 
   /** Project a world point to NDC [-1,1]. Returns null when behind the camera or non-finite. */
-  function project(point, aspect) {
+  function project(point: readonly [number, number, number], aspect: number) {
     const ndc = transform(viewProjection(aspect), point);
     if (!ndc.every(Number.isFinite) || ndc[2]! < -1 || ndc[2]! > 1) return null;
     return ndc;

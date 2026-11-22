@@ -171,7 +171,7 @@ function currentFrame(fx) {
  * Returns the live effect, or null when the sheet did not load or the spec is unusable -- the caller then just goes on
  * (a scene never blocks on art it does not have).
  */
-export function questFxSpawn(spec): QuestFx | null {
+export function questFxSpawn(spec: QuestFxSpec): QuestFx | null {
     if (!spec || typeof spec !== "object") return null;
     const name = String(spec.name ?? spec.sheet ?? "");
     if (!name) return null;

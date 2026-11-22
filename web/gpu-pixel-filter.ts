@@ -216,7 +216,7 @@ function createPipeline(canvas) {
     gl.disable(gl.BLEND);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
-  const upload = (source) => {
+  const upload = (source: TexImageSource): WebGLTexture | null => {
     gl.bindTexture(gl.TEXTURE_2D, input);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -227,7 +227,7 @@ function createPipeline(canvas) {
   // the 4x filter of a w x h texture, drawn into the canvas tile by tile (at most TILE px a side);
   // emit(tile) is called after each tile is drawn. False = the browser gave a smaller buffer than asked.
   const TILE = 2048;
-  const filter4 = (tex, w, h, name, emit: (tile: GpuTile) => void = () => {}) => {
+  const filter4 = (tex: WebGLTexture, w: number, h: number, name: string, emit: (tile: GpuTile) => void = () => {}) => {
     const W = w * 4, H = h * 4;
     let src = tex, sw = w, sh = h, rule = 2, blend = name === "xbrblend" ? 1 : 0;
     if (name === "bilinear") rule = 8;

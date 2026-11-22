@@ -13,7 +13,7 @@ export const CORE_STORE_KEY = "dw.fx.v1";
 export const SMOOTH_SETTING = "smoothanim";
 
 let override: boolean | null = null;                                  // null = follow the player's setting
-export function setSmoothAnim(v) { override = v == null ? null : !!v; }
+export function setSmoothAnim(v: boolean | null) { override = v == null ? null : !!v; }
 
 /** Read the developer override out of a query string: `?smooth=1` turns the mode on. */
 export function smoothFlagFromUrl(search = "") {

@@ -400,7 +400,7 @@ export class ActorAnimator {
       const h2 = {
         ...hooks,
         onMove: (rec: FightMoveRec) => { this._onMove(rec); hooks.onMove?.(rec); },
-        onRotate: (rec) => {
+        onRotate: (rec: Parameters<NonNullable<FightActionHooks["onRotate"]>>[0]) => {
           this._rotation = [rec.x, rec.y, rec.z];
           hooks.onRotate?.(rec);
         },

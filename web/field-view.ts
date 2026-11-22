@@ -1,3 +1,12 @@
+interface FieldFrameRuleOptions {
+    pad: number;
+    mapW: number;
+    fixedViewport?: boolean;
+    stagedScene?: boolean;
+    nativeCentre?: boolean;
+    labCamera?: boolean;
+    fullScreenUi?: boolean;
+}
 // HD Remaster wide overworld (F2 -> Screen -> "Wide overworld", off by default; Authentic never uses it).
 //
 // The disc's field screen is 320x240 and the game draws it at 2x (640x480, ledger UI-DISPLAY-EXTENT-001).
@@ -81,7 +90,7 @@ export function scriptIsStaged(opcodes) {
  * field does not jump under it. A staged scene, a fixed-viewport stage and a map too narrow go back to the
  * original framing completely.
  */
-export function fieldFrameRule({ pad, mapW, fixedViewport = false, stagedScene = false, nativeCentre = false, labCamera = false, fullScreenUi = false }) {
+export function fieldFrameRule({ pad, mapW, fixedViewport = false, stagedScene = false, nativeCentre = false, labCamera = false, fullScreenUi = false }: FieldFrameRuleOptions) {
     if (!(pad > 0)) return { wideCamera: false, showSides: false };
     const original = fixedViewport || stagedScene || nativeCentre || labCamera || !mapFitsWide(mapW, pad);
     if (original) return { wideCamera: false, showSides: false };

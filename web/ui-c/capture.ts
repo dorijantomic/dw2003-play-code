@@ -8,6 +8,10 @@
 import { claimFor } from "./claims.js";
 import { relative } from "./geometry.js";
 import type { UiCapturePart } from "./types.js";
+import type { UiMatrix } from "./types.js";
+import type { UiRun } from './types.js';
+
+
 interface UiCaptureLayer { dx: number; dy: number; w: number; h: number; }
 interface UiCaptureSpriteIds { layers?: UiCaptureLayer[]; }
 interface UiCapturePackDef { name: string; ids?: Record<string, UiCaptureSpriteIds>; }
@@ -34,7 +38,7 @@ export function clipBounds(p: UiCapturePackDef, id: string | number) {
  * scope also takes the plain drawText() calls (web/uifont.js) as runs -- the battle HUD writes its names and numbers that way, not as
  * text widgets.
  */
-export function begin(key, ctx, m0, getArt, o: { texts?: boolean; } = {}) {
+export function begin(key: string, ctx: CanvasRenderingContext2D, m0: UiMatrix, getArt: () => CanvasRenderingContext2D, o: { texts?: boolean; } = {}) {
     cur = { key, ctx, m0, getArt, parts: [], runs: [], unclaimed: [], claimed: [], arts: 0, inArt: false, domText: 0, texts: !!o.texts };
 }
 
@@ -92,7 +96,7 @@ export function clipHook(ctx: CanvasRenderingContext2D, p: UiCapturePackDef, id:
 export const artPieces = (layers = [], sizes = []) => layers.filter((l) => sizes.some(([w, h]) => (l.w | 0) === w && (l.h | 0) === h));
 
 /** Draw only those pieces, in their own pixels, on the art canvas (the frame around them is the C plate). */
-function drawPieces(s, m, p, id: string | number, x: number, y: number, sizes) {
+function drawPieces(s: { getArt: () => CanvasRenderingContext2D | null; arts: number }, m: DOMMatrix, p: UiCapturePackDef & { img?: CanvasImageSource }, id: string | number, x: number, y: number, sizes: [number, number][]) {
     const pieces = artPieces(p.ids?.[String(id)]?.layers, sizes);
     if (!pieces.length || !p.img) return;
     const art = s.getArt();
@@ -107,7 +111,7 @@ function drawPieces(s, m, p, id: string | number, x: number, y: number, sizes) {
 export const insetRect = (x: number, y: number, w: number, h: number, [l, t, r, b]) => ({ x: x + l, y: y + t, w: Math.max(0, w - l - r), h: Math.max(0, h - t - b) });
 
 /** Draw a clip on the art canvas cut to its inner rect (a button's word): the frame around it is the C plate, the word stays pixels. */
-function drawInset(s, m: DOMMatrix, x: number, y: number, w: number, h: number, inset, draw) {
+function drawInset(s: { getArt: () => CanvasRenderingContext2D | null; inArt: boolean; arts: number }, m: DOMMatrix, x: number, y: number, w: number, h: number, inset: [number, number, number, number], draw: (c: CanvasRenderingContext2D) => void) {
     const art = s.getArt();
     if (!art) return;
     const r = insetRect(x, y, w, h, inset);
@@ -120,7 +124,7 @@ function drawInset(s, m: DOMMatrix, x: number, y: number, w: number, h: number, 
 }
 
 /** Art that is not a clip (a partner picture): drawn in its own pixels on the art canvas, never dropped. */
-export function artHook(ctx: CanvasRenderingContext2D | undefined, draw) {
+export function artHook(ctx: CanvasRenderingContext2D | undefined, draw: (ctx: CanvasRenderingContext2D) => void) {
     const s = cur;
     if (!s || s.inArt || ctx !== s.ctx) return false;
     const art = s.getArt();
@@ -134,7 +138,7 @@ export function artHook(ctx: CanvasRenderingContext2D | undefined, draw) {
 }
 
 /** The text hook (web/native-screen-text.js): the runs the widgets would have drawn. */
-export function runsHook(runs) {
+export function runsHook(runs: UiRun[]) {
     if (!cur) return false;
     for (const r of runs) cur.runs.push(r);
     return true;
@@ -144,7 +148,7 @@ export function runsHook(runs) {
 export const capturingText = (ctx: CanvasRenderingContext2D | null | undefined) => !!cur && !cur.inArt && cur.texts && ctx === cur.ctx;
 
 /** A drawText() run (web/uifont.js builds it with the same pens it would paint). Returns true when the scope took it. */
-export function textRunHook(ctx: CanvasRenderingContext2D | null | undefined, run) {
+export function textRunHook(ctx: CanvasRenderingContext2D | null | undefined, run: UiRun) {
     if (!capturingText(ctx)) return false;
     cur.runs.push(run);
     return true;

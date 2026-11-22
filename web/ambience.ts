@@ -169,15 +169,15 @@ syncLegacyFlags();
 // Which effects can show on which map; the panel greys out the others so a toggle that
 // cannot change anything here does not look broken.
 const APPLIES = {
-    rain: (p) => p.rainy, lightning: (p) => p.rainy, snow: (p) => p.snowy, sand: (p) => p.sandy,
+    rain: (p): boolean => p.rainy, lightning: (p) => p.rainy, snow: (p) => p.snowy, sand: (p) => p.sandy,
     gusts: (p) => p.open, breath: (p) => p.snowy, frost: (p) => p.snowy, sparkle: (p) => p.snowy,
     indoor: (p) => p.indoorLit, tod: (p) => p.tod, clouds: (p) => p.clouds, lamps: (p) => p.lamps, fog: (p) => p.fog, shafts: (p) => p.shafts,
     heat: (p) => p.heat, pollen: (p) => p.pollen, leaves: (p) => p.leaves, fireflies: (p) => p.fireflies,
     butterflies: (p) => p.butterflies, critters: (p) => p.butterflies, birds: (p) => p.birds, devils: (p) => p.devils,
-    dragonflies: (p, map) => p.open && !p.snowy && isWaterStage(map.id), fish: (p, map) => p.open && !p.snowy && isWaterStage(map.id),
-    steps: (p) => p.open, puddles: (p) => p.rainy || p.snowy, reflect: (p, map) => isWaterStage(map.id),
-    sway: (p) => p.sway, wetlook: (p) => p.open, mirror: (p, map) => isWaterStage(map.id), villagers: (p) => p.villagers,
-    nightlight: (p) => p.open, windows: (p) => p.lamps, screenfx: (p) => p.open, rainwater: (p, map) => p.rainy && isWaterStage(map.id),
+    dragonflies: (p, map): boolean => p.open && !p.snowy && isWaterStage(map.id), fish: (p, map) => p.open && !p.snowy && isWaterStage(map.id),
+    steps: (p) => p.open, puddles: (p) => p.rainy || p.snowy, reflect: (p: SceneAmbienceProfile, map: { id: string }) => isWaterStage(map.id),
+    sway: (p) => p.sway, wetlook: (p) => p.open, mirror: (p: SceneAmbienceProfile, map: { id: string }) => isWaterStage(map.id), villagers: (p) => p.villagers,
+    nightlight: (p) => p.open, windows: (p) => p.lamps, screenfx: (p) => p.open, rainwater: (p: SceneAmbienceProfile, map: { id: string }): boolean => p.rainy && isWaterStage(map.id),
     wildlife: (p) => p.swamp || p.coast || p.sandy || p.bats, musicfx: (p) => p.open, ambience: (p) => p.open,
 };
 let lastMarked = null;
@@ -337,7 +337,7 @@ const S = {
     pixMap: () => pixOfImg(S.img),
     feet: [], moving: false, dir: "down", wind: 18, img: null,
     grid: () => window.__state?.collision?.[S.map!.id] ?? null,
-    isWater: (x, y) => isWaterAt(S.map!.id, x, y),
+    isWater: (x: number, y: number) => isWaterAt(S.map!.id, x, y),
     waterStage: () => isWaterStage(S.map!.id),
     waterTest: () => waterPixelTest(S.map!.id),
     onThunder: (ms) => thunder(fx.sound!, ms, (Math.random() * 2 - 1) * 0.85),

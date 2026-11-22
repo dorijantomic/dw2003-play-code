@@ -808,7 +808,7 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         lab: {
             /** Make a quest startable: its prerequisites done, and it is neither active nor done. This is also the lab's
              *  focus: while it holds, only this quest may be offered at its giver (several demos share one character). */
-            prepare(id) {
+            prepare(id: string): { level: number; status: string } {
                 labFocus = id;
                 const seen = new Set();
                 const markDone = (q) => {

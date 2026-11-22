@@ -1,3 +1,33 @@
+import type { FightGate } from './types.js';
+interface CastBakeEntry {
+  table?: number;
+  gate?: FightGate;
+}
+
+interface CastFromDonorModel extends ClipScriptModel {
+  castBakes?: Record<number, CastBakeEntry | undefined>;
+}
+
+interface CastFromDonorOpts {
+  turn: boolean;
+  element: number;
+  hits?: number | null;
+  launch?: LaunchSpec;
+}
+
+interface CastFromDonorResult extends ClipScript {
+  retargeted: boolean;
+  gate: FightGate | null;
+}
+interface SpellFromBasicOpts {
+  clip?: number;
+  turn: boolean;
+  giant: boolean;
+  element: number;
+  hits?: number | null;
+  ranged?: boolean;
+  launch?: LaunchSpec;
+}
 interface BodyFromTableOpts {
   turn: boolean;
   element: number;
@@ -625,7 +655,7 @@ function donorStrikeFx(donorOps, model) {
  * model, not only the giants - and the contact sequence is the technique's own hit count (withHits). A spell
  * that hops into melee is exactly the operator's report; a 3-hit volley that plays one contact is C1.
  */
-function spellFromBasic(model, basic, donorScript, { clip = 9, turn, giant, element, hits = 1, ranged = false, launch = {} }) {
+function spellFromBasic(model: DonorScriptModel, basic: ClipScript, donorScript: ClipScript, { clip = 9, turn, giant, element, hits = 1, ranged = false, launch = {} }: SpellFromBasicOpts): ClipScript {
   const donorOps = turnedOps(donorScript.ops, turn);
   const ops = [];
   for (const o of donorOps) {
@@ -676,7 +706,7 @@ function spellFromBasic(model, basic, donorScript, { clip = 9, turn, giant, elem
  *   * the contacts are the technique's own (withHits), so a 1-hit spell fires one strike and a volley fires
  *     its count.
  */
-function castFromDonor(model, clip: number, gap, { turn, element, hits, launch = {} }) {
+function castFromDonor(model: CastFromDonorModel, clip: number, gap: DonorPayload, { turn, element, hits, launch = {} }: CastFromDonorOpts): CastFromDonorResult {
   const bake = model.castBakes?.[Number(clip)];
   const table = bake?.table ?? null;
   const donorOps = turnedOps(gap.script.ops, turn);

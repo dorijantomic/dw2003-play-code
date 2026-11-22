@@ -82,7 +82,7 @@ function armDataField(techId: number) {
     const entry = m.bySig[String(sig)];
     return entry ? { pack: entry.pack, sound: entry.sound != null ? entry.sound : -1 } : null;
   }
-function armThrowBackdrop(sig) {
+function armThrowBackdrop(sig: string | number | null | undefined) {
     const entry = backdropEntryForSig(sig);
     B$.dataFieldArmed = !!entry;
     B$.dataFieldOn = false;

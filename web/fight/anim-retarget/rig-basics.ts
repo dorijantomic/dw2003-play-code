@@ -68,7 +68,7 @@ export function restPose(model, frame = 0) {
   return { rot, pos };
 }
 
-function meshBox(model, i: number, pose) {
+function meshBox(model: RigBasicsModel, i: number, pose) {
   const b = model.bones[i], vs = b.verts || [];
   if (!vs.length) return null;
   const R = pose.rot[i], t = pose.pos[i];
@@ -142,7 +142,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     }
   }
   const H = box.h || 1, W = box.w || 1;
-  const tipY = (ch) => pose.pos[ch.tip][1];
+  const tipY = (ch: ReachChain): number => pose.pos[ch.tip][1];
   const maxY = Math.max(...chains.map(tipY));
   const topY = Math.min(...pose.pos.map((p) => p[1]));
   // a limb-rooted chain starts on the body's centre line, so its side/reach are the TIP's
@@ -252,7 +252,7 @@ export function buildBoneMap(target, source) {
   // target hand travelled 4.5x the donor's). Only the first target joint of a duplicated pair takes the
   // donor's rotation; the extra joint keeps its own rest rotation, so the chain still reaches where the
   // donor's does with one bend instead of two.
-  const chainMap = (tc, sc) => {
+  const chainMap = (tc: number[], sc: number[]) => {
     const m = tc.length, n = sc.length;
     const taken = new Set();
     for (let i = 0; i < m; i++) {

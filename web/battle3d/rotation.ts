@@ -203,7 +203,7 @@ export function smoothTimeWarp(channel, i: number, t: number, angle = false) {
 }
 
 /** Smooth-mode ch2 rotation at `frame` as {q, m}: authored path (quaternion substeps), re-timed. */
-function ch2SmoothRotationAt(channel, frame) {
+function ch2SmoothRotationAt(channel: [number, number, number][] | undefined, frame: number) {
   const s = spanIndexAt(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
   if (!s.hi || s.t <= 0) return { q: ch2ToQuat(s.lo[0], s.lo[1], s.lo[2]), m: ps1AnglesToMat3(s.lo[2], s.lo[1], s.lo[0]) };

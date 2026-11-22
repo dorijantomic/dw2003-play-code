@@ -116,7 +116,7 @@ export function createItemsModel() {
         /** Current item id for this list (the first one when the remembered item is not in it); null for an empty list. */
         current(ids) { if (!ids.length) return null; if (!ids.includes(id)) { id = ids[0]; line = 0; } return id; },
         index: (ids: number[]): number => indexIn(ids),
-        move(ids, d: number) {
+        move(ids: number[], d: number) {
             if (!ids.length) return false;
             const from = indexIn(ids), to = Math.max(0, Math.min(ids.length - 1, from + d));
             if (to === from) return false;

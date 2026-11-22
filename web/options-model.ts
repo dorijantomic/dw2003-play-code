@@ -10,6 +10,10 @@ import { DETAIL_OFF_LOW, DETAIL_OFF_MEDIUM } from "./detail-presets.js";
 import { shipClass } from "./ship-list.js";
 import type { AmbienceSettings } from "./types/ambience.js";
 import type { OptionsHome } from "./types/options-model.js";
+interface DetailStore {
+    setMany(values: { [key: string]: boolean | string }): void;
+}
+
 interface OptionsViewSource extends OptionsRow {
     numeric?: boolean;
     customLabel?: () => string;
@@ -168,7 +172,7 @@ export function detailOf(store: { get: (arg0: string) => boolean; }) {
     }
     return "custom";
 }
-export function applyDetail(store, level: string | undefined) {
+export function applyDetail(store: DetailStore, level: string | undefined) {
     const off = new Set(DETAIL_OFF[level]);
     store.setMany({ ...Object.fromEntries(DETAIL_KEYS.map((k) => [k, !off.has(k)])), quality: DETAIL_QUALITY[level] });
 }

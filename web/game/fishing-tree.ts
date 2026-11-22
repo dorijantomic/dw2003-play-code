@@ -47,6 +47,10 @@ import { currentMap } from "./session.js";
 import { questSpeak } from "./quest-scenes.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 import type { GameState } from './types.js';
+type FishingExtraEntry =
+  | { kind: "item"; item: string; name?: string }
+  | { kind: "bits"; bits: number };
+
 
 
 // ---------------------------------------------------------------------------
@@ -166,7 +170,7 @@ export function playerPackMeta(packId: string): NonNullable<GameState["manifest"
  * fade and wipe are gone so the box is not drawn under them. Remembered in the
  * found-flags (dw.fishfinds.v1) for the Angler's almanac.
  */
-function awardFishingExtra({ area: areaId, entry }) {
+function awardFishingExtra({ area: areaId, entry }: { area: string; entry: FishingExtraEntry }) {
     const area = (state.fishingExtras.areas ?? []).find((a) => a.id === areaId);
     if (!area) return;
     let tries = 0;

@@ -254,7 +254,7 @@ const techKey = (name) => String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g,
 
 /** Enable the solver: null = off (default), "all" = every pair its gate accepts, or a list of pairs
  *  `[{ folder, tech }]` / `["folder|techkey", ...]`. Returns the scope in force. */
-export function setSolverScope(scope) {
+export function setSolverScope(scope: "all" | null | Array<string | { folder?: string; tech?: string }>): "all" | null | Set<string> {
   if (scope == null || scope === "all") { SCOPE = scope; return SCOPE; }
   const set = new Set();
   for (const p of scope) {
@@ -279,7 +279,7 @@ export function solverEnabledFor(model, { tech = null } = {}) {
 // ── the emitter group a technique fires from ───────────────────────────────────────────────────────────
 
 /** Emitter class per site (K19b's geometry classes) folded to the classes K19a measured motion for. */
-function motionClassOf(cls, sideCount = 1) {
+function motionClassOf(cls: string, sideCount = 1): "hand" | "prop" | "mouth" | "eyes" | "body" | null {
   if (cls === "hand" || cls === "prop") return cls;
   if (cls === "head") return "mouth";
   if (cls === "eyes") return "eyes";

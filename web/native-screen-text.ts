@@ -181,7 +181,7 @@ function kindOf(w) {
  * (engine/dw3/ui/text-drawer.ts drawTextElement). A typewriter shows the part
  * revealed so far, and a page after a wait or a clear starts at its own byte.
  */
-export function revealedRun(w) {
+export function revealedRun(w): number[] {
     const bytes = w.lines?.[0]?.bytes ?? [];
     const first = Math.max(0, Math.min(bytes.length, w.revealFirst | 0));
     const end = Math.max(first, Math.min(bytes.length, w.revealEnd | 0));

@@ -1,4 +1,14 @@
 import { prepareModelDonors } from "../fight/clip-fallback.js";
+import type { SkelBufs } from '../types/battle3d.js';
+interface SkeletalGLBone {
+  faces?: number[][];
+}
+
+
+interface SkeletalGLModel {
+  bones: SkeletalGLBone[];
+}
+
 interface SkelBone {
   parent_slot: number;
   anim?: { ch1?: number[][] };
@@ -68,7 +78,7 @@ export async function loadSkeletalModel(folder: string) {
 // Build static IBO + UV buffer from anim.json model. Called once after load.
 // Returns { ibo, ubo, indexCount, totalVerts, boneOffsets, vbo:null }
 // vbo is created dynamically each frame (DYNAMIC_DRAW) by updateSkeletalVBO.
-export function buildSkeletalGLBuffers(gl, model) {
+export function buildSkeletalGLBuffers(gl, model): SkelBufs {
   // One VBO/UBO slot per face corner (3 per face), not per unique vert.
   // This prevents UV overwrites when multiple faces share the same vertex index.
   const boneOffsets = [];

@@ -101,7 +101,7 @@ export const speciesLog = createSpeciesLog();      // installed below (installSp
 export const glossaryLoader = createRetryLoader(() => loadGlossaryData());   // the species, built once from the tables on first open; a failed fetch is tried again after 5 s
 
 export const glossaryStage = createStage({
-    makeRenderer: (canvas) => createBattle3D(canvas, null, { alpha: true }),
+    makeRenderer: (canvas: HTMLCanvasElement) => createBattle3D(canvas, null, { alpha: true }),
     makeCamera: createFreeCamera,
     resolveFolder: resolveModelFolder,
     setTint: setFighterTint,
@@ -343,13 +343,13 @@ export const statusOptions = {
     },
     // The map page asks the flag store which places you have walked into — the bits the
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
-    map: (state) => pauseMapContext(state, undefined, engineFlagSeen),
+    map: (state: GameState) => pauseMapContext(state, undefined, engineFlagSeen),
     // OPTIONS > GAME > Map screen: New makes the MAP row open web/map-screen-book.js instead of the disc's page.
     newMapScreen: () => window.__fx?.mapScreen === "new",
     // Extra rows on the pause list (after CARD FOLDERS): QUESTS, then the GLOSSARY and OPTIONS books while their dev switches are on.
     extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx, fly: questDone(FLY_QUEST) }),
     questsPage: () => questsPausePage(),
-    onBook: (book, row) => openBook(book, row),
+    onBook: (book: string, row: number) => openBook(book, row),
     // The CARD FOLDERS row's gate: the resident home list's own byte, D0x80048f42 =
     // save+0x20E = carried[402] — the Folder Bag key item (claim
     // UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14). It used to read "has
@@ -568,7 +568,7 @@ export const sceneSkip = createSceneSkip({
         const idx = state.manifest.maps.findIndex((m) => m.id === stageId);
         if (idx >= 0) loadAndSetMap(idx);
     },
-    fireStageEnter: (stageId) => checkStageCutscene(stageId),
+    fireStageEnter: (stageId: string) => checkStageCutscene(stageId),
     talk: (npcId) => !!(S.engineBridge && S.engineBridge.onTalk(npcId)),
 });
 
@@ -859,7 +859,7 @@ export const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResol
     // (the s415 rockfall, web/stage-objects.js) consumes the id first, then the
     // native interpreter route, then the generic emote bubbles — the console's
     // registry order, most specific first.
-    fireNativeEffect: (id, anim, facing) => {
+    fireNativeEffect: (id: number, anim: number, facing: number): boolean => {
         const mapId = currentMap().id;
         if (fireStageObject(mapId, id, anim)) return true;
         return fireNativeEffect(id, anim, facing);
@@ -874,7 +874,7 @@ export const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResol
     // stage track does. The >0x383 branch ids (0x385/0x386) key a voice off by
     // handle; no shipped event starts the sound they stop, so a stop cue is a
     // no-op here.
-    emoteSound: (id, stop) => {
+    emoteSound: (id: number, stop: boolean) => {
         if (stop) return;
         if (packedIsMusicStart(id)) {
             const stem = PACKED_MUSIC[packedKey(id)];

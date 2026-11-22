@@ -105,7 +105,7 @@ export class EffectPlayer {
   }
 
   /** The op10 sound table (@0x800a368c): op10 effect type → packed sound id (sound-system.md). */
-  op10Sound(type) { return this.manifest.op10_sounds?.[String(type)] ?? 0; }
+  op10Sound(type: number): number { return this.manifest.op10_sounds?.[String(type)] ?? 0; }
 
   hasType(type: number) { return !!this.manifest.types?.[String(type)]; }
 

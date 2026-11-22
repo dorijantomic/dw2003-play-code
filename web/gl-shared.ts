@@ -44,4 +44,4 @@ export function getSharedRenderer(w: number, h: number) {
 
 export function sharedLost() { return lost; }
 export function sharedContextCount() { return renderer ? 1 : 0; }
-export function __setSharedFactory(f) { factory = f; renderer = null; lost = false; failed = false; }
+export function __setSharedFactory(f: () => THREE.WebGLRenderer) { factory = f; renderer = null; lost = false; failed = false; }

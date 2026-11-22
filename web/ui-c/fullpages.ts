@@ -82,7 +82,7 @@ const keyGlyph = (ch: string) => (ch === "・" ? "·" : ch);
 const ARROW = Object.freeze({ "[arrow-left]": "M0 6L6 0V4H14V8H6V12Z", "[arrow-right]": "M14 6L8 0V4H0V8H8V12Z" });
 
 /** The C7 title plate (a family C window 63 dp tall) and its title run, 36 dp in, in the game's face colour (green when the game tints it). */
-function composeTitle(p: { x: number; y: number; }, i: string, runs, used: Set<unknown>, out) {
+function composeTitle(p: { x: number; y: number; }, i: string, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const n = nat(p), r = { x: n.x, y: n.y, w: n.w, h: C7.hdrH };
     out.push(cWindow(`hdr${i}`, R(r, p), rel(p), { part: "header" }));
     for (const m of takeIn(runs, n, used)) {
@@ -167,7 +167,7 @@ export function composeNameEntry({ parts, runs }: { parts: { part: string }[]; r
  * The partner chooser rows (stdgnm 30): a family C row plate, the portrait frame inside it, the name (Russo) with the game's underline;
  * the row under the game's cursor frame (32) gets the orange edge, corners and the chevron left of it.
  */
-function composeChooser(parts, runs: UiRun[], used: Set<unknown>, out) {
+function composeChooser(parts: { part: string; }[], runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const pick = of(parts, "pickCursor")[0];
     of(parts, "pickRow").forEach((p: { x: number; y: number; }, i) => {
         const row = { x: p.x - 4, y: p.y - 4, w: 160, h: 40 }, on = !!pick && Math.abs(pick.y - row.y) < 3 && Math.abs(pick.x - row.x) < 3, rl = rel(p);

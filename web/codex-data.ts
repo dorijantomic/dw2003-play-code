@@ -11,6 +11,16 @@
 // The odds are the disc's, not a percentage: a rate byte of 128 means 129 in 1024 per win.
 import type { CodexRow, CodexSkill, StageEncounters } from "./types/codex-data.js";
 import type { DigimonRecord } from './types/battle.js';
+interface CodexMapEntry {
+  id?: string;
+  name?: string;
+}
+
+
+interface CodexMapManifest {
+  maps?: CodexMapEntry[];
+}
+
 interface DropRecord {
   droppers: DigimonRecord[];
   stages: string[];
@@ -222,7 +232,7 @@ function innerTable(value, key: string) {
 }
 
 /** The manifest's map list (the whole manifest object or the array). */
-function mapList(value) {
+function mapList(value: CodexMapEntry[] | CodexMapManifest | null | undefined): CodexMapEntry[] {
   if (Array.isArray(value)) return value;
   return Array.isArray(value?.maps) ? value.maps : [];
 }
@@ -296,7 +306,7 @@ export function encounterIndex(stages, screens, maps = null) {
  * surrounding spaces) wins outright, so "Kunemon" never drags in a numbered variant;
  * otherwise every name containing the text is returned. An empty query is every name. Pure.
  */
-export function encounterSpecies(index, query = "") {
+export function encounterSpecies(index: { bySpecies?: Map<string, CodexRow[]> } | null | undefined, query = ""): string[] {
   const names = index?.bySpecies instanceof Map ? [...index.bySpecies.keys()].sort() : [];
   const q = String(query ?? "").trim().toLowerCase();
   if (!q) return names;

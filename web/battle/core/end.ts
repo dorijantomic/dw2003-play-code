@@ -49,6 +49,8 @@ import { buildFightReportRows } from "../report.js";
 import { battleMsgText } from "../../battlemsg-translated.js";
 import type { BattleEndContext, FusionDefeatArgs } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { PlayerRecord } from '../../types/battle.js';
+
 interface WinReportReward {
   xp: number;
   bits: number;
@@ -209,9 +211,9 @@ async function mpKit() {
       forms: (rec) => battleFormIds(Number(rec?.profile?.id), rec?.statsRecord ?? {})
         .map((id) => B.digimonDB[id]).filter((p) => p && p.id !== rec?.profile?.id).map((p) => ({ id: p!.id, name: p!.name })),
       /** A manual digivolve: the record takes the form; the numbers it fights with are re-derived from it, as in the game. */
-      digivolve: (rec, id: string | number) => { const p = B.digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
+      digivolve: (rec: PlayerRecord, id: string | number) => { const p = B.digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
       /** A plain-data copy of a fighter record, to hand to the referee. */
-      pack: (rec) => JSON.parse(JSON.stringify(rec)),
+      pack: (rec: PlayerRecord): PlayerRecord => JSON.parse(JSON.stringify(rec)),
       /** My techniques: [{ id, name, cost, tw, type, magical, power, skill }]. type is "attack", "heal" or "support". */
       myTechs: (rec, blastOn = false) => mpKitTechs(rec, blastOn),
       /** One attack, rolled by the game's own resolver. Returns { hit, dmg, landed, attempts }. */
@@ -284,14 +286,14 @@ async function mpKit() {
       /** Use an item from my bag: take it out through the shared store, as the one-on-one battle does. */
       spendItem: (id) => { storeRemoveItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
       /** Leave my Digimon as the fight left it (the field's own write-back: KO -> 1 HP). */
-      commit: (rec) => { writeBackBattleVitals(rec); persist(); },
+      commit: (rec: PlayerRecord) => { writeBackBattleVitals(rec); persist(); },
       /** My whole party, lead first: [{ member, rec }] (member = the roster entry the game's screens read). */
       party: () => {
         const roster = B.buildPlayerRoster(state), prof = B.getPlayerProfile(state);
         return roster.map((member, i: number) => ({ member, rec: B.buildPlayerRecord(member, i === 0 && prof ? prof.id : null) }));
       },
       /** The profile Blast would turn this Digimon into at its level, or null. */
-      blastForm: (rec) => blastTargetProfile(rec, B.digimonDB),
+      blastForm: (rec: PlayerRecord) => blastTargetProfile(rec, B.digimonDB),
       /** The form (by its name) the record takes, as the game's own Digivolve / Tag / Blast commits do. */
       setFormByName: (rec, name: string) => {
         const p = Object.values(B.digimonDB ?? {}).find((x) => x?.name === name);

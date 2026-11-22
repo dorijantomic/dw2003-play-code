@@ -1,5 +1,7 @@
 import { mat4Identity, mat4Scale } from "../fight/proj-layers.js";
 import { patchCopyRect } from "../vendor/engine.js";
+type Pt3 = [number, number, number];
+
 type Vec3Like = number[] | Float32Array;
 
 
@@ -39,7 +41,7 @@ export function mat4RotateY(a: number) {
   return m;
 }
 
-export function centroid3(pts) {
+export function centroid3(pts: Pt3[]) {
   let x=0,y=0,z=0;
   for (const [px,py,pz] of pts) { x+=px; y+=py; z+=pz; }
   const n = pts.length;

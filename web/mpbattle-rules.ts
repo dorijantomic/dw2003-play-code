@@ -41,6 +41,21 @@ import { battleMsgText } from "./battlemsg-translated.js";
 import type { MpAttackResult, MpEnemyAttackResult, MpRunResult, MpTagResult } from "./types/mpbattle-rules.js";
 import type { PlayerRecord } from './types/battle.js';
 import type { EnemyBattleRecord } from './types/battle.js';
+import type { BattleSkill } from './types/battle.js';
+interface MpStrikeCombatant {
+    gauge?: number;
+    blast?: { active?: boolean };
+}
+
+
+interface MpStrikeResult {
+    hit: boolean;
+    dmg: number;
+    lines: string[];
+    instantDeath?: boolean;
+    stolen?: string | number | null;
+}
+
 interface MpBattleFoe { key: string; i: number; fled?: boolean; rec: EnemyBattleRecord; }
 
 interface MpBattlePlayer {
@@ -138,7 +153,7 @@ export class Arena {
 
     // ---------------------------------------------------------- the action timeline
     #effSpd(rec) { return Math.max(1, (effStats(rec)?.spd ?? rec.spd) | 0); }
-    #avgSpd(list) { return list.length ? list.reduce((s: number, a) => s + this.#effSpd(a.rec), 0) / list.length : 100; }
+    #avgSpd(list: (MpBattleFoe | MpBattlePlayer)[]) { return list.length ? list.reduce((s: number, a) => s + this.#effSpd(a.rec), 0) / list.length : 100; }
     #seatWave() {
         const foes = this.waveFoes(), ps = this.alivePlayers();
         for (const p of ps) if (!this.time.has(p.key)) this.time.set(p.key, 0);
@@ -261,7 +276,7 @@ export class Arena {
 
     // ---------------------------------------------------------- one blow, either direction
     /** Resolve one attack of `skill` from att to def with the game's own rolls, and everything that rides on a hit. */
-    #strike(att, attName: string | undefined, def, defName: string, skill, spread = false) {
+    #strike(att: (PlayerRecord | EnemyBattleRecord) & MpStrikeCombatant, attName: string | undefined, def: (PlayerRecord | EnemyBattleRecord) & MpStrikeCombatant, defName: string, skill: Partial<BattleSkill>, spread = false): MpStrikeResult {
         const lines = [];
         const hits = skill.basic_attack ? basicAttackHitCount(att.multiAttack, skill) : Math.max(1, skill.hits ?? 1);
         const r = hits > 1 ? resolveMultiHit(att, def, skill, hits, this.rng, this.field) : resolveAttack(att, def, skill, this.rng, this.field);

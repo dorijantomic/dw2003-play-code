@@ -48,7 +48,7 @@ export function fighterTint(side: string): [number, number, number, number] {
  * Set one side's fighter tint. `rgba` is four 0..1 numbers; `null` (or anything that is
  * not a colour) puts the game's own FIGHTER_TINT back. Returns the tint now in force.
  */
-export function setFighterTint(side, rgba) {
+export function setFighterTint(side: "player" | "enemy" | "extra", rgba: number[] | null) {
   const key = side === "enemy" ? "enemy" : side === "extra" ? "extra" : "player";
   const colour = Array.isArray(rgba) && rgba.length >= 3
     ? [rgba[0], rgba[1], rgba[2], rgba[3] ?? 1].map(Number)

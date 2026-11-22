@@ -68,6 +68,13 @@ import { S } from "./state.js";
 import { resetFollowers } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 import { startTransition } from "./transitions.js";
+interface QuestChaseEvent {
+    kind: "chase";
+    target?: string | number;
+    speed?: number;
+    lose?: number;
+}
+
 interface QuestSceneWarpEvent {
     kind: "warp";
     to?: string | number | null;
@@ -152,7 +159,7 @@ function questStandIns(sc, built) {
             // someone else is standing there is the copy nudged aside, and then it must land on walkable ground and clear
             // of everyone (web/quest-walk.js standInSpot tries a few nudges around the post, else keeps the post).
             const taken = (x, y) => built.some((n) => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20);
-            const clear = (x, y) => !taken(x, y) && (!grid || questStandFree(grid, x, y));
+            const clear = (x: number, y: number) => !taken(x, y) && (!grid || questStandFree(grid, x, y));
             const post = posts.find((p) => !taken(p.x, p.y)) ?? posts[0];
             s = { ...post, id: "qstand_" + npcId, spawn_flags: [], _questStandIn: true };
             if (taken(post.x, post.y)) {
@@ -427,7 +434,7 @@ export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resum
  * following) through the cutscene's input gate while the VM waits on this event, and the camera is already on the player
  * (compileScene emits FN6A before it). The result becomes the scene's answer, exactly as an "ask" step's does.
  */
-function startQuestChase(ev, done) {
+function startQuestChase(ev: QuestChaseEvent, done: () => void): void {
     const scene = state.scenes[currentMap()?.id];
     const fxTarget = typeof ev.target === "string";
     const npc = fxTarget ? null : scene ? sceneCast(scene).find((n) => n.npc_id === Number(ev.target)) : null;

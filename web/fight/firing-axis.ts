@@ -51,6 +51,15 @@ import { authoredSide } from "./side-mirror.js";
 import type { FightSkeleton } from './types.js';
 import type { Dw2Pose } from '../types/anim-viewer-dw2.js';
 import type { Dw2LoadedModel } from '../types/anim-viewer-dw2.js';
+interface RestPoseClip {
+  start_frame?: number;
+}
+
+
+interface RestPoseModel extends Dw2LoadedModel {
+  clips?: RestPoseClip[];
+}
+
 interface AxisSigma {
   axis: (number | undefined)[];
   sigma: number;
@@ -619,7 +628,7 @@ export function toLocal(model, p) {
 
 /** The model's rest pose, cached per model object (frame 0 of the model's own channels). */
 const restCache = new WeakMap();
-export function restPoseOf(model, frame = null): Dw2Pose {
+export function restPoseOf(model: RestPoseModel, frame = null): Dw2Pose {
   const key = frame == null ? -1 : frame | 0;
   let e = restCache.get(model);
   if (!e) { e = new Map(); restCache.set(model, e); }

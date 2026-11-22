@@ -14,6 +14,8 @@
 // Pure: no DOM, no storage, no fs, no clock beyond the `at` stamp shelfAdd() writes.
 
 import type { QuestSnapshot } from "./types/quest-shelf.js";
+interface ShelfExportInput { name?: string; at?: number; snap?: QuestSnapshot; }
+
 interface QuestShelfItem {
     name: string;
     at: number;
@@ -45,7 +47,7 @@ const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const isName = (v) => typeof v === "string" && v.trim().length > 0;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const listOf = (v) => (Array.isArray(v) ? v : []);
-const byName = (shelf, name): QuestShelfItem | null => listOf(shelf).find((x) => x?.name === name) ?? null;
+const byName = (shelf: QuestShelfItem[], name: string): QuestShelfItem | null => listOf(shelf).find((x) => x?.name === name) ?? null;
 
 /**
  * What is wrong with this snapshot, as plain strings (empty = good). Checks only what a restore would put back into
@@ -144,14 +146,14 @@ export function shelfRename(shelf: QuestShelfItem[] | null, from: string, to: st
 }
 
 /** Drop one shelf item by name. */
-export function shelfRemove(shelf, name) {
+export function shelfRemove(shelf: QuestShelfItem[] | null, name: string): { shelf: QuestShelfItem[]; problems: string[] } {
     const items = listOf(shelf);
     if (!byName(items, name)) return { shelf: items, problems: [`no state named "${name}"`] };
     return { shelf: items.filter((x) => x.name !== name), problems: [] };
 }
 
 /** The shelf as one versioned, JSON-ready object: `{ v: 1, items: [{ name, at, snap }] }`. */
-export function shelfExport(shelf) {
+export function shelfExport(shelf: (QuestShelfItem | ShelfExportInput)[] | null): { v: number; items: QuestShelfItem[] } {
     return { v: 1, items: listOf(shelf).map(({ name, at, snap }) => ({ name, at, snap: clone(snap) })) };
 }
 

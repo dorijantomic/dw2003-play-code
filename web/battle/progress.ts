@@ -163,7 +163,7 @@ export function levelUpThreshold(growthXp: number, nextLevel: number, lu) {
 }
 
 // Level after banking `exp` total EXP (may gain several levels; cap 99).
-export function levelForExp(currentLevel, exp: number, growthXp: number, lu): number {
+export function levelForExp(currentLevel: number, exp: number, growthXp: number, lu: LevelUpTables): number {
   let lv = currentLevel;
   while (lv < (lu.level_cap ?? 99) && exp > levelUpThreshold(growthXp, lv + 1, lu)) lv++;
   return lv;

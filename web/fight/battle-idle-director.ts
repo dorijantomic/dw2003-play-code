@@ -39,7 +39,7 @@ export function createIdleDirector(opts = {}) {
   const director = engineDirector(opts);
   let primed = false;
   return {
-    update(delta) {
+    update(delta): ReturnType<typeof engineTick> {
       if (!primed) { director.prime(); primed = true; }
       return director.update(delta);
     },

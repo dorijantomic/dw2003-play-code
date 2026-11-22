@@ -129,7 +129,7 @@ export function flyCopyFor({ maps, scenes, currentId, id }: FlyCopyArgs) {
 }
 
 /** Every copy of a fly point (just itself when it has no twin). */
-export const flyCopiesOf = (maps, scenes, id) => mapTwins(maps, scenes).get(id) ?? [id];
+export const flyCopiesOf = (maps: FlyMap[], scenes: FlyScenes, id: string): string[] => mapTwins(maps, scenes).get(id) ?? [id];
 
 /**
  * The visited fly points, in FLY_POINTS order, except the place you stand on (any of its copies): [{ id, label }].

@@ -9,6 +9,29 @@ import { darkness, setReveal } from "./scenery.js";
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceSettings } from "./types/ambience.js";
 import type { AmbienceConditions } from "./types/ambience.js";
+type GustFx = AmbienceConditions & { gusts?: boolean };
+
+type GustSettings = AmbienceSettings & { open?: boolean };
+
+interface GustScene {
+    map: { id: string };
+    fx: GustFx;
+    p: GustSettings;
+    now: number;
+    camX: number;
+}
+
+interface LampPixels { w: number; h: number; data: Uint8ClampedArray; }
+
+interface LampSprite { x: number; y: number; size: number; ph: number; }
+
+interface LampWindow { x: number; y: number; w: number; h: number; ph: number; }
+
+interface Scenery2Size {
+    DWB: number;
+    DHB: number;
+}
+
 interface RevealScene {
     p: AmbienceSettings;
     fx: AmbienceConditions;
@@ -159,7 +182,7 @@ setReveal({
 
 export const hasLights = (id: string | number) => !!(stageLights && stageLights[id]);
 
-export function resetScenery2(map, p: { seed: number; }, S) {
+export function resetScenery2(map: { id: string | number }, p: { seed: number; }, S: Scenery2Size) {
     const r = rng(p.seed ^ 0x7f4a7c15);
     sc2 = { id: map.id, rand: r, built: false };
     const W = S.DWB, H = S.DHB;
@@ -190,7 +213,7 @@ function scatterOn(S, count: number, test, tries = 80) {
     return out;
 }
 // lit lamps and windows: small clusters of bright, saturated warm pixels in the picture itself
-function findLamps(S) {
+function findLamps(S): (LampSprite[] & { windows?: LampWindow[] }) | null {
     const px = S.pixMap();
     if (!px) return null;
     const CELL = 6, cols = Math.ceil(px.w / CELL), rows = Math.ceil(px.h / CELL);
@@ -293,7 +316,7 @@ function makeFrost() {
 // ----------------------------------------------------------------- gusts
 // A gust is a front sweeping across the world; it boosts the wind, bends grass blades
 // (grass3d.js reads window.__grassGust) and draws long streaks behind its leading edge.
-export function gustLevel(S) {
+export function gustLevel(S: GustScene) {
     if (!sc2 || sc2.id !== S.map.id) return 0;
     const { fx, p, now, camX } = S;
     if (!fx.gusts || !p.open) { window.__grassGust = null; return 0; }

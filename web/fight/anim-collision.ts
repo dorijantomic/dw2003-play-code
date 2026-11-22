@@ -31,6 +31,10 @@ import { roleOfBone, armChains } from "./digimon-bonemap.js";
 import { armEquip } from "./digimon-anatomy.js";
 import { restPose } from "./anim-retarget.js";
 import type { FightCollisionOut } from "./types.js";
+interface ClearanceCapsule { a: number[]; b: number[]; r: number; }
+
+interface PairClearance { clearance: number; a: number[]; b: number[]; distance: number; }
+
 interface SharedShotOpts {
   points?: ShotPoint[] | undefined;
   mode?: SharedShotMode | null;
@@ -313,7 +317,7 @@ export function segmentDistance(p1, q1, p2, q2) {
 }
 
 /** Clearance of a posed pair: positive = a gap, negative = the two capsules overlap by that much. */
-export function pairClearance(a, b) {
+export function pairClearance(a: ClearanceCapsule, b: ClearanceCapsule): PairClearance {
   const { d, c1, c2 } = segmentDistance(a.a, a.b, b.a, b.b);
   return { clearance: d - a.r - b.r, a: c1, b: c2, distance: d };
 }

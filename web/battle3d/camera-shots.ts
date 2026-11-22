@@ -78,7 +78,7 @@ export function faceCamSideFor(speaker: string) {
   return (id & 0x10) ? "enemy" : "player";
 }
 
-export function modelKeyFromFolder(folder) {
+export function modelKeyFromFolder(folder: string | null | undefined) {
   const m = /^m(\d{3})/.exec(String(folder || ""));
   return m ? String(Number(m[1])) : null;
 }

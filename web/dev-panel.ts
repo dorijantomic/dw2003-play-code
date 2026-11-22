@@ -200,8 +200,8 @@ export function createDevView(panel, api) {
         show() { if (!built) build(); render(); },
         sync,
         isBuilt: () => built,
-        setNa(set) { st.na = set; if (built) for (const r of main.querySelectorAll("[data-key]")) { const na = set.has(r.dataset.key); r.classList.toggle("na", na); r.title = na ? "This effect does not apply on this map" : ""; } },
-        setNote(html) { st.note = html; if (built && st.tab === "quests" && !st.query.trim()) render(); },
+        setNa(set: Set<string>) { st.na = set; if (built) for (const r of main.querySelectorAll("[data-key]")) { const na = set.has(r.dataset.key); r.classList.toggle("na", na); r.title = na ? "This effect does not apply on this map" : ""; } },
+        setNote(html: string) { st.note = html; if (built && st.tab === "quests" && !st.query.trim()) render(); },
         state: st,
     };
     return view;

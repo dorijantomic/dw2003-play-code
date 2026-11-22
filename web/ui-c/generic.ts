@@ -29,7 +29,7 @@ export function runText(r, key: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; 
 }
 
 /** Every run not in `used` as a text part. */
-export function restOfRuns(runs, used: Set<unknown> | null, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out, prefix = "t", pick: (r: any) => any = () => ({})) {
+export function restOfRuns(runs: UiRun[], used: Set<unknown> | null, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out: UiPart[], prefix = "t", pick: (r: any) => any = () => ({})) {
     const seen = new Map();
     runs.forEach((r) => {
         if (used?.has(r)) return;

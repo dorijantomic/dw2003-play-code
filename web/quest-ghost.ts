@@ -1,3 +1,10 @@
+interface QuestGhostEvent {
+    kind: "ghost";
+    npc?: string;
+    off?: boolean;
+    alpha?: number | string | null;
+    tint?: string;
+}
 // web/quest-ghost.js
 // The `ghost` scene step's runtime: one character (an NPC id, or "player") drawn as a faded, tinted figure for the rest of
 // the scene -- a memory replay -- until { "ghost": <id>, "off": true } or the scene ends.
@@ -55,7 +62,7 @@ const tintOf = (t) => (typeof t === "string" && /^#[0-9a-fA-F]{6}$/.test(t) ? t.
  * The `ghost` event: { kind: "ghost", npc: <id>|"player", alpha, tint } fades and tints that actor;
  * { ..., off: true } puts them back. Bad data is ignored (the scene goes on; the step never blocks).
  */
-export function questGhostSet(ev) {
+export function questGhostSet(ev: QuestGhostEvent) {
     const key = actorKey(ev?.npc);
     if (key == null) return;
     if (ev.off === true) {

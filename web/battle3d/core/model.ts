@@ -262,7 +262,7 @@ function entranceMotionTry() {
     if ((e.folder && e.folder !== live) || !(e.side ? B$.enemyAnim8r : B$.playerAnim8r)) return;
     if ((e.side ? B$.playEnemyMotion : B$.playPlayerMotion)(e.motion)) B$.entranceMotion = null;
   }
-function entranceMotionSet(side: number, folder: string, motion) { B$.entranceMotion = { side, folder, motion }; entranceMotionTry(); }
+function entranceMotionSet(side: number, folder: string, motion: string) { B$.entranceMotion = { side, folder, motion }; entranceMotionTry(); }
 function setPlayerVisible(visible: boolean) { B$.playerVisible = !!visible; }
 function setEnemyVisible(visible: boolean) { B$.enemyVisible = !!visible; }
 // NEW content (F2 -> Extras -> "Fusion bosses"): the fusion's white-out. It is the

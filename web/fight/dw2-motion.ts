@@ -31,7 +31,7 @@ let override: boolean | null = null;                  // null = follow the playe
 let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
 let castTypesPromise = null;
 
-export function setDw2MotionEnabled(v) { override = v == null ? null : !!v; }
+export function setDw2MotionEnabled(v: boolean | null) { override = v == null ? null : !!v; }
 export function dw2MotionEnabled() { if (isInstalledBuild()) return true; return override == null ? battleSetting("dw2motion") : override; }   // installed copy: auto = always on (no DW2 data = the disc motion, see prepareDw2Motion)
 /** Read the developer override out of a query string: `?dw2motion=1` turns the swap on for the session. */
 export function dw2MotionFlagFromUrl(search = "") {
@@ -66,7 +66,7 @@ let loader = async (folder) => {
 
 export function setDw2MotionLoader(fn) { loader = typeof fn === "function" ? fn : null; }
 /** Prime a species' generated file synchronously (the tests and the Node harnesses do this). */
-export function registerDw2Motion(folder, data) { if (folder) dataCache.set(folder, data || null); }
+export function registerDw2Motion(folder: string, data: Dw2Motion | null) { if (folder) dataCache.set(folder, data || null); }
 export function dw2MotionData(folder) { return dataCache.get(folder) ?? null; }
 
 /** The technique -> DW2 cast type table (generated next to the motion files). Loaded once. */

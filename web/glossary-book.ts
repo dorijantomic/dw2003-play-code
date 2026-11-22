@@ -19,6 +19,13 @@ import { VISIBLE, createGlossaryModel } from "./glossary-model.js";
 import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glossary-items.js";
 import { drawItemIcon } from "./itemicons.js";
 import { artHook } from "./ui-c/capture.js";
+interface PageTwoLine {
+    kind: string;
+    label: string | null | undefined;
+    text?: string;
+    icon?: string;
+}
+
 interface GlossaryItemEntry { ids(): number[]; }
 
 interface GlossaryCard {
@@ -125,7 +132,7 @@ const TABS = ["DIGIMON", "ITEMS", "PLACES"];
 const HINT = "R1 Strength";
 
 /** The counts line fitted to `maxW` px: the double space first gives way to one, and only then is the text cut. */
-export function fitCounts(text: string, widthOf, maxW: number) {
+export function fitCounts(text: string, widthOf: (text: string) => number, maxW: number) {
     if (widthOf(text) <= maxW) return text;
     const tight = text.replace(/ {2,}/g, " ");
     return widthOf(tight) <= maxW ? tight : fitByWidth(tight, widthOf, maxW);
@@ -191,7 +198,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
             cue(itemsModel.scroll(buttons.has("up") ? -1 : 1, page.where.length, whereVisible(descOf(page.does).length)));
         }
     }
-    function drawItems(ctx, pl, pf, ticks) {
+    function drawItems(ctx: CanvasRenderingContext2D, pl: number, pf: number, ticks: number) {
         const I = ITEMS_LAYOUT;
         withFold(ctx, pl, I.panel.x, I.panel.y + I.panel.h / 2, "x", () => drawPanel(ctx, I.panel.x, I.panel.y, I.panel.cols, I.panel.bands));
         const hint = () => { if (pf >= 1) drawText(ctx, I.hint, I.hintRight, 212, { kind: 3, clut: 2, alignRight: true }); };
@@ -234,7 +241,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
         get model() { data(); return model; },
         get section() { return section; },
         get itemsModel() { return itemsModel; },
-        act(buttons) {
+        act(buttons: ReadonlySet<string>) {
             if (buttons.has(WORD.back)) return "back";
             if (section === SECTION_ITEMS) { actItems(buttons); return null; }
             const d = data();
@@ -320,7 +327,7 @@ function drawPageOne(ctx: CanvasRenderingContext2D, pm: number, pf: number, c: G
     if (pf >= 1 && hint) drawText(ctx, HINT, L.hintRight, 212, { kind: 3, clut: 2, alignRight: true });
 }
 
-function drawPageTwo(ctx, pm, pf, lines, model, view, w) {
+function drawPageTwo(ctx: CanvasRenderingContext2D, pm: number, pf: number, lines: PageTwoLine[], model: { line(): number }, view: GlossaryBookView, w: (s: string, k?: number) => number) {
     const L = GLOSSARY_LAYOUT, P = PAGE2;
     withFold(ctx, pm, L.pane.x, L.pane.y + L.pane.h / 2, "x", () => drawPanel(ctx, L.pane.x, L.pane.y, L.pane.cols, L.pane.bands));
     if (pm >= 1) {

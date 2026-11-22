@@ -45,7 +45,7 @@ function rng(seed: number) {
 
 const placed = new Map();   // stageId -> [npc objects we added]
 
-export function villagersActive(stageId): number { return (placed.get(stageId) || []).length; }
+export function villagersActive(stageId: string | number): number { return (placed.get(stageId) || []).length; }
 
 export function removeVillagers(stageId: string | number, state) {
     const list = placed.get(stageId);

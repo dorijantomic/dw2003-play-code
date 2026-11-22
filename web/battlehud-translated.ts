@@ -110,7 +110,7 @@ function recordStore() {
         read16(addr: number) { return half.get(addr & ~1) | 0; },
         read32(addr: number) { return (mem.read16(addr) | (mem.read16(addr + 2) << 16)) | 0; },
         write16(addr, value: number) { half.set(addr & ~1, value & 0xffff); },
-        write32(addr, value) { mem.write16(addr, value & 0xffff); mem.write16(addr + 2, (value >>> 16) & 0xffff); },
+        write32(addr: number, value: number) { mem.write16(addr, value & 0xffff); mem.write16(addr + 2, (value >>> 16) & 0xffff); },
     };
     return mem;
 }

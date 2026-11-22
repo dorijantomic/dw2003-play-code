@@ -33,7 +33,7 @@ export function battleSetting(key: string) {
   return !!DEFAULTS[key];
 }
 
-export function setBattleSetting(key: string, value) {
+export function setBattleSetting(key: string, value: boolean) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;
   if (typeof window !== "undefined" && typeof window.__setFx === "function") {
     window.__setFx(key, !!value);          // ambience's panel: updates fx, saves, refreshes the panel

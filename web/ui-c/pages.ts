@@ -201,7 +201,7 @@ export function composeInfoCard(p, i, runs, used: Set<unknown>, out) {
 }
 
 /** A hint plate ("Button: Back"): chamfered frame, bleeding to the screen edge, the game's text with its button badge. */
-export function composeHint(p, i, runs, used: Set<unknown>, out) {
+export function composeHint(p: FooterPart, i: string | number, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
@@ -223,7 +223,7 @@ export function composeHint(p, i, runs, used: Set<unknown>, out) {
  * "Not enough BIT." over the buy list): the plate goes over the list (layer "over", above the item icons), its text is the leftmost run
  * column only, and the list texts under it are taken (covered) -- the disc overprints them, unreadable.
  */
-export function composeHeaderPlate(p, i, runs, used: Set<unknown>, out, cover = false) {
+export function composeHeaderPlate(p: FooterPart, i: number, runs: UiRun[], used: Set<unknown>, out: UiPart[], cover = false) {
     const rel = p.rel, r = clipRect(p);
     out.push(cover ? { ...platePart(p, i), layer: "over" } : platePart(p, i));
     let mine = takeIn(runs, r, used);
@@ -380,7 +380,7 @@ function composePickerCard(i, card, namePart, portrait, state: string, runs, use
 }
 
 /** The header of the sidebar pages (C2): plate 664 x 69 slanted left, the game's title in Russo One 30. */
-function composePageHeader(part, runs, used: Set<unknown>, out) {
+function composePageHeader(part: FooterPart & { x: number; y: number }, runs: UiRun[], used: Set<unknown>, out: UiPart[]) {
     const rel = part.rel, f = at(rel, part.x - 34, part.y - 13);
     out.push({ key: "header.plate", kind: "plate", part: "header", layer: "under", rect: f(616, 39, 664, 69), shape: "sl", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const m of takeIn(runs, { x: 100, y: part.y, w: 300, h: 22 }, used)) tokenLine("header.t", m.text, dx(676), N(53) + (part.y - 13), rel, out, { role: "label", sizeDp: 30, lineDp: 40, w: 150 });

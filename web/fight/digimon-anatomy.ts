@@ -1,6 +1,21 @@
 import { ANATOMY, FOLDERS, SIZE_ORDER, TECH_MODE_PRIOR, W } from "./digimon-anatomy/anatomy-data.js";
 import { EMITTERS, SHOTS } from "./digimon-anatomy/emitter-data.js";
 import { ARM_ATTACH, ARM_EQUIP } from "./digimon-anatomy/arm-data.js";
+interface DonorRank {
+  folder: string;
+  name: string;
+  score: number;
+  reasons: string[];
+}
+
+interface FiringPart {
+  mode: string;
+  side: "left" | "right" | null;
+  style: string | null;
+  bodyPart: string | null;
+  source: string;
+}
+
 interface Emitter { id: string; part: string; count: number; kind: string; primary: boolean; mouth: boolean; }
 
 // moved by tools/rewrite/split.mjs: still exported from here
@@ -66,7 +81,7 @@ export function techKey(techName: string | null) {
 }
 
 // Which arm side fires this move, reduced to 'left' | 'right' | 'both' | null.
-export function firingSide(folder: string, techName): "left" | "right" | "both" | null {
+export function firingSide(folder: string, techName: string | null): "left" | "right" | "both" | null {
   const p = firingPart(folder, techName);
   if (p.mode === "left-arm") return "left";
   if (p.mode === "right-arm") return "right";
@@ -82,7 +97,7 @@ export function firingSide(folder: string, techName): "left" | "right" | "both" 
 // Resolution chain: per-technique annotation -> roster majority for that technique -> the
 // model's arm weapons -> dominantSide -> 'unknown'. `source` says which step answered, so the
 // caller can report it and K13 can audit a launch point against a real annotation.
-export function firingPart(folder, techName) {
+export function firingPart(folder, techName: string | null): FiringPart {
   const a = anatomy(folder);
   const k = techKey(techName);
   if (!a) return { mode: "unknown", side: null, style: null, bodyPart: null, source: "no-model" };
@@ -167,7 +182,7 @@ export function similarityDetail(a: string, b: string) {
 }
 
 // Rank candidate donors for a target folder. `candidates` defaults to every model.
-export function rankDonors(target: string, candidates, limit: number | undefined) {
+export function rankDonors(target: string, candidates: string[] | undefined, limit: number | undefined): DonorRank[] {
   const out = [];
   const pool = candidates && candidates.length ? candidates : FOLDERS;
   for (const f of pool) {

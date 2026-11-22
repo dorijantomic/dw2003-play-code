@@ -1,3 +1,17 @@
+import type { FightTechRow } from '../types/battle.js';
+interface ThrowItemEffectRec {
+  item: number;
+  clip: number;
+  motion: number;
+  effect: number;
+  sound: number;
+}
+
+
+interface ThrowItemEffectTable {
+  records?: ThrowItemEffectRec[];
+}
+
 // Shared fight tables baked from the overlay disasm (no RAM dependency -> generalizes to 245).
 //
 // tech -> animation clip: the overlay table @ PS1 0x80042bca (stride 0x12, +0x10 byte = clip
@@ -12,7 +26,7 @@
 // the host (battle3d) via setTechTable; until then techToClip falls back to the verified
 // 52/52 partition rule (which the extracted table reproduces exactly for techs 1..104).
 let TECH_TABLE = null;
-export function setTechTable(json) { TECH_TABLE = json || null; }
+export function setTechTable(json: Record<string, FightTechRow> | null) { TECH_TABLE = json || null; }
 export function techRecord(techId: number) { return TECH_TABLE?.[String(techId)] ?? null; }
 
 export function techToClip(techId: number) {
@@ -52,7 +66,7 @@ export function techEffectType(rec: { effect: number; clip: number; }) {
 // no effect write, the faithful behaviour for a context with no matching record.
 export const ITEM_USE_CLIP = 10; // the clip the default arm writes to actor+0x54
 let ITEM_USE_EFFECTS: Map<number, { effect: number; sound: number; }> | null = null;     // Map item id -> { effect, sound }
-export function setItemUseEffects(json) {
+export function setItemUseEffects(json: { records?: { item: number; effect: number; sound: number }[] } | null) {
   const recs = json?.records;
   ITEM_USE_EFFECTS = Array.isArray(recs)
     ? new Map(recs.map((r) => [r.item | 0, { effect: r.effect | 0, sound: r.sound | 0 }]))
@@ -92,7 +106,7 @@ export const REACTION_EVADE_CLIP = 4;   // decoded accuracy roll missed
 // default-arm clip-10 entry, the faithful behaviour for a context with no table.
 export const THROW_ITEM_BAND = [77, 90];   // the jump table's id range (id - 77 = table index)
 let THROW_ITEM_EFFECTS = null;             // Map item id -> { clip, motion, effect, sound, ... }
-export function setThrowItemEffects(json) {
+export function setThrowItemEffects(json: ThrowItemEffectTable | null) {
   const recs = json?.records;
   THROW_ITEM_EFFECTS = Array.isArray(recs)
     ? new Map(recs.map((r) => [r.item | 0, r]))

@@ -38,6 +38,14 @@
 import { capturingText, textRunHook, artHook } from "./ui-c/capture.js";
 import type { UiFontPaintOpts, UiTextDrawOpts } from "./types/uifont.js";
 import { assetImageScale, loadAssetImage, tagAssetSource } from "./assets.js";
+type ClutRow = Uint16Array;
+
+interface ClutEntry {
+  rows?: Record<string, ClutRow | undefined>;
+}
+
+type ClutTable = Record<string, ClutEntry | undefined>;
+
 
 let img = null;
 let map = null;
@@ -74,7 +82,7 @@ export function clutRow(cluts, kind: number, row = 0) {
 }
 
 /** Row 0 of the number face -- the amber the original draws HP and MP in. */
-export function numberClutRow(cluts = map?.cluts, row = 0) {
+export function numberClutRow(cluts = map?.cluts, row = 0): ClutRow | null {
   return clutRow(cluts, NUMBER_FONT_KIND, row);
 }
 

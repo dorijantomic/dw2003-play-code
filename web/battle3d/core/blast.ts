@@ -7,6 +7,11 @@ import {
 } from "../../fight/digivolve-camera.js";
 import { FormChangeProgram, entranceCameraSchedule, formChangeCameraSchedule } from "../../vendor/engine.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
+interface BlastState {
+  done: boolean;
+  frame: number;
+}
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeBlast(B$: Battle3DContext) {
@@ -28,7 +33,7 @@ function dvHome() {
   }
 // `entrance` = { folder }: the model folder of the fighter that enters (entrance.c key1), for the programs
   // BLAST_REVERT (player side, key2 0) and ENTRANCE_ENEMY (enemy side, key2 0x10).
-  function blastPresentationSet(state, program: string | null, skipped: boolean = false, weak: boolean | (() => boolean) = false, entrance = null) {
+  function blastPresentationSet(state: BlastState | null, program: string | null, skipped: boolean = false, weak: boolean | (() => boolean) = false, entrance = null) {
     B$.blastState = state || null;
     B$.entranceMotionTry();
     // "Digivolve Demo: OFF": the end state of the original presentation in one step.

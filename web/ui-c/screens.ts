@@ -8,6 +8,10 @@ import { isPauseHome, isSidebarPage, hasClip, CMFONT_DIR, STSTAT_DIR, STATUS_CLI
 import { composeNameEntry, composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, composeLanguage } from "./fullpages.js";
 import { composeBook, composeQuests } from "./books.js";
 import type { UiPart, UiRun } from './types.js';
+interface ReportComposeCfg {
+  view?: string;
+}
+
 interface ScreenContext {
   parts: (UiPart & { part: string })[];
   runs: UiRun[];
@@ -45,7 +49,7 @@ export function pickPauseScreen(calls, _entry: string | null) {
     if (isSidebarPage(calls)) {
         if (STATUS_CLIPS.some((id) => hasClip(calls, STSTAT_DIR, id))) return { id: "status", compose: composeStatusPage };
         const word = hasClip(calls, CMFONT_DIR, 28) || hasClip(calls, CMFONT_DIR, 27) || hasClip(calls, CMFONT_DIR, 25) ? "ITEMS" : "PARTY";
-        return { id: "sidebar", compose: (c) => composePausePage(c, { word }) };
+        return { id: "sidebar", compose: (c: ScreenContext): UiPart[] => composePausePage(c, { word }) };
     }
     // the QUESTS page (our own, engine/dw3/ui/native/pause-quests.ts): the list window (cmfont 36) and the description band (ststat 32)
     if (hasClip(calls, CMFONT_DIR, 36) || (hasClip(calls, STSTAT_DIR, 32) && hasClip(calls, CMFONT_DIR, 24))) return { id: "quests", compose: composeQuests };
@@ -56,7 +60,7 @@ export const composeWindow = (c) => composeWindowPage(c, {});
 /** The help counter: its cmfont 69 window carries the topic text (no cursor) = the C message band (T6). */
 export const composeHelp = (c: ScreenContext) => composeWindowPage(c, { messageWindow: true });
 /** The fight report (STFRPT): sheets.js, the highlight in the game's colour cycle. */
-export const composeReport = (c, cfg = {}) => composeReportParts(c, { pulse: cyclePulse, ...cfg });
+export const composeReport = (c, cfg = {}): string[] => composeReportParts(c, { pulse: cyclePulse, ...cfg });
 export { composeCapsule };
 
 // ------------------------------------------------------------------------------------------------ full-screen pages (T7, fullpages.js)

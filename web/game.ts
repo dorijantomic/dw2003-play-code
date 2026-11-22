@@ -284,8 +284,8 @@ installQuests({
     npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
     // Speech goes through the game's own conversation box (translated, same balloon and font as a real NPC); the list and
     // the yes/no questions are the game's choice widget. Both resolve when the player is done.
-    speak: (npcId, name, text) => questSpeak(npcId, name, text),
-    scene: (steps) => playQuestScene(steps),
+    speak: (npcId: number, name: string, text: string) => questSpeak(npcId, name, text),
+    scene: (steps: Parameters<typeof playQuestScene>[0]) => playQuestScene(steps),
     countItem: (name) => { const it = ITEM_BY_NAME?.[name]; return it ? heldCount(state, it.id) : 0; },
     takeItem: (name, n) => {
         const it = ITEM_BY_NAME?.[name];
@@ -413,7 +413,7 @@ menu.cardFolderUnlocked = () => carriesFolderBag(state);
 menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open!(backToCardFolders); };
 menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open!(backToCardFolders); };
 // Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
-window.__fly = { places: () => currentFlyPlaces(), copy: (id) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
+window.__fly = { places: () => currentFlyPlaces(), copy: (id: string) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
 window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys as any));
 window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys as any));
@@ -642,7 +642,7 @@ setPointRecordAnchor(
 window.__stageObjects = {
     state: (mapId) => stageObjectState(mapId ?? currentMap().id),
     draws: (mapId) => stageObjectDraws(mapId ?? currentMap().id),
-    screens: (mapId) => streetScreenQuads(mapId ?? currentMap().id),
+    screens: (mapId: string | undefined): TransitionQuadScreen[] => streetScreenQuads(mapId ?? currentMap().id),
     glows: (mapId) => streetGlowProbe(mapId ?? currentMap().id),
     stinger: (mapId) => stingerPopupProbe(mapId ?? currentMap().id),
     // The two stage users of the resident 2D draw-context service (s805 0x349
@@ -662,7 +662,7 @@ window.__stageObjects = {
     fireSub: (id: string, sub: string, mapId: string | undefined) => fireStageObject(mapId ?? currentMap().id, id, sub),
     // Rockfall oracle only: run the same id through the MIPS interpreter so a
     // verifier can compare the original machine code's frames with the port's.
-    nativeFire: (id, mapId) => fireNativeStageObject(mapId ?? currentMap().id, id),
+    nativeFire: (id: string, mapId: string | undefined): void => fireNativeStageObject(mapId ?? currentMap().id, id),
     clear: (mapId) => clearStageObjects(mapId),
 };
 // Debug-only: the stage overlays' own point-record actors and the point

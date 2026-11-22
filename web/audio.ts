@@ -138,7 +138,7 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
 
     // F0x800202d4 / F0x8002037c: they clear the exclusive register only when it
   // is this very sound that holds it (`bne $v0, $s1` guards the store).
-  function releaseExclusiveByName(name) {
+  function releaseExclusiveByName(name: string) {
     register.releaseName(name);
   }
 

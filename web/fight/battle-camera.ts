@@ -16,6 +16,28 @@ import {
 import type { ShotNode } from "./types.js";
 
 import type { PlacementTable } from "../types/battle3d.js";
+type Op5Words = [
+  number, number, number, number, number, number, number, number,
+  number, number, number, number, number, number, number, number,
+  ...number[]
+];
+
+
+interface Op5Record {
+  words: Op5Words;
+}
+
+
+interface Op5State extends Partial<ComposedShot> {
+  mode: number;
+  preset?: number;
+}
+
+
+interface Op5CamState {
+  op5?: Op5State;
+}
+
 interface ComposedShot {
   fields: number[];
   anchor: number[];
@@ -560,7 +582,7 @@ export function op5GlideFrames(duration: number, delta = CAMERA_FRAME_DELTA) {
   return n;
 }
 
-export function applyOp5(camState, op5rec) {
+export function applyOp5(camState: Op5CamState, op5rec: Op5Record): Op5CamState {
   const w = op5rec.words || [];
   const n0 = (v) => (v === 0 ? 0 : v);   // normalize -0
   if (w[1] === 1) {

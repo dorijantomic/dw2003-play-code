@@ -270,7 +270,7 @@ function drawWildlife(ctx: CanvasRenderingContext2D, S: Scenery3State) {
 }
 
 // rain pocking the water: rings at random water pixels in view
-function drawWaterRain(ctx, S) {
+function drawWaterRain(ctx: CanvasRenderingContext2D, S: Scenery3State & { isWater?: (x: number, y: number) => boolean }) {
     const { L, fade, camX, camY, now, Q } = S;
     if (L.rain < 0.25) { rings3.length = 0; return; }
     if (now >= nextRing && rings3.length < 40) {

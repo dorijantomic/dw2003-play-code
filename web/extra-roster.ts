@@ -140,7 +140,7 @@ if (typeof window !== "undefined" && !/[?&]noextras=1\b/.test(window.location?.s
   window.__extraRoster = {
     load: () => loadExtraRoster(realFetch),
     /** Testing aid (browser console): choose the lead's Aspect, e.g. `__extraRoster.setAspect("dark")`. Once per partner; false when refused. */
-    setAspect(element) {
+    setAspect(element: string) {
       const st = window.__state?.partnerStats;
       if (!applyAspect(st, element)) return false;
       try { localStorage.setItem("partnerStats", JSON.stringify(st)); } catch (_) { /* storage blocked */ }

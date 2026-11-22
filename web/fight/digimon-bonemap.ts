@@ -281,7 +281,7 @@ export const BONEMAP = {
 
 export const FOLDERS = Object.keys(BONEMAP).sort();
 
-export function has(folder) { return Object.prototype.hasOwnProperty.call(BONEMAP, folder); }
+export function has(folder: string) { return Object.prototype.hasOwnProperty.call(BONEMAP, folder); }
 export function boneMap(folder: string | number) { return BONEMAP[folder] || null; }
 export function sideConfidence(folder: string | number) { return (BONEMAP[folder] || {}).sc || null; }
 
@@ -330,7 +330,7 @@ export function wingChains(folder: string | number) {
   return out;
 }
 
-export function tailChain(folder: string | number) {
+export function tailChain(folder: string | number): string[] | null {
   const m = BONEMAP[folder];
   return m && m.tl && m.tl.length ? m.tl.slice() : null;
 }

@@ -464,7 +464,7 @@ function onCoop(m) {
 // "Go to": I ask, they get a yes/no (a team-up partner is answered for them at once). On yes their game sends the place it
 // stands in (stage id, x, y); my game then warps me next to it with the game's own stage change (api.warpNear). Neither of us
 // may be in a battle, a cutscene or a menu. No answer in 14 s = cancelled, like a co-op invite.
-function askGoto(id) {
+function askGoto(id: number) {
     const p = peerOf(id); if (!p) return;
     if (p.away) { note(`${p.name} is away.`); return; }
     if (go) { note("Finish what you are doing first."); return; }
@@ -538,7 +538,7 @@ const LEAGUE_NO: Record<string, string> = {
 
 const lgName = (id) => (id === myId() ? myName() : (peerOf(id)?.name ?? `Tamer ${id}`));
 const matchOf = (pair: MpLeaguePair | null): MpLeagueMatch | null => (pair ? league?.rounds?.[pair.r]?.[pair.m] ?? null : null);
-const leagueScore = (m, id) => (m?.g ?? []).filter((g) => g === id).length;
+const leagueScore = (m: MpLeagueMatch | null, id: string): number => (m?.g ?? []).filter((g) => g === id).length;
 /** The room's champion from its own bracket; null until the final is won, or with the switch off. */
 const champId = () => (serverChampOn() && league ? league.champ : null);
 /** The champ colour: the room's champion, or a card that says so itself. Off = a normal card. */
@@ -630,7 +630,7 @@ function onLeague(m) {
 }
 
 // ------------------------------------------------------------ what I am doing -> everyone's log
-function post(kind, text) {
+function post(kind: string, text: string) {
     add({ k: "feed", kind, name: myName(), text, self: true });
     sendFeed(kind, text);
 }

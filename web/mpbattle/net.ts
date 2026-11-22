@@ -15,6 +15,21 @@ import {
 } from "./host.js";
 import { READY_MS } from "./command.js";
 import type { MpNetFighter, MpNetHost } from "./types.js";
+import type { MpFightResult, MpLaunchOptions } from './types.js';
+import type { DigimonRecord } from '../types/battle.js';
+interface MpHostBot {
+    id: number;
+    name: string;
+    party: DigimonRecord[];
+}
+
+
+interface MpHostOptions extends MpLaunchOptions {
+    ids: (number | null | undefined)[];
+    done: (r: MpFightResult) => void;
+    bots?: MpHostBot[];
+}
+
 
 // ------------------------------------------------------------ starting, joining, finishing
 async function begin(setup, isHost: boolean, hostId, done) {
@@ -70,7 +85,7 @@ async function begin(setup, isHost: boolean, hostId, done) {
 
 /** Start a fight as the referee. ids = everyone in it (me first). done({won, fled, reward}) runs when it is over.
  *  bots = computer-played practice partners [{ id (negative), name, party: [records] }] (F2 -> Extras -> Practice 2 vs 2). */
-export function mpbHost({ foes, ids, label, screenId, challenge, done, bots = [] }) {
+export function mpbHost({ foes, ids, label, screenId, challenge, done, bots = [] }: MpHostOptions) {
     const all = [...ids, ...bots.map((b) => b.id)];
     const names = Object.fromEntries(all.map((id) => [id, bots.find((b) => b.id === id)?.name ?? MB.A.nameOf(id)]));
     return begin({ fid: (Date.now() % 1000000000) + Math.floor(Math.random() * 1000), foes, ids: all, names, label, screenId, ch: challenge, bots, mapId: MB.A.mapId?.() }, true, MB.A.myId(), done);

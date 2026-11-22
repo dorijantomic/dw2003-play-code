@@ -35,6 +35,31 @@ import { activeFollowerCount } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 
 import type { FlagStore } from "./types.js";
+interface NpcDialogueFlag {
+    id: string;
+    expected: number;
+}
+
+
+interface NpcDialogueState {
+    gate?: string;
+    id: number;
+    on_close?: NpcDialogueFlag[];
+}
+
+
+interface DialogueNpc {
+    dialogue?: string[];
+    dialogue_state?: NpcDialogueState[];
+    ifFlag?: string;
+}
+
+
+interface NpcDialoguePick {
+    dialogue: string[];
+    on_close?: NpcDialogueFlag[];
+}
+
 // The rail the PLAYBACK executor's record names. The op-2/op-3 handler passes
 // params[0] (the ladder id) and the endpoint cell params[1]/params[2] straight to
 // the player actor (fieldstg.s:5a80/:5ac0), so the record — not a radius test — is
@@ -435,6 +460,6 @@ export function iceSlideCellAt(slide, x: number, y: number) {
 // as estalk00[id]; its `on_close` set_flags are applied when the box closes (advancing the
 // NPC's state). Manual/ifFlag NPCs (hand-authored `dialogue`, no states) fall back.
 // Returns a state-shaped object { dialogue, on_close? } or null (non-speaking variant).
-export function pickDialogueFor(npc, flags: FlagStore) {
+export function pickDialogueFor(npc: DialogueNpc, flags: FlagStore): NpcDialoguePick | null {
     return selectNpcDialogue(npc, storyFlags.get, flags);
 }

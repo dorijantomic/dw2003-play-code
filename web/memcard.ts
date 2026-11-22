@@ -92,7 +92,7 @@ export function buildSummaryRecord(rec, encodeName = encodeNativeScreenText) {
  * `slot` is the file's own index and lands in the block's +0x01 byte, which the
  * screen's binder uses to pick the record it displays.
  */
-export function buildDirectoryBlock(records, slot = 0, encodeName = encodeNativeScreenText) {
+export function buildDirectoryBlock(records: readonly (Parameters<typeof buildSummaryRecord>[0] | null)[] | null | undefined, slot = 0, encodeName = encodeNativeScreenText) {
     const block = new Uint8Array(DIR_BLOCK_SIZE);
     const dv = new DataView(block.buffer);
     dv.setUint16(2, MCARD_FORMAT, true);
@@ -130,20 +130,20 @@ export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs
     const images = new Map(); // slot -> 0x26C4 image handed back by `block`
     return {
         fileCount: () => 3,
-        record(file) {
+        record(file: number) {
             const list = read();
             const slot = slotForFile(file);
             const records = [0, 1, 2].map((i) => list[i]?.record ?? null);
             return buildDirectoryBlock(records, slot);
         },
-        block(file) {
+        block(file: number) {
             const slot = slotForFile(file);
             const stored = images.get(slot);
             if (stored) return Uint8Array.from(stored);
             const img = read()[slot]?.image;
             return img ? Uint8Array.from(img) : null;
         },
-        store(file, bytes: Iterable<number>) {
+        store(file: number, bytes: Iterable<number>) {
             const buf = Uint8Array.from(bytes);
             // A directory header names its own slot in +0x01 (the writer stamps
             // the selected slot there); the image write carries no slot, so it

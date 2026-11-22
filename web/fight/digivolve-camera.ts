@@ -85,7 +85,7 @@ interface FormChangeCam {
  * @param {{preStep:Function, elapsed:Function, update:Function, owns:Function}} cam
  * @param {number} frame   the presentation frame
  */
-export function stepFormChangeFrame(camRec, cam, frame: number | undefined): { shot: ReturnType<CameraRecord['sample']> | null; fields: ReturnType<CameraRecord['live']> } {
+export function stepFormChangeFrame(camRec: CameraRecord, cam: FormChangeCam, frame: number | undefined): { shot: ReturnType<CameraRecord['sample']> | null; fields: ReturnType<CameraRecord['live']> } {
   cam.preStep(frame);                                 // work armed before the presentation's f0
   const n = cam.elapsed(frame);                       // presentation frames since the last step
   if (n > 0) camRec.tick(n * CAMERA_FRAME_DELTA);     // 1) the camera task

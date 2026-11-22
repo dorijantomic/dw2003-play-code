@@ -317,7 +317,7 @@ export class ActionVM {
     const s = this.slot;
     return {
       sideFlag: s.sideSign === -1 ? 0x10 : 0,
-      getY: () => s.getY(), setY: (v) => s.setY(v),
+      getY: () => s.getY(), setY: (v: number): void => s.setY(v),
       getZ: () => s.getZ(), setZ: (v) => s.setZ(v),
       homeY: () => 0, homeZ: () => 0,
     };

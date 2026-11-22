@@ -1,6 +1,13 @@
 import { renderPhraseNote, PHRASE_SAMPLE_RATE as SAMPLE_RATE } from "../vendor/engine.js";
 import type { AudioEngine } from "../types/audio.js";
 import type { PhraseVoice } from "./types.js";
+import type { PhraseRow } from '../types/audio.js';
+interface SlotKeyVoiceMeta extends VoiceMeta {
+  positional?: boolean;
+  id?: number | string;
+}
+
+
 interface VoiceMeta {
   dedup?: boolean;
   rate?: number;
@@ -86,7 +93,7 @@ function phraseSampleFor(vag: string) {
    * plays the notes, and `otherwise()` is the single-source path for a sound
    * that is not a phrase. `bank` is null for the common bank.
    */
-  function whenPhraseRow(name: string, bank: string | null, run, otherwise: { (): void; (): void; }) {
+  function whenPhraseRow(name: string, bank: string | null, run: (row: PhraseRow) => void, otherwise: { (): void; (): void; }) {
     if (P.phraseTable) { const row = P.phraseRowFor!(name, bank); if (row) run(row); else otherwise(); return; }
     loadPhraseTable().then((t) => {
       const row = t && P.phraseRowFor!(name, bank);
@@ -127,7 +134,7 @@ function bufferFor(name: string, bank = null) {
         if (phraseGain.gain) phraseGain.gain.value = 1;
         phraseGain.connect(P.gain);
         let stopped = false;
-        const later = (ms: number | undefined, fn) => { if (ms! > 0) timers.push(setTimeout(fn, ms)); else fn(); };
+        const later = (ms: number | undefined, fn: () => void) => { if (ms! > 0) timers.push(setTimeout(fn, ms)); else fn(); };
         const stop = () => {
           if (stopped) return;
           stopped = true;
@@ -193,7 +200,7 @@ function bufferFor(name: string, bank = null) {
   // archive = bits 18-24, row = bits 8-15 (selects the bank through the
   // channel's +0x4208 row array), slot = bits 0-7. Positional ids get no key
   // because their path never keys anything off.
-  function slotKeyFor(name: string, meta, bank: string | null | undefined) {
+  function slotKeyFor(name: string, meta: SlotKeyVoiceMeta, bank: string | null | undefined) {
     if (meta.positional) return null;
     const id = meta.id ? Number(meta.id) : NaN;
     if (Number.isFinite(id)) {
