@@ -28,7 +28,11 @@ import { encodeNativeScreenText, nativeScreenObjects, nativeScreenRead } from ".
 import { cards } from "./cardstate.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
 import type { CardDuelHost } from "./types/cardduel-native.js";
-import type { CardDuelOptions } from "./types/cardduel-native.js";
+import type { CardDuelOptions, CardDuelState } from "./types/cardduel-native.js";
+import type { NativeScreenHost } from "./types/native-screen-host.js";
+import type { NativeScreenIo } from "./types/native-screen.js";
+import type { SfxPlayerContext } from "./types/audio.js";
+import type { CardCollection } from "../engine/systems/card-battle/collection.js";
 
 const MODULE_ID = "pro/cardgame";
 /** The duel's root tick F0x80095BFC (cardgame.s 0x00012f4c). */
@@ -60,8 +64,8 @@ function duelScreenClosed() {
     return (nativeScreenRead(root.addr + 0xc, 4) | 0) === 2;
 }
 
-export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptions = {}) {
-    const d = {
+export function createCardDuelNative(sfx: SfxPlayerContext | null = null, bgm: unknown = null, opts: CardDuelOptions = {}) {
+    const d: CardDuelHost = {
         _open: false,
         _pending: false,
         _host: null,
@@ -70,16 +74,16 @@ export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptio
         _onClose: null,
         _opponentId: null,
         _lastDiagnostic: null,
-    } as CardDuelHost;
+    };
 
     /** Walker state -> the RAM the screen reads. */
-    function seed({ write }) {
-        const state = d._state ?? {};
+    function seed({ write }: NativeScreenIo) {
+        const state: Partial<CardDuelState> = d._state ?? {};
         write(LAUNCHER_CELL, (Number.isInteger(d._opponentId) ? d._opponentId : 1)! >>> 0, 4);
         write(MONEY, (state.bits ?? 0) >>> 0, 4);
         write(DUEL_WON, 0, 4);
         seedBoosterStock(state, BOOSTER_ITEM_IDS, write);
-        const col = cards();
+        const col: CardCollection = cards();
         if (col) {
             for (const [id, n] of col.owned ?? []) {
                 const cardId = Number(id);
@@ -109,12 +113,12 @@ export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptio
     }
 
     /** The duel's result -> the walker's state. */
-    function commit(host) {
+    function commit(host: NativeScreenHost | null | undefined) {
         const state = d._state;
         if (!host || !state) return;
         const won = (host.read(DUEL_WON, 4) >>> 0) === 1;
         d._won = won; // the field's close housekeeping reads this (resultWon)
-        commitBoosterStock(state, BOOSTER_ITEM_IDS, (address, size) => host.read(address, size));
+        commitBoosterStock(state, BOOSTER_ITEM_IDS, (address: number, size: number) => host.read(address, size));
         if (typeof localStorage !== "undefined") localStorage.setItem("inventory", JSON.stringify(state.inventory));
         state.duelWon = won;
         emitGameEvent("cardDuelEnded", { won, opponentId: d._opponentId ?? null });   // optional layers (extra quests) hear it

@@ -3,7 +3,9 @@ import { drawTalkWindow, drawAdvanceCursor } from "./uiRects.js";
 import { loadPack, packReady, drawClip, drawClipOpaque } from "./screenpack.js";
 import * as uiC from "./ui-c/index.js";
 import { composeTalk } from "./ui-c/message.js";
-import type { TextboxState } from "./types/textbox.js";
+import type { TextboxState, TextboxScene } from "./types/textbox.js";
+import type { SfxPlayerContext } from "./types/audio.js";
+import type { UiClaimedPart } from "./ui-c/types.js";
 
 import type { TextboxAnchor } from "./types/textbox.js";
 let boxCount = 0;
@@ -28,7 +30,7 @@ export const BALLOON_TAIL = [
 // System-window band (F0x8001b814): CMFONTCS clips 8 then 9 at (0, 166),
 // X-scaled from anchors (320, 196) and (0, 196) while unk68 ramps to 0x1000.
 export const SYSTEM_BAND_CLIPS = [8, 9];
-const BAND_ANCHORS = [[0x140, 0xC4], [0, 0xC4]];
+const BAND_ANCHORS: [number, number][] = [[0x140, 0xC4], [0, 0xC4]];
 
 // ── Decoded balloon-placement algorithm (disasm, fieldstg + EXE) ─────────────
 // Every field dialogue window goes through the controller spawned by fieldstg
@@ -72,7 +74,7 @@ export const BALLOON_TEXT_INSET = { x: 14, y: 22 };
 // left/right is the side of the anchor the BODY lies on (verified against the
 // original in tests/lane-b/dialogue-controller.test.js: R/M->0 R/T->1 L/M->2
 // L/T->3 for the down facings; R/M->1 L/M->3 R/B->0 L/B->2 for the up facings).
-export function autoBalloonMode(dirStr, sx: number, sy: number, viewW: number, viewH: number) {
+export function autoBalloonMode(dirStr: string | null | undefined, sx: number, sy: number, viewW: number, viewH: number) {
   const below = /^up/.test(dirStr ?? "");
   const right = sx < viewW / 2; // speaker on the left half -> balloon on its right
   let mode = below ? (right ? 3 : 1) : (right ? 2 : 0);
@@ -114,14 +116,14 @@ export function balloonBodyRect(mode: number, ax: number, ay: number, w: number,
   };
 }
 
-export function createTextbox(sfx = null) {
+export function createTextbox(sfx: SfxPlayerContext | null = null) {
   const tb = {
     dialogue: null, pageIdx: 0, shown: 0, onClose: null, t: 0, openT: 0,
     anchor: null, _key: `textbox${++boxCount}`,
   } as TextboxState;
   // look C (web/ui-c, task T6): this frame's box in native 320x240 units -- the balloon body / name / typed lines / more marker the
   // overlay draws (web/ui-c/message.js composeTalk). The real clips (tail, band halves) are drawn inside the scope and captured.
-  let scene = null;
+  let scene: TextboxScene | null = null;
   // the typed lines of the current page as native runs: x / y = the line's left / top (its centre at y + 4.5), only the revealed part
   const pageRuns = (x: number, baseline: number, lineH: number, s: number) => {
     let remaining = Math.floor(tb.shown);
@@ -137,7 +139,8 @@ export function createTextbox(sfx = null) {
   const moreBox = (x: number, y: number, s: number) => ({ part: "more", x: x / s - 6, y: y / s - 3, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } });
 
   tb.isOpen = () => tb.dialogue !== null;
-  tb.currentPage = () => tb.dialogue!.pages[tb.pageIdx];
+  // ETS item 9: pageIdx stays below pages.length (open() sets 0 on a non-empty list, advance() steps only while pageIdx + 1 < length).
+  tb.currentPage = () => tb.dialogue!.pages[tb.pageIdx]!;
   tb.pageLength = () => tb.currentPage!().join("").length;
   tb.isPageFullyShown = () => tb.shown >= tb.pageLength!();
 
@@ -276,8 +279,9 @@ export function createTextbox(sfx = null) {
     const s = viewW / PS1_W;
     scene = null;
     ctx.save();
+    // ETS item 9: composeTalk reads only part, x, y, w, h and rel of the "more" arrow (web/ui-c/message.ts moreBox); bx and by belong to captured clips.
     ctx.scale(s, s);
-    uiC.scope(tb._key, ctx, { enable: true, compose: (sc) => composeTalk({ parts: scene?.more ? [...sc.parts, scene.more] : sc.parts, runs: scene?.runs ?? [] },
+    uiC.scope(tb._key, ctx, { enable: true, compose: (sc) => composeTalk({ parts: scene?.more ? [...sc.parts, scene.more as UiClaimedPart] : sc.parts, runs: scene?.runs ?? [] },
       { body: scene?.body, name: scene?.name ?? null }) }, () => {
       ctx.save();
       ctx.scale(1 / s, 1 / s);
@@ -304,7 +308,8 @@ export function createTextbox(sfx = null) {
       ctx.save();
       ctx.scale(s, s);
       SYSTEM_BAND_CLIPS.forEach((clip, i) => {
-        const [ax, ay] = BAND_ANCHORS[i];
+        // ETS item 9: SYSTEM_BAND_CLIPS and BAND_ANCHORS both have two entries, so i is a valid index.
+        const [ax, ay] = BAND_ANCHORS[i]!;
         ctx.save();
         if (wipe < 1) {
           ctx.translate(ax, ay);

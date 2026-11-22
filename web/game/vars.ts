@@ -81,6 +81,8 @@ import { runQuestSceneEvent, sceneCast } from "./quest-scenes.js";
 import { dispatchInput } from "./input.js";
 import type { Closeable, FadeState, Follower, GameState, ManifestMap, SceneNpc, SpriteRecord, TrailPoint } from "./types.js";
 import type { RosterMember } from "../types/battle.js";
+import type { BookFactoryArgs } from "../types/screens.js";
+import type { WithAnyKey } from "../types/game-shared2.js";
 
 
 // D0x80055c34 is ONE register in the original, so both players share one
@@ -111,12 +113,12 @@ export const glossaryStage = createStage({
 export const books = createBookHost({
     sfx,
     factories: {
-        glossary: (args: { sfx: typeof sfx; }) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
-        options: (args: { sfx: typeof sfx; }) => createOptionsBook(args),
+        glossary: (args: BookFactoryArgs) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
+        options: (args: BookFactoryArgs) => createOptionsBook(args),
         // FLY (quest zz_fly): the visited fly points; the chosen one is flown to after the pause list has gone (openBook).
-        fly: (args: { sfx: typeof sfx; }) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { S.flyChosen = p; } }),
+        fly: (args: BookFactoryArgs) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { S.flyChosen = p; } }),
         // OPTIONS > GAME > Map screen: New. Read once when it opens: the manifest names, the scenes' exits, the visited flag, the current map.
-        mapscreen: (args: { sfx: typeof sfx; }) => createMapScreenBook({
+        mapscreen: (args: BookFactoryArgs) => createMapScreenBook({
             sfx: args.sfx,
             data: () => ({
                 maps: state.manifest.maps, scenes: state.scenes, currentId: currentMap().id,
@@ -279,9 +281,11 @@ export const textbox = new Proxy(fallbackTextbox, {
             return dialogueBox.isOpen!() ? dialogueBox.pressConfirm!() : target.advance!();
         };
         if (prop === "close") return () => { if (dialogueBox.isOpen!()) dialogueBox.close!(); (target as Closeable).close?.(); };
-        return target[prop];
+        // ETS item 9: the proxy forwards any property name to the fallback box; TextboxState has no string index signature.
+        return (target as WithAnyKey<typeof target>)[prop];
     },
-    set(target, prop, value) { target[prop] = value; return true; },
+    // ETS item 9: same forwarding for writes.
+    set(target, prop, value) { (target as WithAnyKey<typeof target>)[prop] = value; return true; },
 });
 
 export const choice = createChoice(sfx);
@@ -338,7 +342,7 @@ export const statusOptions = {
     // 0x1200 = Card Album, 0x400 = folder editor. Those two overlays are not
     // hosted in production yet (Phase 6.3 group 2), so the walker's own screens
     // answer the request — the same ones the walker's CARD FOLDERS panel opens.
-    onTransition: (id) => {
+    onTransition: (id: string | number) => {
         if (id === 0x1200) menu.onCardAlbum?.();
         else if (id === 0x400) menu.onCardDeck?.();
     },

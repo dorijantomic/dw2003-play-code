@@ -9,50 +9,7 @@ import { lampPoints, windowRects } from "./scenery2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
-type DrawNightLightState = Omit<Scenery3State, "fx"> & {
-  fx: Scenery3Fx & { lamps?: boolean };
-  feet?: { x: number; y: number; leader?: boolean }[];
-};
-
-interface Scenery3State {
-  L: { rain: number; blizzard: number; sand: number };
-  t: number;
-  dt: number;
-  now: number;
-  fade: number;
-  camX: number;
-  camY: number;
-  Q: number;
-}
-
-interface Scenery3Fx {
-    rainwater?: boolean;
-    wildlife?: boolean;
-    windows?: boolean;
-    nightlight?: boolean;
-    screenfx?: boolean;
-}
-
-interface Scenery3Phase {
-    rainy?: boolean;
-    lamps?: boolean;
-    open?: boolean;
-}
-
-interface Scenery3State {
-    map: { id: number | string };
-    fx: Scenery3Fx;
-    p: Scenery3Phase;
-    DW: number;
-    DH: number;
-    DWB: number;
-    DHB: number;
-    wrapX: (x: number, cam: number) => number;
-    wrapY: (y: number, cam: number) => number;
-    wrapXB: (x: number, cam: number) => number;
-    wrapYB: (y: number, cam: number) => number;
-}
-
+import type { Scenery3Frog, Scenery3Lens, Scenery3Ring, Scenery3Scene, Scenery3Lizard, Scenery3Gull, Scenery3Bat } from "./types/rest-c.js";
 const VIEW_H = 240;
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -62,30 +19,31 @@ function rng(seed: number) {
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
-let id3 = null, r3 = Math.random, built3 = false;
+let id3: number | string | null = null, r3 = Math.random, built3 = false;
 let nl: HTMLCanvasElement | null = null, nlx: CanvasRenderingContext2D | null = null;
-let lens = [], nextLens = 0;
-let rings3 = [], nextRing = 0;
-let frogs = [], lizards: { x: number | undefined; y: number | undefined; vx: number; vy: number; until: number; dash: number; face: number; }[] = [], gulls: { cx: number; cy: number; rx: number; ry: number; sp: number; ph: number; flap: number; }[] = [], bats: { x: number; y: number; vx: number; vy: number; ph: number; home: number[]; }[] = [];
+let lens: Scenery3Lens[] = [], nextLens = 0;
+let rings3: Scenery3Ring[] = [], nextRing = 0;
+let frogs: Scenery3Frog[] = [], lizards: Scenery3Lizard[] = [], gulls: Scenery3Gull[] = [], bats: Scenery3Bat[] = [];
 
-export function resetScenery3(map, p: { seed: number; }) {
+export function resetScenery3(map: { id: number | string }, p: { seed: number; }) {
     id3 = map.id; built3 = false; r3 = rng(p.seed ^ 0x51ed270b);
     lens = []; rings3 = []; frogs = []; lizards = []; gulls = []; bats = [];
     nextLens = 0; nextRing = 0;
 }
 
-function scatterOn(S, count: number, test: ((r: number, g: number, b: number) => boolean) | ((r: number, g: number, b: number) => boolean), tries = 90) {
+function scatterOn(S: Scenery3Scene, count: number, test: (r: number, g: number, b: number) => boolean, tries = 90) {
     const px = S.pix();
     if (!px) return [];
-    const out = [];
+    const out: [number, number][] = [];
     for (let n = 0; out.length < count && n < count * tries; n++) {
         const x = r3() * px.w, y = r3() * px.h, o = ((y | 0) * px.w + (x | 0)) * 4;
-        if (px.data[o + 3] < 128) continue;
-        if (test(px.data[o], px.data[o + 1], px.data[o + 2])) out.push([x, y]);
+        // ETS item 9: x < px.w and y < px.h, so the four bytes of pixel o are inside px.data
+        if (px.data[o + 3]! < 128) continue;
+        if (test(px.data[o]!, px.data[o + 1]!, px.data[o + 2]!)) out.push([x, y]);
     }
     return out;
 }
-function build(S) {
+function build(S: Scenery3Scene) {
     const { p } = S;
     if (!S.pix()) return;
     built3 = true;
@@ -99,7 +57,7 @@ function build(S) {
 }
 
 // ----------------------------------------------------------------- lighting
-function drawNightLight(ctx: CanvasRenderingContext2D, S: DrawNightLightState) {
+function drawNightLight(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     const { fx, p, now, fade, camX, camY, t } = S;
     const dark = darkness(p, fx, now);
     if (dark < 0.06) return;
@@ -133,7 +91,7 @@ function drawNightLight(ctx: CanvasRenderingContext2D, S: DrawNightLightState) {
     ctx.drawImage(nl, 0, 0);
 }
 
-function drawWindows(ctx: CanvasRenderingContext2D, S: Scenery3State) {
+function drawWindows(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     const { p, fx, now, t, fade, camX, camY } = S;
     const dark = darkness(p, fx, now);
     if (dark < 0.05) return;
@@ -159,7 +117,7 @@ function drawWindows(ctx: CanvasRenderingContext2D, S: Scenery3State) {
 }
 
 // ------------------------------------------------------------- the lens
-function drawLens(ctx: CanvasRenderingContext2D, S: Scenery3State) {
+function drawLens(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     const { fx, L, t, dt, now, fade } = S;
     const storm = Math.max(L.rain, L.blizzard), cold = L.blizzard, grit = L.sand;
     if (storm > 0.05 || grit > 0.05) {
@@ -181,7 +139,8 @@ function drawLens(ctx: CanvasRenderingContext2D, S: Scenery3State) {
                 r: 1.2 + r3() * 2, born: now, life: 4500 + r3() * 3500, ph: r3() * 6.28 });
         }
         for (let i = lens.length - 1; i >= 0; i--) {
-            const d = lens[i], k = (now - d.born) / d.life;
+            // ETS item 9: i runs from lens.length - 1 down to 0, so lens[i] exists.
+            const d = lens[i]!, k = (now - d.born) / d.life;
             if (k >= 1) { lens.splice(i, 1); continue; }
             const run = Math.max(0, Math.sin(t * 0.9 + d.ph));
             d.y += (2 + 14 * run * run) * dt;
@@ -196,22 +155,24 @@ function drawLens(ctx: CanvasRenderingContext2D, S: Scenery3State) {
 }
 
 // ------------------------------------------------------------- wildlife
-function drawWildlife(ctx: CanvasRenderingContext2D, S: Scenery3State) {
+function drawWildlife(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     const { p, L, t, dt, now, fade, camX, camY, Q } = S;
     const calm = L.rain < 0.35 && L.blizzard < 0.2 && L.sand < 0.4;
     // frogs: sit still, puff their throats, now and then hop
     for (let i = 0; i < Math.max(1, Math.round(frogs.length * Q)) && i < frogs.length; i++) {
-        const f = frogs[i];
+        // ETS item 9: the loop test i < frogs.length makes frogs[i] exist.
+        const f = frogs[i]!;
         if (now >= f.until) {
             f.until = now + 2500 + r3() * 5500;
             if (r3() < 0.55) { const a = r3() * 6.283; f.tx = f.hx + Math.cos(a) * 16; f.ty = f.hy + Math.sin(a) * 9; f.hop = 1; f.dir = Math.cos(a) >= 0 ? 1 : -1; f.t0 = now; }
             else f.croak = now;
         }
         let x = f.x, y = f.y, lift = 0;
+            // ETS item 9: hop is set to 1 only together with tx, ty and t0 (the hop start above), so all three are set while it is on.
         if (f.hop) {
-            const k = (now - f.t0) / 420;
-            if (k >= 1) { f.x = f.tx; f.y = f.ty; f.hop = 0; x = f.x; y = f.y; }
-            else { x = f.x + (f.tx - f.x) * k; y = f.y + (f.ty - f.y) * k; lift = 4 * k * (1 - k) * 12; }
+            const k = (now - f.t0!) / 420;
+            if (k >= 1) { f.x = f.tx!; f.y = f.ty!; f.hop = 0; x = f.x; y = f.y; }
+            else { x = f.x + (f.tx! - f.x) * k; y = f.y + (f.ty! - f.y) * k; lift = 4 * k * (1 - k) * 12; }
         }
         const sx = x - camX, sy = y - camY;
         if (sx < -8 || sx > VIEW_W + 8 || sy < -8 || sy > VIEW_H + 8) continue;
@@ -270,7 +231,7 @@ function drawWildlife(ctx: CanvasRenderingContext2D, S: Scenery3State) {
 }
 
 // rain pocking the water: rings at random water pixels in view
-function drawWaterRain(ctx: CanvasRenderingContext2D, S: Scenery3State & { isWater?: (x: number, y: number) => boolean }) {
+function drawWaterRain(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     const { L, fade, camX, camY, now, Q } = S;
     if (L.rain < 0.25) { rings3.length = 0; return; }
     if (now >= nextRing && rings3.length < 40) {
@@ -282,14 +243,15 @@ function drawWaterRain(ctx: CanvasRenderingContext2D, S: Scenery3State & { isWat
     }
     ctx.lineWidth = 0.5; ctx.strokeStyle = "#e8f2ff";
     for (let i = rings3.length - 1; i >= 0; i--) {
-        const r = rings3[i], k = (now - r.born) / r.life;
+        // ETS item 9: i runs from rings3.length - 1 down to 0, so rings3[i] exists.
+        const r = rings3[i]!, k = (now - r.born) / r.life;
         if (k >= 1) { rings3.splice(i, 1); continue; }
         ctx.globalAlpha = (1 - k) * 0.55 * L.rain * fade;
         ctx.beginPath(); ctx.ellipse(r.x - camX, r.y - camY, 1 + k * 8, 0.4 + k * 3.2, 0, 0, 6.2832); ctx.stroke();
     }
 }
 
-export function drawScenery3(ctx: CanvasRenderingContext2D, S: Scenery3State) {
+export function drawScenery3(ctx: CanvasRenderingContext2D, S: Scenery3Scene) {
     if (id3 !== S.map.id) return;
     const { fx, p } = S;
     if (!built3) build(S);

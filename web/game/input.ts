@@ -640,7 +640,8 @@ export function dispatchInput(k: string, e: FieldKeyEvent, raw = "") {
                     // An extra training hall greeter (web/gym-extra.js): speaks, then opens the gym screen on the themed drills.
                     const gymHall = gymExtraHallAt(state.gymExtra, currentMap().id, npc.npc_id);
                     if (gymHall) {
-                        const plan = gymExtraPlan(state.gymExtra, gymHall, state.inventory);
+                        // ETS item 9: gymExtraHallAt only returns a hall when state.gymExtra holds it, so gymExtra is loaded here.
+                        const plan = gymExtraPlan(state.gymExtra!, gymHall, state.inventory);
                         const hallMap = currentMap().id;
                         questSpeak(npc.npc_id, gymHall.trainer, gymHall.greeting.join("\n\n")).then(() => gym.open!(state, null, plan.group, hallMap, plan.drills));
                         return;

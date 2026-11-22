@@ -126,7 +126,8 @@ function questStandIns(sc: CastScene, built: SceneNpc[]) {
             // of everyone (web/quest-walk.js standInSpot tries a few nudges around the post, else keeps the post).
             const taken = (x: number, y: number) => built.some((n: SceneNpc) => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20);
             const clear = (x: number, y: number) => !taken(x, y) && (!grid || questStandFree(grid, x, y));
-            const post = posts.find((p: SceneNpc) => !taken(p.x, p.y)) ?? posts[0];
+            // ETS item 9: posts is non-empty (the `continue` above), so posts[0] exists.
+            const post = posts.find((p: SceneNpc) => !taken(p.x, p.y)) ?? posts[0]!;
             s = { ...post, id: "qstand_" + npcId, spawn_flags: [], _questStandIn: true };
             if (taken(post.x, post.y)) {
                 const spot = standInSpot(post, clear);
@@ -329,7 +330,8 @@ export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resum
         case "time": setAmbienceScene(ev).then(() => done()); return;
         case "lightning": ambienceLightning(ev.count, ev.force).then(() => done()); return;
         case "sfx":                                        // a sound cue by name; never blocks the scene
-            try { sfx.play!(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, e?.message ?? e); }
+            // ETS item 9: a caught value is untyped; the log only reads .message when the thrown value has one.
+            try { sfx.play!(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, (e as Partial<Error> | null)?.message ?? e); }
             return done();
         case "placecard":
             // The quest's own place card: the field's blue stage-entry card, typed with two names the quest wrote
@@ -410,7 +412,8 @@ function startQuestChase(ev: QuestChaseEvent, done: () => void): void {
         console.warn(`[quest scene] chase target ${JSON.stringify(ev.target)} is not here; the step is skipped`);
         return done();
     }
-    const machine = createQuestChase(ev, { x: npc ? npc.x : fx.x, y: npc ? npc.y : fx.y });
+    // ETS item 9: the check above returned when both npc and fx were missing, so without an npc the fx is there.
+    const machine = createQuestChase(ev, { x: npc ? npc.x : fx!.x, y: npc ? npc.y : fx!.y });
     if (S.questChase) clearQuestChase();                 // defensive: one chase at a time
     S.questChase = { machine, npc, fx, resolve: done, settled: false };
     state._questChase = true;

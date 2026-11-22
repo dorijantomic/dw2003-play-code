@@ -13,6 +13,8 @@ import type { createRetryLoader } from "../retry-loader.js";
 import type { tiledMap } from "../map-tiles.js";
 import type { FishExtrasData } from "../types/misc-game2.js";
 import type { ItemsData } from "../types/screens.js";
+import type { DriStats } from "../types/misc-game.js";
+import type { GymExtraHall } from "../gym-extra.js";
 
 import type { createQuestChase } from "../quest-chase.js";
 import type { questFxGet } from "../quest-fx.js";
@@ -92,7 +94,7 @@ export interface GameState {
   _subEntering?: boolean;
   _subThrustHeld?: boolean;
   /** the sound handle the thrust loop was started with (web/sound.ts) */
-  _subThrustSound?: any;
+  _subThrustSound?: boolean;
   _subTurn?: number;
   activeClip?: string;
   allOrdinals: number[];
@@ -146,7 +148,7 @@ export interface GameState {
   flags: Record<string, boolean>;
   gondolaAutoFired?: boolean;
   gunslingerLatch?: any;
-  gymExtra?: any;
+  gymExtra?: GymExtraData | null;
   handoffHold: { ticks: number; exit: StageExit; } | null;
   iceSlide?: any;
   /** the bag: one row per held item */
@@ -182,7 +184,7 @@ export interface GameState {
   npcSprites?: Record<string, any>;
   onExit?: boolean;
   ordinalByStage: Record<string, number>;
-  packId: string;
+  packId: string | null | undefined;
   packSelect?: any;
   packSelectDone?: (() => void) | null;
   padLayoutLatch?: number;
@@ -200,7 +202,7 @@ export interface GameState {
   pendingStoryBattleIndex?: number | null;
   pendingStoryBattleNpc?: number | null;
   playerCastOne?: any;
-  playerCharOne?: any;
+  playerCharOne?: boolean | null;
   playerDrawBucket?: any;
   playerName: string;
   playSeconds: number;
@@ -209,7 +211,7 @@ export interface GameState {
   progressTable: ProgressOrdinalTable | null;
   replayLadder: { byStage: Record<string, any>; names: Record<string, any>; } | null;
   reserveEquipment: any;
-  reserveStats: any;
+  reserveStats: Record<string, DriStats | null>;
   rosterOwned?: number;
   rosterPredTable: any;
   sbIndex?: Record<string, ScriptedBattleRow[]>;
@@ -294,7 +296,7 @@ export interface NameEntryOptions {
 export type WalkBlend = number | false;
 
 // A wrapped chat message as web/chat.ts builds it: the packet bytes the box steps through.
-export type ChatPack = ChatPacket;
+export type ChatPack = ChatPacket & { pages: number; };
 
 // A screen object that may expose the optional quad wipe (save screen, book screens).
 export interface TransitionQuadScreen {
@@ -500,7 +502,7 @@ export interface StoryEvent {
   native_fn_ram?: number;
   on_complete_fn?: number;
   on_complete_fn_ram?: number;
-  disasm?: string[] | undefined;
+  disasm?: string[];
   esdmg_stage?: string | undefined;
   esdmg_entry?: number | null | undefined;
   esdmg_approx?: boolean;
@@ -759,6 +761,9 @@ export interface SpriteRecord {
   starter?: boolean;
 }
 
+/** What ensureMapImg resolves with: the base picture plus the extra layers loaded with it, or nothing when it was already up. */
+export type MapLoadResult = void | (void | HTMLImageElement)[];
+
 /** One map of assets/manifest.json. */
 export interface ManifestMap {
   id: string;
@@ -851,4 +856,10 @@ export interface PlacePoint {
   to?: string | null;
   screen: number;
   dirName?: string;
+}
+
+/** assets/data/gym_extra.json: the extra training halls and the ID cards that gate their rank (web/gym-extra.ts). */
+export interface GymExtraData {
+  halls?: GymExtraHall[];
+  cards: { platinum: number; silver: number; gold: number; };
 }

@@ -1,3 +1,4 @@
+import type { UiMatrix, UiRect } from "../ui-c/types.js";
 /** The script the box reveals: one page per screen, each a list of lines. */
 export interface TextboxDialogue {
   pages: string[][];
@@ -33,4 +34,22 @@ export interface TextboxState {
   /** the reveal clock, in seconds */
   t: number;
   update?: (dt: number) => void;
+}
+
+/** The frame's box in native 320x240 units that look C's overlay draws (web/ui-c/message.ts composeTalk): body, name, typed lines and the more marker. */
+export interface TextboxScene {
+  body: UiRect | undefined;
+  more: TextboxMore | null;
+  name: string | null | undefined;
+  runs: { text: string; x: number; y: number; kind: number; }[];
+}
+
+/** The "more" arrow's part descriptor, handed to composeTalk next to the captured parts. */
+export interface TextboxMore {
+  part: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rel: UiMatrix;
 }

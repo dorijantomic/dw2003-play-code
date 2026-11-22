@@ -12,30 +12,15 @@ import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount,
 import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 import type { MpFoe, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
+import type { MpLeagueState, MpNight } from "./types/mp-league.js";
 // the tamer ids of a Server Champ night are the room's peer ids: whole numbers (server/room-core.mjs checks Number.isInteger)
 interface MpLeaguePair { a: number; b: number; r: number; m: number; game: number; }
 
-interface MpLeagueMatch {
-  a: number;
-  b: number;
-  w?: number | null;
-  g?: number[];
-  bye?: boolean;
-  dead?: boolean;
-  wo?: boolean;
-}
+/** One bracket match of the night, as unpackLeague makes it. */
+type MpLeagueMatch = MpLeagueState;
 
 /** The Server Champ night as the dock reads it (unpackLeague in web/mp-league.ts makes it from the room's packed copy). */
-interface MpLeagueNight {
-  bestOf: number;
-  ids: number[];
-  dropped: number[];
-  r: number;
-  phase: string;
-  asked: boolean;
-  champ: number | null;
-  rounds: MpLeagueMatch[][];
-}
+type MpLeagueNight = MpNight;
 
 /** The room's packed bracket as it travels in one relay message (see packLeague in web/mp-league.ts). */
 interface MpLeagueWire {
@@ -288,7 +273,8 @@ function closeInspect() { inspectId = null; if (el.inspect) el.inspect.hidden = 
 function drawInspect() {
     if (inspectId == null || !el.inspect) return;
     const self = inspectId === myId();
-    const p: MpPlayerRow | null = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
+    // ETS item 9: self is true only when inspectId (a number) equals myId(), so myId() is not null here.
+    const p: MpPlayerRow | null = self ? { id: myId()!, name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
     if (!p) { closeInspect(); return; }
     const c = p.card;
     const box = el.inspect; box.hidden = false; box.replaceChildren();

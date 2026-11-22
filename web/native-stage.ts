@@ -25,11 +25,15 @@ import { NativeVblankClock } from "./vendor/engine.js";
 // enterNativeStage can run, so the stage boot stays synchronous.
 import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
 
-let manifest = null; // assets/native/manifest.json (null until loaded)
-let exeTables = null;
+import type { NativeHost } from "../engine/native/stubs.js";
+import type { NativeStageRuntime, StageManifestEntry } from "../engine/native/runtime.js";
+import type { NativeExeTables, NativeStageCurrent } from "./types/rest-c.js";
+
+let manifest: Record<string, StageManifestEntry> | null = null; // assets/native/manifest.json (null until loaded)
+let exeTables: NativeExeTables | null = null;
 let fieldstg: Uint8Array<ArrayBuffer> | null = null; // the resident field-engine image (registry + tables + code)
 const overlays: Record<string, Uint8Array<ArrayBuffer>> = {}; // stageId -> Uint8Array
-let current = null; // { stageId, rt, pointTable }
+let current: NativeStageCurrent | null = null; // { stageId, rt, pointTable }
 
 /** The console's vertical blanks, through the same clock the screen host steps
  *  its screens with (engine/systems/native-vblank-clock.ts). A stage's objects
@@ -48,7 +52,7 @@ const blanks = new NativeVblankClock();
  * same blanks. `seconds` is the frame's elapsed time; without it the clock
  * reads `performance.now()`.
  */
-export function advanceFieldBlanks(seconds?) {
+export function advanceFieldBlanks(seconds?: number) {
     return typeof seconds === "number"
         ? blanks.advance(seconds)
         : blanks.advanceFromStamp(typeof performance !== "undefined" ? performance.now() : 0);
@@ -69,7 +73,7 @@ export async function loadNativeStages() {
     exeTables = t;
     fieldstg = new Uint8Array(f);
     await Promise.all(
-        Object.entries(m as Record<string, { root_ctor: number }>)
+        Object.entries<StageManifestEntry>(m)
             .filter(([, e]) => e.root_ctor >= 0)
             .map(([id]) =>
                 fetch(`assets/native/${id}.bin`)
@@ -81,13 +85,13 @@ export async function loadNativeStages() {
 }
 
 /** Enter a stage: boot its native code if it has any. Synchronous. */
-export function enterNativeStage(stageId, host) {
+export function enterNativeStage(stageId: string, host: NativeHost) {
     current = null;
     const entry = manifest?.[stageId];
     const bytes = overlays[stageId];
     const ns = nativeRuntime();
     if (!entry || entry.root_ctor < 0 || !bytes || !ns) return null;
-    const rt = new ns.NativeStageRuntime(bytes, entry, host, exeTables, fieldstg ?? undefined);
+    const rt: NativeStageRuntime = new ns.NativeStageRuntime(bytes, entry, host, exeTables, fieldstg ?? undefined);
     if (!rt.boot()) {
         console.warn(`[native] ${stageId} boot trap:`, rt.bootTrap);
         return null;
@@ -111,7 +115,7 @@ export function enterNativeStage(stageId, host) {
  *  display service's own delta. A browser frame that owes no blank leaves the
  *  stage alone and keeps its recorded draw intents, which is why a 30 Hz monitor
  *  and a 144 Hz one show the same stage at the same speed. */
-export function tickNativeStage(stageId, deltas = advanceFieldBlanks()) {
+export function tickNativeStage(stageId: string, deltas: number[] = advanceFieldBlanks()) {
     if (!current || current.stageId !== stageId) return null;
     const { rt } = current;
     if (!deltas.length) return rt;
@@ -130,18 +134,19 @@ export function tickNativeStage(stageId, deltas = advanceFieldBlanks()) {
 }
 
 /** The live runtime + point-table base for the current stage (or null). */
-export function nativeStage(stageId) {
+export function nativeStage(stageId: string) {
     return current && current.stageId === stageId ? current : null;
 }
 
 /** SETANIM ≥ 0x320 route: fire the id on the current stage's native code.
  *  Returns true when consumed (the caller skips the generic emote bubble). */
-export function fireNativeEffect(id, anim, facing) {
+export function fireNativeEffect(id, anim: number, facing) {
     if (!current) return false;
     const ok = current.rt.fireEffect(id, anim, facing);
     if (ok) current.effects.set(id, anim);
     if (!ok && current.rt.disabled.length) {
-        const d = current.rt.disabled[current.rt.disabled.length - 1];
+        // ETS item 9: the `.length` test above proves the last entry exists.
+        const d = current.rt.disabled[current.rt.disabled.length - 1]!;
         if (d.reason.startsWith("fireEffect")) console.warn(`[native] ${current.stageId} ${d.reason}`);
     }
     return ok;

@@ -1,5 +1,7 @@
 import { questDone } from "../quests.js";
 import type { FightReportOptions } from "../types/fightreport-translated.js";
+import type { BattleState } from "../types/battle.js";
+import type { DriStats } from "../types/misc-game.js";
 import { FLY_QUEST, flyBlock, FLY_POINTS, flyCopyFor, arrivalSpot } from "../fly-points.js";
 import {
   rosterSlotOfCharId,
@@ -60,7 +62,7 @@ export function openFly(row: number) {
         const chosen = S.flyChosen; S.flyChosen = null;
         if (!chosen) { pauseHome(row); return; }
         flyTo(chosen.id).then((r) => { if (r !== "ok") questSpeak(null, "", "Not now."); });
-    }, state.keys as any);
+    }, state.keys);
 }
 
 /** Fly to a fly point: resolves "ok" or why not. Every rule is re-checked here, whoever asks (the book, the window.__fly hook). */
@@ -180,7 +182,7 @@ export async function playEndingChain(launchCode: number) {
 }
 
 // (shared with the multiplayer fight: `onClose` is what runs when the player leaves the screen)
-export function openNativeReport(b, onClose) {
+export function openNativeReport(b: BattleState, onClose: () => void) {
         const rows = b._winReportRows ?? [];
         const progress = b._winProgress ?? [];
         const party = Array.isArray(state.party) ? state.party : [];
@@ -204,7 +206,7 @@ export function openNativeReport(b, onClose) {
                 // (web/battle.js applyParticipantProgress applies them once, ahead of
                 // this screen); the screen replays the disc's rules from that snapshot
                 // on a private record and never writes EXP/level back.
-                const ps = pr?.before ?? b.playerRecords?.[pos]?.statsRecord ?? {};
+                const ps: DriStats = pr?.before ?? b.playerRecords?.[pos]?.statsRecord ?? {};
                 // The row flag byte at workspace +6 for this position. A position the
                 // outcome knocked out had it cleared (pro/wfightmn.s .L0x00002070),
                 // so it goes to the screen unflagged even though it still has a row.

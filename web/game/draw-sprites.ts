@@ -190,7 +190,7 @@ export function drawEntitySprite(meta: SpriteRecord, sheet: HTMLImageElement | u
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
 }
 
-function _drawEntitySpriteRaw(meta: SpriteRecord, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, dir: string, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip = null, walkBlend: WalkBlend = false): EntitySpriteDrawResult {
+function _drawEntitySpriteRaw(meta: SpriteRecord, sheet: HTMLImageElement | undefined, clipImg: HTMLImageElement | undefined, x: number, y: number, dir: string, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip: SpriteClipId | number | null = null, walkBlend: WalkBlend = false): EntitySpriteDrawResult {
     // walkBlend: false = off, else the seconds already elapsed inside the current field tick (walk-blend.js).
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));
@@ -254,4 +254,4 @@ export function devSnapshot() {
 // The trailing frame arguments drawEntitySprite forwards untouched: which clip a cutscene latched,
 // how far into it the draw is, the fallback frame, whether the body is moving, its idle clock and
 // the walk-blend seconds (false = off).
-type SpriteFrameArgs = [dir?: any, activeClip?: any, animTime?: any, fallbackFrameIdx?: any, isMoving?: any, idleTime?: any, movementClip?: any, walkBlend?: WalkBlend];
+type SpriteFrameArgs = [dir: string, activeClip: SpriteClipId | null | undefined, animTime: number | undefined, fallbackFrameIdx: number | undefined, isMoving: boolean | undefined, idleTime: number | undefined, movementClip?: SpriteClipId | number | null, walkBlend?: WalkBlend];

@@ -62,7 +62,8 @@ import { reseedLiveTree } from "./fishing-tree.js";
 import { stepPlayback } from "./field-steps.js";
 import { fieldcomTick } from "./field-fx.js";
 import { applyStoryCommand } from "./story-events.js";
-import type { CollisionGrid, ManifestMap, PlacePoint, SpawnPoint, StageExit } from "./types.js";
+import type { CollisionGrid, ManifestMap, MapLoadResult, PlacePoint, SpawnPoint, StageExit } from "./types.js";
+import type { StepPlayback } from "../../engine/systems/trigger-system.js";
 interface ActiveExit extends StageExit {
     aimed?: boolean;
     routeWords?: readonly number[];
@@ -227,7 +228,7 @@ export function effectsMapImg(id: string, part = "base") {
     return state.mapNativeImgs[id]?.[part] ?? null;
 }
 
-export function drawMapPicture(img: HTMLImageElement, tm: ReturnType<typeof tiledMap>, kind: string | null, ox: number, oy: number) {
+export function drawMapPicture(img: HTMLImageElement, tm: ReturnType<typeof tiledMap> | undefined, kind: string | null, ox: number, oy: number) {
     if (!tm) { ctx!.drawImage(img, ox, oy); return; }
     const key = `${tm.name}:${kind}`;
     if (!tilesComplete.get(key)) ctx!.drawImage(img, ox, oy);
@@ -236,7 +237,7 @@ export function drawMapPicture(img: HTMLImageElement, tm: ReturnType<typeof tile
     tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M - FIELD_VIEW_PAD, -oy - M, FIELD_VIEW_W + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
 }
 
-export function ensureMapImg(id: string) {
+export function ensureMapImg(id: string): Promise<MapLoadResult> {
     // HD: which maps are tiled decides what to load, so wait for the tile index once.
     if (HD_MAPS && !tileIndexReady()) return loadTileIndex().then(() => ensureMapImg(id));
     // The fg check sits before the early return: the overlay index can finish
@@ -803,7 +804,7 @@ export function activeExitAt(x = state.x, y = state.y): ActiveExit | null {
 // `activeExitAt`'s stage-change/dive branch. Null whenever the ordinal is not the
 // post-game marker, or the record names a screen this table has no shadow for, and the
 // caller then keeps the scene row's own `to`.
-function swappedStepDestination(pb) {
+function swappedStepDestination(pb: StepPlayback) {
     if (!screenRouterOptions.useAlt()) return null;
     const handoff = pb.effect?.handoff?.args?.[0];
     const screenId = handoff != null ? handoff : pb.effect?.actorCall?.args?.[0];

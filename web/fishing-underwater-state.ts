@@ -1,13 +1,24 @@
-interface ExtrasData {
-  stages?: Record<string | number, { area: string }>;
-  areas?: { id: string; theme: string }[];
+import type { FishingState } from "../engine/systems/fishing.js";
+import type { FishExtrasData } from "./types/misc-game2.js";
+
+/** One look of the scene (a THEMES entry): colours are 0xRRGGBB, fog is an exponential density. */
+export interface FishingThemeLook {
+  fog: number;
+  density: number;
+  top: number;
+  deep: number;
+  light: number;
+  shafts: number;
+  floor: string;
+  floorColor: number;
+  rocks: number;
+  mote: number;
 }
 
-interface FishingTheme {
-  surface: string;
-  mid: string;
-  deep: string;
-  light: string;
+/** state.fishing as the view reads it: the running cast, and the catch slot a strike is waiting on. */
+export interface FishingView {
+  pending?: number | null | undefined;
+  run?: FishingState | null | undefined;
 }
 // web/fishing-underwater-state.js — the pure half of the underwater fishing view.
 //
@@ -40,7 +51,7 @@ export const PHASES = ["idle", "cast", "wait", "strike", "bite", "miss", "reel",
  * `f` is state.fishing (or null = idle). The band is only read once the game
  * itself has set it (hold phase), so the view never shows the odds early.
  */
-export function phaseFor(f) {
+export function phaseFor(f: FishingView | null | undefined) {
     const run = f?.run;
     if (!run) return "idle";
     switch (run.phase) {
@@ -50,7 +61,8 @@ export function phaseFor(f) {
         case "hold":
             if (run.band == null) return "strike";
             return run.band === 1 || run.band === 2 ? "bite" : "miss";
-        case "over": return f.pending != null ? "reel" : "gone";
+        // ETS item 9: run is only set when f is, and the check above returned for a missing run.
+        case "over": return f!.pending != null ? "reel" : "gone";
         default: return "idle";
     }
 }
@@ -62,7 +74,7 @@ const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * cast = settle timer, wait = meter position, strike = speed braking to 0,
  * bite/miss = the hold timer. reel/gone have no counter (the view times them).
  */
-export function progressFor(f) {
+export function progressFor(f: FishingView | null | undefined) {
     const run = f?.run;
     if (!run) return 0;
     switch (run.phase) {
@@ -75,7 +87,7 @@ export function progressFor(f) {
 }
 
 /** Fish size class: the hooked band (1 = small card-sized catch, 2 = the big water Digimon). */
-export function sizeFor(f) {
+export function sizeFor(f: FishingView | null | undefined) {
     const band = f?.run?.band;
     return band === 1 ? "small" : band === 2 ? "big" : "shadow";
 }
@@ -85,7 +97,7 @@ export function sizeFor(f) {
  * oasis). Colours are 0xRRGGBB; fog is exponential density.
  * floor: "sand" | "rock" | "ice" | "mud".
  */
-export const THEMES = {
+export const THEMES: Record<string, FishingThemeLook> = {
     sea:    { fog: 0x0b5f80, density: 0.055, top: 0x2aa8c8, deep: 0x06324a, light: 0xbff4ff, shafts: 0.55, floor: "sand", floorColor: 0xd9c690, rocks: 4, mote: 0xd8f6ff },
     lake:   { fog: 0x1d6a62, density: 0.07,  top: 0x3aa39a, deep: 0x0a3b3a, light: 0xd8ffe8, shafts: 0.45, floor: "rock", floorColor: 0x8a8a70, rocks: 8, mote: 0xe6fff0 },
     cold:   { fog: 0x3a86b8, density: 0.06,  top: 0x9fd8f2, deep: 0x16486e, light: 0xeaf8ff, shafts: 0.6,  floor: "ice",  floorColor: 0xc8e4f0, rocks: 6, mote: 0xffffff },
@@ -97,15 +109,16 @@ export const THEMES = {
 export const DEFAULT_THEME = "lake";
 
 /** Theme id of a stage from the extras table (fishing_extras.json), falling back to the default. */
-export function themeIdFor(extrasData: ExtrasData | undefined, stage: string | number) {
+export function themeIdFor(extrasData: FishExtrasData | null | undefined, stage: string | number) {
     const rec = extrasData?.stages?.[stage];
     const area = rec ? (extrasData.areas ?? []).find((a) => a.id === rec.area) : null;
     return area && THEMES[area.theme] ? area.theme : DEFAULT_THEME;
 }
 
 /** The theme record of a stage. */
-export function themeFor(extrasData: ExtrasData | undefined, stage: string | number): FishingTheme {
-    return THEMES[themeIdFor(extrasData, stage)];
+export function themeFor(extrasData: FishExtrasData | null | undefined, stage: string | number): FishingThemeLook {
+    // ETS item 9: themeIdFor only returns a key THEMES has (a THEMES entry's own id, or DEFAULT_THEME).
+    return THEMES[themeIdFor(extrasData, stage)]!;
 }
 
 /**

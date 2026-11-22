@@ -456,7 +456,8 @@ export function render() {
             // Firefox: each drawImage from a WebGL canvas holds frames back; one copy + 2D strips is as fast as no grass (measured 12.3 -> 127.5 fps).
             if (!S._grassScratch) S._grassScratch = document.createElement("canvas");
             if (S._grassScratch!.width !== gc.width || S._grassScratch!.height !== gc.height) { S._grassScratch!.width = gc.width; S._grassScratch!.height = gc.height; }
-            const sctx = S._grassScratch!.getContext("2d");
+            // ETS item 9: a canvas that has only been asked for "2d" always gives a context.
+            const sctx = S._grassScratch!.getContext("2d")!;
             sctx.clearRect(0, 0, S._grassScratch!.width, S._grassScratch!.height);
             sctx.drawImage(gc, 0, 0);
             const gsrc = S._grassScratch;

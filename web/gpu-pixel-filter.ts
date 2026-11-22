@@ -293,10 +293,12 @@ let pumping = false;
 function pump() {
   const t0 = performance.now();
   while (queue.length && performance.now() - t0 < 6) {
-    const [image, name] = queue.shift();
+    // ETS item 9: the while test above proves the queue is not empty.
+    const [image, name] = queue.shift()!;
     let out = null;
     try { out = pixelFilterNow(image, name); } catch (error) { console.warn("[pixel filter]", error); }
-    cache.get(image).set(name, out);
+    // ETS item 9: pixelFiltered() sets the cache entry of an image before it queues it, and the queue holds the image.
+    cache.get(image)!.set(name, out);
   }
   if (queue.length) requestAnimationFrame(pump); else pumping = false;
 }
@@ -342,7 +344,7 @@ export function pixelFilteredFrame() { return frameCanvas; }
 
 /** Install the filter for the game canvas. `isHd()` true = HD Remaster: native images are filtered one
  * by one; false = Authentic: the whole frame is filtered. */
-export function installPixelFilter(stageEl, gameCanvas, isHd = () => false) {
+export function installPixelFilter(stageEl: HTMLElement, gameCanvas, isHd = () => false) {
   if (!stageEl || !gameCanvas) return;
   screens.add(gameCanvas);
   imageMode = isHd;

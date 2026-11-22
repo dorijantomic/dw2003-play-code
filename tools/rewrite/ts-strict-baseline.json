@@ -1,6 +1,6 @@
 {
- "total": 4710,
- "any": 877,
+ "total": 4617,
+ "any": 861,
  "files": {
   "engine/dw3/ui/folder-session.ts": {
    "errors": 1,
@@ -563,7 +563,7 @@
    "any": 0
   },
   "web/cardduel-native.ts": {
-   "errors": 9,
+   "errors": 4,
    "any": 0
   },
   "web/cardduel-net.ts": {
@@ -730,20 +730,12 @@
    "errors": 3,
    "any": 0
   },
-  "web/fishing-almanac.ts": {
-   "errors": 6,
-   "any": 0
-  },
   "web/fishing-extras.ts": {
    "errors": 4,
    "any": 0
   },
-  "web/fishing-underwater-state.ts": {
-   "errors": 5,
-   "any": 0
-  },
   "web/fishing-underwater.ts": {
-   "errors": 2,
+   "errors": 0,
    "any": 11
   },
   "web/flag-store.test.ts": {
@@ -783,7 +775,7 @@
    "any": 0
   },
   "web/game/auction-replay.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 0
   },
   "web/game/battle-launch.ts": {
@@ -792,7 +784,7 @@
   },
   "web/game/draw-sprites.ts": {
    "errors": 5,
-   "any": 7
+   "any": 0
   },
   "web/game/field-steps.ts": {
    "errors": 3,
@@ -807,7 +799,7 @@
    "any": 0
   },
   "web/game/init.ts": {
-   "errors": 5,
+   "errors": 3,
    "any": 1
   },
   "web/game/input.ts": {
@@ -815,19 +807,15 @@
    "any": 0
   },
   "web/game/map-load.ts": {
-   "errors": 6,
-   "any": 0
-  },
-  "web/game/mp-chat.ts": {
-   "errors": 1,
+   "errors": 3,
    "any": 0
   },
   "web/game/quest-scenes.ts": {
-   "errors": 18,
+   "errors": 8,
    "any": 0
   },
   "web/game/render.ts": {
-   "errors": 11,
+   "errors": 5,
    "any": 0
   },
   "web/game/session.ts": {
@@ -844,18 +832,18 @@
   },
   "web/game/types.ts": {
    "errors": 0,
-   "any": 54
+   "any": 50
   },
   "web/game/ui-openers.ts": {
-   "errors": 10,
-   "any": 1
+   "errors": 7,
+   "any": 0
   },
   "web/game/update.ts": {
    "errors": 10,
    "any": 0
   },
   "web/game/vars.ts": {
-   "errors": 20,
+   "errors": 12,
    "any": 0
   },
   "web/gate-text.ts": {
@@ -879,7 +867,7 @@
    "any": 0
   },
   "web/gpu-pixel-filter.ts": {
-   "errors": 20,
+   "errors": 17,
    "any": 0
   },
   "web/grass3d.ts": {
@@ -947,12 +935,12 @@
    "any": 0
   },
   "web/map-screen-book.ts": {
-   "errors": 1,
+   "errors": 17,
    "any": 0
   },
   "web/map-screen-model.ts": {
-   "errors": 17,
-   "any": 1
+   "errors": 1,
+   "any": 0
   },
   "web/map-tiles.ts": {
    "errors": 7,
@@ -1079,7 +1067,7 @@
    "any": 0
   },
   "web/native-stage.ts": {
-   "errors": 16,
+   "errors": 2,
    "any": 0
   },
   "web/options-book.ts": {
@@ -1210,10 +1198,6 @@
    "errors": 0,
    "any": 3
   },
-  "web/scenery3.ts": {
-   "errors": 15,
-   "any": 0
-  },
   "web/screendim.ts": {
    "errors": 1,
    "any": 0
@@ -1299,7 +1283,7 @@
    "any": 0
   },
   "web/textbox.ts": {
-   "errors": 9,
+   "errors": 1,
    "any": 0
   },
   "web/theatre-plan.ts": {
@@ -1361,10 +1345,6 @@
   "web/types/carddeck-translated.ts": {
    "errors": 0,
    "any": 1
-  },
-  "web/types/cardduel-native.ts": {
-   "errors": 0,
-   "any": 3
   },
   "web/types/cardshop-translated.ts": {
    "errors": 0,

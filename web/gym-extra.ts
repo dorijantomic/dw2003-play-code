@@ -1,6 +1,6 @@
 
 import type { InventoryRow } from "./game/types.js";
-interface GymExtraHall {
+export interface GymExtraHall {
   map: string;
   npc_id: string;
   trainer?: string;

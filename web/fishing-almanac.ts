@@ -1,17 +1,25 @@
+/** One catch slot of a stage in fishing_spots.json: the battle screen the strike starts. */
 interface AlmanacCatchSlot { screenId?: string | null; }
 
-interface AlmanacStageRecord extends AlmanacFishRecord { catch?: Record<string, AlmanacCatchSlot | undefined>; }
-
-interface AlmanacEncounterParty { length?: number; }
+/** A battle screen's party in field_encounters.json: one record per fighter, the first one names the catch. */
+type AlmanacEncounterParty = { name?: string }[];
 interface AlmanacSpot { x?: number; y?: number; offset?: number; }
 
-interface AlmanacFishRecord { spots?: AlmanacSpot[]; }
+/** One stage of fishing_spots.json: its spot records and its catch slots ("4", "7"). */
+interface AlmanacFishRecord { spots?: AlmanacSpot[]; catch?: Record<string, AlmanacCatchSlot | undefined>; }
 
-interface AlmanacCatch { screen: string; species: string; }
+/** One catch of a stage: the battle screen and the first party member's name; a missing half is null. */
+interface AlmanacCatch { screen: string | null; species: string | null; }
 
 interface AlmanacReward { dvexp: number; exp: number; bits: number; }
 
-interface AlmanacEntry { stage: string; name: string; spots: number; budget: number; cardmon: AlmanacCatch; water: AlmanacCatch; reward: AlmanacReward; }
+/** progression.json battle_rewards: an array indexed by screen id, each record [dvexp, exp, bits]. */
+type AlmanacRewardTable = [number, number, number][];
+
+/** manifest.maps: an array of { id, name } or an id -> name object. */
+type AlmanacMaps = { id?: string | number | null; name?: string }[] | Record<string, string>;
+
+interface AlmanacEntry { stage: string; name: string; spots: number; budget: number; cardmon: AlmanacCatch; water: AlmanacCatch; reward: AlmanacReward | null; }
 // web/fishing-almanac.js — the 46 fishing stages as one read-only table.
 //
 // Pure: no DOM, no fs, no fetch. The page (web/fishing-almanac.html) hands in
@@ -51,16 +59,16 @@ const CARDMON_SLOT = "4";
 const WATER_SLOT = "7";
 
 /** A stage id → name lookup from manifest.maps (array or id → name object). */
-function mapNameLookup(maps: Record<string, string>) {
+function mapNameLookup(maps: AlmanacMaps) {
     if (Array.isArray(maps)) {
-        const byId = new Map();
+        const byId = new Map<string, string>();
         for (const map of maps) {
             if (map && map.id != null) byId.set(String(map.id), map.name ?? "");
         }
-        return (id) => byId.get(String(id)) ?? "";
+        return (id: string | number) => byId.get(String(id)) ?? "";
     }
     if (maps && typeof maps === "object") {
-        return (id) => maps[String(id)] ?? "";
+        return (id: string | number) => maps[String(id)] ?? "";
     }
     return () => "";
 }
@@ -73,7 +81,7 @@ function mapNameLookup(maps: Record<string, string>) {
  * field_encounters.screens. A slot the stage does not carry, or a screen the
  * encounters table does not know, leaves the missing half null.
  */
-function catchAt(stageRecord: AlmanacStageRecord, slot: string, screens: Record<string, AlmanacEncounterParty | undefined>): { screen: string | null; species: string | null } {
+function catchAt(stageRecord: AlmanacFishRecord, slot: string, screens: Record<string, AlmanacEncounterParty | undefined>): { screen: string | null; species: string | null } {
     const record = stageRecord?.catch?.[slot];
     if (!record || record.screenId == null) return { screen: null, species: null };
     const party = screens?.[String(record.screenId)];
@@ -90,7 +98,7 @@ function catchAt(stageRecord: AlmanacStageRecord, slot: string, screens: Record<
  * record the water catch's screen pays — the area's own number. The page shows
  * the Cardmon catch's record too, through rewardFor.
  */
-export function almanac(fish: Record<string, AlmanacFishRecord>, screens: Record<string, string>, rewards: Record<string, AlmanacReward>, maps: Record<string, string>): AlmanacEntry[] {
+export function almanac(fish: Record<string, AlmanacFishRecord>, screens: Record<string, AlmanacEncounterParty | undefined>, rewards: AlmanacRewardTable | null | undefined, maps: AlmanacMaps): AlmanacEntry[] {
     const nameOf = mapNameLookup(maps);
     const stages = Object.keys(fish ?? {}).sort();
     return stages.map((stage) => {
@@ -119,13 +127,14 @@ export function cardmonStages(rows: AlmanacEntry[] | undefined): AlmanacEntry[] 
  * species, by species name. Ten rows today; a species' stages are the stage
  * ids whose slot-7 catch resolves to it.
  */
-export function waterIndex(rows) {
-    const bySpecies = new Map();
+export function waterIndex(rows: AlmanacEntry[] | null | undefined) {
+    const bySpecies = new Map<string, string[]>();
     for (const row of rows ?? []) {
         const species = row?.water?.species;
         if (!species) continue;
         if (!bySpecies.has(species)) bySpecies.set(species, []);
-        bySpecies.get(species).push(row.stage);
+        // ETS item 9: the line above puts an entry for the species when the map had none.
+        bySpecies.get(species)!.push(row.stage);
     }
     return [...bySpecies.keys()].sort().map((species) => ({ species, stages: bySpecies.get(species) }));
 }
@@ -136,7 +145,7 @@ export function waterIndex(rows) {
  * The field line passes the live `state.fishingBudget` (or FISHING_BUDGET
  * before the first cast); a missing number means a fresh visit.
  */
-export function castsLeft(budget: number) {
+export function castsLeft(budget: number | null | undefined) {
     const n = Number(budget);
     if (!Number.isFinite(n)) return CASTS_PER_VISIT;
     return Math.max(0, Math.min(CASTS_PER_VISIT, Math.floor(n)));
@@ -148,7 +157,7 @@ export function castsLeft(budget: number) {
  * indexed by screen id, each record `[dvexp, exp, bits]`; an index past the
  * end (or no table at all) is unknown, never zero.
  */
-export function rewardFor(rewards: Record<string, AlmanacReward>, screenId) {
+export function rewardFor(rewards: AlmanacRewardTable | null | undefined, screenId: string | number | null | undefined) {
     if (screenId == null) return null;
     const id = Number(screenId);
     if (!Number.isInteger(id) || id < 0) return null;

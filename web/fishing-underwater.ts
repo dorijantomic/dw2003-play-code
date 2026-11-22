@@ -295,7 +295,8 @@ let appliedTheme = "";
 function applyTheme(id: string) {
     if (id === appliedTheme) return;
     appliedTheme = id;
-    const t = THEMES[id];
+    // ETS item 9: id comes from themeIdFor, which only returns keys THEMES has.
+    const t = THEMES[id]!;
     uFog.value.set(t.fog); uTop.value.set(t.top); uDeep.value.set(t.deep);
     uLight.value.set(t.light); uMote.value.set(t.mote); uFloor.value.set(t.floorColor);
     uDensity.value = t.density; uShafts.value = t.shafts;
