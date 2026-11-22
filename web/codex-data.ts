@@ -10,6 +10,8 @@
 // web/glossary-digimon.js reads these rows; the future glossary ITEMS page reads the drop index.
 // The odds are the disc's, not a percentage: a rate byte of 128 means 129 in 1024 per win.
 import type { CodexRow, CodexSkill, StageEncounters } from "./types/codex-data.js";
+import type { DigimonRecord } from './types/battle.js';
+
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
@@ -24,7 +26,7 @@ const pick = (source, keys: string[]) =>
  * `digimon` may be the whole JSON object or just the profile array; `skills` overrides the
  * JSON's own list when given.
  */
-export function partnerRows(digimon, skills) {
+export function partnerRows(digimon: DigimonRecord[] | { digimon: DigimonRecord[]; skills?: CodexSkill[] }, skills: CodexSkill[] | undefined) {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   const skillList = Array.isArray(skills) ? skills : Array.isArray(digimon) ? [] : digimon?.skills ?? [];
   const skillById = new Map<number, CodexSkill>(skillList.map((s) => [s.id, s]));

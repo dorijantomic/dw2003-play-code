@@ -51,18 +51,18 @@ function epxRule(at, x: number, y: number) {
 // neighbour read per pixel (the port reads P and S once per row).  luma = Rec.709 like the port, in integers
 // (x10000) so gpu-pixel-filter.js makes exactly the same comparisons.
 function luma(c: number) { return 2126 * (c & 255) + 7152 * ((c >>> 8) & 255) + 722 * ((c >>> 16) & 255); }
-function mmpxRule(at, x: number, y: number) {
+function mmpxRule(at: (x: number, y: number) => number, x: number, y: number): [number, number, number, number] {
   const A = at(x - 1, y - 1), B = at(x, y - 1), C = at(x + 1, y - 1);
   const D = at(x - 1, y), E = at(x, y), F = at(x + 1, y);
   const G = at(x - 1, y + 1), H = at(x, y + 1), I = at(x + 1, y + 1);
   const P = at(x, y - 2), Q = at(x - 2, y), R = at(x + 2, y), S = at(x, y + 2);
   const Bl = luma(B), Dl = luma(D), El = luma(E), Fl = luma(F), Hl = luma(H);
-  const any3 = (b, a0, a1, a2) => b === a0 || b === a1 || b === a2;
-  const all2 = (b, a0, a1) => b === a0 && b === a1;
-  const all3 = (b, a0, a1, a2) => b === a0 && b === a1 && b === a2;
-  const all4 = (b, a0, a1, a2, a3) => b === a0 && b === a1 && b === a2 && b === a3;
-  const none2 = (b, a0, a1) => b !== a0 && b !== a1;
-  const none4 = (b, a0, a1, a2, a3) => b !== a0 && b !== a1 && b !== a2 && b !== a3;
+  const any3 = (b: number, a0: number, a1: number, a2: number) => b === a0 || b === a1 || b === a2;
+  const all2 = (b: number, a0: number, a1: number) => b === a0 && b === a1;
+  const all3 = (b: number, a0: number, a1: number, a2: number) => b === a0 && b === a1 && b === a2;
+  const all4 = (b: number, a0: number, a1: number, a2: number, a3: number) => b === a0 && b === a1 && b === a2 && b === a3;
+  const none2 = (b: number, a0: number, a1: number) => b !== a0 && b !== a1;
+  const none4 = (b: number, a0: number, a1: number, a2: number, a3: number) => b !== a0 && b !== a1 && b !== a2 && b !== a3;
   let J = E, K = E, L = E, M = E;
   // 1:1 slope rules
   if ((D === B && D !== H && D !== F) && (El >= Dl || E === A) && any3(E, A, C, G) && ((El < Dl) || A !== D || E !== P || E !== Q)) J = D;

@@ -76,7 +76,7 @@ export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof 
             }
         },
         /** Paint over everything else. `viewW` x `viewH` is the canvas (640 x 480), `padL` the wide-screen pad each side. */
-        draw(ctx, viewW, viewH, padL = 0, sidesByField = false) {
+        draw(ctx: CanvasRenderingContext2D, viewW: number, viewH: number, padL = 0, sidesByField = false) {
             if (!book) return;
             ctx.save();
             // sidesByField (wide overworld): the field cover dims the strips (web/game.js drawWideSideCovers), so the dim and the wall stop at the box.

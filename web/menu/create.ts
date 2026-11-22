@@ -69,6 +69,11 @@ import { _drawDetail, _drawSeeDigivolve } from "./draw-digivolve.js";
 import type { MenuState } from "./types.js";
 
 import type { GameState } from "../game/types.js";
+import type { RosterMember, DigimonRecord } from '../types/battle.js';
+interface RosterViewEntry extends RosterMember {
+  profile?: DigimonRecord;
+}
+
 export function createMenu(sfx = null) {
   const backdrop = createStatusBackdrop();
   const m = {
@@ -305,7 +310,7 @@ export function createMenu(sfx = null) {
     if (changed) localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
   }
 
-  function roster(state: GameState) {
+  function roster(state: GameState): RosterViewEntry[] {
     ensurePartyStats(state);
     return partyRosterView(state.party, state.partnerStats, state.partyStats, m.digimonDB ?? {}, state.digimonNames);
   }

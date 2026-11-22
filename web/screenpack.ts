@@ -11,6 +11,23 @@ import { loadAssetImage } from "./assets.js";
 import { registerPausePanels } from "./panel-kit.js";
 import { noteBackdropBlend } from "./battle-layer.js";
 import { clipHook } from "./ui-c/capture.js";
+interface ScreenPack {
+  name: string;
+  img: HTMLImageElement | null;
+  map: ScreenPackSheet | null;
+  ids: ScreenPackIds | null;
+  patterns: Record<string, CanvasPattern>;
+}
+
+interface ScreenPackSheet {
+  ids?: ScreenPackIds;
+  [key: string]: ScreenPackIds | number[] | undefined;
+}
+
+interface ScreenPackIds {
+  [clip: string]: number[] | undefined;
+}
+
 
 const packs = {}; // name -> { img, map, ids, patterns }
 
@@ -23,7 +40,7 @@ const packs = {}; // name -> { img, map, ids, patterns }
 // any OTHER reason should still be visible.
 const ABSENT_PACKS = new Set();
 
-export function loadPack(name) {
+export function loadPack(name: string): ScreenPack {
   if (packs[name]) return packs[name];
   // patterns is keyed by clip id, not one per pack: sttrng3 alone holds eight
   // different scrolling walls (0x2d..0x34, one per training ground), so a

@@ -34,6 +34,11 @@
 //     launch / world spawn fires inside the hide window.
 import { skillRowsForName } from "./fight-tables.js";
 import { shotsFor } from "./digimon-anatomy.js";
+interface OwnClipModel {
+  actions?: OwnClipRec[];
+  folder?: string | number;
+}
+
 
 // The disc's clip families (clips.md §5): 9/13 the casts, 15/16 the field/throw casts; 5,6,7,8,14 the
 // contact families. A move on a cast clip is a shot whatever the model does.
@@ -244,7 +249,7 @@ function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
  * `tech` is the technique's NAME, the key the animator has (techName) and the anatomy's tables use; the
  * skills row is found by that name and narrowed by the clip when one name covers several rows.
  */
-export function moveKind(model, clip: number, tech) {
+export function moveKind(model: OwnClipModel, clip: number, tech) {
   const rows = (tech ? skillRowsForName(tech) : []).filter((r: { clip: number; }) => clip == null || (r.clip | 0) === (clip | 0));
   const cats = new Set(rows.map((r) => String(r.attack_category || "")));
   const cat = cats.size === 1 ? [...cats][0] : null;
@@ -261,7 +266,7 @@ export function moveKind(model, clip: number, tech) {
 }
 
 /** The model's own clip of `kind`: its own casting clip first for a shot, its own attack for a blow. */
-export function pickOwnClip(model, kind: string) {
+export function pickOwnClip(model: OwnClipModel, kind: string) {
   const inv = ownClipInventory(model);
   const list = Object.values(inv.slots).filter((r) => (kind === "shoot" ? r.launches!.length > 0 : r.contacts!.length > 0));
   if (!list.length) return null;
@@ -280,7 +285,7 @@ export function pickOwnClip(model, kind: string) {
  * heal/support move is never planned (its calm self cast is the right shape), an item is not a
  * technique (the animator passes no tech for it) and an unknown move kind is not guessed.
  */
-export function ownClipPlan(model, clip: number, { tech = null, target = "enemy" } = {}) {
+export function ownClipPlan(model: OwnClipModel, clip: number, { tech = null, target = "enemy" } = {}) {
   if (!ownClipsEnabled() || !model || clip == null || !tech) return null;
   if (target === "self") return null;
   if (hasOps(model.actions?.[clip])) return null;

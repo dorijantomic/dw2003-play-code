@@ -7,6 +7,9 @@
 import { applyRel, dx, dy } from "./geometry.js";
 import { isCursorToken, badgeSvg } from "./icons.js";
 import { N, textPart, plate, rowPlate, cursor, typeWord, badgeText, stripes, cardBar } from "./base.js";
+import type { UiCapturePart, UiPart, UiRun } from './types.js';
+type HomeClip = UiCapturePart & { part: string; x: number; y: number };
+
 
 const STD = { header: { x: 34, y: 13 }, panel: { x: 168, y: 40 }, money: { x: 0, y: 158 } };
 const CARD_H = 42, CARD_W_RUNS = 116, ROW_PITCH = 14, FIRST_ROW_TEXT_DY = 9;     // list label pen sits 9 native below the panel top
@@ -67,9 +70,9 @@ export function partyCard(i: number, part, namePart, card, out, v = CARD_VARIANT
     }
 }
 
-const composeCard = (i: number, part: { y: number; }, namePart, runs, out) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
+const composeCard = (i: number, part: { y: number; }, namePart: HomeClip | null, runs: UiRun[], out) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
 
-function composeHeader(part, runs, out) {
+function composeHeader(part: HomeClip, runs: UiRun[], out) {
     const rel = part.rel, ox = part.x - STD.header.x, oy = part.y - STD.header.y, f = at(rel, ox, oy);
     out.push({ key: "header.plate", kind: "plate", part: "header", layer: "under", rect: f(520, 42, 760, 64), shape: "sl", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     const run = runs.find((r: { x: number; y: number; }) => inRegion(r, 120, 400, part.y, part.y + 22));
@@ -117,7 +120,7 @@ function composePanel(part, runs, out, word = "MENU") {
  * parts = the claimed clips in draw order [{ part, pack, id, x, y, rel }], runs = the text runs captured in the scope.
  * Returns the descriptors (native space) in paint order; `full: true` = the whole bleed limit.
  */
-export function composePauseHome({ parts, runs }) {
+export function composePauseHome({ parts, runs }: { parts: HomeClip[]; runs: UiRun[] }): UiPart[] {
     const of = (name: string) => parts.filter((p: { part: string; }) => p.part === name);
     const panel = of("panel")[0], header = of("header")[0], money = of("money")[0], back = of("backdrop")[0];
     const cards = of("card").sort((a: { y: number; }, b: { y: number; }) => a.y - b.y);

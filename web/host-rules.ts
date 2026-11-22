@@ -60,7 +60,7 @@ export function createRuleOverride(fx: AmbienceSettings) {
     const host = new Map();      // key -> the host's value
     const unlock = (k: string | number) => { fx[k] = own.get(k); own.delete(k); host.delete(k); };
     return {
-        apply(rules) {
+        apply(rules: Record<string, boolean>) {
             const next = cleanRules(rules);
             for (const k of [...host.keys()]) if (!(k in next)) unlock(k);
             for (const [k, v] of Object.entries(next)) {

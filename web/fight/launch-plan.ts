@@ -22,6 +22,16 @@ import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
 import type { LaunchOpsSpec } from "./types.js";
+interface TipPointModel {
+  folder: string;
+}
+
+interface TipPointPoint {
+  source: string;
+  id: string;
+  bone: string;
+}
+
 
 /** The furthest a shot's spawn point may sit from its emitter's bone tip, as a share of body height. */
 export const LAUNCH_SPREAD = 0.03;
@@ -313,7 +323,7 @@ export function emitterTip(model, folder: string | number, id, bone: string | nu
 }
 
 /** The point a plan point was taken from, recomputed for a frame: the C11/C15 cross-check. */
-export function tipPointFor(model, point, frame = null) {
+export function tipPointFor(model: TipPointModel, point: TipPointPoint, frame = null): number[] | null {
   if (!model || !point) return null;
   const { folder } = model;
   const window = frame == null ? null : [{ frame, pos: restPose(model, frame).pos, rot: restPose(model, frame).rot }];

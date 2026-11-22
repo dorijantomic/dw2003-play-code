@@ -13,6 +13,21 @@ import {
 } from "./k16-rig.js";
 import { k23Cloud, k23NeutralFrame } from "./world.js";
 import type { RetargetBake } from "./types.js";
+import type { RetargetModel, RigProp } from "./types.js";
+interface HandPointResult {
+  bone: number;
+  weapon: boolean;
+  x: number;
+  y: number;
+  z: number;
+  frame: number;
+}
+
+interface HandPointOptions {
+  table?: string | null;
+  side?: RigProp["side"] | null;
+}
+
 
 /**
  * The retarget entry point. Candidates, best first:
@@ -112,7 +127,7 @@ const angBetween = (a: number[], b: number[]) => {
  * disc's own packs launch (Gallantmon's raw op6 x is his lance bone's x, y is 7424 = above the head).
  * `table` is the baked cast table on the model; without one the rest pose is used.
  */
-export function handPoint(model, { table = null, side = null } = {}) {
+export function handPoint(model: RetargetModel, { table = null, side = null } = {}): HandPointResult | null {
   if (!model) return null;
   const roles = rolesOf(model);
   const own = roles.props.length

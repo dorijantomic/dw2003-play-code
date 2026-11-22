@@ -42,6 +42,8 @@ import { ensureFormLedger } from "./dri-model.js";
 import { persistDriState } from "./dri.js";
 import type { GameState } from "./game/types.js";
 import type { DriHost } from "./types/dri-native.js";
+type SlotStatBlock = NonNullable<GameState["partnerStats"]>;
+
 
 const MODULE_ID = "pro/stgdglab";
 const SAVE_CONTEXT = 0x80048d34;
@@ -101,7 +103,7 @@ export function ownedSlots(state, { includeParty = false } = {}) {
 /** The walker's stats object for a roster slot: the deployed party's live
  *  block, or the reserve store keyed by character id. Shared with web/game.js
  *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
-export function slotStats(state: GameState, slot: number) {
+export function slotStats(state: GameState, slot: number): SlotStatBlock | null {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId!);
     if (pos === 0) return state.partnerStats ?? null;

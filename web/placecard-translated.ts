@@ -16,6 +16,10 @@ import { ui } from "./vendor/engine.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import * as uiC from "./ui-c/index.js";
 import { composePlaceCard } from "./ui-c/message.js";
+interface PlaceCardComposeScreen {
+  runs: string[];
+}
+
 
 let cardCount = 0;
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
@@ -172,7 +176,7 @@ export function createPlaceCardTranslated() {
         // look C (web/ui-c, task T6): the bars become the C6b card in the game's own rects and paint order, the names the game's typed runs;
         // the slit is the layer's clip. When the overlay cannot draw, the same code paints the pixels.
         card._key ??= `placecardT${++cardCount}`;
-        uiC.scope(card._key, ctx, { enable: true, clip: slit, compose: (sc) => composePlaceCard(sc, { quads }) }, () => {
+        uiC.scope(card._key, ctx, { enable: true, clip: slit, compose: (sc: PlaceCardComposeScreen) => composePlaceCard(sc, { quads }) }, () => {
             // Paint order: the GPU walks the bar entry from its head, so the first quad is the bottom one.
             if (!uiC.capturing()) for (const q of quads) {
                 if (!q.w || !q.h) continue;

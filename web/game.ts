@@ -46,6 +46,8 @@ import { bindCardShopInventory } from "./cardshop-translated.js";
 import { loadCatalog, loadStarter, ensureStarterFolder, cards, persistCollection, catalog as cardCatalog } from "./cardstate.js";
 import { buildFightReportPages } from "./battle.js";
 import { restoreWindowFill } from "./fullscreen.js";
+import type { BattleState } from './types/battle.js';
+
 restoreWindowFill(document);
 import { loadPlaceCardTranslated } from "./placecard-translated.js";
 import { asButton } from "./input.js";
@@ -184,7 +186,7 @@ installMpBattle({
     stageEl: document.getElementById("stage"),
     getKit: () => battle.mpKit(),
     sfx, bgm, mapId: () => currentMap()?.id ?? null, languageByte: () => state.languageByte,
-    openReport: (b, onClose) => openNativeReport(b, onClose),
+    openReport: (b: BattleState, onClose: () => void) => openNativeReport(b, onClose),
     myId: () => myId() ?? 1, myName: () => myName() || state.playerName || "Tamer",
     practice: (o) => mpbPractice(o),
     nameOf: (id) => peerOf(id)?.name ?? myName(),
@@ -657,7 +659,7 @@ window.__stageObjects = {
     // The same route a cutscene SETANIM takes, with the second operand, so a
     // verifier can fire the stage overlays' own point-record actors
     // (engine/systems/point-record-actor.ts) the way their scripts do.
-    fireSub: (id, sub, mapId) => fireStageObject(mapId ?? currentMap().id, id, sub),
+    fireSub: (id: string, sub: string, mapId: string | undefined) => fireStageObject(mapId ?? currentMap().id, id, sub),
     // Rockfall oracle only: run the same id through the MIPS interpreter so a
     // verifier can compare the original machine code's frames with the port's.
     nativeFire: (id, mapId) => fireNativeStageObject(mapId ?? currentMap().id, id),

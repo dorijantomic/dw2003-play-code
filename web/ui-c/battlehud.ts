@@ -74,7 +74,7 @@ export function turnArc(S: { x1: number; x0: number; y0: number; }, now: string,
     });
 }
 /** A counter blow named in the full message line ("<Name> countered for N damage!"): the pop lands on the side opposite the one that countered. */
-export function classifyCounter(line, who, note) {
+export function classifyCounter(line, who: { player: string; enemy: string; actor: string; }, note) {
     const t = String(line ?? "").replace(/\s+/g, " ").trim(), m = t.match(/countered for (\d+) damage/i);
     if (!m) return null;
     const by = [who.player, who.enemy].filter(Boolean).find((nm) => t.includes(nm + " countered")) ?? null;
@@ -174,7 +174,7 @@ export function joinNumbers(list) {
     return out;
 }
 /** Runs inside a box that are not row labels: numbers stay numbers (amber), small labels dim, as generic.runText does. */
-const boxRuns = (key: string, list, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out, on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
+const boxRuns = (key: string, list, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out: UiPart[], on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
 
 /**
  * The battle screen. `cfg.view` = the close-up's window (native, BATTLE_UI_LAYOUT.portraitView): the bezel leaves it open.

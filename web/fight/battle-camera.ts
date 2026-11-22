@@ -16,6 +16,11 @@ import {
 import type { ShotNode } from "./types.js";
 
 import type { PlacementTable } from "../types/battle3d.js";
+interface FaceBoxShot {
+  eye: number[];
+  target: number[];
+}
+
 // camera_view_matrix ledger: F0x8002a1ac builds a STANDARD look-at view matrix (data-confirmed
 // to ~0.3 deg), with the eye/target/H living in the live cam struct D0x800a46d8. buildView here
 // reproduces that look-at exactly (== battle3d.mat4LookAt at roll=0), plus an optional roll.
@@ -251,7 +256,7 @@ export function faceBoxFovY(H, screenH = FACE_BOX_RECT.h) {
 export const FACE_BOX_ASPECT = FACE_BOX_RECT.w / FACE_BOX_RECT.h;
 
 /** The look-at F0x8002a1ac builds from a face-box shot, as a render-space view matrix. */
-export function faceBoxView(shot) {
+export function faceBoxView(shot: FaceBoxShot) {
   // The render-space CLOSED FORM of the console's look-at — the same basis the port's
   // lookAtView builds (the ledger's own shader: F0x8002a1ac is a standard look-at,
   // data-confirmed to ~0.3 deg), on the renderer's axes and units. Kept as the

@@ -10,6 +10,16 @@ import { composeDeck } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards, persistCollection, loadCatalog, catalog, loadCardIcons, drawCardIcon } from "./cardstate.js";
 import type { CardDeckScreen } from "./types/carddeck-translated.js";
+interface CardDeckBank {
+  offset: number;
+  bytes: Uint8Array;
+}
+interface CardDeckLoadedData {
+  resident: Awaited<ReturnType<typeof loadResidentResources>>;
+  banks: CardDeckBank[];
+  tables: Record<string, Uint8Array>;
+}
+
 
 // 1904 = namedt: the folder rename is the name keyboard (without it every keyboard clip was skipped, text only)
 const PACKS = { 1598: "stcdsp", 1904: "namedt" };
@@ -28,7 +38,7 @@ const BANK_SOURCES = [
 ];
 
 let dataPromise = null;
-function loadData(language: number | undefined) {
+function loadData(language: number | undefined): Promise<CardDeckLoadedData> {
   dataPromise ??= loadAll(language).catch((error) => { dataPromise = null; throw error; });
   return dataPromise;
 }

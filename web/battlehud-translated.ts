@@ -30,6 +30,35 @@ import { battleAilmentByte } from "./battlecmd-translated.js";
 import type { BattleHudPipsOptions, RecordMemory } from "./types/battlehud-translated.js";
 
 import type { BattleState } from "./types/battle.js";
+interface DvPaintPart {
+    cel: number;
+    x: number;
+    y: number;
+}
+
+interface DvPaintFill {
+    x: number;
+    y: number;
+    width: number;
+}
+
+interface DvPaintTrough {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    rgb: number[][];
+}
+
+interface DvPaintFrame {
+    outer: DvPaintPart;
+    inner: DvPaintPart;
+    fill: DvPaintFill;
+    fillCel: number;
+    trough: DvPaintTrough;
+    backing?: boolean;
+}
+
 const {
   BATTLE_HUD_ACTIVE_SLOT, BATTLE_HUD_BANK_SEPARATOR, BATTLE_HUD_DV_FILL_CEL_FILLING,
   BATTLE_HUD_DV_FILL_CEL_FULL, BATTLE_HUD_DV_FRAME_CEL_INNER, BATTLE_HUD_DV_FRAME_CEL_OUTER,
@@ -250,7 +279,7 @@ export const BATTLE_HUD_DV_PAINT_INNER_FRAME = false;
  * clips the source rectangle to `gauge/25` native pixels, which is what the walker
  * already did.
  */
-export function battleHudDvPaint(ctx: CanvasRenderingContext2D | undefined, frame, packs) {
+export function battleHudDvPaint(ctx: CanvasRenderingContext2D | undefined, frame: DvPaintFrame, packs: { pgfgc00?: Parameters<typeof packReady>[0] } | undefined) {
     const pack = packs?.pgfgc00 ?? null;
     const ready = !!pack && packReady(pack);
     if (ready) drawClip(ctx, pack, String(frame.outer.cel), frame.outer.x, frame.outer.y);

@@ -15,9 +15,10 @@ import { composeBandWindow } from "./message.js";
 import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
+import type { UiRect } from "./types.js";
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
-const lbl = (key: string, str: string | undefined, rect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
+const lbl = (key: string, str: string | undefined, rect: UiRect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
 export const takeIn = (runs, rc, used: Set<unknown>, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
 

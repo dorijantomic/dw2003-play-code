@@ -16,19 +16,28 @@ import { isCursorToken } from "./icons.js";
 import { N, ID, textPart, plate, rule, rowPlate, cursor, corners, elementChip, ELEMENTS, stripes, TAB, tabPlate, tabTitle } from "./base.js";
 import { restOfRuns } from "./generic.js";
 import type { UiRect, UiSheetDef, UiTextOpts } from "./types.js";
+interface SheetRun {
+  x: number;
+  y: number;
+  text?: string;
+  right?: number;
+  w?: number;
+  h?: number;
+}
+
 
 /** C4 sizes in native units: the header window starts at 616 dp; tab 390 x 46 dp; the panel body 18 dp right / 9 below the tab; rows 40 dp right / 17 below. */
 export const SHEET = Object.freeze({
     headerX: dx(616), tabW: TAB.w, tabH: TAB.h, bodyDx: N(18), bodyDy: 9, rowDx: N(40), rowDy: 17, pitch: 14, rowH: 12, push: 12, lead: 8,
 });
 const isNum = (t) => /^[0-9]+$/.test(String(t).trim());
-const mid = (r) => r.y + 4.5;
+const mid = (r: SheetRun) => r.y + 4.5;
 /** The native rect of a claimed clip before its matrix (the game's draw position + the clip's pixel bounds). */
 export const localRect = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
 /** A rect that runs on to the right screen edge (the C panels bleed right). */
 const toRight = (x: number, y, h: number, right = 320) => ({ x, y, w: Math.max(right, 320) - x, h });
-const inside = (r, rc) => r.x >= rc.x - 1 && r.x < rc.x + rc.w && mid(r) >= rc.y && mid(r) < rc.y + rc.h;
-const take = (runs, used: Set<unknown>, rc: UiRect) => runs.filter((r) => !used.has(r) && inside(r, rc));
+const inside = (r: SheetRun, rc) => r.x >= rc.x - 1 && r.x < rc.x + rc.w && mid(r) >= rc.y && mid(r) < rc.y + rc.h;
+const take = (runs: SheetRun[], used: Set<unknown>, rc: UiRect): SheetRun[] => runs.filter((r) => !used.has(r) && inside(r, rc));
 
 // ------------------------------------------------------------------------------------------------ text helpers
 const label = (key: string, m, rect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) => textPart(key, "label", m.text, applyRel(rect, rel), o.sizeDp ?? 24, o.lineDp ?? 36, { color: o.color ?? m.face ?? null, rel, maxDp: o.maxDp ?? 0 });
@@ -298,7 +307,7 @@ export function composeVictory({ parts, runs, stage }, cfg) {
     const lines = (band ? take(runs, used, localRect(band)) : []).filter((m) => !isCursorToken(m.text)).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x).map((m) => String(m.text).trim()).filter(Boolean);
     runs.forEach((m) => used.add(m));                 // everything else of the native page is replaced by the part
     const head = lines[0] ?? "", rest = lines.slice(1).join(" ").trim();
-    const num = (t) => Number(String(t).replace(/[^0-9]/g, "")) || 0;
+    const num = (t: string) => Number(String(t).replace(/[^0-9]/g, "")) || 0;
     const d = { key: "vic", kind: "vic", part: "vic", layer: "over", rect: { x: S.x0, y: S.y0, w: S.x1 - S.x0, h: S.y1 - S.y0 }, sx: 1, sy: 1, page: "text", big: lines.join(" "), small: "" } as UiSheetDef;
     if (/exp/i.test(head) && (v.partners ?? []).length) {
         const rows = v.rows ?? [];

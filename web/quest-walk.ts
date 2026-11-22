@@ -1,3 +1,8 @@
+interface QuestReachGrid {
+    cols: number;
+    rows: number;
+    cell: number;
+}
 // Quest scenes: walkable ground.
 //
 // A scripted walk hands the game's cutscene VM a target point, and the VM's walk driver steps the character toward it in
@@ -234,7 +239,7 @@ export function questWalkLegs(grid, ax: number | undefined, ay: number | undefin
  * Connected components of standable cells (8-connected, no cutting a wall corner): `labels` is one int per cell (-1 =
  * not standable) and two cells share a label exactly when a character can walk between them.
  */
-export function questComponents(grid) {
+export function questComponents(grid: QuestReachGrid) {
     if (!grid) return { labels: new Int32Array(0), sizes: [] };
     const { cols, rows } = grid;
     const labels = new Int32Array(cols * rows).fill(-1);
@@ -273,7 +278,7 @@ export function questComponents(grid) {
  * Everything else is a sealed pocket — ground drawn on the map that nothing can walk to. `reach` is one byte per cell,
  * 1 = reachable.
  */
-export function questReachArea(grid, seeds = [], links = []) {
+export function questReachArea(grid: QuestReachGrid, seeds = [], links = []) {
     const { cols, rows } = grid || { cols: 0, rows: 0 };
     const { labels, sizes } = questComponents(grid);
     const parent = sizes.map((_, i) => i);

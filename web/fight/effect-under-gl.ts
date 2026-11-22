@@ -11,6 +11,27 @@
 // The placement comes from spriteGeometry()/spriteCorners() in effect-player.js, the same maths the
 // 2D pass (drawEffects) uses.
 import { effectClip, spriteGeometry, spriteCorners } from "./effect-player.js";
+interface UnderEffectSprite {
+  /** archive key into manifest.archives and images */
+  arch: string | number;
+}
+
+interface UnderEffectArchive {
+  /** parsed clip table for this archive, consumed by effectClip() */
+  readonly clips?: Record<string, readonly number[]>;
+}
+
+interface UnderEffectManifest {
+  archives: Record<string, UnderEffectArchive>;
+}
+
+interface UnderEffectView {
+  centerX: number;
+  centerY: number;
+  pxScale: number;
+  worldToScreen: (x: number, y: number, z: number) => { x: number; y: number } | null;
+}
+
 
 const VS = "attribute vec2 aP; attribute vec2 aT; varying vec2 vT; void main(){ vT = aT; gl_Position = vec4(aP, 0.0, 1.0); }";
 // Same sampling as drawEffects: the UV is clamped inside the clip rect (the source rect of drawImage never
@@ -23,10 +44,10 @@ const FS = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\npr
 
 const perGl = new WeakMap();     // gl -> { prog, aP, aT, uTex, buf, tex: WeakMap(image -> texture) }
 
-function resources(gl) {
+function resources(gl: WebGLRenderingContext) {
   let r = perGl.get(gl);
   if (r) return r;
-  const sh = (type, src: string) => {
+  const sh = (type: number, src: string) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);
@@ -50,7 +71,7 @@ function resources(gl) {
   return r;
 }
 
-function textureFor(gl, r, img) {
+function textureFor(gl: WebGLRenderingContext, r, img: TexImageSource) {
   let t = r.tex.get(img);
   if (t) return t;
   t = gl.createTexture();
@@ -78,7 +99,7 @@ function textureFor(gl, r, img) {
  *   opaque = source-over   0 = 0.5B + 0.5F*a   1 = B + F*a   2 = B - F*a   3 = B + 0.25F*a
  * Opaque keeps the frame alpha (ONE, ONE_MINUS_SRC_ALPHA on alpha); the semi modes never write alpha.
  */
-export function applySemiBlend(gl, semi) {
+export function applySemiBlend(gl: WebGLRenderingContext, semi: number | undefined) {
   gl.enable(gl.BLEND);
   gl.blendEquation(gl.FUNC_ADD);
   if (semi === 0) gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -88,7 +109,7 @@ export function applySemiBlend(gl, semi) {
 }
 
 /** The constant the fragment alpha is multiplied by for a semi mode. */
-export function blendConstant(semi) { return semi === 0 ? 0.5 : semi === 3 ? 0.25 : 1; }
+export function blendConstant(semi: number | undefined) { return semi === 0 ? 0.5 : semi === 3 ? 0.25 : 1; }
 
 function drawRect(gl, r, tex, img, rect, corners, W, H) {
   const px = ([x, y]) => [x / W * 2 - 1, 1 - y / H * 2];
@@ -112,7 +133,7 @@ function drawRect(gl, r, tex, img, rect, corners, W, H) {
  * W,H = drawing-buffer size, the same px the view maps to. Leaves the GL state as it found it.
  * Returns the number of sprites drawn.
  */
-export function drawUnderEffects(gl, list, manifest, images, view, W, H) {
+export function drawUnderEffects(gl: WebGLRenderingContext, list: UnderEffectSprite[], manifest: UnderEffectManifest, images: Record<string, TexImageSource>, view: UnderEffectView, W: number, H: number) {
   if (!list?.length) return 0;
   const r = resources(gl);
   const prev = {

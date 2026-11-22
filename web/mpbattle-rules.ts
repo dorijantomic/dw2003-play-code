@@ -115,7 +115,7 @@ export class Arena {
     forcedTag() { return this.P.find((p) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
     waveFoes() { return this.E.filter((e: { i: number; }) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
     aliveFoes() { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
-    byKey(key) { return this.P.find((p) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
+    byKey(key: string) { return this.P.find((p) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
     recAt(side: number, slot: number) { return ((side | 0) < 1 ? this.P[slot | 0] : this.E[slot | 0])?.rec ?? null; }
     waves() { return Math.ceil(this.E.length / this.waveSize); }
     /** "play" | "won" | "lost" | "fled" */

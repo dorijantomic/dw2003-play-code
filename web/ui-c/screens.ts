@@ -7,6 +7,13 @@ import { composeSheetParts, composeReport as composeReportParts } from "./sheets
 import { isPauseHome, isSidebarPage, hasClip, CMFONT_DIR, STSTAT_DIR, STATUS_CLIPS } from "./claims.js";
 import { composeNameEntry, composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, composeLanguage } from "./fullpages.js";
 import { composeBook, composeQuests } from "./books.js";
+import type { UiPart, UiRun } from './types.js';
+interface ScreenContext {
+  parts: (UiPart & { part: string })[];
+  runs: UiRun[];
+}
+
+
 
 export const composeProbe = (c) => composeGeneric(c, {});
 
@@ -54,15 +61,15 @@ export { composeCapsule };
 
 // ------------------------------------------------------------------------------------------------ full-screen pages (T7, fullpages.js)
 /** Name entry: the partner chooser and the keyboard (NAME word). */
-export const composeName = (c) => composeNameEntry(c, { word: "NAME" });
+export const composeName = (c): UiPart[] => composeNameEntry(c, { word: "NAME" });
 /** The deck screens: the folder rename is the name keyboard (a keyboard part), every other deck page the window page. */
-export const composeDeck = (c) => (c.parts.some((p: { part: string; }) => p.part === "keyboard") ? composeNameEntry(c, { word: "NAME" }) : composeWindow(c));
+export const composeDeck = (c: { parts: (UiPart & { part: string })[]; runs: UiRun[] }): UiPart[] => (c.parts.some((p: { part: string; }) => p.part === "keyboard") ? composeNameEntry(c, { word: "NAME" }) : composeWindow(c));
 /** The language page: its frames and backdrop claimed (claims.js cntselwn), the flags and words the game's pictures. */
 export { composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, composeLanguage };
 
 // ------------------------------------------------------------------------------------------------ our own screens (T9, books.js)
 /** A book (web/book-host.js): `look` = the book's own cfg ({ rows: false } for the map book); the runs are uifont drawText (clut 7 = dim). */
-export const composeBookScreen = (look = {}) => (c) => composeBook(c, { dimClut: true, ...look });
+export const composeBookScreen = (look = {}) => (c): UiPart[] => composeBook(c, { dimClut: true, ...look });
 /** The Digivolve Demo setup page (web/menu.js, the one page that still draws through the old menu module): the sidebar page family. */
 export const composeDemo = (c) => composePausePage(c, {});
 export { composeQuests };

@@ -178,7 +178,7 @@ interface DialogueOpenArgs {
         const lines = (raw ?? []).filter((r) => r.kind === "tailLine").map((r) => r.intent);
         ctx.save();
         ctx.scale(s, s);
-        uiC.scope(g._key, ctx, { enable: true, compose: (sc) => composeTalk(sc, { lines }) }, () => {
+        uiC.scope(g._key, ctx, { enable: true, compose: (sc: Parameters<typeof composeTalk>[0]) => composeTalk(sc, { lines }) }, () => {
             renderer.draw(ctx, calls, null, [], contextMarkers, raw);
             g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets(), { revealWindow: true }).texts;
         });

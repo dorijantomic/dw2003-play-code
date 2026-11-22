@@ -68,6 +68,34 @@ import { S } from "./state.js";
 import { resetFollowers } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 import { startTransition } from "./transitions.js";
+interface QuestSceneWarpEvent {
+    kind: "warp";
+    to?: string | number | null;
+    at?: [number, number] | null;
+    dir?: number;
+}
+
+type QuestSceneEvent =
+    | { kind: "fx"; sheet: string }
+    | { kind: "fxplay" }
+    | { kind: "fxmove" }
+    | { kind: "fxremove" }
+    | { kind: "fxwait"; name: string }
+    | { kind: "drop"; pixels: number; step: number }
+    | { kind: "rise"; pixels: number; step: number }
+    | { kind: "ghost" }
+    | { kind: "bucket"; value: number }
+    | { kind: "fade"; to: number; frames: number }
+    | { kind: "shake" }
+    | { kind: "weather" }
+    | { kind: "time" }
+    | { kind: "lightning"; count: number; force?: boolean }
+    | { kind: "sfx"; name: string }
+    | { kind: "placecard"; area: string; place: string }
+    | { kind: "chase" }
+    | { kind: "battle"; screen: number }
+    | QuestSceneWarpEvent;
+
 
 // The cast of the CURRENT stage, built ONCE at stage entry.
 //
@@ -290,7 +318,7 @@ export async function playQuestScene(steps) {
  * sprite scale for effects, the s680 +0x54 drive for the player, the story's battle handoff for a fight, and HANDOFF's
  * routing plus the ordinary stage transition for a warp.
  */
-export function runQuestSceneEvent(ev, resume) {
+export function runQuestSceneEvent(ev: QuestSceneEvent | null | undefined, resume: (() => void) | undefined): void {
     const done = typeof resume === "function" ? resume : () => {};
     if (!ev || typeof ev !== "object") return done();
     switch (ev.kind) {

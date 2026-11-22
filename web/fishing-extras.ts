@@ -1,3 +1,25 @@
+interface ExtrasStageData {
+    tier: number;
+}
+
+interface ExtrasSource {
+    stages: Record<string, ExtrasStageData>;
+}
+
+interface ExtrasEntry {
+    key: string;
+    found: boolean;
+    label: string;
+    percent: number | null;
+}
+
+interface ExtrasRow {
+    stage: string;
+    area: string;
+    tier: number;
+    total: number;
+    entries: ExtrasEntry[];
+}
 // web/fishing-extras.js — rare extra rewards that can come on top of a fishing win.
 //
 // NEW CONTENT of this project, on for everyone (no option row, no URL flag).
@@ -118,7 +140,7 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
  * An entry not found yet has label "???" and no percent; a found one is named
  * (item name, "N bits", or "Old bottle") with its percent.
  */
-export function extrasRows(data, found, itemNameOf: (item: any) => string | null = () => null) {
+export function extrasRows(data: ExtrasSource, found: Record<string, boolean> | undefined, itemNameOf: (item: any) => string | null = () => null): ExtrasRow[] {
     const flags = found ?? {};
     return Object.keys(data?.stages ?? {}).sort().map((stage) => {
         const area = areaOf(data, stage);

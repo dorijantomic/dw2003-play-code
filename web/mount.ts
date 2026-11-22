@@ -17,6 +17,8 @@
 // unchanged (tests/mount.test.js proves it position by position).
 import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit, mountRenderInfo, probeFramebuffer, renderSelfTest, sceneProbe } from "./mount3d.js";
 import type { GameState } from "./game/types.js";
+import type { Dw2Model } from "./mount3d.js";
+
 
 /**
  * The mount table. One row per rideable Digimon; adding a second mount is a new row plus the quest that
@@ -144,7 +146,7 @@ export function mountActorHidden(npc) {
 }
 
 const actorAssets = new Map();   // url -> asset | null (loading or missing)
-function actorAsset(key: string, url: string) {
+function actorAsset(key: string, url: string): Dw2Model | null {
   if (actorAssets.has(url)) return actorAssets.get(url);
   actorAssets.set(url, null);
   loadMountAsset(key, url).then((a) => actorAssets.set(url, a)).catch(() => {});
@@ -223,7 +225,7 @@ export function seatSettings(id, dir: string) {
  * Where the rider goes in the mount's cell (cell px; the ground point is (w/2, h-8)), from the saddle point the split
  * measured this frame and the facing's settings. The game and the editor both place the rider with this.
  */
-export function seatLayout(def, split, cfg) {
+export function seatLayout(def, split: { back: HTMLCanvasElement; front: HTMLCanvasElement; seatX: number; seatY: number; }, cfg) {
   const dx = Math.round(split.seatX - MOUNT_VIEW.w / 2 + cfg.dx);
   const feetY = Math.round(split.seatY + (def.seat?.drop ?? 0) + cfg.dy);
   return {

@@ -2,6 +2,12 @@ import { smoothAnimEnabled } from "../fight/smooth-anim.js";
 import { mat4Identity } from "../fight/proj-layers.js";
 import { ps1AnglesToMat3 } from "./math.js";
 import { S } from "./state.js";
+interface Bone {
+  anim?: {
+    ch2?: Array<[number, number, number]>;
+  };
+}
+
 
 const PS1_UNIT_RAD = (Math.PI * 2) / 4096;   // 4096 units = one turn
 
@@ -226,7 +232,7 @@ function interpChannelSmooth(channel, frame) {
 /** The LOCAL ch2 rotation matrix the renderer puts on this bone at `frame`, flag-aware and without
  *  the FK chain. Same three samplers buildBoneWorldMatrices uses; exported for the animation tests
  *  and the smoothness measurement, which must not confuse a parent's pose with a bone's own. */
-export function localRotationAt(bone, frame) {
+export function localRotationAt(bone: Bone | undefined, frame: number) {
   const ch = bone?.anim?.ch2;
   if (smoothAnimEnabled()) return ch2SmoothRotationAt(ch, frame).m;
   if (S._slerpRot) return ch2RotationAt(ch, frame).m;

@@ -48,6 +48,19 @@
 import { armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChain, tailChain, wingChains, boneMap } from "./digimon-bonemap.js";
 import { authoredSide } from "./side-mirror.js";
+import type { FightSkeleton } from './types.js';
+import type { Dw2Pose } from '../types/anim-viewer-dw2.js';
+interface FiringAxis {
+  calibrated: boolean;
+  emitterId: string;
+  cls: string;
+  bone: string;
+  method: string;
+  origin: number[];
+  joint: number[];
+  axis: number[];
+}
+
 
 const TAU = (Math.PI * 2) / 4096;          // PS1 angle units: 4096 = one turn
 const UP = [0, -1, 0];                      // +Y is DOWN in this frame, so "up" is -Y
@@ -574,7 +587,7 @@ export function armAxisCandidates(model, folder: string | number, emitterId, pos
 }
 
 /** Both hand-class candidates, so a caller (or the calibration) can compare them. */
-export function axisVariants(model, folder: string | number, emitterId, pose, { rest = null } = {}) {
+export function axisVariants(model: FightSkeleton, folder: string | number, emitterId: string, pose: Dw2Pose, { rest = null } = {}): { push: FiringAxis; palm: FiringAxis } {
   const out: Record<string, any> = {};
   for (const v of ["push", "palm"]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
   return { push: out.push, palm: out.palm };
@@ -670,7 +683,7 @@ export function r1Acceptance(cls: string | number) {
  * how well the prop is conditioned). They differ by design: a raised sword's blade can point 56 deg
  * off while the arm that fires the spell points at the target.
  */
-export function aimAxisFor(model, folder: string | number, emitterId, pose, { rest = null } = {}) {
+export function aimAxisFor(model: FightSkeleton, folder: string | number, emitterId: string, pose: Dw2Pose, { rest = null } = {}): FiringAxis | null {
   const fa = firingAxis(model, folder, emitterId, pose, { rest });
   if (!fa) return null;
   if (fa.cls !== "prop" && fa.cls !== "hand") return { ...fa, calibrated: true };

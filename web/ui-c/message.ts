@@ -20,7 +20,7 @@ export const TAILS = Object.freeze({
  * The C tail for tail clip `id` drawn at native rect `r`: the tip where the clip's tip is (3 px in from its tip side, on its far edge), the
  * base along the body edge over the clip's wide part, widened MSG.tailWiden each side (C6 draws a fuller tail than the 10 px pixel one).
  */
-export function tailGeometry(id: string | number, r, body: UiRect) {
+export function tailGeometry(id: string | number, r: UiRect, body: UiRect) {
     const d = TAILS[id];
     if (!d || !body || !r) return null;
     const left = d.tip === "left";

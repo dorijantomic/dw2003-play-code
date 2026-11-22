@@ -8,6 +8,8 @@ import { grantNewPartners, prepareStageAssets, setMap } from "./map-load.js";
 import { checkStageCutscene } from "./story-events.js";
 import { frame } from "./update.js";
 import { playerPackMeta } from "./fishing-tree.js";
+import type { GameState } from "./types.js";
+
 
 export function saveFieldLocation() {
     if (!state.started || !state.manifest) return;
@@ -89,6 +91,6 @@ export function manifestIndexOf(charId: string | null | undefined) {
     return state.manifest.characters.findIndex((c) => c.id === charId);
 }
 
-export function currentMap() {
+export function currentMap(): GameState["manifest"]["maps"][number] {
     return state.manifest.maps[state.mapIdx];
 }

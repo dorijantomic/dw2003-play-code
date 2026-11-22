@@ -192,7 +192,7 @@ export function battleScriptedPlanFor(b, side: number, record, techniqueId: numb
  * measured. It returns null for every other category-5 arm, which is exactly the
  * question it was written to answer: "does this technique charge anybody?"
  */
-export function battleAffinityPlanFor(b, side: number, record, techniqueId: number, options = {}) {
+export function battleAffinityPlanFor(b: BattleState, side: number, record: PlayerRecord | EnemyBattleRecord, techniqueId: number, options = {}): ReturnType<typeof battleScriptedPlanFor> | null {
   const plan = battleScriptedPlanFor(b, side, record, techniqueId, options);
   if (!plan) return null;
   return plan.effect === "affinity" || plan.effect === "healCharge" ? plan : null;

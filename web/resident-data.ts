@@ -5,6 +5,12 @@
 // Also the ESDMG entry reader (the cutscene SAY bank) that the dialogue and Yes/No screens use.
 // It never executes original instructions and never requests an executable asset.
 import { ui } from "./vendor/engine.js";
+interface ResidentResources {
+    font: Uint8Array;
+    ranges: ReturnType<typeof ui.dialogueRangesFromFile>;
+    cursorGlyphs: Parameters<NonNullable<typeof ui.setDefaultCursorGlyphs>>[0];
+}
+
 
 const RESIDENT_LABEL = "Resident data";
 
@@ -33,7 +39,7 @@ export const fetchJson = async (path: string, label: string) => {
 
 let residentPromise = null;
 /** The font, the resident ranges and the cursor glyphs: { font, ranges, cursorGlyphs }. Cached; a failure clears the cache. */
-export const loadResidentResources = () => {
+export const loadResidentResources = (): Promise<ResidentResources> => {
     residentPromise ??= Promise.all([
         fetchBytes("shop_font.bin", RESIDENT_LABEL),
         fetchBytes("dialogue-box/resident-ranges.bin", RESIDENT_LABEL),

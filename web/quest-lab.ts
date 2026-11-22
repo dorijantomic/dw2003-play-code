@@ -7,6 +7,11 @@
 // "Hide" folds the panel into a small tab. "Reset quests" clears the quest layer's own progress. Nothing here touches the story or the normal save.
 // "Ways" reads one job's every ending out of its data (web/quest-endings.js): the same page tools/quest_endings.mjs prints.
 import { endingsBlock } from "./quest-endings.js";
+interface QuestSnapshot {
+  [key: string]: QuestSnapshotValue;
+}
+type QuestSnapshotValue = string | number | boolean | null | QuestSnapshot | QuestSnapshotValue[];
+
 
 const $ = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 
@@ -114,7 +119,7 @@ const wait = setInterval(() => { if (ready()) { clearInterval(wait); build(); } 
 import { diffSnapshots, shelfAdd, shelfRemove, shelfRename, shelfExport, shelfImport } from "./quest-shelf.js";
 
 /** The live quest state as a plain snapshot (window.__quests.state is the quest layer's own object). */
-const shelfNow = () => JSON.parse(JSON.stringify(window.__quests.state));
+const shelfNow = (): QuestSnapshot => JSON.parse(JSON.stringify(window.__quests.state));
 
 function shelfLoad() {
   try {

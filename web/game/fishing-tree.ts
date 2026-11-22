@@ -46,6 +46,8 @@ import {
 import { currentMap } from "./session.js";
 import { questSpeak } from "./quest-scenes.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
+import type { GameState } from './types.js';
+
 
 // ---------------------------------------------------------------------------
 // Fishing (engine/systems/fishing.ts, tools/extract_fishing_spots.py).
@@ -154,7 +156,7 @@ export function fishingSpriteMeta() {
  * latches a clip asks here, so the fishing cast, the ladder, the slope step and
  * the tree kick all reach their pack by the same table instead of by name.
  */
-export function playerPackMeta(packId: string) {
+export function playerPackMeta(packId: string): NonNullable<GameState["manifest"]["npcs"]>[number] | undefined {
     return state.manifest.npcs?.find((n) => n.id === packId);
 }
 

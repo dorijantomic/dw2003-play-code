@@ -6,6 +6,9 @@ import {
   ROSTER_SLOT_CHARIDS, reserveRosterSlots, rosterSlotDigimonId, rosterSlotOfCharId,
   DEPLOYED_PARTY_CAP, syncWornFromEquipment, isFormDigimonId,
 } from "./vendor/engine.js";
+import type { BattleState, DigimonRecord } from './types/battle.js';
+interface StandingChoice { profile: DigimonRecord; formId: number; doNothing?: boolean; }
+
 
 export function ensureDriPartyStats(state, digimonById) {
   const party = state.party ?? [];
@@ -264,7 +267,7 @@ export function standingChoicesFromStats(stats, starter, digimonById) {
   return rows;
 }
 
-export function standingChoices(state, index, digimonById) {
+export function standingChoices(state, index, digimonById): StandingChoice[] {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return [];

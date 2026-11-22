@@ -1,3 +1,20 @@
+interface ClipScriptOp {
+  op: number;
+  words?: number[];
+}
+
+interface ClipScript {
+  ops: ClipScriptOp[];
+  side?: string;
+  synthesized?: boolean;
+  camAuthored?: string;
+  buildKind?: string;
+}
+
+interface ClipScriptModel {
+  folder: string | number;
+  actions?: Record<number, ClipScript | undefined>;
+}
 // A technique the model has no action clip for.
 //
 // The disc's player species carry all 18 action clips in their model pack. The enemy-only species (made
@@ -514,7 +531,7 @@ function withHits(ops, model, contactCount) {
 }
 
 /** The model's basic attack with the technique's own effect added where its hit spark lands. */
-function physicalFromBasic(model, basic, donor, { clip = 5, hits = null, planted = false } = {}) {
+function physicalFromBasic(model: ClipScriptModel, basic: ClipScript | undefined, donor, { clip = 5, hits = null, planted = false } = {}) {
   const ops = [{ op: 3, words: [1, EFFECT_CURRENT] }];
   for (const o of stripMovement(basic.ops, planted)) {
     ops.push({ ...o, words: o.words ? o.words.slice() : [] });
@@ -774,7 +791,7 @@ export function scriptIsSelfCast(script) {
  *   table 0 — the idle, for a pack with neither (the pose still breathes).
  * `hold` is null for 44 (play the gesture through) and a frame count for a wind-up.
  */
-function calmBodyTable(model, row: { m: string; d: string; t: number[]; }) {
+function calmBodyTable(model: ClipScriptModel, row: { m: string; d: string; t: number[]; }) {
   const tail = hasTable(model, 45) ? 45 : null;
   if (hasTable(model, 44)) return { table: 44, tail, hold: null };
   // the row's own body table, the calmest of them: play its EARLY WIND-UP only, never the swing.
@@ -794,7 +811,7 @@ function calmBodyTable(model, row: { m: string; d: string; t: number[]; }) {
  * of the attack records. op3 9999 is resolved by the animator to the technique's own effect —
  * or, on the item path, to the used item's record effect (actor+0x6c).
  */
-function buildSelfScript(model, row: { m: string; d: string; t: number[]; }) {
+function buildSelfScript(model: ClipScriptModel, row: { m: string; d: string; t: number[]; }) {
   const body = calmBodyTable(model, row);
   if (!body) return null;
   const hold = body.hold == null ? Math.min(120, Math.max(45, Math.round(tableFrames(model, body.table) * 0.85))) : body.hold;
@@ -819,7 +836,7 @@ function buildSelfScript(model, row: { m: string; d: string; t: number[]; }) {
   return { ops, synthesized: true, camAuthored: "donor", buildKind: "self", selfCast: true };
 }
 
-function buildGapScript(model, clip: number, row: { m: string; d: string; t: number[]; }, gap, element: number, target: string, hits = null, planted = false, tech = null) {
+function buildGapScript(model: ClipScriptModel, clip: number, row: { m: string; d: string; t: number[]; }, gap, element: number, target: string, hits = null, planted = false, tech = null) {
   const targetSide = authoredSide(model);
   const turn = !!gap.side && !!targetSide && gap.side !== targetSide;
   if (target === "self") return buildSelfScript(model, row);   // heal/support/item: never an attack body
@@ -1241,7 +1258,7 @@ export function withDw2Body(model, base, clip: number, { tech = null, element = 
   return { ...base, ops: finalOps, dw2Motion: { letter: dw2.letter, table: bodyTable, kind: dw2.kind, slot: dw2.slot } };
 }
 
-export function resolveClipScriptBase(model, clip: number | null, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+export function resolveClipScriptBase(model: ClipScriptModel, clip: number | null, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}): ClipScript | null {
   const own = model?.actions?.[clip];
   if (hasOps(own) && (target !== "self" || scriptIsSelfCast(own))) return own;
   if (clip == null || !model) return null;

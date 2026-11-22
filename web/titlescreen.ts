@@ -21,6 +21,36 @@ import { paintTitleVignette } from "./screendim.js";
 import { loadPack, drawClip, drawClipAtPaletteRow, packReady } from "./screenpack.js";
 import { ui } from "./vendor/engine.js";
 import { TITLE_TWINKLES } from "./title-twinkle-data.js";
+interface TitleTwinkle {
+  pack: number;
+  clip: number;
+  x: number;
+  y: number;
+}
+
+interface TitleScreenState {
+  isJapanese?: () => boolean;
+  isUsa?: () => boolean;
+  twinkles?: () => TitleTwinkle[];
+  legalVisible?: () => boolean;
+  legalRows?: () => number[];
+  clips: () => [number, number, number];
+  logoAt?: () => [number, number];
+  wordmarkAt?: () => [number, number];
+  numeralAt?: () => [number, number];
+  glowAt?: () => [number, number];
+  glowLevel?: () => number;
+  showNumeral?: () => boolean;
+  phase?: () => string;
+  optionsShown: () => boolean;
+  optionY: () => [number, number];
+  highlight: () => number;
+  showBox: () => boolean;
+  blink: () => number;
+  boxAt: () => [number, number];
+  dimLevel?: () => number;
+}
+
 
 const ART_PAL = loadPack("tlogopal");
 let ART_JPN = null;
@@ -180,7 +210,7 @@ export function titleViewTransform(viewW, viewH) {
   };
 }
 
-export function drawTitleScreen(ctx, ts, viewW, viewH, background = null) {
+export function drawTitleScreen(ctx: CanvasRenderingContext2D, ts: TitleScreenState, viewW: number, viewH: number, background = null) {
   const L = layout();
   const ART = ts.isJapanese?.() ? (ART_JPN ??= loadPack("tlogojpn"))
     : ts.isUsa?.() ? (ART_USA ??= loadPack("tlogousa")) : ART_PAL;

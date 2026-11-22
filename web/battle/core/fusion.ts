@@ -14,6 +14,8 @@ import {
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import type { EnemyStatBlock, FusedRecord } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { BattleState } from "../../types/battle.js";
+
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeFusion(B: BattleContext) {
@@ -119,7 +121,7 @@ function applyTagAction(action: { rosterIndex: number; formId: number; }) {
    * The Tag commit, menu.c:388-398 (WFIGHTMN_tag state 2, run when `entrance->done` is set at the cut):
    * the new fighter becomes the active one, the turn was queued at command time with the OUTGOING speed (spd; none when forced).
    */
-  function commitTag(b, action: { rosterIndex: number; formId: number; }, spd: number | undefined) {
+  function commitTag(b: BattleState, action: { rosterIndex: number; formId: number; }, spd: number | undefined) {
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
     const profile = B.digimonDB[action.formId];

@@ -31,6 +31,31 @@ import { roleOfBone, armChains } from "./digimon-bonemap.js";
 import { armEquip } from "./digimon-anatomy.js";
 import { restPose } from "./anim-retarget.js";
 import type { FightCollisionOut } from "./types.js";
+type SharedShotMode = "combined" | "spread";
+
+interface ShotPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface SharedShotRule {
+  combinedGap?: number;
+  minSeparation?: number;
+}
+
+interface SharedShotTargets {
+  mode: SharedShotMode | null;
+  span: number;
+  gap: number;
+  separation: number;
+  height: number;
+  rule: SharedShotRule;
+  points: ShotPoint[];
+  origins: ShotPoint[];
+  basis: string;
+}
+
 
 // ---------------------------------------------------------------- the measured rule (R3)
 //
@@ -483,7 +508,7 @@ const isArmSite = (p) => /arm|hand|claw|fist/.test(String(p?.site ?? p?.role ?? 
  *                    ±half its own arm span), and every shot is at least `minSeparation` from its
  *                    neighbour, so two shots never draw on top of each other.
  */
-export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1], origin = null, rule = SHARED_SHOT }) {
+export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1], origin = null, rule = SHARED_SHOT }): SharedShotTargets {
   const pts = (points || []).filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
   const H = height || 1;
   const gap = (rule.combinedGap ?? SHARED_SHOT.combinedGap) * H;

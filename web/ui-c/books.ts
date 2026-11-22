@@ -19,6 +19,12 @@ import { N, ID, textPart, plate, cursor, chip, tabPlate, tokenLine, stripes, typ
 import { clipRect, restOfRuns, runText } from "./generic.js";
 import { composeRows, composeFooter, runIn } from "./pages.js";
 import type { BookOpts } from "./types.js";
+import type { UiPart, UiRun } from './types.js';
+interface QuestCapture {
+  parts: UiPart[];
+  runs: UiRun[];
+}
+
 
 /** Sizes (design px unless named): title Russo 26 / 36, tabs 20 / 30, the L1 / R1 chip 52 x 32, a map link 0.8 native wide, a map box 8 native. */
 export const BOOK = Object.freeze({ titleDp: 26, titleLineDp: 36, tabDp: 20, tabLineDp: 30, tabIn: N(16), tabOut: N(26), chipW: N(52), chipH: N(32), chipMaxX: 318, link: 0.8 });
@@ -144,4 +150,4 @@ export function composeBook({ parts, runs }, cfg: BookOpts = {}) {
 }
 
 /** The pause QUESTS page: the diamond backdrop with the faint word, the header bar, the quest list, the description band. */
-export const composeQuests = (c) => composeBook(c, { word: "QUESTS" });
+export const composeQuests = (c: QuestCapture): UiPart[] => composeBook(c, { word: "QUESTS" });

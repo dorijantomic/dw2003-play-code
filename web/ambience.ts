@@ -141,7 +141,7 @@ export function setFxMany(values) {
 window.__setFxMany = setFxMany;
 /** web/multiplayer.js: apply(rules) while I am a guest in a room, clear() on leaving it (or when I become the host). locked(key) is read by OPTIONS and F2. */
 window.__hostRules = {
-    apply(rules) { hostRules.apply(rules); syncLegacyFlags(); refreshPanel(); },
+    apply(rules: Record<string, boolean>) { hostRules.apply(rules); syncLegacyFlags(); refreshPanel(); },
     clear() { hostRules.clear(); syncLegacyFlags(); refreshPanel(); },
     locked: (k) => hostRules.locked(k),
 };

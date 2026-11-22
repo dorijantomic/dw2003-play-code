@@ -12,6 +12,10 @@
 //
 // Nothing here reads game state: mount.js owns the riding rules.
 import * as THREE from "./lib3d/three.module.js";
+interface RigLeg { end: number; }
+interface MeasureRig { legs: RigLeg[]; height?: number; forwardAxis: string; }
+interface ClipWalkStats { clip: string; dur: number; ticks: number; inPlace: boolean; loops: boolean; loopErr: number; bodyTravel: number; feet: number; usableFeet: number; alternation: number; walk: boolean; why?: string; }
+
 
 export const MOUNT_VIEW = { w: 112, h: 104 };      // game pixels of the sprite cell
 const PITCH = (50 * Math.PI) / 180;                // the field's own isometric pitch (web/grass3d.js)
@@ -518,7 +522,7 @@ export function gaitFootfalls(model, rig, legs, steps = 16) {
  * between planted and lifted, and does a planted foot slide along the ground? Returns the numbers, so the
  * mount table's `walk` can be justified (or refused) instead of guessed.
  */
-export function clipWalkStats(model, clipIndex, rig = null) {
+export function clipWalkStats(model: Dw2Model, clipIndex: number, rig = null): ClipWalkStats | null {
   const clip = model.anims[clipIndex];
   if (!clip) return null;
   rig = rig || measureRig(model);
@@ -636,7 +640,7 @@ function ensureRenderer() {
   return true;
 }
 
-async function imageFrom(uri) {
+async function imageFrom(uri: string) {
   const img = new Image();
   img.src = uri;
   if (img.decode) { try { await img.decode(); } catch { return null; } } else {
@@ -691,7 +695,7 @@ async function loadMountAssetOnce(key: string, url: string) {
     }
     // one mesh per primitive, parented to a group per bone node (three composes the hierarchy for us)
     const boneGroups = new Map();
-    const groupOf = (node) => {
+    const groupOf = (node: number | undefined) => {
       if (boneGroups.has(node)) return boneGroups.get(node);
       const obj: any = new THREE.Object3D();
       obj.matrixAutoUpdate = false;

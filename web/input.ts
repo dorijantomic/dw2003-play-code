@@ -37,7 +37,7 @@ export { isPadButton };
  * raw key it stands for ("enter"). A key with no pad button — a name-entry
  * letter, a dev-tool key — passes through lowercased and unchanged.
  */
-export function asButton(k: string) {
+export function asButton(k: string): string {
   if (k == null) return "";
   const raw = String(k).toLowerCase();
   return buttonForKey(raw) ?? raw;

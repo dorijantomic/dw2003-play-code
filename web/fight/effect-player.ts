@@ -40,6 +40,30 @@ import {
   EFFECT_SCALE_ONE,
   newProjectileFlight, projectileRegistryFromIds,
 } from "../vendor/engine.js";
+interface EffectClip {
+  sheet?: string;
+  frames?: number[];
+  delay?: number;
+  loop?: boolean;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  semi?: number;
+  solid?: EffectRect;
+}
+
+interface EffectRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface ClipArchive {
+  clips?: Record<string, EffectClip>;
+}
+
 
 const SCREEN_Z = new Set([32767, -1]);
 const TURN = 4096;                              // PS1 angle units in one full turn
@@ -259,13 +283,13 @@ export async function loadEffectAssets(base = "assets/battle/effects") {
 }
 
 /** The sheet clip a sprite descriptor draws (channel 1 selects a palette-cycled "id@shift" variant). */
-export function effectClip(arch, s) {
+export function effectClip(arch, s): EffectClip | undefined {
   return (s.clutShift ? arch?.clips?.[`${s.frame}@${s.clutShift & 0xFF}`] : null)
     ?? arch?.clips?.[String(s.frame)];
 }
 
 /** PS1 semi-transparency modes that mix with the pixels under the sprite: 1 and 3 add, 2 subtracts. */
-const blendsBackdrop = (semi) => semi === 1 || semi === 2 || semi === 3;
+const blendsBackdrop = (semi: number | undefined) => semi === 1 || semi === 2 || semi === 3;
 
 /**
  * True when any sprite in the list is drawn with a mode that blends with what is under it (so the 3D

@@ -21,6 +21,21 @@ import { packReady } from "./screenpack.js";
 import { drawClip } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
 import type { BattleMsgBankFile } from "./types/battlemsg-translated.js";
+type BattleMsgScreenPack = Parameters<typeof packReady>[0];
+
+interface BattleMsgPaintPrompt {
+    clipId: string;
+    x: number;
+    y: number;
+    size: number;
+}
+
+interface BattleMsgPaintFrame {
+    panel: { cel: number; x: number; y: number; w: number; h: number };
+    lines: (string | undefined)[];
+    prompt?: BattleMsgPaintPrompt | null;
+}
+
 
 const {
   BATTLE_MESSAGE_ARMS, BATTLE_MESSAGE_BANK, BATTLE_MESSAGE_BANK_FIELD,
@@ -201,7 +216,7 @@ export function battleMsgGeometry() {
  * has let through, and the blinking prompt. `nativeText` is web/battle.js's own text
  * helper, passed in so this file does not import the battle renderer.
  */
-export function battleMsgPaint(ctx: CanvasRenderingContext2D | undefined, frame, nativeText, packs) {
+export function battleMsgPaint(ctx: CanvasRenderingContext2D | undefined, frame: BattleMsgPaintFrame, nativeText: (text: string, x: number, y: number, opts?: { kind: typeof BATTLE_MESSAGE_FONT_KIND }) => void, packs: Record<string, BattleMsgScreenPack>) {
     const panel = packs?.[battleMsgPackName(BATTLE_MESSAGE_PANEL_PACK)];
     if (panel && packReady(panel)) {
         drawClip(ctx, panel, String(frame.panel.cel), frame.panel.x, frame.panel.y);

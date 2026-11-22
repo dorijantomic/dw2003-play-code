@@ -19,6 +19,16 @@ import { VISIBLE, createGlossaryModel } from "./glossary-model.js";
 import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glossary-items.js";
 import { drawItemIcon } from "./itemicons.js";
 import { artHook } from "./ui-c/capture.js";
+interface GlossarySpecies {
+  name: string;
+}
+interface GlossarySpeciesData {
+  species: GlossarySpecies[];
+  world?: Record<string, number>;
+  maxima?: Record<string, number>;
+  wildMaxima?: Record<string, number>;
+}
+
 
 const rect = (x: number, y: number, cols: number, bands: number) => ({ x, y, w: cols * 40, h: panelPixelHeight(bands), cols, bands });
 export const GLOSSARY_LAYOUT = Object.freeze({
@@ -123,7 +133,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     let model = null, loadedFor = null, first = true;
     let section = SECTION_DIGIMON;
     const itemsModel = createItemsModel();
-    const data = () => {
+    const data = (): GlossarySpeciesData | null => {
         const d = getSpecies();
         if (d && loadedFor !== d) { loadedFor = d; model = createGlossaryModel({ count: d.species.length }); first = true; }
         return d;
@@ -134,7 +144,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
         return { sp, partner, lead: getPartners()[0] ?? null, state: speciesState(sp, log, partner) };
     };
     // the scroll cursor stops where the last ROW (not line: long lines wrap) sits on the last pane row
-    const lineCount = (d) => {
+    const lineCount = (d: GlossarySpeciesData) => {
         const c = current(d);
         const rows = page2Rows(pageTwoLines(c.sp, c.state, c.partner, d.world, d.maxima, d.wildMaxima, c.lead), (s) => textWidth(s)).length;
         return Math.max(1, rows - PAGE2.visible + 1);
@@ -194,7 +204,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
         drawFooter(ctx, pf, `Item ${itemsModel.index(ids) + 1}/${ids.length}`, "");
         hint();
     }
-    const show = (d) => { const c = current(d); stage?.show(c.sp.name, { shadow: c.state === "unknown", partnerId: c.sp.profileId ?? null }); };
+    const show = (d: GlossarySpeciesData) => { const c = current(d); stage?.show(c.sp.name, { shadow: c.state === "unknown", partnerId: c.sp.profileId ?? null }); };
     return {
         windows: ["title", "list", "model", "footer"],
         wall: true,

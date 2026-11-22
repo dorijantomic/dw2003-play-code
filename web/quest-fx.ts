@@ -266,7 +266,7 @@ function settle(fx) {
  * effect being removed). Resolves at once for an effect that does not exist or has already settled: a scene step waiting
  * on an effect that could not be placed must never hang the scene.
  */
-export function questFxWait(name) {
+export function questFxWait(name: string) {
     const fx = live.get(String(name ?? ""));
     if (!fx || isSettled(fx)) return Promise.resolve(false);
     return new Promise((resolve) => { fx.waiters.push(resolve); });
@@ -297,7 +297,7 @@ function removeFx(fx) {
  * the game's own transition wipe belongs to stage changes, and a quest must not fake one (that would fire the arrival
  * events of the map it is still on).
  */
-export function questFxFade(mode, frames) {
+export function questFxFade(mode: number, frames: number) {
     const m = String(mode ?? "out");
     const target = m === "in" || m === "clear" ? 0 : 1;
     if (m === "black" || m === "clear") {
@@ -323,7 +323,7 @@ export const questFxFading = () => fade.alpha > 0;
  * the s680 floor-collapse drive, in which the character object itself descends and the camera follows, so the room scrolls
  * instead of the sprite bobbing. Resolves when the whole distance is travelled.
  */
-export function questFxDrivePlayer(pixels, step = 0.25) {
+export function questFxDrivePlayer(pixels: number, step = 0.25) {
     const total = Number(pixels);
     if (!Number.isFinite(total) || total === 0) return Promise.resolve(0);
     // No field character to drive (a host without one): the step is skipped rather than waited on.

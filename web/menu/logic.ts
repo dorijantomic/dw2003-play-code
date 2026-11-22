@@ -15,6 +15,8 @@ import { syncLeadEquipBonuses, elementValueWithGear } from "../party.js";
 import { EQUIP_SLOT_KEYS, RES_ROWS, STAT_ROWS } from "./pure.js";
 
 import type { GameState } from "../game/types.js";
+import type { DigimonRecord } from "../types/battle.js";
+
 export function clampIndex(i: number, n: number) {
   if (n <= 0) return 0;
   return Math.max(0, Math.min(n - 1, i));
@@ -122,7 +124,7 @@ export function swapFormation(state: GameState, a: number, b: number) {
 // The six technique slots of one digivolution, as F0x80089bf0 state 0x2B reads
 // them: exactly six, low 13 bits are the technique id, zero means empty. The
 // cursor may only rest on a non-empty slot.
-export function formTechSlots(stats, formId, digimonDB) {
+export function formTechSlots(stats: Record<string, number>, formId: string, digimonDB: Record<string, DigimonRecord> | undefined) {
   const record = formLedgerRecord(stats, formId, digimonDB ?? {});
   const words = record?.techSlots ?? [];
   return Array.from({ length: 6 }, (_, i) => (Number(words[i] ?? 0) & 0x1fff) || 0);

@@ -11,6 +11,51 @@ import type { GymScreen } from "./types/gym-translated.js";
 import type { LabScreen } from "./types/lab-translated.js";
 import type { SaveScreen } from "./types/save-translated.js";
 import * as uiC from "./ui-c/index.js";
+type NativeDrawCalls = FightReportSession["draw"]["calls"];
+
+type NativeTextWidgetList = Parameters<typeof drawNativeTextWidgets>[1];
+
+interface NativeScreenRenderer {
+    stats: NativeScreenRenderStats;
+    ready(): boolean;
+    draw(
+        ctx: CanvasRenderingContext2D,
+        calls: NativeDrawCalls,
+        vram: null,
+        cards: readonly Uint16Array[],
+        contextMarkers: readonly number[],
+    ): void;
+}
+
+interface NativeScreenDraw {
+    calls: NativeDrawCalls;
+    contextMarkers: readonly number[];
+}
+
+interface NativeScreenWidgets {
+    textWidgets(): NativeTextWidgetList;
+}
+
+interface NativeScreenSession {
+    /** absent on sessions that never fade (the canvas dim stays at 0) */
+    fadeLevel?: () => number;
+    draw: NativeScreenDraw;
+    widgets: NativeScreenWidgets;
+}
+
+interface NativeUIScope {
+    key: string;
+    compose: (root: HTMLElement) => void;
+    enable?: boolean;
+}
+
+interface PaintNativeSessionOptions {
+    fade?: boolean;
+    revealWindow?: boolean;
+    skipWidget?: string | null;
+    ui?: NativeUIScope | null;
+}
+
 
 /**
  * Paint one frame of a translated session: its recorded draw calls, its text widgets and,
@@ -25,7 +70,7 @@ import * as uiC from "./ui-c/index.js";
  * `ui` = { key, compose, enable } puts the screen in the look C capture scope (web/ui-c): the clips it claims and its text become DOM
  * parts, the rest is drawn as art. The disc's fade stays the canvas subtract; the DOM layer takes the same level as brightness.
  */
-export function paintNativeSession(ctx, renderer, session, { fade = true, revealWindow = false, skipWidget = null, ui = null } = {}) {
+export function paintNativeSession(ctx: CanvasRenderingContext2D, renderer: NativeScreenRenderer, session: NativeScreenSession, { fade = true, revealWindow = false, skipWidget = null, ui = null } = {}) {
     const body = () => {
         renderer.draw(ctx, session.draw.calls, null, [], session.draw.contextMarkers);
         drawNativeTextWidgets(ctx, session.widgets.textWidgets(), skipWidget ? { revealWindow, skip: skipWidget } : { revealWindow });

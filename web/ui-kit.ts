@@ -123,7 +123,7 @@ export function panelClipId(pack, cols: number, bands: number) {
 }
 
 /** Draw a panel of `cols` 40 px columns and `bands` middle bands with its top-left at (x, y). False until the sheet has loaded. */
-export function drawPanel(ctx, x: number, y: number, cols: number, bands: number, pack = cmfont) {
+export function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, cols: number, bands: number, pack = cmfont) {
     if (!packReady(pack)) return false;
     const id = panelClipId(pack, cols, bands);
     return id ? drawClip(ctx, pack, id, x, y) : false;

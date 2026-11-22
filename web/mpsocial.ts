@@ -12,6 +12,16 @@ import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount,
 import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 import type { MpRosterRow, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
+interface MpLeagueMatch {
+  a: string;
+  b: string;
+  w?: string | null;
+  g?: string[];
+  bye?: boolean;
+  dead?: boolean;
+  wo?: boolean;
+}
+
 
 const MAX_LOG = 300;
 const S = { tab: "all", log: [], collapsed: false, unread: 0 };
@@ -532,7 +542,7 @@ const champId = () => (serverChampOn() && league ? league.champ : null);
 /** The champ colour: the room's champion, or a card that says so itself. Off = a normal card. */
 const isChamp = (p) => serverChampOn() && (p.id === champId() || p.card?.champ === true);
 
-function matchText(m) {
+function matchText(m: MpLeagueMatch | null | undefined) {
     if (!m) return "?";
     if (m.bye) return `${lgName(m.a ?? m.b)} (bye)`;
     if (m.dead) return "no tamer left";

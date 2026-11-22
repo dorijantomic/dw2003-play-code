@@ -11,6 +11,8 @@
 // tests/fly-points.test.js holds every rule; the fly points are listed once, here.
 
 import { isOpenAirMapName } from "./map-open-air.js";
+interface FlyCopyArgs { maps?: FlyMap[]; scenes?: FlyScenes | null; currentId: string | null; id: string; }
+
 
 /** The quest that gives the flight (data/authored/quests/pack_zz_fly.py). */
 export const FLY_QUEST = "zz_fly";
@@ -47,7 +49,7 @@ export function flyLabel(name: string | undefined) {
  * finale twin), each group sorted by map id. Map<id, string[]>; a map with no twin is absent. Pure; cached per `scenes` object.
  */
 const twinCache = new WeakMap();
-export function mapTwins(maps, scenes) {
+export function mapTwins(maps, scenes): Map<string, string[]> {
     const hit = scenes && typeof scenes === "object" ? twinCache.get(scenes) : null;
     if (hit && hit.maps === maps) return hit.groups;
     const bySig = new Map();
@@ -71,10 +73,10 @@ export function mapTwins(maps, scenes) {
 
 /** The worlds: the normal one, its Amaterasu copy, the s9xx finale copy (index = world number). */
 export const WORLDS = Object.freeze(["normal", "amaterasu", "s9xx"]);
-const idNum = (id) => Number(String(id).replace(/\D/g, ""));
+const idNum = (id: string) => Number(String(id).replace(/\D/g, ""));
 
 /** The world of a map from its twin group alone: s9xx ids = the finale world, the others take their rank by id (0 normal, 1 Amaterasu). */
-function rankWorld(group, id) {
+function rankWorld(group: string[], id: string) {
     if (idNum(id) >= 900) return 2;
     const r = group.filter((x) => idNum(x) < 900).indexOf(id);
     return r >= 0 && r < 2 ? r : -1;
@@ -118,7 +120,7 @@ export function mapWorlds(maps: FlyMap[], scenes: FlyScenes | null) {
  * { id } or { why }: "world-unknown" (the map you stand on has no known world), "no-copy" (that world holds no copy of the point).
  * Never a guess.
  */
-export function flyCopyFor({ maps, scenes, currentId, id }) {
+export function flyCopyFor({ maps, scenes, currentId, id }: FlyCopyArgs) {
     const w = mapWorlds(maps, scenes).get(currentId);
     if (w === undefined) return { why: "world-unknown" };
     const g = mapTwins(maps, scenes).get(id);
@@ -165,7 +167,7 @@ export function flyPlaces({ maps = [], seen = () => false, currentId = null, poi
  * Where the game puts you when you walk into `id`: the spawn of the first (lowest map id) exit of any scene that leads there.
  * { x, y, dir } or null when no scene leads there with a spawn.
  */
-export function arrivalSpot(scenes, id) {
+export function arrivalSpot(scenes, id: string | undefined) {
     for (const from of Object.keys(scenes ?? {}).sort()) {
         for (const e of scenes[from]?.exits ?? []) {
             if (e?.to === id && Number.isFinite(e.spawnX) && Number.isFinite(e.spawnY)) {

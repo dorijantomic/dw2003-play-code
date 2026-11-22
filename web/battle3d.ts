@@ -1,3 +1,6 @@
+interface PlaylistOptions {
+  loop?: boolean;
+}
 /**
  * battle3d.js — WebGL 3D skeletal renderer for DW2003 fight models.
  *
@@ -1074,7 +1077,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     },
     // Debug (fight-action-lab): play an ORDERED SEQUENCE of timeline tables back-to-back on the
     // player (the assembled action the user composes), looping by default so it can be studied.
-    debugPlayPlaylist(tableIndices, opts) {
+    debugPlayPlaylist(tableIndices: number[] | undefined, opts: PlaylistOptions | undefined) {
       if (!B$.playerAnim8r || !B$.playerModel) return false;
       const tables = (tableIndices || [])
         .map(i => B$.playerModel.timeline?.[i]?.table)

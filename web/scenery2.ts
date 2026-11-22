@@ -8,6 +8,16 @@ import { darkness, setReveal } from "./scenery.js";
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 import type { AmbienceSettings } from "./types/ambience.js";
+import type { AmbienceConditions } from "./types/ambience.js";
+interface RevealScene {
+    p: AmbienceSettings;
+    fx: AmbienceConditions;
+    now: number;
+    fade: number;
+    camX: number;
+    camY: number;
+}
+
 const VIEW_H = 240;
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -119,7 +129,7 @@ function revealSprite() {
 }
 setReveal({
     wants(S) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
-    draw(ctx, snap, S) {
+    draw(ctx: CanvasRenderingContext2D, snap: HTMLCanvasElement, S: RevealScene) {
         const dark = darkness(S.p, S.fx, S.now);
         if (dark < 0.04) return;
         const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, a = clamp01(0.85 * gain * dark * S.fade);

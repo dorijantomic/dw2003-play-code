@@ -220,7 +220,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const ramp = Math.max(6, Math.round(K23.rampShare * nF));
   const weight = (s: number) => { const x = Math.max(0, Math.min(1, Math.min((s - lo) / ramp, (hi - s) / ramp))); return x * x * (3 - 2 * x); };
   /** the rotation `Wtarget`, reached `w` of the way from the rest rotation `Wrest` (along the shortest turn) */
-  const blendRot = (Wrest, Wtarget, w: number) => {
+  const blendRot = (Wrest, Wtarget: number[][], w: number) => {
     if (w >= 1) return Wtarget;
     const { axis, ang } = k16axisOf(k16mul(k16tr(Wrest), Wtarget));
     return k16mul(Wrest, k16axisAngle(axis, ang * w));
@@ -229,7 +229,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   // direction. The shortest turn from rest has an ill-conditioned axis when a limb goes from hanging to raised (it swings
   // sideways and rolls, shoulders merge, arms cross); small steps of a planar path add no roll. Off by default.
   const tstate = new Map();
-  const aimR = (key: string, u, dv) => {
+  const aimR = (key: string, u, dv): number[][] => {
     if (!transport) return k16fromTo(u, dv);
     const st = tstate.get(key) || { d: u, R: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
     const R = k16mul(k16fromTo(st.d, dv), st.R);

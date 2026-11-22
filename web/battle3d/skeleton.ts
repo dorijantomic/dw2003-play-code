@@ -1,4 +1,16 @@
 import { prepareModelDonors } from "../fight/clip-fallback.js";
+interface SkelBone {
+  parent_slot: number;
+  anim?: { ch1?: number[][] };
+}
+
+interface SkelModel {
+  bones: SkelBone[];
+  mirrorBones?: Set<number>;
+  slotMap?: number[][] | null;
+  bridgeVertCapacity?: number;
+}
+
 
 // ─── Skeletal model cache ─────────────────────────────────────────────────────
 
@@ -11,7 +23,7 @@ export async function loadSkeletalModel(folder: string) {
   const p = fetch(`${base}/anim.json`)
     .then(r => r.ok ? r.json() : null)
     .catch(() => null)
-    .then(async (anim) => {
+    .then(async (anim): Promise<SkelModel | null> => {
       if (!anim) return null;
 
       // Structural mirrorX detection: direct children of bone[0] with negative

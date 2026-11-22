@@ -67,7 +67,7 @@ const SHAFT_COUNT = 4;
 const shaftBase = new Float32Array(SHAFT_COUNT);
 
 // Floor relief by x,z (also places the rocks on it).
-function floorHeight(x, z, amp: number) {
+function floorHeight(x: number, z: number, amp: number) {
     return amp * (Math.sin(x * 0.5) * Math.cos(z * 0.4) + 0.5 * Math.sin(x * 1.3 + z * 0.9));
 }
 

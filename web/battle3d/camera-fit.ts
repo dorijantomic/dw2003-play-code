@@ -4,6 +4,21 @@ import { buildBoneWorldMatrices } from "./rotation.js";
 import { posedVertex } from "./skeleton.js";
 import { cross3, dot3, normalize, sub3 } from "./math.js";
 import type { GiantShotOptions, PlacementTable } from "../types/battle3d.js";
+interface GiantShotRef {
+  eye: [number, number, number];
+  target: number[];
+  H: number;
+}
+
+interface GiantShotFit {
+  eye: number[];
+  target: number[];
+  H: number;
+  lift: number;
+  pull: number;
+  changed: boolean;
+}
+
 
 /**
  * May the fight scene run its camera at all — i.e. are BOTH fighters' staging records in?
@@ -249,7 +264,7 @@ export function shotBodyBounds(shot, slot, rest, target = null, aspect = GIANT_F
  * (`changed: false`) when it already frames the body, which is the identity every small model
  * takes. `target` is a CONSTRAINT (the opposing fighter must stay on screen), never the aim.
  */
-export function giantShotFor(refShot, slot: { x: number; y: number; z: number; }, rest: { h: number; }, target = null, opts: GiantShotOptions = {}) {
+export function giantShotFor(refShot: GiantShotRef, slot: { x: number; y: number; z: number; }, rest: { h: number; }, target = null, opts: GiantShotOptions = {}): GiantShotFit {
   const fill = opts.fill ?? GIANT_FRAME_FILL;
   const hMin = opts.hMin ?? GIANT_H_MIN;
   const pullMax = opts.pullMax ?? GIANT_PULL_MAX;
@@ -267,7 +282,7 @@ export function giantShotFor(refShot, slot: { x: number; y: number; z: number; }
   if (!asIs.behind && asIs.fill <= fill) {
     return { eye: refShot.eye, target: refShot.target, H: refShot.H, lift: 0, pull: 1, changed: false };
   }
-  const fits = (eye, H) => {
+  const fits = (eye: number[], H: number) => {
     const b = shotBodyBounds({ eye, target: bodyC, H }, slot, rest, keep, aspect);
     return !b.behind && b.fill <= fill;
   };

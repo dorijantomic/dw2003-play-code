@@ -4,6 +4,28 @@
 import { chevronSvg } from "./icons.js";
 import { ROLES, FACE, fitRun, measureText } from "./text.js";
 import { fillVic } from "./vic.js";
+import type { UiPart } from './types.js';
+interface PartRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+interface PartEdges {
+  u: number;
+  d: number;
+  l?: number;
+  r?: number;
+}
+interface PartGeom {
+  rect: PartRect;
+  ed: PartEdges;
+  sx: number;
+  sy: number;
+}
+
 
 const pt = (list) => `polygon(${list.map(([x, y]) => `${+x.toFixed(3)}px ${+y.toFixed(3)}px`).join(",")})`;
 
@@ -184,7 +206,7 @@ const px = (n) => `${Math.round(n)}px`;
 const setBox = (e, r) => { e.style.left = px(r.left); e.style.top = px(r.top); e.style.width = px(r.width); e.style.height = px(r.height); };
 
 /** Build the element for `desc` and fill it for the current geometry `g` = { rect (snapped page px), ed (edges), sx, sy (scale vs native) }. */
-export function buildPart(desc, g) {
+export function buildPart(desc: UiPart, g: PartGeom) {
     const root = el(`uic-part uic-${desc.kind}`);
     root.dataset.uicKey = desc.key;
     fillPart(root, desc, g);

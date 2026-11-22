@@ -59,9 +59,9 @@ export const K16 = {
 
 // real row-major 3x3 helpers. A ch2 triple (c0,c1,c2) is the rotation RZ(c2)*RY(c1)*RX(c0) in the
 // renderer's own arithmetic (verified against restPose(): identical to 0.0e+0 on every bone).
-export const k16mul = (A, B) => A.map((row) => B[0].map((_, j) => row.reduce((s, v, k) => s + v * B[k][j], 0)));
+export const k16mul = (A: number[][], B: number[][]): number[][] => A.map((row) => B[0].map((_, j) => row.reduce((s, v, k) => s + v * B[k][j], 0)));
 
-export const k16tr = (A) => A[0].map((_, j) => A.map((r) => r[j]));
+export const k16tr = (A: number[][]): number[][] => A[0].map((_, j) => A.map((r) => r[j]));
 
 export const k16mv = (A, v) => A.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
 
@@ -118,7 +118,7 @@ export function k16axisOf(M) {
 }
 
 /** Clamp a rotation's angle to `max` (a joint limit applied in the joint's own frame). */
-export function k16clampRot(M, max: number) {
+export function k16clampRot(M: number[][], max: number) {
   const { axis, ang } = k16axisOf(M);
   if (ang <= max) return M;
   return k16axisAngle(axis, max);

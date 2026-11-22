@@ -10,6 +10,11 @@ import { WORD } from "./ui-kit-input.js";
 import { LIST_WINDOW, drawHeader, drawHelpBox, drawPanel, layoutTabs, listRowY, withFold } from "./ui-kit.js";
 import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { fitByWidth } from "./text-fit.js";
+interface OptionsView {
+    progress(name: string): number;
+    ticks: number;
+}
+
 
 /** Short names: the long F2 names ("Plain smooth (bilinear)") are too long for a value beside a row label. */
 const FILTER_SHORT = Object.freeze({ off: "Off", bilinear: "Smooth", epx: "EPX", mmpx: "MMPX", xbr: "xBR", xbrblend: "xBR blend" });
@@ -72,7 +77,7 @@ export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "u
             else if (buttons.has("right")) cue(model.change(1));
             return null;
         },
-        draw(ctx, view) {
+        draw(ctx: CanvasRenderingContext2D, view: OptionsView) {
             const pt = view.progress("title"), pl = view.progress("list"), ph = view.progress("help");
             const hl = headerLayout((s, k = 1) => textWidth(s, k), "OPTIONS", model.pageLabels());
             drawHeader(ctx, pt, "OPTIONS", model.pageLabels(), model.page(), { tabStart: hl.tabStart, gap: hl.tabGap });

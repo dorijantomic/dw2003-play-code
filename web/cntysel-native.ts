@@ -135,7 +135,7 @@ export function createCntyselNative(sfx = null, music = null) {
                 if (screen.complete) finish(true);
             }
         },
-        draw(ctx, viewW, _viewH) {
+        draw(ctx: CanvasRenderingContext2D, viewW: number, _viewH: number) {
             if (!open || !screen || !renderer.ready()) return;
             const viewport = screen.rectangle(0);
             const dim = screen.rectangle(2);

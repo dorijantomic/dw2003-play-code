@@ -22,7 +22,12 @@ import { fitByWidth, wrapByWidth, wrapToLines, BAND_TEXT_W } from "./text-fit.js
 import { textWidth } from "./uifont.js";
 import { validateScene } from "./quest-scenes.js";
 import { installTriggers } from "./quest-triggers.js";
-import { offersAt, offerLabels } from "./quest-offers.js";   // the offer loop's filters, written once (F2: pick which job)
+import { offersAt, offerLabels } from "./quest-offers.js";
+interface QuestDef {
+    offer?: boolean;
+    acceptAt?: string[];
+}
+   // the offer loop's filters, written once (F2: pick which job)
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -328,7 +333,7 @@ export function questsTick(mapId, x: number, y: number) {
             if (!st.visited.includes(key)) { st.visited.push(key); saveState(); }
             bump("visit", (o) => sameMap(o.map, mapId)); markVisited(mapId);
             ensureGenerated(); announceUnlocks();
-            const posted = allDefs().find((d) => !d.offer && d.acceptAt && statusOf(d) === "available" && d.acceptAt.some((m) => sameMap(m, mapId)));
+            const posted = allDefs().find((d): boolean => !d.offer && d.acceptAt && statusOf(d) === "available" && d.acceptAt.some((m) => sameMap(m, mapId)));
             if (posted) toast(`A job is posted here: ${posted.title}  (press F3)`);
         }
     }
@@ -573,7 +578,7 @@ const isHere = (d) => !!lastMap && (d.offer ? d.offer.maps : d.acceptAt ?? []).s
 const placeOf = (d) => (d.offer ? mapLabel(d.offer.maps[0]) : d.acceptAt ? mapLabel(d.acceptAt[0]) : "Wanted board");
 
 /** The game's choice list over any number of labels, four at a time. Returns the index picked, or -1 for Back. */
-async function pagedPick(prompt, labels) {
+async function pagedPick(prompt: string, labels) {
     const PER = 4, pages = Math.max(1, Math.ceil(labels.length / PER));
     let page = 0;
     for (;;) {
@@ -585,7 +590,7 @@ async function pagedPick(prompt, labels) {
     }
 }
 /** A list of quests; "leave" when one of them starts a fight (the log closes). */
-async function listQuests(prompt, ds) {
+async function listQuests(prompt: string, ds: { title: string }[]) {
     const i = await pagedPick(prompt, ds.map((d) => `${MARK[statusOf(d)]} ${clip(d.title, 34)}`));
     if (i < 0) return null;
     return (await showQuest(ds[i])) === "leave" ? "leave" : null;     // afterwards the menu is rebuilt: the quest may have changed bucket

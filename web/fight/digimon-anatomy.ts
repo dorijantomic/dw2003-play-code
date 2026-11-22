@@ -1,6 +1,8 @@
 import { ANATOMY, FOLDERS, SIZE_ORDER, TECH_MODE_PRIOR, W } from "./digimon-anatomy/anatomy-data.js";
 import { EMITTERS, SHOTS } from "./digimon-anatomy/emitter-data.js";
 import { ARM_ATTACH, ARM_EQUIP } from "./digimon-anatomy/arm-data.js";
+interface Emitter { id: string; part: string; count: number; kind: string; primary: boolean; mouth: boolean; }
+
 // moved by tools/rewrite/split.mjs: still exported from here
 export { ANATOMY, BODY_FAMILY, FOLDERS, MODES, TECH_MODE_PRIOR } from "./digimon-anatomy/anatomy-data.js";
 export { EMITTERS, EMITTER_KINDS, EMITTER_PARTS, SHOTS, SHOT_MODES } from "./digimon-anatomy/emitter-data.js";
@@ -197,7 +199,7 @@ function armTokens(a) {
   return t;
 }
 
-export function emitters(folder: string | number) {
+export function emitters(folder: string | number): Emitter[] {
   const rows = EMITTERS[folder];
   if (!rows) return [];
   return rows.map((r) => ({

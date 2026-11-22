@@ -14,6 +14,20 @@ import { scaledHp, scaledMp, scaledStat } from "./battle.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import { elementValue } from "./vendor/engine.js";
 import type { GlossaryDigimonOut } from "./types/glossary-digimon.js";
+interface DigimonLogState {
+    met: Record<string, number>;
+    beaten: Record<string, number>;
+    owned?: Record<string, number> | null;
+}
+
+interface DigimonLog {
+    read?: () => DigimonLogState | null;
+    metCount: (id: string | number) => number;
+    beatenCount: (id: string | number) => number;
+    ownedCount: (id: string | number) => number;
+    totals: () => { met: number; beaten: number };
+}
+
 
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -151,7 +165,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
     // are one entry. The shown name is still the plain one (displayName). A numbered entry is listed right after its base entry
     // (the one with the plain name), after any numbered sibling already placed there.
     const byName = new Map(), first = [];
-    const entry = (name) => { if (!byName.has(name)) { byName.set(name, { names: [name], partners: [], wilds: [] }); first.push(name); } return byName.get(name); };
+    const entry = (name: string) => { if (!byName.has(name)) { byName.set(name, { names: [name], partners: [], wilds: [] }); first.push(name); } return byName.get(name); };
     for (const p of partners) entry(p.name).partners.push(p);
     for (const w of wilds) entry(w.name).wilds.push(w);
     const groups = new Map();
@@ -278,7 +292,7 @@ export function speciesState(sp, log, partner) {
  * The log as it stands right now, read ONCE: the species log re-reads and parses its storage key on every query, which for 240
  * species a frame is far too slow. A frame takes one snapshot and asks that. A log without a readable state is returned as it is.
  */
-export function logSnapshot(log) {
+export function logSnapshot(log: DigimonLog): DigimonLog {
     const s = typeof log?.read === "function" ? log.read() : null;
     if (!s || typeof s.met !== "object" || typeof s.beaten !== "object" || !s.met || !s.beaten) return log;
     const owned = s.owned && typeof s.owned === "object" ? s.owned : {};

@@ -1,3 +1,13 @@
+interface SpeciesLogEvent {
+    enemies?: string[];
+    name?: string;
+}
+
+interface SpeciesLogSink {
+    noteMet(names?: string[]): void;
+    noteBeaten(names?: string[]): void;
+    noteOwned(names?: (string | undefined)[]): void;
+}
 // web/species-log.js -- which species the player has MET and DEFEATED, and how often. Feeds GLOSSARY > DIGIMON.
 //
 // Why a new store: nothing recorded it. `battleStarted` carried no names (web/battle.js), `battleWon` carries them but the only
@@ -71,7 +81,7 @@ export function createSpeciesLog(storage = defaultStorage()) {
 }
 
 /** Wire the log to the game's event bus (web/gameEvents.js `on`). Returns a function that unhooks both. */
-export function installSpeciesLog({ on, log }) {
+export function installSpeciesLog({ on, log }: { on: (name: string, fn: (e?: SpeciesLogEvent) => void) => (() => void) | undefined; log: SpeciesLogSink }) {
     const offs = [
         on("battleStarted", (e) => { log.noteMet(e?.enemies); }),
         on("battleWon", (e) => { log.noteBeaten(e?.enemies); }),

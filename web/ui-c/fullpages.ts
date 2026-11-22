@@ -13,6 +13,8 @@ import { restOfRuns } from "./generic.js";
 import { composeHint, composeRows, runIn, takeIn } from "./pages.js";
 import { isCursorToken } from "./icons.js";
 import type { UiPopOpts } from "./types.js";
+import type { UiPart, UiRun } from "./types.js";
+
 
 /** The native rect of a part's pixels (draw position + the clip's bounds), before its matrix. */
 const nat = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
@@ -351,7 +353,7 @@ export function composeNet({ parts, runs }) {
 }
 
 /** The registration wizard (one session, scope "ui-pack"): the message window, then the name keyboard, then the pack list and the confirm. */
-export function composeWizard(c) {
+export function composeWizard(c: { parts: { part: string }[]; runs: UiRun[] }): UiPart[] {
     if (c.parts.some((p: { part: string; }) => p.part === "keyboard")) return composeNameEntry(c, { word: null });
     return composeNet(c);
 }

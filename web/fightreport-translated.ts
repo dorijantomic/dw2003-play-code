@@ -33,6 +33,10 @@ import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } fro
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import type { FightReportScreen } from "./types/fightreport-translated.js";
+interface ScreenCompose {
+    text: (x: number, y: number, text: string) => void;
+}
+
 
 /** The report art: 0x079F0000 is disc index 1951 (STFRPT), 0x02860000 is 646 (CMFONT, the banner). */
 const PACKS = { 1951: "stfrpt", 646: "cmfont" };
@@ -249,7 +253,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         fitNativeScreen(ctx);
-        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc) => composeReport(sc, { view: reportView() }) } });
+        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc): string[] => composeReport(sc, { view: reportView() }) } });
         ctx.restore();
     };
 

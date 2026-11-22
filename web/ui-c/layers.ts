@@ -72,7 +72,7 @@ export const clipInset = (c: { left: number; top: number; right: number; bottom:
 
 /** Write the descriptors of one scope. `pl` = placement, `geo` = frameGeometry, `dim` = 0..1, `clip` = a native rect the whole layer is
  *  cut to (the place card's slit), null = none. */
-export function commit(key: string | undefined, descs, pl, geo, dim: number, clip = null) {
+export function commit(key: string | undefined, descs, pl: { s: number; sy: number; ox: number; oy: number; }, geo, dim: number, clip = null) {
     const s = scopeFor(key);
     s.seen = performance.now();
     s.seenFrame = frameNo;

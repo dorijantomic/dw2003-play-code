@@ -9,6 +9,34 @@ import { lampPoints, windowRects } from "./scenery2.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+interface Scenery3Fx {
+    rainwater?: boolean;
+    wildlife?: boolean;
+    windows?: boolean;
+    nightlight?: boolean;
+    screenfx?: boolean;
+}
+
+interface Scenery3Phase {
+    rainy?: boolean;
+    lamps?: boolean;
+    open?: boolean;
+}
+
+interface Scenery3State {
+    map: { id: number | string };
+    fx: Scenery3Fx;
+    p: Scenery3Phase;
+    DW: number;
+    DH: number;
+    DWB: number;
+    DHB: number;
+    wrapX: (x: number, cam: number) => number;
+    wrapY: (y: number, cam: number) => number;
+    wrapXB: (x: number, cam: number) => number;
+    wrapYB: (y: number, cam: number) => number;
+}
+
 const VIEW_H = 240;
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -245,7 +273,7 @@ function drawWaterRain(ctx, S) {
     }
 }
 
-export function drawScenery3(ctx, S) {
+export function drawScenery3(ctx: CanvasRenderingContext2D, S: Scenery3State) {
     if (id3 !== S.map.id) return;
     const { fx, p } = S;
     if (!built3) build(S);

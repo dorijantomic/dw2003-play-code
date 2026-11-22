@@ -23,7 +23,15 @@ import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
 import type { FightTechRow } from "../types/battle.js";
 
 import type { BattleState } from "../types/battle.js";
-export function battleRestoreParty(b, side: number) {
+interface BattleRestoreState {
+  player: BattleState["player"];
+  enemy: BattleState["enemy"];
+  playerRecords: BattleState["playerRecords"];
+  statusEvents: BattleState["statusEvents"];
+  activePlayerIndex?: number;
+}
+
+export function battleRestoreParty(b: BattleRestoreState, side: number) {
   if ((side | 0) < 1) {
     const records = b?.playerRecords ?? [];
     return [0, 1, 2].map((i) => {
@@ -75,7 +83,7 @@ function clearRestoreAilments(rec, mask: number) {
  * The plan is the port's, so this only translates the port's per-slot numbers back into
  * the walker's records. Returns the slot indices whose HP actually rose.
  */
-export function applyBattleRestorePlan(b, side: number, plan) {
+export function applyBattleRestorePlan(b: BattleRestoreState, side: number, plan) {
   const targets = battleRestoreTargets(b, side);
   const healed = [];
   const pool = b?.statusEvents;
@@ -244,7 +252,7 @@ export function clearActionAffinity(b, side: number) {
  * Returns null when the technique is not a category-4 member, so a caller can use it as
  * the gate: that null IS the "this technique is an ordinary attack" answer.
  */
-export function battleRestorePlanFor(b, side: number, record: { category: number; }, techniqueId: number, options: RestorePlanOptions = {}) {
+export function battleRestorePlanFor(b: BattleRestoreState, side: number, record: { category: number; }, techniqueId: number, options: RestorePlanOptions = {}) {
   if ((record?.category | 0) !== 4) return null;
   // The record machine's state-1 sub-state-0 clear runs BEFORE this category handler and
   // has no category test (`pro/fightstg.s:13092 sh $zr, 0xe($v0)`), so a heal throws the

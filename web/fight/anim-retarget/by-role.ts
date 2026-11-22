@@ -84,7 +84,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   const rootRestC1 = sample(target.bones[rootBone]?.anim?.ch1, 0);
   const sRootRestC1 = sample(source.bones[S.root]?.anim?.ch1, 0);
   // each model's REST-FRAME local rotation per bone (the "rest-pose orientation offset" of every joint)
-  const localOf = (model, pose) => model.bones.map((b, i: string | number) => {
+  const localOf = (model: RetargetModel, pose: { W: (typeof K16_ID)[] }): (typeof K16_ID)[] => model.bones.map((b, i: string | number) => {
     const p = (b.parent_slot ?? 0) - 1;
     return k16mul(k16tr(p >= 0 && p < pose.W.length ? pose.W[p] : K16_ID), pose.W[i]);
   });

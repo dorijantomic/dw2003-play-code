@@ -41,7 +41,7 @@ export const plate = (key: string, part: string, rect, rel = ID, o: UiPlateOpts 
 export const TAB = Object.freeze({ w: N(390), h: N(46), inset: N(36), sizeDp: 24, lineDp: 34 });
 
 /** A title tab plate (C4 #2c2c8a by default; o.edge = another tab colour, o.part = another part name). */
-export const tabPlate = (key: string, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "tab", rect, rel, { shape: "tab", edge: o.edge ?? "var(--c-under)", layer: o.layer });
+export const tabPlate = (key: string, rect: UiRect | { x: number; y: number; w: number; h: 14; } | { x: number; y: number; w: number; h: 14; }, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "tab", rect, rel, { shape: "tab", edge: o.edge ?? "var(--c-under)", layer: o.layer });
 
 /** The title of a tab: the game's run `m`, never on the slant (at least TAB.inset in), centred in the tab (`tab` native, before `rel`). */
 export function tabTitle(key: string, m, tab, rel = ID) {
@@ -60,7 +60,7 @@ export const CONFIRM = Object.freeze({ onIn: N(24), plainIn: N(60), rowH: N(40),
  * Chakra Petch 700 40 / 52 right-anchored on the game's own right edge, the up / down triangles (24 x 56 dp, orange).
  */
 export const SPINNER = Object.freeze({ xDp: 26, xLineDp: 40, countDp: 40, countLineDp: 52, arrowW: N(24), arrowH: N(56) });
-export const spinnerPlate = (key: string, rect, rel = ID, live = true) => plate(key, "spinner", rect, rel, { shape: "ch", edge: live ? "var(--c-orange)" : "var(--c-edge)" });
+export const spinnerPlate = (key: string, rect: UiRect, rel = ID, live = true) => plate(key, "spinner", rect, rel, { shape: "ch", edge: live ? "var(--c-orange)" : "var(--c-edge)" });
 /** The spinner's up / down triangles centred on (cx, cy) native. */
 export const spinArrows = (key: string, cx: number, cy: number, rel = ID) => ({
     key, kind: "svg", part: "spinArrows", layer: "over", vw: 24, vh: 56, d: "M2 20L12 6L22 20Z M2 36L12 50L22 36Z", fill: "var(--c-orange)",
@@ -75,7 +75,7 @@ export const ROW_INK = Object.freeze({ on: "var(--c-orange-ink)" });
 
 /** A list row plate: plain = navy under-edge on the body, `on` = the focused row, solid orange. `under` = another under-edge colour for a plain
  *  row that stands out (the skill row of a Digivolve sheet: orange under-edge). */
-export const rowPlate = (key: string, rect, on: boolean, rel = ID, part = "row", under: string = "var(--c-under)") =>
+export const rowPlate = (key: string, rect: UiRect, on: boolean, rel = ID, part = "row", under: string = "var(--c-under)") =>
     plate(key, part, rect, rel, { shape: on ? "rowSolid" : "row", edge: on ? "var(--c-orange)" : under, body: on ? null : "var(--c-body)" });
 
 /**
@@ -90,7 +90,7 @@ export function cursor(key: string, glyph: string, cx: number, cy: number, rel =
 }
 
 /** The C card bar (party cards, info cards, the GLOSSARY strength bars): dark track, fill at `ratio` (0..1). `rect` is already through `rel`. */
-export const cardBar = (key: string, rect, ratio: number, color = "var(--c-hp)", rel = ID) => ({
+export const cardBar = (key: string, rect: UiRect, ratio: number, color = "var(--c-hp)", rel = ID) => ({
     key, kind: "bar", part: "cardBar", layer: "over", rect, ratio, track: "var(--c-track)", color, sx: rel.a, sy: rel.d,
 });
 
@@ -106,10 +106,10 @@ export const triangle = (key: string, cx: number, cy: number, dir: string, rel =
 });
 
 /** Focus corners around a rect (already in native units, through the matrix). */
-export const corners = (key: string, rect, color = "var(--c-orange)", rel = ID, part = "selection") => ({ key, kind: "corners", part, layer: "over", rect, color, sx: rel.a, sy: rel.d });
+export const corners = (key: string, rect: UiRect, color = "var(--c-orange)", rel = ID, part = "selection") => ({ key, kind: "corners", part, layer: "over", rect, color, sx: rel.a, sy: rel.d });
 
 /** A small slanted chip (L1 / R1 page keys, small plates). `on` = the game draws the key's arrow (bright). */
-export const chip = (key: string, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "pageChip", rect, rel, { shape: "chip", edge: o.edge ?? "var(--c-under)", body: o.body, shadow: 0, layer: o.layer ?? "over" });
+export const chip = (key: string, rect: UiRect | { x: number; y: number; w: number; h: number; }, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "pageChip", rect, rel, { shape: "chip", edge: o.edge ?? "var(--c-under)", body: o.body, shadow: 0, layer: o.layer ?? "over" });
 
 /** The seven element colours of the C9 chips, in the order of the game's resistance rows (fire, water, ice, wind, thunder, machine, dark). */
 export const ELEMENTS = Object.freeze(["fire", "water", "ice", "wind", "thunder", "machine", "dark"].map((k) => `var(--c-el-${k})`));
@@ -118,7 +118,7 @@ export const ELEMENTS = Object.freeze(["fire", "water", "ice", "wind", "thunder"
  * A stat / element chip (C9 6): solid chip body with the 10 dp chamfer; with `cap` a colour strip 8 dp wide down its left side, below the
  * chamfer (element chips). Returns the descriptors (the strip over the body).
  */
-export function elementChip(key: string, rect, cap = null, rel = ID) {
+export function elementChip(key: string, rect: UiRect, cap = null, rel = ID) {
     const out: UiPart[] = [plate(key, "statChip", rect, rel, { shape: "chip", edge: "var(--c-chip)", body: null, shadow: 0 })];
     if (cap) out.push(rule(`${key}.cap`, { x: rect.x, y: rect.y + N(10) * rel.d, w: N(8) * rel.a, h: rect.h - N(10) * rel.d }, cap, rel, "under", "chipCap"));
     return out;
@@ -145,7 +145,7 @@ export const MSG = Object.freeze({
 export const MORE_PATH = "M0 0L10 10L20 0V6L10 16L0 6Z M0 14L10 24L20 14V20L10 30L0 20Z";
 
 /** The "more" arrow (C9 9) centred in the native box the game's own marker occupies. */
-export const moreArrow = (key: string, box, rel = ID, fill = "var(--c-orange)") => ({
+export const moreArrow = (key: string, box: UiRect | { x: number; y: number; w: number; h: number; }, rel = ID, fill = "var(--c-orange)") => ({
     key, kind: "svg", part: "more", layer: "over", vw: 20, vh: 30, d: MORE_PATH, fill,
     rect: { x: box.x + box.w / 2 - MSG.moreW * rel.a / 2, y: box.y + box.h / 2 - MSG.moreH * rel.d / 2, w: MSG.moreW * rel.a, h: MSG.moreH * rel.d }, sx: rel.a, sy: rel.d,
 });
@@ -215,33 +215,33 @@ export const FAMILY_C = Object.freeze({
 });
 
 /** A family C window (C7: 4 dp edge #2AA8FF, body #000818, chamfer 24 / 22, drop shadow 6). */
-export const cWindow = (key: string, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "window", rect, rel, { shape: o.shape ?? "ch", edge: o.edge ?? FAMILY_C.edge, body: FAMILY_C.body, layer: o.layer });
+export const cWindow = (key: string, rect: UiRect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "window", rect, rel, { shape: o.shape ?? "ch", edge: o.edge ?? FAMILY_C.edge, body: FAMILY_C.body, layer: o.layer });
 
 /**
  * One C7 key (38 x 50 dp, chamfer 8, 2 dp under-edge) with its letter (Russo 26 / 48, centred). state = "on" (the cursor's key: solid
  * orange, dark ink), "key" (a letter) or "empty" (no letter: dim). `ch` = the game's glyph on that key ("" = none).
  */
-export function keyCap(key: string, rect, ch: string | undefined, state: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
+export function keyCap(key: string, rect: UiRect, ch: string | undefined, state: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
     const on = state === "on", empty = state === "empty";
     out.push(plate(`${key}.plate`, "key", rect, rel, { shape: "key", edge: on ? "var(--c-orange)" : empty ? FAMILY_C.emptyEdge : FAMILY_C.keyEdge, body: on ? "var(--c-orange)" : empty ? FAMILY_C.emptyBody : FAMILY_C.keyBody, shadow: 0 }));
     if (ch) out.push(textPart(`${key}.ch`, "label", ch, rect, 26, 48, { align: "center", spacing: 0, color: on ? "var(--c-orange-ink)" : FAMILY_C.keyInk, rel }));
 }
 
 /** One C7 name slot (45 x 51 dp, chamfer 8, edge all round, drop shadow 4); `on` = the slot the game's cursor is on (orange edge, amber body). */
-export function nameSlot(key: string, rect, ch: string, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
+export function nameSlot(key: string, rect: UiRect, ch: string, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
     out.push(plate(`${key}.plate`, "slot", rect, rel, { shape: "key", underEdge: "all", edge: on ? "var(--c-orange)" : FAMILY_C.edge, body: on ? FAMILY_C.slotOn : FAMILY_C.body, shadow: 4 }));
     if (ch) out.push(textPart(`${key}.ch`, "label", ch, rect, 28, 51, { align: "center", spacing: 0, color: on ? FAMILY_C.slotInk : null, rel }));
 }
 
 /** A C7 button (DEL / SPC / arrows / OK): kb frame, body #001030; `on` = the cursor's button (orange edge, amber body). */
-export const keyButton = (key: string, rect, on: boolean, rel = ID) => plate(key, "keyButton", rect, rel, { shape: "kb", edge: on ? "var(--c-orange)" : FAMILY_C.edge, body: on ? FAMILY_C.slotOn : FAMILY_C.keyBody, shadow: 4 });
+export const keyButton = (key: string, rect: UiRect, on: boolean, rel = ID) => plate(key, "keyButton", rect, rel, { shape: "kb", edge: on ? "var(--c-orange)" : FAMILY_C.edge, body: on ? FAMILY_C.slotOn : FAMILY_C.keyBody, shadow: 4 });
 
 // ------------------------------------------------------------------------------------------------ the battle HUD (C8)
 /** C8 colours: cyan edge, navy body, the dark name slab / key box body, the bar track, the gauge well. */
 export const HUD = Object.freeze({ edge: "var(--c-cyan)", body: "var(--c-hud-body)", slab: "var(--c-hud-slab)", track: "var(--c-hud-track)", well: "var(--c-hud-well)" });
 
 /** The C8 key box left of a command row (k shape, 4 dp edge all round, drop shadow 4); `on` = solid orange with the dark bullet. */
-export function keyBox(key: string, rect, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out: UiPart[]) {
+export function keyBox(key: string, rect: UiRect, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out: UiPart[]) {
     out.push(plate(key, "keyBox", rect, rel, { shape: "key", underEdge: "all", edge: on ? "var(--c-orange)" : HUD.edge, body: on ? "var(--c-orange)" : HUD.slab, shadow: 4 }));
     if (on) out.push({ key: `${key}.dot`, kind: "svg", part: "keyDot", layer: "over", vw: 16, vh: 16, d: "M8 1A7 7 0 1 1 7.99 1Z", fill: "var(--c-orange-ink)",
         rect: { x: rect.x + N(12) * rel!.a, y: rect.y + rect.h / 2 - N(8) * rel!.d, w: N(16) * rel!.a, h: N(16) * rel!.d }, sx: rel!.a, sy: rel!.d });
@@ -361,4 +361,4 @@ export const dockPart = (key: string, stage: { x0: number; y0: number; x1: numbe
 /** The damage number that pops at a hit: shown while the game's own "N damage!" line is up; `side` = who was hit. The DOM plays the CSS pop once per element. */
 export const popPart = (key, rect, n, side, o: UiPopOpts = {}) => ({ key, kind: "pop", part: "pop", layer: "over", rect, n, side, o, evt: o.evt ?? "", sx: 1, sy: 1 });
 /** One node of the turn arc (top right): `turn` = "now" | "next" | "later", `side` = "player" | "enemy", `letter` = the name's initial. */
-export const turnNode = (key: string, rect: { x: number; y: number; w: number; h: number; }, o) => ({ key, kind: "node", part: "turnNode", layer: "over", rect, turn: o.turn, side: o.side, letter: o.letter, nb: false, sx: 1, sy: 1 });
+export const turnNode = (key: string, rect: { x: number; y: number; w: number; h: number; }, o: { side: string; turn: string | undefined; letter: string; rect: { x: number; y: number; w: number; h: number; }; }) => ({ key, kind: "node", part: "turnNode", layer: "over", rect, turn: o.turn, side: o.side, letter: o.letter, nb: false, sx: 1, sy: 1 });

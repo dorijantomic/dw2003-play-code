@@ -166,7 +166,7 @@ export function composeEmptyCell(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>
 }
 
 /** The dim C3 plate of a slot with nothing in it (list cell or grid slot). */
-export function emptyPlate(key: string, rect, rel = ID, shape = "row") {
+export function emptyPlate(key: string, rect: UiRect, rel = ID, shape = "row") {
     return plate(key, "cellEmpty", rect, rel, { shape, edge: "var(--c-empty-edge)", body: "var(--c-empty-body)", shadow: 0 });
 }
 
@@ -183,7 +183,7 @@ export function composeCellFrame(p, i, out) {
 }
 
 /** A connector line: a 2 native bar centred in the game's piece. */
-export const connector = (key: string, r, rel = ID) => rule(key, { x: r.x, y: r.y + r.h / 2 - rel.d, w: r.w, h: 2 * rel.d }, "var(--c-under)", rel, "under", "connector");
+export const connector = (key: string, r: UiRect, rel = ID) => rule(key, { x: r.x, y: r.y + r.h / 2 - rel.d, w: r.w, h: 2 * rel.d }, "var(--c-under)", rel, "under", "connector");
 
 /** The cursor box of a grid: orange corner brackets (the palette row's colour cycle when the call carries one). */
 export function composeCursorBox(p, i, out, pulse = null) {

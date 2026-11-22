@@ -1,10 +1,17 @@
 
-import type { InventoryRow } from "./game/types.js";// Extra training halls (idea I6): our own greeters in towns that have no disc gym.
+import type { InventoryRow } from "./game/types.js";
+interface GymExtraHall {
+  map: string;
+  npc_id: string;
+  trainer?: string;
+  greeting?: string[];
+}
+// Extra training halls (idea I6): our own greeters in towns that have no disc gym.
 // Data: data/authored/web/assets/data/gym_extra.json (installed as assets/data/gym_extra.json).
 // A hall opens the ordinary gym screen (web/gym.js) with the game own rank menu cut down to
 // the hall theme. The file holds drill ids only; rows, gains and TP costs come from progression.json at run time.
 // Rank gate = the ID cards, as the disc greeters (gym_ranks.json): Platinum > Silver+Gold > Silver > none.
-export function gymExtraHallAt(data, mapId, npcId) {
+export function gymExtraHallAt(data: { halls?: GymExtraHall[] } | null | undefined, mapId: string, npcId: string): GymExtraHall | null {
   return data?.halls?.find((h) => h.map === mapId && h.npc_id === npcId) ?? null;
 }
 

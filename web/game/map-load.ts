@@ -62,6 +62,13 @@ import { reseedLiveTree } from "./fishing-tree.js";
 import { stepPlayback } from "./field-steps.js";
 import { fieldcomTick } from "./field-fx.js";
 import { applyStoryCommand } from "./story-events.js";
+interface ActiveExit {
+    to: string | number;
+    aimed?: boolean;
+    routeWords?: readonly number[];
+    gondola?: boolean;
+}
+
 
 function updateHud() {
     const hud = document.getElementById("hud");
@@ -729,7 +736,7 @@ export function refreshPartyCharisma() {
 // Measured over the 790 shipped exits: every exit that carries a warp tag from a
 // step program is named by a grid cell inside its own rectangle (781 of the 789 that
 // have both a program and a grid), so this gate removes no working door.
-export function activeExitAt(x = state.x, y = state.y) {
+export function activeExitAt(x = state.x, y = state.y): ActiveExit | null {
     const exits = state.scenes[currentMap().id]?.exits ?? [];
     const hit = hitRect(
         exits.filter((exit) => exitGatePasses(exit, storyFlags.get)),

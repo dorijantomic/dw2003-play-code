@@ -245,7 +245,7 @@ function formChangeView(b, position: number, profile = null) {
  * Tag commit; the report then pays DVEXP and the form-level ladder, and tries
  * one learn and one loadable, per marked row.
  */
-export function markFormTaken(b, position: number, speciesId: number) {
+export function markFormTaken(b: BattleState, position: number, speciesId: number) {
   if (!b?.playerRecords?.[position]) return;
   engineMarkEquippedFormFlags(formChangeView(b, position), Number(speciesId));
 }
