@@ -149,10 +149,11 @@ export const rowFor = (key: string) => BY_KEY.get(key) || null;
 export const rowsOfTab = (tab: string) => DEV_ROWS.filter((r) => r.tab === tab);
 
 /** { tabId: { on, total } }: switches on per tab (a missing or false value is off). */
-export function tabCounts(fx) {
+export function tabCounts(fx: Readonly<Record<string, unknown>> | null | undefined) {
     const out: Record<string, { on: number; total: number; }> = {};
     for (const t of DEV_TABS) out[t.id] = { on: 0, total: 0 };
-    for (const r of DEV_ROWS) { out[r.tab].total++; if (fx && fx[r.key]) out[r.tab].on++; }
+    // ETS item 9: every DEV_ROWS tab is one of DEV_TABS, whose entries the loop above just made
+    for (const r of DEV_ROWS) { out[r.tab]!.total++; if (fx && fx[r.key]) out[r.tab]!.on++; }
     return out;
 }
 

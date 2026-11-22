@@ -13,7 +13,9 @@ import { ui } from "./vendor/engine.js";
 import { paintNativeSession } from "./native-session.js";
 import { wfightLoaderRegion } from "./wfight-translated.js";
 import { capturing as uiCCapturing, partHook as uiCPart } from "./ui-c/capture.js";
-import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
+import type { BattleMenuAdapterSpec, BattleMenuAdapterState, BattleMenuOptions, BattleMenuSession, BattleStripMove } from "./types/battle-menu-adapter.js";
+import type { EngineUi } from "./types/battle.js";
+import type { ThrownError } from "./types/translated-screens.js";
 
 /** The buttons a queued press is allowed to carry. */
 export const BATTLE_PULSE_BUTTONS = new Set([
@@ -28,7 +30,7 @@ export const BATTLE_QUEUE_LIMIT = 16;
  * with the original's seven-language range. Every battle screen resolves it the
  * same way; only the error's wording names the screen.
  */
-export function battleMenuLanguage(options, errorText: string | undefined) {
+export function battleMenuLanguage(options: BattleMenuOptions | undefined, errorText: string | undefined) {
     const state = options?.getState?.() ?? {};
     const selected = state.languageByte;
     const value = Number.isInteger(selected) ? selected : 2;
@@ -61,7 +63,7 @@ export function stripCanvas(bytes: number[], w: number, h: number) {
  * strip is what the battle boot loader uploaded to VRAM; when no loader ran, the
  * identical bytes come from the data build.
  */
-export function paintStripMoves(ctx: CanvasRenderingContext2D, state: BattleMenuAdapterState, moves) {
+export function paintStripMoves(ctx: CanvasRenderingContext2D, state: BattleMenuAdapterState, moves: readonly BattleStripMove[] | undefined) {
     const info = state._data?.manifest?.strip;
     if (!info) return;
     const [vx, vy] = info.vram;
@@ -107,7 +109,7 @@ export function paintStripMoves(ctx: CanvasRenderingContext2D, state: BattleMenu
  *   extraApi(r)                           the screen's own read-only extras
  *   pulseButtons / queueLimit / countPresses
  */
-export function createBattleMenuAdapter(spec) {
+export function createBattleMenuAdapter(spec: BattleMenuAdapterSpec) {
     const r = {
         _open: false, _session: null, _data: null, _error: null, _failed: false, _loading: false,
         _seed: null, _clock: null, _queue: [], _strip: null, _stripSource: null,
@@ -120,9 +122,9 @@ export function createBattleMenuAdapter(spec) {
     const renderer = spec.renderer;
     const queueLimit = spec.queueLimit ?? BATTLE_QUEUE_LIMIT;
     const pulseButtons = spec.pulseButtons ?? BATTLE_PULSE_BUTTONS;
-    const done = spec.done ?? ((session) => session.finished());
+    const done = spec.done ?? ((session: BattleMenuSession) => session.finished());
 
-    function fail(error) {
+    function fail(error: ThrownError) {
         r._error = error;
         r._failed = true;
         r._lastDiagnostic = `${spec.failureMessage}: ${error?.message ?? error}`;
@@ -144,7 +146,8 @@ export function createBattleMenuAdapter(spec) {
     function startSession() {
         const language = battleMenuLanguage(spec.options, spec.languageError);
         r._session = spec.start(r, r._data, language, (id) => { spec.sfx?.playPacked(id); });
-        r._clock = new ui.MenuDisplayClock();
+        // ETS item 9: the bundle's `ui` export carries no types; EngineUi is the engine source's own type of it.
+        r._clock = new (ui as EngineUi).MenuDisplayClock();
     }
 
     /** Open; the arguments are the screen's own (the command list takes a row too). */
@@ -181,7 +184,7 @@ export function createBattleMenuAdapter(spec) {
         // two presses never merge into one held stretch. The actor's first tick
         // builds the list, so presses wait until it reads the pad.
         const buttons = new Set(held);
-        const canQueue = spec.canQueue ?? ((_, session) => !!session && session.ready());
+        const canQueue = spec.canQueue ?? ((_: unknown, session: BattleMenuSession | null) => !!session && session.ready());
         if (r._releaseTicks > 0) {
             r._releaseTicks--;
             r._pulse = null;

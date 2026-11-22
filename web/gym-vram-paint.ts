@@ -9,6 +9,14 @@ interface GymVram {
   find(x: number, y: number): GymVramImage | null | undefined;
 }
 
+/** A logical (320 x 240) rectangle: left, top, right, bottom. */
+interface GymBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 interface GymPaintStats {
   sprites: number;
   quads: number;
@@ -69,11 +77,12 @@ const PAGE_W = 64;       // a texture page is 64 VRAM halfwords wide (256 four-b
 const PAGE_H = 256;
 
 /** The halfword at VRAM (x, y) from the most recent upload covering it, or -1. */
-function vramHalf(vram, x: number, y: number) {
+function vramHalf(vram: GymVram, x: number, y: number) {
     const image = vram.find(x, y);
     if (!image) return -1;
     const i = ((y - image.y) * image.w + (x - image.x)) * 2;
-    return image.pixels[i] | (image.pixels[i + 1] << 8);
+    // ETS item 9: find(x, y) only answers an upload that covers (x, y), so both bytes of that texel are inside its pixels
+    return image.pixels[i]! | (image.pixels[i + 1]! << 8);
 }
 
 export function createGymPrimPainter(getVram: () => GymVram | null): GymPrimPainter {
@@ -115,7 +124,7 @@ export function createGymPrimPainter(getVram: () => GymVram | null): GymPrimPain
      * Fill the device rectangle of a logical box. `sample(lx, ly)` -> colour half or -1 for a
      * transparent / missing texel. `semi` blends the stp-flagged texels with mode `abr`.
      */
-    function fill(ctx, box, semi: boolean, abr: number, sample: ((lx: number, ly: number) => number) | ((lx: number, ly: number) => number)) {
+    function fill(ctx: CanvasRenderingContext2D, box: GymBox, semi: boolean, abr: number, sample: ((lx: number, ly: number) => number) | ((lx: number, ly: number) => number)) {
         const m = ctx.getTransform();
         const sx = m.a, sy = m.d, tx = m.e, ty = m.f;
         const canvas = ctx.canvas;
@@ -133,10 +142,11 @@ export function createGymPrimPainter(getVram: () => GymVram | null): GymPrimPain
                 if (half <= 0) continue; // missing or colour 0: transparent
                 const o = ((dy - y0) * (x1 - x0) + (dx - x0)) * 4;
                 const r = (half & 31) << 3, g = ((half >> 5) & 31) << 3, b = ((half >> 10) & 31) << 3;
+                // ETS item 9: o is the pixel (dx, dy) of the rectangle read into `data`, so o..o+3 are inside it
                 if (semi && (half & 0x8000)) {
-                    data[o] = blend(data[o], r, abr);
-                    data[o + 1] = blend(data[o + 1], g, abr);
-                    data[o + 2] = blend(data[o + 2], b, abr);
+                    data[o] = blend(data[o]!, r, abr);
+                    data[o + 1] = blend(data[o + 1]!, g, abr);
+                    data[o + 2] = blend(data[o + 2]!, b, abr);
                 } else {
                     data[o] = r; data[o + 1] = g; data[o + 2] = b;
                 }

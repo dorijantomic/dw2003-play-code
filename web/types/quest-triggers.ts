@@ -10,7 +10,7 @@ export type QuestTriggerSwitch = boolean | (() => boolean);
  */
 export interface QuestTriggerContext {
   /** start a scene; null when the game is busy or an actor is missing (the trigger stays armed) */
-  playScene?: (scene: any[]) => unknown;
+  playScene?: (scene: unknown[] | undefined) => unknown;
   save?: () => void;
   /** the quest layer's state store, read again after a scene ran */
   state?: QuestSnapshot | (() => QuestSnapshot);
@@ -21,4 +21,21 @@ export interface QuestTriggerContext {
   dialogBusy?: QuestTriggerSwitch;
   enabled?: QuestTriggerSwitch;
   idle?: QuestTriggerSwitch;
+}
+
+/** What a trigger needs of a quest before it may fire: the quest and the status it must be in. */
+export interface QuestTriggerWhen {
+  quest?: string;
+  status?: string;
+}
+
+/** One authored trigger of quests.json: a map, a walk-in rectangle (x, y, w, h) or an arrival (`on: "enter"`), and the scene it plays. */
+export interface QuestTriggerRow {
+  id: string;
+  map: string;
+  on?: string;
+  once?: boolean;
+  rect?: number[];
+  scene?: unknown[];
+  when?: QuestTriggerWhen;
 }

@@ -7,7 +7,7 @@ export interface AudioPlayer {
   current: string | null;
   el: HTMLAudioElement;
   muted: boolean;
-  play?: (trackId: string) => void;
+  play: (trackId: string | null) => void;
   playJingle?: (trackId: string) => void;
   setVolume?: (level: number) => void;
   toggleMute?: () => boolean;

@@ -7,18 +7,19 @@
 // written once, here.
 
 import { FLY_ROW_LABEL } from "./fly-points.js";
+import type { PauseExtraRowsArgs } from "./types/rest-a.js";
 
 /** The row labels of the two books. */
 export const BOOK_LABELS = Object.freeze({ glossary: "GLOSSARY", options: "OPTIONS" });
 
 /** True when `label` is something the pause list's text codec can draw. */
-export const pauseLabelOk = (label) => /^[A-Za-z0-9 ]{1,12}$/.test(String(label));
+export const pauseLabelOk = (label: string) => /^[A-Za-z0-9 ]{1,12}$/.test(String(label));
 
 /**
  * `quests` is what web/quests.js questsPauseRow() returns ({ label } or null); `fx` is the F2 switch object; `fly` is true once quest zz_fly is done (the FLY row, web/fly-points.js). A book row is
  * there only while its dev switch is exactly true (default off: web/ambience.js EXPERIMENTAL).
  */
-export function pauseExtraRows({ quests = null, fx = null, fly = false } = {}) {
+export function pauseExtraRows({ quests = null, fx = null, fly = false }: PauseExtraRowsArgs = {}) {
     const rows = [];
     if (quests && pauseLabelOk(quests.label)) rows.push({ label: quests.label, opens: "quests" });
     if (fly === true) rows.push({ label: FLY_ROW_LABEL, opens: "fly" });     // once the flight quest is done: not a switch, a key

@@ -13,11 +13,13 @@
 //
 // Pure: takes a fetch-like function; no DOM, no game state.
 
+import type { NewMapExit, NewMapFile, NewMaps } from "./types/rest-b.js";
+
 const DIR = "assets/data/newmaps/";
 
 /** Read every new map. `get(url)` resolves to parsed JSON or null (404). `has(url)` resolves true when the file exists. */
-export async function loadNewMaps(get, has) {
-    const out = { records: [], scenes: {}, exits: {} };
+export async function loadNewMaps(get: (url: string) => Promise<NewMapFile | null>, has?: ((url: string) => Promise<boolean>) | null): Promise<NewMaps> {
+    const out: NewMaps = { records: [], scenes: {}, exits: {} };
     const idx = await get(DIR + "index.json").catch(() => null);
     for (const id of idx?.maps ?? []) {
         try {
@@ -55,14 +57,14 @@ export function mergeNewMaps(manifest: { maps: { id: string; }[]; }, nm: NewMapP
 }
 
 /** The scene of a new map, or null when `id` is not one. */
-export function newMapScene(nm, id: string | number) {
+export function newMapScene(nm: NewMaps | null | undefined, id: string | number) {
     return nm?.scenes?.[id] ?? null;
 }
 
 /** Put the exits that lead into new maps onto a neighbour's scene (once; safe to call again). */
-export function addNewMapExits(nm, mapId: string | number, scene) {
+export function addNewMapExits(nm: NewMaps | null | undefined, mapId: string | number, scene: { exits?: NewMapExit[] }) {
     const list = nm?.exits?.[mapId];
     if (!list?.length) return;
     scene.exits = scene.exits ?? [];
-    for (const e of list) if (!scene.exits.some((x) => x._newMap === e._newMap && x.to === e.to)) scene.exits.push({ ...e });
+    for (const e of list) if (!scene.exits.some((x: NewMapExit) => x._newMap === e._newMap && x.to === e.to)) scene.exits.push({ ...e });
 }

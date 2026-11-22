@@ -52,7 +52,7 @@ export function widePadFor(stageW: number, stageH: number, maxAspect = MAX_WIDE_
 
 /** True when the map is at least as wide as the whole wide view, so the wider camera can clamp
  *  inside it. A narrower map keeps the original framing (its own edges would show). */
-export function mapFitsWide(mapW, pad) {
+export function mapFitsWide(mapW: number, pad: number) {
     return pad > 0 && mapW >= NATIVE_VIEW_W + 2 * pad;
 }
 
@@ -60,7 +60,7 @@ export function mapFitsWide(mapW, pad) {
  *  centred on the target exactly as the original centres its 320 view (target - 160), then clamped
  *  inside the map, and the box is the wide view's middle. Same low-then-ceiling clamp as F0x8008D788.
  *  Returns null when the map is narrower than the wide view. */
-export function wideBoxCameraX(targetX: number, mapW, pad: number) {
+export function wideBoxCameraX(targetX: number, mapW: number, pad: number) {
     if (!mapFitsWide(mapW, pad)) return null;
     const left = Math.min(Math.max(targetX - NATIVE_CENTRE_X - pad, 0), mapW - NATIVE_VIEW_W - 2 * pad);
     return left + pad;
@@ -72,7 +72,7 @@ export function wideBoxCameraX(targetX: number, mapW, pad: number) {
 // FN6A (camera on an actor) in 147, FN6B (camera on a point) in 63. A plain talk (SAY / WAIT / SETANIM
 // only) moves nothing, so it keeps the wide view.
 const STAGED_OPS = new Set(["WALKTO", "SETPOS", "FN6A", "FN6B"]);
-export function scriptIsStaged(opcodes) {
+export function scriptIsStaged(opcodes: readonly unknown[] | null | undefined) {
     if (!Array.isArray(opcodes)) return false;
     for (const line of opcodes) {
         if (typeof line !== "string") continue;

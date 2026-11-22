@@ -60,18 +60,19 @@
 // walker's model of the original's `roster_owned[slot] != 0` (see dw3-config ROSTER_OWNED_VAR).
 import { partyCharismaMeets, routePairPredicate, isStoryCommandBank, flagConditionPasses, storyCommand, ordinalInRange } from "./vendor/engine.js";
 import type { StoryExplorerOpts } from "./types/story-explorer.js";
+import type { FlagBackend } from "./types/rest-a.js";
 
 const ITEM_BANKS = new Set([0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e]);
 const CARD_BANK = 0x92;
 const CHARISMA_BANK = 0x72;
 /** The flags also report story commands (SET_FLAG on a command bank); the shared opts type has not caught up. */
 type FlagStoreOpts = Partial<StoryExplorerOpts> & { command?: (command: ReturnType<typeof storyCommand>) => void };
-export function createFlagStore(backend, opts: FlagStoreOpts = {}) {
+export function createFlagStore(backend: FlagBackend, opts: FlagStoreOpts = {}) {
   const {
     getOrdinal, rosterTable, hasItem, hasCard, packIndex, ownedSlots, routePair,
     partyCharisma, partnerLevels,
   } = opts;
-  function get(id) {
+  function get(id: number) {
     const bank = (id >> 8) & 0xfe;
     if (isStoryCommandBank(bank)) return 1; // get_flag fallthrough: success for either polarity
     if (bank <= 0x40) return backend.get(id) ? 1 : 0;               // stored bit (delegated)
@@ -115,7 +116,7 @@ export function createFlagStore(backend, opts: FlagStoreOpts = {}) {
         // arrays the possession banks read, so hasItem answers it exactly.
         case "collection_all":
           if (!hasItem) return null;
-          return sem.collection_indices.every((i) => hasItem(i)) ? 1 : 0;
+          return sem.collection_indices.every((i: number) => hasItem(i)) ? 1 : 0;
         // op0x10 cases 1/6/9 read only `roster_owned[slot] != 0`, which ownedSlots models.
         case "roster_owned":
           return ownedSlots ? ((ownedSlots() >> sem.slot) & 1 ? 1 : 0) : null;
@@ -146,9 +147,9 @@ export function createFlagStore(backend, opts: FlagStoreOpts = {}) {
         // op0x40 (F0x80015bd8): both subops are plain stored-bit reads (F0x80015590) on
         // banks 0x1c/0x10, which the backend already stores — so these resolve exactly.
         case "stored_bits_all_set":
-          return sem.flag_ids.every((id) => backend.get(id)) ? 1 : 0;
+          return sem.flag_ids.every((id: number) => backend.get(id)) ? 1 : 0;
         case "stored_bit_tally": {
-          const set = sem.flag_ids.filter((id) => backend.get(id)).length;
+          const set = sem.flag_ids.filter((id: number) => backend.get(id)).length;
           const clear = sem.flag_ids.length - set;
           if (sem.test === "set_count_at_least") return set >= sem.n ? 1 : 0;
           if (sem.test === "clear_count_at_least") return clear >= sem.n ? 1 : 0;
@@ -196,8 +197,8 @@ export function createFlagStore(backend, opts: FlagStoreOpts = {}) {
   }
   return {
     get,
-    matches: (id, expected) => flagConditionPasses(get, id, expected),
-    set: (id, val) => {
+    matches: (id: number, expected: number | boolean) => flagConditionPasses(get, id, expected),
+    set: (id: number, val: boolean | number) => {
       if (isStoryCommandBank((id >>> 8) & 0xfe)) {
         const command = storyCommand(id);
         if (command) opts.command?.(command);

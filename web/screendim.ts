@@ -52,7 +52,7 @@ function scratch(w: number, h: number) {
  * caller's transform. Anything it leaves black subtracts nothing, so a shape
  * may be painted without masking the rest of the screen.
  */
-export function subtractLayer(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, paintLayer) {
+export function subtractLayer(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, paintLayer: (layer: CanvasRenderingContext2D, w: number, h: number) => void) {
   if (w <= 0 || h <= 0) return;
   noteBackdropBlend();   // it reads the canvas under it (web/battle-layer.js)
   if (typeof document === "undefined") { paintLayer(ctx, w, h); return; }
@@ -130,7 +130,7 @@ export function paintScreenDim(ctx: CanvasRenderingContext2D, level: number, w: 
     ctx.restore();
     return;
   }
-  subtractLayer(ctx, 0, 0, w, h, (layer: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => {
+  subtractLayer(ctx, 0, 0, w, h, (layer: CanvasRenderingContext2D) => {
     layer.fillStyle = dimFillStyle(k);
     layer.fillRect(0, 0, w, h);
   });
@@ -146,11 +146,11 @@ export function paintScreenDim(ctx: CanvasRenderingContext2D, level: number, w: 
  * hardware's corner interpolation: that is an approximation of the shading, not
  * of the geometry and not of the subtraction.
  */
-export function paintTitleVignette(ctx: CanvasRenderingContext2D, level: number, centre, edges, edgeLevel: number, w: number, h: number) {
+export function paintTitleVignette(ctx: CanvasRenderingContext2D, level: number, centre: { x: number; y: number }, edges: readonly (readonly [number, number, number, number])[], edgeLevel: number, w: number, h: number) {
   const k = Math.max(0, Math.min(255, Math.round(level)));
   if (k <= 0) return;
   const outer = Math.max(0, Math.min(255, Math.round(edgeLevel)));
-  subtractLayer(ctx, 0, 0, w, h, (layer) => {
+  subtractLayer(ctx, 0, 0, w, h, (layer: CanvasRenderingContext2D) => {
     for (const [x1, y1, x2, y2] of edges) {
       // Both outer corners carry the same colour, so the shading runs along one
       // axis: from the shared centre vertex to the middle of the outer edge.

@@ -22,6 +22,6 @@ export function packOptions() {
   return PACKS.map(p => `${p.id} — ${p.name}: ${p.members.map(m => m.name).join(", ")}`);
 }
 
-export function leadOptions(packIdx: string | number) {
+export function leadOptions(packIdx: number) {
   return PACKS[packIdx].members.map(m => m.name);
 }

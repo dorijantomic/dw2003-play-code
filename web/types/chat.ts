@@ -3,3 +3,13 @@
 export interface ChatPacket extends Uint8Array {
   pages?: number;
 }
+
+/** What the game hands installChat: the stage to mount the box on and the key / bubble hooks. */
+export interface ChatHooks {
+  stage: HTMLElement;
+  canOpen(): boolean;
+  releaseKeys?(): void;
+  onSend?(text: string): void;
+  bubbleOpen?(): boolean;
+  dismiss?(): void;
+}

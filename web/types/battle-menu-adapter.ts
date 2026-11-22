@@ -1,4 +1,64 @@
 import type { NativeScreenRenderStats } from "./native-screen-render.js";
+import type { NativeScreenRenderer, NativeScreenSession } from "../native-session.js";
+import type { MenuDisplayClock, PackedSfx, ThrownError } from "./translated-screens.js";
+
+/** One VRAM-to-VRAM copy a menu session records: the marker strip's source and the place it lands. */
+export interface BattleStripMove {
+  srcX: number;
+  srcY: number;
+  dstX: number;
+  dstY: number;
+  w: number;
+  h: number;
+}
+
+/** What the adapter reads of an engine menu session (the engine's ui.*Session the screen runs) when it paints it. */
+export interface BattleMenuSession extends NativeScreenSession {
+  ready(): boolean;
+  finished(): boolean;
+  dispose(): void;
+  moves?: readonly BattleStripMove[] | undefined;
+}
+
+/** The player-state reader a menu adapter takes: only the language byte is read. */
+export interface BattleMenuOptions {
+  getState?: (() => { languageByte?: number } | null | undefined) | undefined;
+}
+
+/**
+ * What one screen hands createBattleMenuAdapter. The callbacks are method signatures whose state, data and
+ * session parameters are `unknown`: each screen annotates its own narrower types (its state fields, its data,
+ * its engine session), and a method signature accepts those; the adapter hands them the objects it built itself.
+ */
+export interface BattleMenuAdapterSpec {
+  renderer: NativeScreenRenderer;
+  sfx?: PackedSfx | null | undefined;
+  options?: BattleMenuOptions | undefined;
+  /** the screen's own fields, spread into the adapter's state */
+  state?: Record<string, unknown> | undefined;
+  load(r: unknown): Promise<unknown>;
+  loadFailure: string;
+  failureMessage: string;
+  failureConsole: string;
+  languageError: string;
+  seed(r: unknown, ...args: unknown[]): unknown;
+  beforeLoad?(r: unknown): void;
+  start(r: unknown, data: unknown, language: number, playSound: (soundId: number) => void): unknown;
+  canQueue?(r: unknown, session: unknown): boolean;
+  answer?(r: unknown, session: unknown): { value: unknown } | null | undefined;
+  paintTarget?(r: unknown): BattleMenuSession | null | undefined;
+  done?(session: unknown): boolean;
+  onOpen?(r: unknown): void;
+  onFail?(r: unknown): void;
+  readChosen?(r: unknown): unknown;
+  diagnostics?(r: unknown): object;
+  /** false: do not emit the shared `chosen` field */
+  chosenField?: boolean | undefined;
+  extraApi?(r: unknown): void;
+  pulseButtons?: ReadonlySet<string> | undefined;
+  queueLimit?: number | undefined;
+  countPresses?: boolean | undefined;
+}
 
 /** What a battle menu adapter's diagnostics report to the debug overlay. */
 export interface BattleMenuDiagnostics {
@@ -27,10 +87,10 @@ export interface BattleMenuAdapterState {
   /** the screen's answer word (attack id, item id, tag...), null before the player answers */
   _chosen: unknown;
   /** vendor object: the ui.MenuDisplayClock the session is ticked on */
-  _clock: any;
+  _clock: MenuDisplayClock | null;
   /** the packed data the adapter loaded (manifest, strip, tables) */
   _data: any;
-  _error: Error | null;
+  _error: ThrownError | null;
   _failed: boolean;
   _lastDiagnostic: string | null;
   _loading: boolean;

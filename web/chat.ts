@@ -1,9 +1,9 @@
 // EXPERIMENT: type-to-chat. Press T, type a line, press Enter: the game's own speech balloon
 // (its balloon chrome, tail and bitmap font) shows it over your character for a few seconds.
 // Esc cancels. Purely visual: it never touches the story, dialogue or save state.
-import type { ChatPacket } from "./types/chat.js";
+import type { ChatHooks, ChatPacket } from "./types/chat.js";
 const MAX_CHARS = 160;
-let box: HTMLDivElement | null = null, input: HTMLInputElement | null = null, hooks = null;
+let box: HTMLDivElement = null, input: HTMLInputElement = null, hooks: ChatHooks = null;
 
 export function chatOpen() { return !!box && box.style.display !== "none"; }
 
@@ -26,7 +26,7 @@ function send() {
 }
 
 // hooks: { stage, canOpen(), releaseKeys(), onSend(text) }
-export function installChat(h) {
+export function installChat(h: ChatHooks) {
     hooks = h;
     box = document.createElement("div");
     box.id = "chat-box";
@@ -64,13 +64,13 @@ export function installChat(h) {
 // code page: digits 0x04.., A-Z 0x0e.., a-z 0x28.., 01 01 = space, 01 04 , 01 05 . 01 13 ' 01 1a -,
 // e6 ? e7 !, 02 01 = new line, 02 02 = pause, 02 00 = end (read off estalk00.bin).
 const WRAP = 17, PAGE_LINES = 3;   // what fits in the balloon; longer lines are re-wrapped by the box and get cut off
-function encode(ch) {
+function encode(ch: string): number[] {
     if (ch >= "0" && ch <= "9") return [0x04 + ch.charCodeAt(0) - 48];
     if (ch >= "A" && ch <= "Z") return [0x0e + ch.charCodeAt(0) - 65];
     if (ch >= "a" && ch <= "z") return [0x28 + ch.charCodeAt(0) - 97];
     return { ",": [1, 4], ".": [1, 5], "'": [1, 0x13], "-": [1, 0x1a], "?": [0xe6], "!": [0xe7] }[ch] ?? [1, 1];
 }
-export function buildChatPack(text, name = "") {
+export function buildChatPack(text: string, name = "") {
     const words = text.split(" "), lines = [];
     let cur = "";
     for (let w of words) {

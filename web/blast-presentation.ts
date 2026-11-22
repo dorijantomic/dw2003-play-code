@@ -82,7 +82,7 @@ export function curtainClosed(s: { voidAlpha: number; }) {
  * The E000EVOL sprites are NOT drawn here; they go through the effect player and
  * are composited by the op3 path in battle.js draw().
  */
-export function drawBlastCurtain(ctx: CanvasRenderingContext2D | undefined, s, w: number, h: number) {
+export function drawBlastCurtain(ctx: CanvasRenderingContext2D | undefined, s: { voidAlpha: number; }, w: number, h: number) {
   // Deliberately draws NOTHING, and that is a finding rather than a stub.
   //
   // The controller's +0x60..+0x6E halfwords are not black bars: they are the
@@ -103,7 +103,7 @@ export function drawBlastCurtain(ctx: CanvasRenderingContext2D | undefined, s, w
   void ctx; void s; void w; void h;
 }
 
-export function drawBlastFlash(ctx: CanvasRenderingContext2D | undefined, s: { flashAlpha: number; flashLevel: undefined; }, w: number, h: number) {
+export function drawBlastFlash(ctx: CanvasRenderingContext2D | undefined, s: { flashAlpha: number; flashLevel?: number | undefined; }, w: number, h: number) {
   if (!s || s.flashAlpha <= 0) return;
   ctx!.save();
   ctx!.setTransform(1, 0, 0, 1, 0, 0);

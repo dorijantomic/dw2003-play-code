@@ -1,6 +1,8 @@
 // The per-frame code the translated screen adapters share: painting a session's frame,
 // and the update loop of the screens whose session starts once their data has loaded.
 
+import type { VramMap } from "../engine/native/vram.js";
+import type { NativeCardPrim } from "../engine/native/runtime.js";
 import type { FightReportSession } from "../engine/dw3/ui/fight-report-session.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { paintScreenDim } from "./screendim.js";
@@ -11,20 +13,21 @@ import type { GymScreen } from "./types/gym-translated.js";
 import type { LabScreen } from "./types/lab-translated.js";
 import type { SaveScreen } from "./types/save-translated.js";
 import * as uiC from "./ui-c/index.js";
+import type { UiComposer } from "./ui-c/types.js";
 type NativeDrawCalls = FightReportSession["draw"]["calls"];
 
 type NativeTextWidgetList = Parameters<typeof drawNativeTextWidgets>[1];
 
-interface NativeScreenRenderer {
+export interface NativeScreenRenderer {
     stats: NativeScreenRenderStats;
     ready(): boolean;
     draw(
         ctx: CanvasRenderingContext2D,
         calls: NativeDrawCalls,
-        vram: null,
-        cards: readonly Uint16Array[],
+        vram: VramMap | null,
+        cards: readonly NativeCardPrim[],
         contextMarkers: readonly number[],
-    ): void;
+    ): unknown;
 }
 
 interface NativeScreenDraw {
@@ -36,26 +39,53 @@ interface NativeScreenWidgets {
     textWidgets(): NativeTextWidgetList;
 }
 
-interface NativeScreenSession {
+export interface NativeScreenSession {
     /** absent on sessions that never fade (the canvas dim stays at 0) */
     fadeLevel?: () => number;
     draw: NativeScreenDraw;
     widgets: NativeScreenWidgets;
 }
 
-interface NativeUIScope {
+export interface NativeUIScope {
     key: string;
-    compose: (root: HTMLElement) => void;
+    compose: UiComposer;
     enable?: boolean;
 }
 
-interface PaintNativeSessionOptions {
+export interface PaintNativeSessionOptions {
     fade?: boolean;
     revealWindow?: boolean;
-    skipWidget?: string | null;
+    /** drawNativeTextWidgets calls this on each widget (opts.skip); no caller passes one yet */
+    skipWidget?: ((widget: NativeTextWidgetList[number]) => boolean) | null;
     ui?: NativeUIScope | null;
 }
 
+/** The part of a started session the update loop drives: one tick per displayed frame, and the end check. */
+export interface NativeTickSession<K> {
+    tick(keys: K, displayTick: number): void;
+    finished(): boolean;
+}
+
+/** The part of a translated screen adapter the update loop reads and writes. */
+export interface NativeUpdateScreen<S> {
+    _open: boolean;
+    _failed: boolean;
+    _session: S | null;
+    _pending?: boolean;
+    _ticks: number;
+    _clock: { advance(seconds: number): Array<{ tick: number }> } | null;
+    _finish?: () => unknown;
+}
+
+/** What a screen hands updateNativeSession: when its data is in, how to start, the held keys, and what to do on a failure. */
+export interface UpdateNativeSessionOptions<S extends NativeTickSession<Iterable<unknown>>> {
+    ready: () => unknown;
+    start: () => void;
+    held: () => Iterable<unknown>;
+    // a method, so a screen's own `fail(error: Error)` fits (the catch below hands it the thrown value)
+    fail(error: unknown): void;
+    onFrame?: ((session: S) => void) | null;
+}
 
 /**
  * Paint one frame of a translated session: its recorded draw calls, its text widgets and,
@@ -70,7 +100,7 @@ interface PaintNativeSessionOptions {
  * `ui` = { key, compose, enable } puts the screen in the look C capture scope (web/ui-c): the clips it claims and its text become DOM
  * parts, the rest is drawn as art. The disc's fade stays the canvas subtract; the DOM layer takes the same level as brightness.
  */
-export function paintNativeSession(ctx: CanvasRenderingContext2D, renderer: NativeScreenRenderer, session: NativeScreenSession, { fade = true, revealWindow = false, skipWidget = null, ui = null } = {}) {
+export function paintNativeSession(ctx: CanvasRenderingContext2D, renderer: NativeScreenRenderer, session: NativeScreenSession, { fade = true, revealWindow = false, skipWidget = null, ui = null }: PaintNativeSessionOptions = {}) {
     const body = () => {
         renderer.draw(ctx, session.draw.calls, null, [], session.draw.contextMarkers);
         drawNativeTextWidgets(ctx, session.widgets.textWidgets(), skipWidget ? { revealWindow, skip: skipWidget } : { revealWindow });
@@ -91,7 +121,7 @@ export function paintNativeSession(ctx: CanvasRenderingContext2D, renderer: Nati
  * "BIT gained" page is up) can mirror that into the walker's state on the very frame the original
  * pays it.
  */
-export function updateNativeSession(screen, dt: number, { ready, start, held, fail, onFrame = null }) {
+export function updateNativeSession<S extends NativeTickSession<Iterable<unknown>>>(screen: NativeUpdateScreen<S>, dt: number, { ready, start, held, fail, onFrame = null }: UpdateNativeSessionOptions<S>) {
     if (!screen._open || screen._failed) return;
     if (!screen._session) {
         if (!ready()) return;

@@ -17,7 +17,7 @@
 // is served as plain ES modules and cannot load a .ts file). tests/disc-rolls.test.js
 // pins the pair against the engine leaf so the two cannot drift.
 import type { FightTechRow } from "./types/battle.js";
-import type { TechRecordMerged } from "./types/tech-record.js";
+import type { BattleDropCandidate, TechRecordMerged } from "./types/tech-record.js";
 
 /** The record's +0x06 accuracy byte; a missing record falls back to today's 100. */
 export function techRecordAccuracy(rec: FightTechRow | null) {
@@ -53,7 +53,7 @@ export function dropPasses(rate: number, rng: { (): number | undefined; (): numb
  * pick's `RAND % 1024 < drop_rate + 1` roll (0x1f9c-0x1fcc). Returns the picked record's
  * item or null. At most one item, always two draws in that order.
  */
-export function rollBattleDrop(candidates, rng: { (): number | undefined; (): number; }) {
+export function rollBattleDrop(candidates: BattleDropCandidate[] | null | undefined, rng: { (): number | undefined; (): number; }) {
   const list = (candidates ?? []).filter((e: { drop_item: string; }) => e && e.drop_item && e.drop_item !== "Null");
   if (list.length === 0) return null;
   const pick = list[rng()! % list.length];

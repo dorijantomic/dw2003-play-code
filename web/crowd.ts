@@ -8,33 +8,34 @@
 //   * they only borrow sprites already loaded for the map's own cast, and never the player's;
 //   * every path is walked through the map's collision grid first, so they stay on walkable
 //     ground, and they are removed during cutscenes, textboxes and battles.
+import type { CrowdGrid, CrowdMap, CrowdNone, CrowdNpc, CrowdPoint, CrowdProfile, CrowdState } from "./types/rest-a.js";
 const MAX_PER_MAP = 4;
 
-function walkable(grid: { cell: number; cols: number; rows: number; cells: number[]; }, x: number, y: number) {
+function walkable(grid: CrowdGrid, x: number, y: number) {
     const c = (x / grid.cell) | 0, r = (y / grid.cell) | 0;
     return c >= 0 && r >= 0 && c < grid.cols && r < grid.rows && grid.cells[r * grid.cols + c] === 0;
 }
-function clearLine(grid: { cell: number; cols: number; rows: number; cells: number[]; }, a: number[], b) {
-    const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0]!, b[1] - a[1]!) / 4));
-    for (let i = 0; i <= n; i++) if (!walkable(grid, a[0]! + (b[0] - a[0]!) * i / n, a[1]! + (b[1] - a[1]!) * i / n)) return false;
+function clearLine(grid: CrowdGrid, a: CrowdPoint, b: CrowdPoint) {
+    const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4));
+    for (let i = 0; i <= n; i++) if (!walkable(grid, a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n)) return false;
     return true;
 }
 // a closed loop of 3-5 waypoints around a start point, every leg on walkable ground
-function makeLoop(grid: { cell: number; cols: number; rows: number; cells: number[]; }, start, rand: () => number): number[][] | null {
+function makeLoop(grid: CrowdGrid, start: CrowdPoint, rand: () => number): CrowdPoint[] | null {
     for (let attempt = 0; attempt < 30; attempt++) {
-        const pts = [start], n = 3 + ((rand() * 3) | 0);
+        const pts: CrowdPoint[] = [start], n = 3 + ((rand() * 3) | 0);
         let ok = true;
         for (let i = 0; i < n; i++) {
-            let next = null;
+            let next: CrowdPoint | null = null;
             for (let tries = 0; tries < 14 && !next; tries++) {
                 const a = rand() * 6.283, d = 40 + rand() * 90;
-                const p = [pts[pts.length - 1][0] + Math.cos(a) * d, pts[pts.length - 1][1] + Math.sin(a) * d * 0.6];
-                if (walkable(grid, p[0], p[1]) && clearLine(grid, pts[pts.length - 1], p)) next = p;
+                const p: CrowdPoint = [pts[pts.length - 1]![0] + Math.cos(a) * d, pts[pts.length - 1]![1] + Math.sin(a) * d * 0.6];
+                if (walkable(grid, p[0], p[1]) && clearLine(grid, pts[pts.length - 1]!, p)) next = p;
             }
             if (!next) { ok = false; break; }
             pts.push(next);
         }
-        if (ok && clearLine(grid, pts[pts.length - 1], start)) return pts;
+        if (ok && clearLine(grid, pts[pts.length - 1]!, start)) return pts;
     }
     return null;
 }
@@ -43,11 +44,11 @@ function rng(seed: number) {
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
-const placed = new Map();   // stageId -> [npc objects we added]
+const placed = new Map<string | number, (CrowdNpc | CrowdNone)[]>();   // stageId -> [npc objects we added]
 
 export function villagersActive(stageId: string | number): number { return (placed.get(stageId) || []).length; }
 
-export function removeVillagers(stageId: string | number, state) {
+export function removeVillagers(stageId: string | number, state: CrowdState) {
     const list = placed.get(stageId);
     if (!list || !list.length) return;
     const scene = state.scenes?.[stageId];
@@ -59,7 +60,7 @@ export function removeVillagers(stageId: string | number, state) {
 }
 
 // Called every frame with the game state; adds or removes the villagers as needed.
-export function syncVillagers(on: boolean | undefined, map, profile, state) {
+export function syncVillagers(on: boolean | undefined, map: CrowdMap, profile: CrowdProfile, state: CrowdState) {
     const id = map.id;
     const scene = state.scenes?.[id];
     const busy = !!(state._inCutscene || state.battleActive || state.textboxOpen);
@@ -79,10 +80,10 @@ export function syncVillagers(on: boolean | undefined, map, profile, state) {
     }
     if (templates.length < 2) { placed.set(id, [{ _none: true }]); return 0; }   // nothing sensible to borrow; do not retry every frame
     const rand = rng([...id].reduce((a, c) => a * 31 + c.charCodeAt(0), 11));
-    const made = [];
+    const made: CrowdNpc[] = [];
     for (let k = 0; k < Math.min(MAX_PER_MAP * 2, templates.length * 2 + 2) && made.length < MAX_PER_MAP; k++) {
-        const tpl = templates[(k + ((rand() * templates.length) | 0)) % templates.length];
-        const start = [tpl.x + (rand() - 0.5) * 30, tpl.y + (rand() - 0.5) * 20];
+        const tpl = templates[(k + ((rand() * templates.length) | 0)) % templates.length]!;
+        const start: CrowdPoint = [tpl.x + (rand() - 0.5) * 30, tpl.y + (rand() - 0.5) * 20];
         if (!walkable(grid, start[0], start[1])) continue;
         if (made.some((m) => Math.hypot(m.x - start[0], m.y - start[1]) < 140)) continue;   // spread them out
         const path = makeLoop(grid, start, rand);
@@ -100,4 +101,4 @@ export function syncVillagers(on: boolean | undefined, map, profile, state) {
     console.log(`crowd: ${id} -> ${made.length} villagers`);
     return made.length;
 }
-window.__crowd = (id) => ({ placed: (placed.get(id) || []).filter((n) => !n._none).length });
+window.__crowd = (id: string) => ({ placed: (placed.get(id) || []).filter((n) => !n._none).length });

@@ -13,7 +13,7 @@ import { FAMILY_TO_CLIP } from "./itemicons-data.js";
 export { FAMILY_TO_CLIP };
 
 const cmfont = loadPack("cmfont");
-let familyById = null; // itemId -> family (icon class)
+let familyById: Record<string | number, number> | null = null; // itemId -> family (icon class)
 
 fetch("assets/data/item_effects.json")
   .then((r) => r.json())

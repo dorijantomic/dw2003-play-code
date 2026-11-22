@@ -2,8 +2,9 @@
 //
 // The desk itself is web/lab-translated.js (engine LabSession); web/dri-native.js
 // uses this one function to write the party back to localStorage.
+import type { GameState } from "./game/types.js";
 
-export function persistDriState(state) {
+export function persistDriState(state: Partial<Pick<GameState, "party" | "partyStats" | "partnerStats" | "equipment" | "reserveStats" | "reserveEquipment" | "charId">>) {
   if (typeof localStorage === "undefined") return;
   localStorage.setItem("party", JSON.stringify(state.party ?? []));
   localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));

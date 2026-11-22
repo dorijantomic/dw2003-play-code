@@ -5,9 +5,9 @@
 //   Delete = remove nearest npc/exit/zone to last mouse position
 //   Shift+X = download the scene JSON
 import { canvasEventToLogical } from "./canvas-resolution.js";
-import type { SceneEditorState } from "./types/sceneEditor.js";
+import type { SceneEditorContext, SceneEditorState } from "./types/sceneEditor.js";
 
-export function createSceneEditor(canvas: HTMLCanvasElement, getCtx) {
+export function createSceneEditor(canvas: HTMLCanvasElement, getCtx: () => SceneEditorContext) {
   // getCtx: () => ({ scene, mapId, camX, camY, zoom })
   const ed = { armed: null, dragStart: null, lastMouse: null } as SceneEditorState;
 

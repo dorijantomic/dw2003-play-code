@@ -36,7 +36,7 @@
 import {
     questFxSpawn, questFxGet, questFxRemove, questFxSheetInfo, loadQuestFxSheets,
 } from "./quest-fx.js";
-import type { QuestProp, QuestPropRow } from "./types/quest-props.js";
+import type { QuestProp, QuestPropBox, QuestPropRow } from "./types/quest-props.js";
 
 const LAYERS = ["entity", "behind", "front"];
 /** Every prop's effect name carries this prefix, so it can never collide with a scene's effect name. */
@@ -52,7 +52,7 @@ const SOLID_DEPTH = 10;
 /** The props holding on the current map: [{ key, name, sheet, x, y, clip, layer, solid }]. */
 let shown: QuestPropRow[] = [];
 /** The solid foot boxes of those props (empty when none is solid). */
-let boxes = [];
+let boxes: QuestPropBox[] = [];
 /** The map those boxes belong to, so a frame between a map change and the next tick cannot use another map's boxes. */
 let boxesMap: string | null = null;
 /** Sheets that were named but are not in web/extra_fx yet: asked for once each, never once per frame. */
@@ -100,7 +100,7 @@ export function questPropsTick(mapId: string | number | null | undefined, onThis
  * The props a raw quest-data list turns into: usable ones only, each with a stable key and its effect name. Pure, so a
  * test can drive it without the browser.
  */
-export function normalize(onThisMap) {
+export function normalize(onThisMap: QuestProp[] | null | undefined) {
     const out: QuestPropRow[] = [];
     const seen = new Set();
     for (const p of Array.isArray(onThisMap) ? onThisMap : []) {
@@ -153,7 +153,7 @@ export function boxHolds(box: { x: number; halfW: number; y: number; depth: numb
  * must not use the old map's boxes. (A night/story variant of a place is its own map id here, and the tick uses whichever
  * one the player is standing on -- quests.js has already matched the prop to it.)
  */
-export function questPropSolidAt(mapId, px: number, py: number) {
+export function questPropSolidAt(mapId: string | number | null | undefined, px: number, py: number) {
     if (!boxes.length) return false;
     if (mapId != null && boxesMap != null && String(mapId) !== boxesMap) return false;
     for (const b of boxes) if (boxHolds(b, px, py)) return true;

@@ -135,7 +135,7 @@ export function installStopApi(P: AudioEngine) {
     for (const slotKey of [...P.voices!.keys()]) stopVoice!(slotKey);
     P.player!.stopAllSustained!();
     P.player!.stopEffectLoop!();
-    for (const side of ["player", "enemy"]) {
+    for (const side of ["player", "enemy"] as const) {
       if (P.battleTimer![side]) { clearTimeout(P.battleTimer![side]); P.battleTimer![side] = null; }
       if (P.battlePhrase![side]) { P.battlePhrase![side].stop(); P.battlePhrase![side] = null; }
       if (P.battleVoice![side] >= 0) P.pool.keyOff(P.battleVoice![side]);

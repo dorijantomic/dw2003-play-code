@@ -7,7 +7,7 @@
 // the canvas backing store follows its displayed CSS size * devicePixelRatio,
 // and one transform maps logical drawing coordinates into those device pixels.
 
-import type { CanvasBacking } from "./types/canvas-resolution.js";
+import type { CanvasBacking, CanvasBackingArgs, WideView } from "./types/canvas-resolution.js";
 export const FIELD_LOGICAL_WIDTH = 640;
 export const FIELD_LOGICAL_HEIGHT = 480;
 export const MAX_BACKING_DIMENSION = 4096;
@@ -20,7 +20,7 @@ export function computeCanvasBacking({
   logicalWidth = FIELD_LOGICAL_WIDTH,
   logicalHeight = FIELD_LOGICAL_HEIGHT,
   maxDimension = MAX_BACKING_DIMENSION,
-}) {
+}: CanvasBackingArgs) {
   if (!hd) return { width: logicalWidth, height: logicalHeight };
 
   const dpr = Math.max(1, Number(devicePixelRatio) || 1);
@@ -110,7 +110,7 @@ export function createCanvasResolutionController(
   // (logicalWidth + 2 padX) x logicalHeight, sized from the STAGE height (the canvas's own CSS size
   // follows its backing shape, so reading it would only repeat last frame's shape), and the
   // transform puts the box's (0,0) padX in from the left edge.
-  function beginFrame(hd: boolean, wide = null) {
+  function beginFrame(hd: boolean, wide: WideView | null = null) {
     const padX = hd && wide?.padX > 0 ? wide!.padX : 0;
     const fullWidth = logicalWidth + 2 * padX;
     if (

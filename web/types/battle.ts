@@ -557,7 +557,7 @@ export interface BattleContext {
   introLinePendingFor: (b: BattleState) => boolean;
   isActive: () => boolean;
   itemAnnouncementSpec: (b: BattleState, item: any) => BattleLineSpec;
-  itemListSeed: (b: BattleState) => { items: any; };
+  itemListSeed: (b: BattleState | null) => { items: any; };
   itemNative?: any;
   jogressDB?: any;
   jogressFused?: any;

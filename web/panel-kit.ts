@@ -1,4 +1,5 @@
-import type { ScreenPackClip } from "./types/misc-game2.js";
+import type { ScreenPackClip, ScreenPackIds, ScreenPackLayer } from "./types/misc-game2.js";
+import type { PanelFrame, PanelFrameNumber, PanelFrames } from "./types/rest-a.js";
 type PanelClip = ScreenPackClip;
 // web/panel-kit.js -- free-height panels built from the game's own pause-list tiles. Pure: no DOM, no imports.
 //
@@ -25,24 +26,25 @@ export const PANEL_COLS = 4;
 const SOURCE_CLIP = "28";
 
 /** Frame number -> { frame, x, y, w, h } read from the layer records of the pause list's own five-row panel. */
-export function tileFrames(ids, sourceClip = SOURCE_CLIP) {
-    const out = {};
+export function tileFrames(ids: ScreenPackIds | null | undefined, sourceClip = SOURCE_CLIP) {
+    const out: Record<number, PanelFrame> = {};
     for (const l of ids?.[sourceClip]?.layers ?? []) out[l.frame] = { frame: l.frame, x: l.x, y: l.y, w: l.w, h: l.h };
     for (const f of Object.values(PANEL_FRAMES)) if (!out[f]) return null;
-    return out;
+    // ETS item 9: the loop above just proved all six tile frames are in `out`
+    return out as PanelFrames;
 }
 
 /** Height of a panel with `bands` middle bands. */
-export function panelHeight(frames, bands) {
+export function panelHeight(frames: PanelFrames, bands: number) {
     return frames[PANEL_FRAMES.topLeft].h + bands * frames[PANEL_FRAMES.left].h + frames[PANEL_FRAMES.bottomLeft].h;
 }
 
 /** A clip (the sheet's own record shape) with `cols` tile columns and `bands` middle bands. */
-export function buildPanelClip(frames, cols: number, bands: number) {
+export function buildPanelClip(frames: PanelFrames, cols: number, bands: number): PanelClip {
     const F = PANEL_FRAMES;
     const tileW = frames[F.topLeft].w;
-    const layers = [];
-    const put = (frame: number, col: number, dy: number) => {
+    const layers: ScreenPackLayer[] = [];
+    const put = (frame: PanelFrameNumber, col: number, dy: number) => {
         const f = frames[frame];
         layers.push({ frame: f.frame, x: f.x, y: f.y, w: f.w, h: f.h, dx: col * tileW, dy });
     };
@@ -61,7 +63,7 @@ export function buildPanelClip(frames, cols: number, bands: number) {
  * Add the clips for 8 to `maxRows` rows to a loaded cmfont `ids` table. Returns how many were added (0 when the sheet has
  * not got the six tiles, in which case nothing changes and the list falls back to the disc's panels).
  */
-export function registerPausePanels(ids: Record<string, number | PanelClip>, maxRows = 12) {
+export function registerPausePanels(ids: ScreenPackIds, maxRows = 12) {
     const frames = tileFrames(ids);
     if (!frames) return 0;
     let added = 0;

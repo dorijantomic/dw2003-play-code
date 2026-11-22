@@ -12,13 +12,13 @@
 //
 // `push(text, meta)` passes `meta` through to `send(text, meta)`, so the caller can clear the "..." it put
 // on that line's local echo once the line really leaves.
-import type { ChatQueueOptions } from "./types/chat-queue.js";
+import type { ChatQueueOptions, ChatQueuedLine } from "./types/chat-queue.js";
 export function createChatQueue({ gap = 650, now = () => performance.now(), send }: ChatQueueOptions = {}) {
     if (typeof send !== "function") throw new TypeError("createChatQueue needs a send(text) function");
     let nextAt = -Infinity;             // when the next line may leave; the first one never waits
-    const waiting = [];                 // { text, meta }, oldest first
+    const waiting: ChatQueuedLine[] = [];               // { text, meta }, oldest first
 
-    const push = (text: string, meta) => {
+    const push = (text: string, meta?: unknown) => {
         const t = now();
         if (t >= nextAt) {
             if (send(text, meta) === false) return false;    // refused: not sent, not queued, not counted
@@ -34,7 +34,7 @@ export function createChatQueue({ gap = 650, now = () => performance.now(), send
     const flush = () => {
         const t = now();
         while (waiting.length && t >= nextAt) {
-            const item = waiting[0];
+            const item = waiting[0]!;
             if (send(item.text, item.meta) === false) return;   // still refused: keep it for the next tick
             waiting.shift();
             nextAt = Math.max(t, nextAt) + gap;

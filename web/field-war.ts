@@ -20,6 +20,8 @@
 //     element, -base*power/256 for the element it counters. This module never does
 //     damage; it only names the field the fight is in.
 
+import type { FieldWarField } from "./types/rest-a.js";
+
 /** The field power the seven field items and the seven field techniques write. */
 export const FIELD_POWER = 64;
 
@@ -33,7 +35,7 @@ export const FIELD_CYCLE = Object.freeze([
 ]);
 
 /** The disc's word for each of the seven fields (esmfight 0x63..0x69). */
-const FIELD_WORDS = Object.freeze({
+const FIELD_WORDS: Readonly<Record<string, string>> = Object.freeze({
   fire: "Fire field!",
   water: "Water field!",
   ice: "Ice field!",
@@ -60,7 +62,7 @@ export function fieldName(element: string | number) {
  * field starts from none. Landing on "none" returns null, because that is the
  * state the damage formula already understands as no field at all.
  */
-export function nextField(field, step = 1) {
+export function nextField(field: FieldWarField | null | undefined, step = 1) {
   const current = field?.element ? FIELD_CYCLE.indexOf(field.element) : -1;
   // An unknown element (or no field) starts from the none slot, so the first step
   // always lands on fire — the cycle's own order.

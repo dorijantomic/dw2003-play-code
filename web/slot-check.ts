@@ -28,6 +28,7 @@
 // found.", 8 = "MEMORY CARD error. Please check MEMORY CARD.".
 //
 // Pure: no DOM, no storage, no fetch.
+
 import { RESIDENT_SAVE_SIZE } from "./vendor/engine.js";
 
 /** The resident card image's size. The engine's own constant, never a second copy. */

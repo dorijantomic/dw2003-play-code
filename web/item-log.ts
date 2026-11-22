@@ -9,13 +9,14 @@
 // Nothing is cached in memory: every call reads the key, changes it and writes it back (a slot load rewrites localStorage
 // under a running game).
 import { ITEM_ID_MAX } from "./vendor/engine.js";
-import type { GameState } from "./game/types.js";
+import type { GameState, InventoryRow } from "./game/types.js";
 
+type ItemLog = ReturnType<typeof createItemLog>;
 export const ITEM_LOG_KEY = "dw.glossary.v1";
 export const ITEM_MAX_ID = ITEM_ID_MAX;    // the shipped item catalogue ends at 402 (engine item-directories)
 
-const validId = (n) => Number.isInteger(n) && n >= 1 && n <= ITEM_MAX_ID;
-const cleanSet = (o) => {
+const validId = (n: number) => Number.isInteger(n) && n >= 1 && n <= ITEM_MAX_ID;
+const cleanSet = (o: Record<string, unknown> | null | undefined) => {
     const out: Record<string, number> = {};
     if (!o || typeof o !== "object" || Array.isArray(o)) return out;
     for (const k of Object.keys(o)) {
@@ -39,7 +40,7 @@ export function createItemLog(storage = defaultStorage()) {
         return { v: 1, met: {}, beaten: {}, owned: {} };
     };
     const read = () => { const i = readRaw().items; return { owned: cleanSet(i?.owned), seen: cleanSet(i?.seen) }; };
-    const note = (field: string, ids) => {
+    const note = (field: "owned" | "seen", ids: unknown) => {
         const list = (Array.isArray(ids) ? ids : []).map(Number).filter(validId);
         if (!list.length) return false;
         const raw = readRaw();
@@ -53,13 +54,13 @@ export function createItemLog(storage = defaultStorage()) {
     return {
         read,
         noteOwned: (ids: number[]) => note("owned", ids),
-        noteSeen: (ids) => note("seen", ids),
-        isOwned: (id) => !!read().owned[id],
-        isSeen: (id) => !!read().seen[id],
+        noteSeen: (ids: unknown) => note("seen", ids),
+        isOwned: (id: number) => !!read().owned[id],
+        isSeen: (id: number) => !!read().seen[id],
         /** owned or seen: the ids the ITEMS page lists */
         knownIds() { const s = read(); return [...new Set([...Object.keys(s.owned), ...Object.keys(s.seen)].map(Number))].sort((a, b) => a - b); },
         /** everything in a bag ([{id, qty}]) counts as owned (existing players, loaded saves) */
-        syncBag(bag) { return note("owned", (Array.isArray(bag) ? bag : []).filter((s) => s && (s.qty ?? 1) > 0).map((s) => s.id)); },
+        syncBag(bag: readonly InventoryRow[] | null | undefined) { return note("owned", (Array.isArray(bag) ? bag : []).filter((s) => s && (s.qty ?? 1) > 0).map((s) => s.id)); },
     };
 }
 
@@ -68,9 +69,9 @@ export function createItemLog(storage = defaultStorage()) {
  * `push`) is logged as owned, and so is every slot of a bag assigned to `state.inventory` (load, duel restore). Raising the
  * count of a slot already in the bag needs no hook: that item is owned already. The bag in `state` at call time is synced.
  */
-export function watchBag(state: GameState, log) {
-    const mine = new WeakSet();     // the proxies made here: assigning one back (state.inventory = state.inventory) must not wrap it again
-    const wrap = (bag) => {
+export function watchBag(state: GameState, log: ItemLog) {
+    const mine = new WeakSet<InventoryRow[]>();     // the proxies made here: assigning one back (state.inventory = state.inventory) must not wrap it again
+    const wrap = (bag: InventoryRow[]) => {
         if (!Array.isArray(bag) || mine.has(bag)) return bag;
         const p = new Proxy(bag, {
             set(target, prop, value, recv) {

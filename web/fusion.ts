@@ -15,8 +15,10 @@ import type { FusionDefeatArgs } from "./battle/core/types.js";
 import type { BattleSkill } from "./types/battle.js";
 
 import type { EnemyBattleRecord } from "./types/battle.js";
+import type { FusionBoss } from "./battle/core/types.js";
+import type { FusedRecordArgs, FusionBossLookup, FusionBossRef, FusionPartyEntry, FusionSkillRow, FusionStatKey, FusionStatRow, LabBossCandidate } from "./types/rest-a.js";
 /** The five primary stats every blend covers. */
-export const FUSION_STATS = Object.freeze(["str", "def", "spt", "wis", "spd"]);
+export const FUSION_STATS: readonly FusionStatKey[] = Object.freeze(["str", "def", "spt", "wis", "spd"]);
 
 /** Is the fusion layer switched on? (F2 -> Extras -> Fusion bosses, off by default.) */
 export function fusionEnabled() {
@@ -28,7 +30,7 @@ export function fusionEnabled() {
  * original `max + 0.25 * min` rule exactly; a third or fourth donor adds nothing more, so
  * a long recipe cannot pile stat on stat. A single value is returned as it is.
  */
-export function blendValues(values) {
+export function blendValues(values: readonly (number | string | null | undefined)[] | null | undefined) {
   const v = (Array.isArray(values) ? values : []).map((x) => Number(x ?? 0) || 0).sort((p, q) => q - p);
   return Math.round((v[0] ?? 0) + 0.25 * (v[1] ?? 0));
 }
@@ -41,7 +43,7 @@ export function blendValues(values) {
  * quarter of itself, so neither half's weakness survives the fusion. The rows are enemy
  * stat rows (enemies.json) or anything else carrying the five keys.
  */
-export function blendStats(...rows) {
+export function blendStats(...rows: FusionStatRow[] | [FusionStatRow[]]) {
   const list = Array.isArray(rows[0]) ? rows[0] : rows;
   const out: Record<string, number> = {};
   for (const key of FUSION_STATS) out[key] = blendValues(list.map((r) => r?.[key]));
@@ -53,7 +55,7 @@ export function blendStats(...rows) {
  * `max(10, round(spt * 1.5 + level * 3))` web/battle.js's enemyMp uses. Kept here so the
  * fused record needs no battle closure.
  */
-function enemyMpFor(row, level: number) {
+function enemyMpFor(row: FusionStatRow | null | undefined, level: number) {
   const spt = Number(row?.spt ?? 0) || 0;
   const lv = Number(level ?? 1) || 1;
   return Math.max(10, Math.round(spt * 1.5 + lv * 3));
@@ -91,7 +93,7 @@ export function fusedAiMoves(rows) {
  * more than once (a row keeps its own condition). Nothing changes when every filled slot
  * is already called, so a fusion that keeps its body's kit keeps its body's AI exactly.
  */
-export function ensureAiRows(rows, moves = []) {
+export function ensureAiRows(rows, moves: number[] = []) {
   const src = Array.isArray(rows) && rows.length
     ? rows.map((r) => ({ ...(r ?? {}) }))
     : fusedAiMoves(null);
@@ -124,7 +126,7 @@ export function ensureAiRows(rows, moves = []) {
  * multiplier FIGHTSTG_F0x8009ec94 applies to an enemy row. Nothing is a full heal: the
  * record's HP is the authored number, not a player's maximum.
  */
-export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statScale = 16, moves = [], aiFill = false } = {}) {
+export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statScale = 16, moves = [], aiFill = false }: FusedRecordArgs = {}) {
   const a = halves[0];
   const blend = blendStats(halves);
   const scale = Math.max(1, Number(statScale) || 16);
@@ -156,7 +158,7 @@ export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statS
  * `fxOn` false (F2 -> Extras -> Fusion bosses off) both fields are dropped: no party
  * entry may carry a fusion into a battle the player did not switch on.
  */
-export function partyEntriesFor(party, fxOn = true) {
+export function partyEntriesFor(party: FusionPartyEntry[] | null | undefined, fxOn = true): FusionPartyEntry[] {
   if (!Array.isArray(party)) return [];
   return party.map((entry) => {
     if (!entry || typeof entry !== "object") return entry;
@@ -175,7 +177,7 @@ export function partyEntriesFor(party, fxOn = true) {
  * its id, resolved through the built table (`bosses.bosses` or the bosses object).
  * Returns null when nothing real is named.
  */
-export function fusionBossFor(fuseInto, bosses = null) {
+export function fusionBossFor(fuseInto: FusionBossRef | null | undefined, bosses: FusionBossLookup | null = null): FusionBoss | null {
   if (!fuseInto) return null;
   if (typeof fuseInto === "object") return Number(fuseInto.hp) > 0 ? fuseInto : null;
   const table = bosses?.bosses ?? bosses ?? null;
@@ -213,7 +215,7 @@ export function enemyDisplayName(en: EnemyBattleRecord) {
  * same line the HUD plate reads), else the enemy table's species key. The numbered
  * records (Goburimon2, Cardmon3, ...) carry the plain species line on the disc.
  */
-export function enemyMessageName(en: EnemyBattleRecord, record: { nameId: number | null; }, nameBank, fallback = "") {
+export function enemyMessageName(en: EnemyBattleRecord, record: { nameId: number | null; }, nameBank: readonly (string | null)[] | null | undefined, fallback = "") {
   if (en?.displayName != null) return String(en.displayName);
   const line = record?.nameId == null ? null : nameBank?.[record.nameId | 0];
   if (typeof line === "string" && line !== "") return line;
@@ -227,7 +229,7 @@ export function enemyMessageName(en: EnemyBattleRecord, record: { nameId: number
  * nothing authored, so the battle's skill table is exactly today's. Keys stay the
  * technique ids the battle already indexes by.
  */
-export function mergeFusionSkills(skillDB: { [k: string]: BattleSkill; }, skills: ArrayLike<unknown> | { [s: string]: unknown; }, fxOn = false) {
+export function mergeFusionSkills(skillDB: { [k: string]: BattleSkill; }, skills: ArrayLike<FusionSkillRow> | { [s: string]: FusionSkillRow; }, fxOn = false) {
   if (!fxOn || !skills) return skillDB;
   const rows = Array.isArray(skills) ? skills : Object.values(skills);
   if (!rows.length) return skillDB;
@@ -250,13 +252,13 @@ export function mergeFusionSkills(skillDB: { [k: string]: BattleSkill; }, skills
 export const LAB_MODEL_RE = /^m[0-9]{3}[a-z0-9_]+$/;
 
 /** A Lab boss record as fusion_lab_bosses.json carries it: the fused body and its numbers. */
-interface LabBossRecord { id: string; hp?: any; moves?: any[]; model?: string }
+interface LabBossRecord extends FusionBoss { id: string }
 
 /** Is this a usable Lab boss record? (Shape only; the numbers are the helper's.) */
-export function labBossValid(rec) {
+export function labBossValid(rec: LabBossCandidate | null | undefined) {
   return !!rec && typeof rec === "object"
     && typeof rec.id === "string" && rec.id !== ""
-    && Array.isArray(rec.halves) && rec.halves.length >= 1 && rec.halves.every((h: string) => typeof h === "string" && h !== "")
+    && Array.isArray(rec.halves) && rec.halves.length >= 1 && rec.halves.every((h: string | number) => typeof h === "string" && h !== "")
     && typeof rec.body === "string" && rec.body !== ""
     && typeof rec.modelFolder === "string" && LAB_MODEL_RE.test(rec.modelFolder)
     && Number(rec.hp) > 0 && Array.isArray(rec.moves) && rec.moves.length === 3;
@@ -266,7 +268,7 @@ export function labBossValid(rec) {
  * Add the Lab bosses to the authored table. An authored id is never replaced, a record
  * that is not valid is skipped. `table` is returned as it is when nothing is added.
  */
-export function mergeLabBosses(table, lab: { bosses: { [s: string]: LabBossRecord; } | ArrayLike<LabBossRecord>; }) {
+export function mergeLabBosses(table: Record<string, FusionBoss> | null | undefined, lab: { bosses: { [s: string]: LabBossRecord; } | ArrayLike<LabBossRecord>; }) {
   const rows = (lab?.bosses && typeof lab.bosses === "object" ? Object.values(lab.bosses) : []) as LabBossRecord[];
   const good = rows.filter(labBossValid);
   if (!good.length) return table;
@@ -280,7 +282,7 @@ export function mergeLabBosses(table, lab: { bosses: { [s: string]: LabBossRecor
  * entry, the strongest screen the disc has it on), carrying `fuseInto` the boss id, so
  * the existing rule "the last body falls, the fusion appears" does the rest.
  */
-export function labBossParty(rec) {
+export function labBossParty(rec: LabBossCandidate | null | undefined) {
   const p = rec?.party ?? {};
   return [{
     name: rec?.body, id: p.id, level: p.level, hp: p.hp, mp: p.mp, stat_scale: p.stat_scale ?? 16,

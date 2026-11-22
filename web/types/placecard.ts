@@ -1,4 +1,4 @@
-import type { LocationCardState } from "../../engine/systems/location-card.js";
+import type { LocationBarTemplate, LocationCardState } from "../../engine/systems/location-card.js";
 
 /** The stage-entry location title card (web/placecard.ts). */
 export interface PlaceCard {
@@ -20,4 +20,10 @@ export interface PlaceCard {
   isActive?: () => boolean;
   state?: () => LocationCardState | null;
   step?: (dt: number) => void;
+}
+
+/** assets/data/place_card.json: the bar templates, and the two names per stage id. */
+export interface PlaceCardData {
+  bars: LocationBarTemplate[];
+  stages: Record<string, { area: string; place: string; }>;
 }

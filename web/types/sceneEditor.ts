@@ -23,3 +23,28 @@ export interface SceneEditorState {
   lastMouse: SceneEditorPoint | null;
   removeNearest?: () => void;
 }
+
+/** One thing the editor places: an NPC (a point) or an exit / zone (a rectangle, w and h set), in map pixels. */
+export interface SceneEditorItem {
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  [field: string]: unknown;
+}
+
+/** The scene being edited: its NPCs, its exit rectangles and its zones. */
+export interface SceneEditorScene {
+  npcs: SceneEditorItem[];
+  exits: SceneEditorItem[];
+  zones: SceneEditorItem[];
+}
+
+/** What the editor asks the game for on each event. */
+export interface SceneEditorContext {
+  scene: SceneEditorScene;
+  mapId: string;
+  camX: number;
+  camY: number;
+  zoom: number;
+}

@@ -24,7 +24,7 @@ export const FLY_POINTS = Object.freeze(["s200", "s201", "s330", "s420"]);
 /** A map record as the fly rules read it: its stage id, its name, and the size the twin signature compares. */
 export interface FlyMap { id: string; name?: string; width?: number; height?: number }
 /** A scene exit: the rectangle it covers, and the map it leads to. */
-export interface FlyExit { x?: number; y?: number; w?: number; h?: number; to?: string; _entranceReturn?: boolean }
+export interface FlyExit { x?: number; y?: number; w?: number; h?: number; to?: string; _entranceReturn?: boolean; spawnX?: number; spawnY?: number; dir?: string }
 /** The scenes table (web/assets/scenes.json) as the fly rules read it: a map id's exits. */
 export type FlyScenes = Record<string, { exits?: FlyExit[] }>;
 
@@ -48,20 +48,20 @@ export function flyLabel(name: string | undefined) {
  * The copies of every place: maps with the same size and the same exit rectangles (the normal world, its Amaterasu twin, the s9xx
  * finale twin), each group sorted by map id. Map<id, string[]>; a map with no twin is absent. Pure; cached per `scenes` object.
  */
-const twinCache = new WeakMap();
-export function mapTwins(maps, scenes): Map<string, string[]> {
+const twinCache = new WeakMap<FlyScenes, { maps: FlyMap[] | undefined; groups: Map<string, string[]> }>();
+export function mapTwins(maps: FlyMap[] | undefined, scenes: FlyScenes | null | undefined): Map<string, string[]> {
     const hit = scenes && typeof scenes === "object" ? twinCache.get(scenes) : null;
     if (hit && hit.maps === maps) return hit.groups;
-    const bySig = new Map();
+    const bySig = new Map<string, string[]>();
     for (const m of maps ?? []) {
         const ex = (scenes?.[m.id]?.exits ?? []).filter((e) => !e._entranceReturn);
         if (!ex.length) continue;
         const sig = `${m.width}x${m.height}|` + ex.map((e) => [e.x, e.y, e.w, e.h].join(",")).sort().join(";");
         if (!bySig.has(sig)) bySig.set(sig, []);
-        bySig.get(sig).push(m.id);
+        bySig.get(sig)!.push(m.id);
     }
-    const groups = new Map();
-    const num = (id) => Number(String(id).replace(/\D/g, ""));
+    const groups = new Map<string, string[]>();
+    const num = (id: string) => Number(String(id).replace(/\D/g, ""));
     for (const ids of bySig.values()) {
         if (ids.length < 2) continue;
         ids.sort((a, b) => num(a) - num(b));
@@ -88,20 +88,20 @@ function rankWorld(group: string[], id: string) {
  * repeated until nothing changes. A map with no such neighbour (Kusanagi Street Corner) stays out: world unknown.
  * Underground / dig maps are not followed (they join the worlds). Pure; cached per `scenes` object.
  */
-const worldCache = new WeakMap();
-export function mapWorlds(maps: FlyMap[], scenes: FlyScenes | null) {
+const worldCache = new WeakMap<FlyScenes, { maps: FlyMap[] | undefined; worlds: Map<string, number> }>();
+export function mapWorlds(maps: FlyMap[] | undefined, scenes: FlyScenes | null | undefined) {
     const hit = scenes && typeof scenes === "object" ? worldCache.get(scenes) : null;
     if (hit && hit.maps === maps) return hit.worlds;
     const twins = mapTwins(maps, scenes);
     const air = new Set((maps ?? []).filter((m) => isOpenAirMapName(m.name)).map((m) => m.id));
-    const worlds = new Map();
+    const worlds = new Map<string, number>();
     for (const id of air) {
         const g = twins.get(id);
         const w = g ? rankWorld(g, id) : -1;
         if (w >= 0) worlds.set(id, w);
     }
-    const adj = new Map();
-    const link = (a: string, b: string) => { if (air.has(a) && air.has(b)) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); } };
+    const adj = new Map<string, Set<string>>();
+    const link = (a: string, b: string) => { if (air.has(a) && air.has(b)) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a)!.add(b); } };
     for (const [from, sc] of Object.entries(scenes ?? {})) for (const e of sc?.exits ?? []) if (e?.to) { link(from, e.to); link(e.to, from); }
     for (let changed = true; changed;) {
         changed = false;
@@ -167,7 +167,7 @@ export function flyPlaces({ maps = [], seen = () => false, currentId = null, poi
  * Where the game puts you when you walk into `id`: the spawn of the first (lowest map id) exit of any scene that leads there.
  * { x, y, dir } or null when no scene leads there with a spawn.
  */
-export function arrivalSpot(scenes, id: string | undefined) {
+export function arrivalSpot(scenes: FlyScenes | null | undefined, id: string | undefined) {
     for (const from of Object.keys(scenes ?? {}).sort()) {
         for (const e of scenes[from]?.exits ?? []) {
             if (e?.to === id && Number.isFinite(e.spawnX) && Number.isFinite(e.spawnY)) {
@@ -182,7 +182,7 @@ export function arrivalSpot(scenes, id: string | undefined) {
  * May the flight start now? `openAir` = the map you stand on is open air; `free` = the field is free of every lock.
  * Returns null when yes, else the line to say.
  */
-export function flyBlock({ openAir, free }) {
+export function flyBlock({ openAir, free }: { openAir: boolean; free: boolean }) {
     if (!free) return NO_FREE_LINE;
     if (!openAir) return NO_AIR_LINE;
     return null;

@@ -1,3 +1,4 @@
+import type { PauseHomeArgs } from "./types/rest-a.js";
 // THE pause home. One function, so there is one list.
 //
 // Until 2026-10-04 the pause home was reachable three ways and two of them were
@@ -16,7 +17,7 @@
 //
 // `status` is the translated adapter. A null `status` (a caller with no translated
 // adapter) keeps web/menu.js; no production route and no lab route reaches it.
-export function openPauseHome({ state, status, menu, row = 0 }) {
+export function openPauseHome({ state, status, menu, row = 0 }: PauseHomeArgs) {
   if (typeof status?.openHome === "function") {
     state.menuOpen = true;
     status.openHome(state, () => { state.menuOpen = false; menu.reset(); }, row);
@@ -58,7 +59,7 @@ export function openPauseHome({ state, status, menu, row = 0 }) {
 // of it returns to the home list on the CARD FOLDERS row. That is what
 // `status.reopenPage` opens. Only with no translated page to reopen
 // does the copy in web/menu.js answer — not a second copy in ordinary play.
-export function returnToPauseCardFolders({ state, status, menu }) {
+export function returnToPauseCardFolders({ state, status, menu }: PauseHomeArgs) {
   if (typeof status?.reopenPage === "function" && status.reopenPage("cardfolders", 5)) {
     state.menuOpen = true;
     return "translated";

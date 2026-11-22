@@ -12,7 +12,7 @@
 // Generic system window (menus, shop, item list, Yes/No choice prompt) — sampled from
 // the "Download your partner Digimon now?" screenshot: near-black navy fill, thin
 // blue-violet border line, full-width bottom-anchored in its original context.
-export function drawWindow(ctx: CanvasRenderingContext2D, img, _rects, x: number, y: number, w: number, h: number) {
+export function drawWindow(ctx: CanvasRenderingContext2D, img: unknown, _rects: unknown, x: number, y: number, w: number, h: number) {
   ctx.save();
 
   ctx.fillStyle = "rgb(0, 0, 32)";

@@ -16,6 +16,6 @@ export const SANDY = [
     /^West Sector — (Pelche Oasis|Bullet Valley|South Badland|North Badland W|North Badland E|Noise Desert|S Noise Desert|Mobius Desert)/,
 ];
 /** Open air by the map name (snow and sand places count as open air). Everything else is indoor. */
-export function isOpenAirMapName(name) {
+export function isOpenAirMapName(name: string) {
     return SNOWY.some((r) => r.test(name)) || SANDY.some((r) => r.test(name)) || OPEN_AIR.some((r) => r.test(name));
 }

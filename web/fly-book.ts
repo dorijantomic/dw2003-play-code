@@ -25,7 +25,7 @@ export function createFlyBook({ sfx = null, data, choose }: FlyBookArgs = {} as 
         windows: ["title", "list", "help"],
         wall: false,
         model,
-        act(buttons) {
+        act(buttons: ReadonlySet<string>) {
             if (buttons.has(WORD.back)) return "back";
             if (buttons.has(WORD.confirm) && model.current()) { choose?.(model.current()!); return "back"; }
             const d = buttons.has("up") ? -1 : buttons.has("down") ? 1 : 0;

@@ -40,7 +40,7 @@ export function createMapScreenBook({ sfx = null, data }: MapScreenBookArgs = {}
         // look C (web/ui-c/books.js): the cursor points at an area box, not at a list row
         look: Object.freeze({ rows: false }),
         model,
-        act(buttons) {
+        act(buttons: Set<string>) {
             if (buttons.has(WORD.back)) return "back";
             if (buttons.has(WORD.prev)) cue(model.switchRegion(-1));
             else if (buttons.has(WORD.next)) cue(model.switchRegion(1));

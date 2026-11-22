@@ -31,23 +31,25 @@ const MOVIE_DIR = "assets/movie/";
 
 /** One row of assets/movie/manifest.json: the shipped file, and the disc file index it stands for. */
 interface MovieRecord { file: string; index: number }
+/** assets/movie/manifest.json: the shipped files by lower-case stem. */
+interface MovieManifest { movies?: Record<string, MovieRecord> }
 
 /** The shipped asset for a movie row, by the disc's own file index (the one
  *  identifier the row and the manifest share); the filename is the fallback. */
-export function movieRecordFor(manifest, row) {
+export function movieRecordFor(manifest: MovieManifest | null | undefined, row: { file: string; fileIndex: number }) {
   const movies = manifest?.movies ?? {};
-  const byIndex = (Object.values(movies) as MovieRecord[]).find((m) => m.index === row.fileIndex);
+  const byIndex = Object.values(movies).find((m) => m.index === row.fileIndex);
   if (byIndex) return byIndex;
   return movies[row.file.replace(/_STR$/, "").toLowerCase()] ?? null;
 }
 
-export function createFieldMoviePlayer(onEnd, onError = console.error, createVideo = null, languageByte = () => 2) {
+export function createFieldMoviePlayer(onEnd: (code: number, why: string | null) => void, onError: (error: unknown) => void = console.error, createVideo: (() => HTMLVideoElement) | null = null, languageByte = () => 2) {
   const video = createVideo ? createVideo() : document.createElement("video");
   video.playsInline = true;
   video.preload = "auto";
   video.volume = 0.6;
   const player = new FieldMoviePlayer();
-  let manifestPromise = null;
+  let manifestPromise: Promise<MovieManifest> | null = null;
   let active = false, code = 0, file = "", blocked = false, generation = 0;
   let accumulator = 0;
 

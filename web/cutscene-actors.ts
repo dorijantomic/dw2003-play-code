@@ -4,7 +4,9 @@
 // record +0x8), so it is carried as `npc_id`: per-actor systems gate on it, and
 // the drop shadow's six-id denylist can only fire if it is present.
 // `x`/`y` park the actor off-map until the script positions it.
-export function ephemeralActorRecord(actorId, spriteId) {
+import type { SceneNpc } from "./game/types.js";
+
+export function ephemeralActorRecord(actorId: number, spriteId: string): SceneNpc {
   return {
     id: "eph_" + actorId,
     npc_id: actorId,

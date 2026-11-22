@@ -1,7 +1,7 @@
 import { renderPhraseNote, PHRASE_SAMPLE_RATE as SAMPLE_RATE } from "../vendor/engine.js";
 import type { AudioEngine } from "../types/audio.js";
 import type { PhraseVoice } from "./types.js";
-import type { PhraseRow } from '../types/audio.js';
+import type { PhraseRow, PhraseNote } from '../types/audio.js';
 interface SlotKeyVoiceMeta extends VoiceMeta {
   positional?: boolean;
   id?: number | string;
@@ -42,7 +42,7 @@ function loadPhraseTable() {
     }
     return new Int16Array(0);
   }
-function phraseSampleFor(vag: string) {
+function phraseSampleFor(vag: string | number) {
     if (!P.phraseSamples!.has(vag)) {
       P.phraseSamples!.set(vag, loadPhraseTable()
         .then((t) => (t && t.samples && t.samples[vag]) || null)
@@ -64,7 +64,7 @@ function phraseSampleFor(vag: string) {
    * length can still be struck at different velocities, and jingle04's pad
    * layers differ by nothing else.
    */
-  function phraseNoteAudio(note) {
+  function phraseNoteAudio(note: PhraseNote) {
     const key = `${note.sample}|${note.rate}|${note.relStart}|${note.release.mode}`
       + `|${note.release.seconds}|${note.gain}`;
     if (!P.phraseRenders!.has(key)) {
@@ -93,14 +93,14 @@ function phraseSampleFor(vag: string) {
    * plays the notes, and `otherwise()` is the single-source path for a sound
    * that is not a phrase. `bank` is null for the common bank.
    */
-  function whenPhraseRow(name: string, bank: string | null, run: (row: PhraseRow) => void, otherwise: { (): void; (): void; }) {
+  function whenPhraseRow(name: string, bank: string | null, run: (row: PhraseRow) => void, otherwise: () => void) {
     if (P.phraseTable) { const row = P.phraseRowFor!(name, bank); if (row) run(row); else otherwise(); return; }
     loadPhraseTable().then((t) => {
       const row = t && P.phraseRowFor!(name, bank);
       if (row) run(row); else otherwise();
     }).catch(() => otherwise());
   }
-function bufferFor(name: string, bank = null) {
+function bufferFor(name: string, bank: string | null = null) {
     const key = bank ? bank + "/" + name : name;
     if (!P.buffers![key]) {
       const url = bank
@@ -122,7 +122,7 @@ function bufferFor(name: string, bank = null) {
    * which of its notes is still ringing. `onIdle` fires when the last note has
    * finished on its own, so a caller holding it by slot key can let go.
    */
-  function startPhrase(row, onIdle: { (): void; (): void; }) {
+  function startPhrase(row: PhraseRow, onIdle: (() => void) | null) {
     return Promise.all(row.notes.map((note) => phraseNoteAudio(note)))
       .then((audios) => {
         if (P.player!.muted || audios.some((a) => !a)) return null;
@@ -154,7 +154,7 @@ function bufferFor(name: string, bank = null) {
           try { phraseGain.disconnect(); } catch (e) { /* already gone */ }
           onIdle?.();
         };
-        row.notes.forEach((note, i: string | number) => {
+        row.notes.forEach((note, i) => {
           const audio = audios[i];
           const at = t0 + note.start / SAMPLE_RATE;
           const begin = () => {

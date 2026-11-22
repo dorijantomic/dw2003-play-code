@@ -15,7 +15,7 @@ const PUNCT: Record<string, number[]> = {
 };
 
 /** One character -> its bytes (empty when the disc text has no code for it). */
-export function encodeChar(ch) {
+export function encodeChar(ch: string) {
     const c = ch.charCodeAt(0);
     if (ch >= "0" && ch <= "9") return [0x04 + (c - 0x30)];
     if (ch >= "A" && ch <= "Z") return [0x0e + (c - 0x41)];
@@ -28,7 +28,7 @@ const encodeText = (s: string) => [...s].flatMap(encodeChar);
 
 /** Wrap one paragraph into lines of at most `width` characters (words are never split unless longer than a line). */
 export function wrap(text: string, width = 22) {
-    const lines = [];
+    const lines: string[] = [];
     let line = "";
     for (const word of String(text).split(/\s+/).filter(Boolean)) {
         if (!line) line = word;
@@ -42,7 +42,7 @@ export function wrap(text: string, width = 22) {
 
 /** Text -> pages of at most `perPage` lines each: [[line, ...], ...]. A blank line starts a new page; a single newline breaks the line. */
 export function paginate(text: string, { width = 22, perPage = 3 } = {}) {
-    const pages = [];
+    const pages: string[][] = [];
     for (const para of String(text).split(/\n\s*\n/)) {
         const lines = para.split("\n").flatMap((l) => wrap(l, width));     // a single newline is a hard line break
         for (let i = 0; i < lines.length; i += perPage) pages.push(lines.slice(i, i + perPage));
@@ -51,7 +51,7 @@ export function paginate(text: string, { width = 22, perPage = 3 } = {}) {
 }
 
 /** Pages -> the bytes of one line (name tab + text). */
-export function encodeLine(name, pages: string[][]) {
+export function encodeLine(name: string | null | undefined, pages: string[][]) {
     const out = [0x02, 0x07, ...encodeText(String(name ?? "").slice(0, 20)), 0x02, 0x07];
     pages.forEach((page: string[], p: number) => {
         if (p > 0) out.push(0x02, 0x02, 0x02, 0x02, 0x03);
@@ -62,7 +62,7 @@ export function encodeLine(name, pages: string[][]) {
 }
 
 /** A whole pack holding that one line as entry 0 (the form `dialogueBox.open({ pack, index: 0 }, ...)` takes). */
-export function buildPack(name, pages: string[][]) {
+export function buildPack(name: string | null | undefined, pages: string[][]) {
     const line = encodeLine(name, pages);
     const first = 4 + 4 * 2;                         // count, then two offsets
     const bytes = new Uint8Array(first + line.length);
@@ -75,14 +75,14 @@ export function buildPack(name, pages: string[][]) {
 }
 
 /** The inverse, for tests: the bytes of a line -> { name, pages } (null if it uses a code this module does not know). */
-export function decodeLine(bytes) {
+export function decodeLine(bytes: ArrayLike<number>) {
     const rev = new Map(Object.entries(PUNCT).map(([ch, b]) => [b.join(","), ch]));
     let i = 0;
     const take = () => {
         let s = "";
         const pages = [[""]];
         for (; i < bytes.length; ) {
-            const c = bytes[i];
+            const c = bytes[i]!;
             if (c === 0x02 && bytes[i + 1] === 0x07) break;
             if (c === 0x02 && bytes[i + 1] === 0x01) { pages.at(-1)!.push(""); i += 2; continue; }
             if (c === 0x02 && bytes[i + 1] === 0x02 && bytes[i + 2] === 0x02 && bytes[i + 3] === 0x02 && bytes[i + 4] === 0x03) { pages.push([""]); i += 5; continue; }
@@ -104,7 +104,7 @@ export function decodeLine(bytes) {
     i = 2;
     let name = "";
     for (; i < bytes.length && !(bytes[i] === 0x02 && bytes[i + 1] === 0x07); i++) {
-        const c = bytes[i];
+        const c = bytes[i]!;
         if (c >= 0x0e && c <= 0x27) name += String.fromCharCode(0x41 + c - 0x0e);
         else if (c >= 0x28 && c <= 0x41) name += String.fromCharCode(0x61 + c - 0x28);
         else if (c >= 0x04 && c <= 0x0d) name += String.fromCharCode(0x30 + c - 0x04);

@@ -5,16 +5,12 @@
 // giant mode, battle camera/backdrops), sound (boss music), field warnings (omen, enemy tells: they show information, they
 // decide nothing) and info pages (blast ladder) are not.
 import { DIAL_MODES } from "./encounter-dial.js";
-import type { AmbienceSettings } from "./types/ambience.js";
-type HostRuleValue = string | number | boolean | null | undefined | HostRuleValue[] | HostRuleRecord;
-interface HostRuleRecord {
-    [key: string]: HostRuleValue;
-}
-type CleanRulesResult = Partial<Record<string, string | number>>;
+import type { AmbienceBag } from "./types/rest-b.js";
+type CleanRulesResult = Partial<Record<string, boolean | number | string>>;
 
 
 /** Key -> kind of value. "bool" = a switch, "dial" = one of DIAL_MODES, "speed" = a number 1..3 (the Faster battles slider). */
-export const HOST_RULES = Object.freeze({
+export const HOST_RULES: Readonly<Record<string, string>> = Object.freeze({
     battlespeed: "bool",         // OPTIONS Battle speed (x1 = off): how fast a fight runs
     battleSpeed: "speed",        //   ... and its value
     encounterdial: "bool",       // OPTIONS Random fights: how often wild fights come
@@ -26,16 +22,17 @@ export const HOST_RULES = Object.freeze({
 });
 export const HOST_RULE_KEYS = Object.freeze(Object.keys(HOST_RULES));
 
-function cleanValue(kind: string, v): boolean | number | string | undefined {
+function cleanValue(kind: string | undefined, v: unknown): boolean | number | string | undefined {
     if (kind === "bool") return typeof v === "boolean" ? v : undefined;
-    if (kind === "dial") return DIAL_MODES.includes(v) ? v : undefined;
+    // ETS item 9: includes() takes a string; any other v is simply not in the list, so the answer is the same
+    if (kind === "dial") return DIAL_MODES.includes(v as string) ? v as string : undefined;
     if (kind === "speed") return typeof v === "number" && Number.isFinite(v) ? Math.min(3, Math.max(1, Math.round(v * 4) / 4)) : undefined;
     return undefined;
 }
 
 /** Anything -> a plain object with only the known keys that hold a valid small value. Never throws. */
-export function cleanRules(o: HostRuleValue) {
-    const out = {};
+export function cleanRules(o: Record<string, unknown> | null | undefined) {
+    const out: CleanRulesResult = {};
     if (!o || typeof o !== "object" || Array.isArray(o)) return out;
     for (const k of HOST_RULE_KEYS) {
         const v = cleanValue(HOST_RULES[k], o[k]);
@@ -45,8 +42,8 @@ export function cleanRules(o: HostRuleValue) {
 }
 
 /** My current values for the rule keys (what a host sends). */
-export function pickRules(fx) {
-    const raw = {};
+export function pickRules(fx: AmbienceBag | null | undefined) {
+    const raw: Record<string, unknown> = {};
     for (const k of HOST_RULE_KEYS) raw[k] = HOST_RULES[k] === "bool" ? fx?.[k] === true : fx?.[k];
     return cleanRules(raw);
 }
@@ -61,7 +58,7 @@ export function pickRules(fx) {
  *   locked(key)   true while the host decides this key
  *   canSave(key)  false for a locked key
  */
-export function createRuleOverride(fx: AmbienceSettings) {
+export function createRuleOverride(fx: AmbienceBag) {
     const own = new Map();       // key -> the player's own value, taken the moment the key was locked
     const host = new Map();      // key -> the host's value
     const unlock = (k: string | number) => { fx[k] = own.get(k); own.delete(k); host.delete(k); };
@@ -77,7 +74,7 @@ export function createRuleOverride(fx: AmbienceSettings) {
         },
         reimpose() { for (const [k, v] of host) fx[k] = v; },
         clear() { for (const k of [...host.keys()]) unlock(k); },
-        locked: (k) => host.has(k),
+        locked: (k: string) => host.has(k),
         canSave: (k: string) => !host.has(k),
         keys: () => [...host.keys()],
     };

@@ -11,6 +11,8 @@ import type { CanvasBacking } from "../types/canvas-resolution.js";
 import type { FlyPlace } from "../fly-points.js";
 import type { createRetryLoader } from "../retry-loader.js";
 import type { tiledMap } from "../map-tiles.js";
+import type { FishExtrasData } from "../types/misc-game2.js";
+import type { ItemsData } from "../types/screens.js";
 
 import type { createQuestChase } from "../quest-chase.js";
 import type { questFxGet } from "../quest-fx.js";
@@ -138,7 +140,7 @@ export interface GameState {
   fireTraps?: any;
   fishing?: any;
   fishingBudget?: number;
-  fishingExtras?: any;
+  fishingExtras?: FishExtrasData | null | undefined;
   fishingSpots?: any;
   /** the string markers the field keeps in the save ("evt_<flag_key>", an npc's setFlag) */
   flags: Record<string, boolean>;
@@ -205,7 +207,7 @@ export interface GameState {
   /** the story ordinal the walker has reached */
   progressOrdinal?: number;
   progressTable: ProgressOrdinalTable | null;
-  replayLadder: { byStage: Record<string, any>; names: Record<string, any>; };
+  replayLadder: { byStage: Record<string, any>; names: Record<string, any>; } | null;
   reserveEquipment: any;
   reserveStats: any;
   rosterOwned?: number;
@@ -391,7 +393,7 @@ export interface SceneNpc {
 }
 
 /** The loader the glossary's item list reads through (web/retry-loader.ts). */
-export type ItemLoader = ReturnType<typeof createRetryLoader>;
+export type ItemLoader = ReturnType<typeof createRetryLoader<ItemsData>>;
 
 /** The engine's bag object, which the field replaces with an adapter over state.inventory. */
 export type EngineInventory = InstanceType<typeof GameEngine>["state"]["inventory"];

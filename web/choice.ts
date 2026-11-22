@@ -19,6 +19,7 @@
 //     (substate 10). The window's fold and the close-before-answer timing are the
 //     remaining part of the same decode (the walker still shows/hides instantly).
 import { drawWindow } from "./uiRects.js";
+import type { PackedSfx } from "./types/translated-screens.js";
 import * as uiC from "./ui-c/index.js";
 import { composeWindow } from "./ui-c/screens.js";
 import type { ChoicePrompt, ChoiceRun } from "./types/choice.js";
@@ -46,7 +47,7 @@ export function choiceScene(ch: ChoicePrompt) {
   return { parts, runs };
 }
 
-export function createChoice(sfx = null) {
+export function createChoice(sfx: PackedSfx | null = null) {
   const uiKey = `choice${++choiceCount}`;
   const ch = {
     prompt: "",

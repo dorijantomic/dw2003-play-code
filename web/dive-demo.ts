@@ -11,6 +11,7 @@
 
 import { drawFieldcomIcon } from "./fieldcom.js";
 import { DEMO_PACK } from "./vendor/engine.js";
+import type { ScreenPackLayer } from "./types/misc-game2.js";
 
 // The demo cells are authored in the PS1's 320x240 screen space — the extracted
 // layer dx/dy ARE screen coordinates, which is why the native code draws every
@@ -23,13 +24,15 @@ import { DEMO_PACK } from "./vendor/engine.js";
 const AUTHORED_W = 320;
 const AUTHORED_H = 240;
 
-let packs = null;
-let sheets = {};      // packName -> { opaque, semi }
+let packs: Record<string, DivePack> | null = null;
+let sheets: Record<string, DiveSheets> = {};      // packName -> { opaque, semi }
 
 /** What assets/effects/dive/dive_demo.json says of a pack: its opaque sheet and its semi (additive) sheet. */
-interface DivePack { sheet: string; semiSheet: string }
+interface DivePack { sheet: string; semiSheet: string; clips: Record<string, { layers: ScreenPackLayer[] } | undefined> }
+/** The two loaded pictures of one pack. */
+interface DiveSheets { opaque: HTMLImageElement; semi: HTMLImageElement }
 
-export async function loadDiveDemo(loadImage) {
+export async function loadDiveDemo(loadImage: (src: string) => Promise<HTMLImageElement>) {
     const base = "assets/effects/dive/";
     packs = await (await fetch(base + "dive_demo.json")).json();
     const entries = await Promise.all(Object.entries(packs as Record<string, DivePack>).map(async ([name, p]) => {
@@ -53,7 +56,7 @@ export function diveDemoReady() {
  * Every clip in both packs is flagged opaque in the source data, so there is no
  * blended pass here — unlike the particles, which are additive.
  */
-export function drawDiveDemoCells(ctx: CanvasRenderingContext2D | null, mode, cells, viewW: number, viewH: number) {
+export function drawDiveDemoCells(ctx: CanvasRenderingContext2D | null, mode: keyof typeof DEMO_PACK, cells: number[], viewW: number, viewH: number) {
     if (!packs || !cells?.length) return;
     const pack = packs[DEMO_PACK[mode]];
     const sheet = sheets[DEMO_PACK[mode]];
@@ -88,6 +91,6 @@ export function drawDiveDemoCells(ctx: CanvasRenderingContext2D | null, mode, ce
  * freezes the last on-screen position and keeps passing it; whether the native
  * fields are screen- or world-space is recorded unresolved as DIVE-Q006.
  */
-export function drawDiveParticles(ctx: CanvasRenderingContext2D | null, cells, x: number, y: number) {
+export function drawDiveParticles(ctx: CanvasRenderingContext2D | null, cells: number[], x: number, y: number) {
     for (const cell of cells) drawFieldcomIcon(ctx, 1, cell, x, y);
 }

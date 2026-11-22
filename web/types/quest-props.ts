@@ -17,3 +17,11 @@ export interface QuestProp {
 export interface QuestPropRow extends QuestProp {
   name: string;
 }
+
+/** The solid foot box of one prop (web/quest-props.ts propFootBox). */
+export interface QuestPropBox {
+  x: number;
+  y: number;
+  halfW: number;
+  depth: number;
+}

@@ -8,9 +8,15 @@ type Quat = [number, number, number, number];
 /** one keyframe of a rotation/translation channel: x, y, z, then the frame it is set at (30000 ends the channel) */
 type ChannelKey = readonly [number, number, number, number];
 
+/** one translation / scale / rotation triple */
+type Vec3 = [number, number, number];
+
+/** a channel as the model file holds it: key rows in frame order */
+type Channel = readonly ChannelKey[];
+
 interface Bone {
   anim?: {
-    ch2?: Array<[number, number, number]>;
+    ch2?: Channel;
   };
 }
 
@@ -146,13 +152,13 @@ export function ch2QuatAlongSpan(lo: ChannelKey, hi: ChannelKey, t: number) {
 
 // The key span a frame sits in, with the index of the LOWER key (the smooth re-timing needs the
 // neighbouring spans, which channelSpan() alone does not expose). Same walk, same sentinel.
-function spanIndexAt(channel, frame) {
+function spanIndexAt(channel: Channel | undefined, frame: number) {
   if (!channel || channel.length === 0) return null;
-  let i = 0, lo = channel[0], hi = channel[0];
+  let i = 0, lo = channel[0]!, hi = channel[0]!;
   for (let k = 0; k < channel.length; k++) {
-    if (channel[k][3] === 30000) break;
-    if (channel[k][3] <= frame) { lo = channel[k]; i = k; }
-    else { hi = channel[k]; break; }
+    if (channel[k]![3] === 30000) break;
+    if (channel[k]![3] <= frame) { lo = channel[k]!; i = k; }
+    else { hi = channel[k]!; break; }
   }
   if (lo === hi || hi[3] === 30000 || hi[3] <= lo[3]) return { i, lo, hi: null, t: 0 };
   return { i, lo, hi, t: (frame - lo[3]) / (hi[3] - lo[3]) };
@@ -209,7 +215,7 @@ export function smoothTimeWarp(channel, i: number, t: number, angle = false) {
 }
 
 /** Smooth-mode ch2 rotation at `frame` as {q, m}: authored path (quaternion substeps), re-timed. */
-function ch2SmoothRotationAt(channel: [number, number, number][] | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
+function ch2SmoothRotationAt(channel: Channel | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
   const s = spanIndexAt(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
   if (!s.hi || s.t <= 0) return { q: ch2ToQuat(s.lo[0], s.lo[1], s.lo[2]), m: ps1AnglesToMat3(s.lo[2], s.lo[1], s.lo[0]) };
@@ -221,7 +227,7 @@ function ch2SmoothRotationAt(channel: [number, number, number][] | undefined, fr
 
 /** Smooth-mode linear channel (ch1 translation / ch3 scale): the same authored segment, re-timed by
  *  the same monotone warp so translation and rotation arrive together. */
-function interpChannelSmooth(channel, frame) {
+function interpChannelSmooth(channel: Channel | undefined, frame: number): Vec3 {
   const s = spanIndexAt(channel, frame);
   if (!s) return [0, 0, 0];
   if (!s.hi) return [s.lo[0], s.lo[1], s.lo[2]];
@@ -249,13 +255,13 @@ export function localRotationAt(bone: Bone | undefined, frame: number) {
 // The key span a channel is sampled in at `frame`: {lo, hi, t} with t∈[0,1], or {lo, hi:null}
 // when the frame is at/after the last key (or the channel holds a single key). Shared by the
 // linear sampler and the quaternion rotation sampler so both read the SAME two keys.
-function channelSpan(channel, frame) {
+function channelSpan(channel: Channel | undefined, frame: number) {
   if (!channel || channel.length === 0) return null;
-  let lo = channel[0], hi = channel[0];
+  let lo = channel[0]!, hi = channel[0]!;
   for (let i = 0; i < channel.length; i++) {
-    if (channel[i][3] === 30000) break;
-    if (channel[i][3] <= frame) lo = channel[i];
-    else { hi = channel[i]; break; }
+    if (channel[i]![3] === 30000) break;
+    if (channel[i]![3] <= frame) lo = channel[i]!;
+    else { hi = channel[i]!; break; }
   }
   if (lo === hi || hi[3] === 30000 || hi[3] <= lo[3]) return { lo, hi: null, t: 0 };
   return { lo, hi, t: (frame - lo[3]) / (hi[3] - lo[3]) };
@@ -264,7 +270,7 @@ function channelSpan(channel, frame) {
 // Interpolate a keyframe channel at the given frame number.
 // channel: array of [x,y,z,frame] records. Sentinel frame=30000.
 // Returns [x,y,z] linearly interpolated.
-export function interpChannel(channel, frame) {
+export function interpChannel(channel: Channel | undefined, frame: number): Vec3 {
   const s = channelSpan(channel, frame);
   if (!s) return [0, 0, 0];
   const lo = s.lo, hi = s.hi;
@@ -280,7 +286,7 @@ export function interpChannel(channel, frame) {
 // A ch2 rotation at `frame` as {q, m}: the quaternion of the SAME rotation the matrix carries.
 // At a key both come straight from the key (m is ps1AnglesToMat3, bit-identical to the linear
 // path); between keys the quaternion is the shortest-path slerp and m its matrix.
-function ch2RotationAt(channel: [number, number, number][] | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
+function ch2RotationAt(channel: Channel | undefined, frame: number): { q: Quat; m: Float32Array<ArrayBuffer>; } {
   const s = channelSpan(channel, frame);
   if (!s) return { q: [0, 0, 0, 1], m: ps1AnglesToMat3(0, 0, 0) };
   const keyAt = (k: ChannelKey) => ({ q: ch2ToQuat(k[0], k[1], k[2]), m: ps1AnglesToMat3(k[2], k[1], k[0]) });
@@ -338,7 +344,7 @@ export function buildBoneWorldMatrices(model, frame: number, blend: { from: numb
     // Sample a keyframe channel at `frame`, or (during a blend segment) lerp the sample from
     // the `blend.from` frame toward `frame` by `blend.t`. This is what makes transitions fluid
     // instead of snapping between disjoint motion phases. See the header note.
-    const sampleCh = (ch) => {
+    const sampleCh = (ch: Channel | undefined): Vec3 => {
         const a = smooth ? interpChannelSmooth(ch, frame) : interpChannel(ch, frame);
         if (!blend || blend.from == null) return a;
         const b = smooth ? interpChannelSmooth(ch, blend.from) : interpChannel(ch, blend.from);
@@ -350,7 +356,7 @@ export function buildBoneWorldMatrices(model, frame: number, blend: { from: numb
     // into a matrix. Flag on: slerp the two surrounding keys (and the two poses of a blend
     // segment) as whole rotations, shortest path. Endpoints are the key matrices themselves, so a
     // key frame is bit-identical either way.
-    const sampleRot = (ch) => {
+    const sampleRot = (ch: Channel | undefined) => {
         if (!S._slerpRot && !smooth) {
             const c = sampleCh(ch);
             return ps1AnglesToMat3(c[2], c[1], c[0]);

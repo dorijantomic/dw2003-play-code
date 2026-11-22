@@ -165,7 +165,7 @@ export function createBattleCommandTranslated(sfx: PackedSfx | null = null, opti
 
         // The joke owner closes itself on the confirm and answers with the chosen
         // joke; the command actor writes its out word instead.
-        answer: (r, session) => {
+        answer: (r: { _chosen: unknown }, session: FightCommandSession) => {
             const joke = session.joke();
             if (joke !== null) {
                 r._chosen = joke;

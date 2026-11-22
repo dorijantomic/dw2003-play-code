@@ -22,12 +22,12 @@
 export const COMMON_SOUND_ARCHIVE = 1;
 
 /** Bits 18-24 of a packed word: which sound archive it addresses (F0x80020030). */
-export function packedArchive(packed) {
+export function packedArchive(packed: number) {
     return (packed >>> 18) & 0x7f;
 }
 
 /** "0x8004503c" — the key the extracted manifests file their ids under. */
-export function packedKey(packed) {
+export function packedKey(packed: number) {
     return "0x" + (packed >>> 0).toString(16).padStart(8, "0");
 }
 
@@ -42,7 +42,7 @@ export function packedKey(packed) {
  * sample path, so callers pair this predicate with a music-stem table and fall
  * through to the sample sink when no stem is named.
  */
-export function packedIsMusicStart(packed) {
+export function packedIsMusicStart(packed: number) {
     return ((packed >>> 29) & 0x7) === 0x3;
 }
 
@@ -67,19 +67,20 @@ export function packedIsMusicStart(packed) {
  *    they always have.
  */
 /** One row of a packed sound manifest: the stem, and the record it was packed from. */
-type PackedRow = [string, { id?: any }];
+interface PackedMeta { id?: any }   // the extractor files each id as a "0x..." string
+type PackedRow = [string, PackedMeta];
 
-export function packedSampleResolver(commonManifest, areaManifest = null) {
-    const index = (rows: Record<string, { id?: any }>): Map<string, PackedRow> => {
+export function packedSampleResolver(commonManifest: Record<string, PackedMeta> | null | undefined, areaManifest: Record<string, Record<string, PackedMeta>> | null = null) {
+    const index = (rows: Record<string, PackedMeta> | null | undefined): Map<string, PackedRow> => {
         const out = new Map<string, PackedRow>();
         for (const [stem, meta] of Object.entries(rows ?? {}))
             if (meta?.id) out.set(String(meta.id).toLowerCase(), [stem, meta]);
         return out;
     };
-    const common = index(commonManifest as Record<string, { id?: any }>);
-    const banks = Object.entries(areaManifest ?? {}).map(([bank, rows]) => [bank, index(rows as Record<string, { id?: any }>)] as [string, Map<string, PackedRow>]);
+    const common = index(commonManifest);
+    const banks = Object.entries(areaManifest ?? {}).map(([bank, rows]) => [bank, index(rows)] as [string, Map<string, PackedRow>]);
 
-    return (id) => {
+    return (id: number) => {
         const word = id >>> 0;
         const key = packedKey(word);
         const archive = packedArchive(word);

@@ -11,9 +11,9 @@
 //
 // All game mutation goes through injected deps so this stays DOM/global-free and the
 // autonomous walkthrough test can drive the very same jump() (see tools/test_walkthrough.mjs).
-import type { SceneSkipState } from "./types/sceneSkip.js";
+import type { SceneSkipDeps, SceneSkipState } from "./types/sceneSkip.js";
 
-export function createSceneSkip(deps) {
+export function createSceneSkip(deps: SceneSkipDeps) {
   // deps: { setOrdinal(n), getOrdinal(), clearFlag(id), warpToStage(stageId), fireStageEnter(stageId), talk(npcId) }
   const d = { enabled: false, sel: 0, top: 0, spine: [], ordAdj: 0, msg: null, ready: false } as SceneSkipState;
 

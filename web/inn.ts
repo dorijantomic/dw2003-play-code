@@ -10,7 +10,10 @@
 // threw "Cannot create property 'hp' on string". Index 0 is the live
 // partnerStats block, the rest are the partyStats slots.
 
-export function applyInnRest(state, before, after) {
+import type { InnMember } from "../engine/dw3/inn.js";
+import type { WalkerState } from "./types/translated-screens.js";
+
+export function applyInnRest(state: WalkerState, before: readonly InnMember[], after: readonly InnMember[]) {
   const chars = state?.party;
   if (!Array.isArray(chars) || !chars.length) return;
   const stats = Array.isArray(state.partyStats) ? state.partyStats : [];

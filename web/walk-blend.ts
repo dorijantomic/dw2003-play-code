@@ -8,8 +8,9 @@
 // never reaches its window, a 4-tick frame only 0.375), so the caller passes `subTick` = the seconds
 // already elapsed inside the current tick (the field tick accumulator); the weight is then continuous.
 // Standing (not moving) never calls this: it shows the single frame of its own clip.
+import type { SpriteRecord } from "./game/types.js";
 
-export const WALK_TICK_RATE = 50;       // = FIELD_TICK_RATE (engine/systems/animation-controller)
+export const WALK_TICK_RATE = 50;      // = FIELD_TICK_RATE (engine/systems/animation-controller)
 export const WALK_BLEND_FRACTION = 0.4; // the last 40% of each frame's time is the fade
 
 const MIRROR: Record<string, string> = { right: "left", "down-right": "down-left", "up-right": "up-left" };
@@ -29,7 +30,7 @@ const OUT = { col: 0, mirror: false, bottom: 0, w: 0 };
  * of a frame). subTick = seconds into the current field tick (0 for clocks that advance by dt). Same lookup and same time arithmetic as engine clipFrame, so the current frame is the
  * one clipFrame returns. Returns one shared scratch object: read it at once, do not keep it.
  */
-export function walkBlendNext(clips, clipId: (string | number) | null, dir: string | number, elapsedSeconds: number, subTick = 0) {
+export function walkBlendNext(clips: SpriteRecord["clips"] | undefined, clipId: (string | number) | null, dir: string | number, elapsedSeconds: number, subTick = 0) {
     if (!clips || clipId == null) return null;
     const entry = clips[String(clipId)];
     if (!entry) return null;
@@ -37,11 +38,12 @@ export function walkBlendNext(clips, clipId: (string | number) | null, dir: stri
     const mirror = !entry[dir] && !!ms && !!entry[ms];
     const perDir = entry[dir] ?? (ms && entry[ms]) ?? entry.down;
     if (!perDir) return null;
+    // ETS item 9: durations is parallel to cols (one length per frame), so durs[i] and cols[i] exist for every i < n below
     const cols = perDir.cols, durs = perDir.durations;
     const n = cols.length;
     if (n <= 1) return null;
     let total = 0;
-    for (let i = 0; i < n; i++) total += durs[i];
+    for (let i = 0; i < n; i++) total += durs[i]!;
     if (!(total > 0)) return null;
     let remaining = elapsedSeconds * WALK_TICK_RATE % total;
     if (subTick > 0) {   // whole-tick clock: a sum of 0.02s steps lands a hair off the tick (3.9999999), so snap it
@@ -49,14 +51,14 @@ export function walkBlendNext(clips, clipId: (string | number) | null, dir: stri
         if (Math.abs(remaining - r) < 1e-6) remaining = r % total;
     }
     for (let i = 0; i < n; i++) {
-        const d = durs[i];
+        const d = durs[i]!;
         if (remaining < d) {
             // sub-tick time moves only inside this frame (clamped), so the frame is still clipFrame's.
             const w = blendWeight(Math.min(remaining + subTick * WALK_TICK_RATE, d), d);
             if (w <= 0) return null;
             const j = i + 1 < n ? i + 1 : 0;
             if (cols[j] === cols[i]) return null;
-            OUT.col = cols[j];
+            OUT.col = cols[j]!;
             OUT.mirror = mirror;
             OUT.bottom = perDir.bottoms?.[j] ?? 0;
             OUT.w = w;

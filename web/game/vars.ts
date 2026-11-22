@@ -754,9 +754,9 @@ export const state = {
 // Decoded field assets are intentionally bounded to the current stage and its
 // direct exits. Browser HTTP caching still makes revisits cheap, while dropping
 // these references lets decoded HD textures and collision grids be reclaimed.
-export const retainedStageIds = new Set();
+export const retainedStageIds = new Set<string>();
 
-export const readyStageIds = new Set();
+export const readyStageIds = new Set<string>();
 
 export const stageLoadPromises = new Map();
 

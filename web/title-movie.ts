@@ -11,23 +11,24 @@
 // stream's last one ends the movie; the container's own `ended` event is the
 // same statement from the other side and is kept as its confirmation.
 import { titleViewTransform } from "./titlescreen.js";
+import type { TitleMovieLayout } from "./types/rest-a.js";
 
 const LAYOUT_URL = "assets/data/stdwtitl_ui.json";
 const MOVIE_DIR = "assets/movie/";
 
-export function createTitleMoviePlayer(onEnd: (finishedCode: number) => void, onError = console.error, createVideo = null) {
+export function createTitleMoviePlayer(onEnd: (finishedCode: number) => void, onError = console.error, createVideo: (() => HTMLVideoElement) | null = null) {
   const video = createVideo ? createVideo() : document.createElement("video");
   video.playsInline = true;
   video.preload = "auto";
   video.volume = 0.6;
-  let layoutPromise = null;
-  const loadLayout = () => layoutPromise ??= fetch(LAYOUT_URL).then(async (response) => {
+  let layoutPromise: Promise<TitleMovieLayout> | null = null;
+  const loadLayout = (): Promise<TitleMovieLayout> => layoutPromise ??= fetch(LAYOUT_URL).then(async (response) => {
     if (!response.ok) throw new Error(`Title movie layout: ${response.status}`);
-    const loaded = (await response.json()).title_menu?.movie_display;
+    const loaded: TitleMovieLayout | undefined = (await response.json()).title_menu?.movie_display;
     if (!loaded?.logical || !loaded?.launch) throw new Error("Title movie layout is missing");
     return loaded;
   });
-  let active = false, code = 0, layout = null, generation = 0, blocked = false;
+  let active = false, code = 0, layout: TitleMovieLayout | null = null, generation = 0, blocked = false;
   let frames = 0, fps = 0, endedBy = "", endedPictures = 0;
 
   /** How many pictures of the stream have been shown so far. The original's

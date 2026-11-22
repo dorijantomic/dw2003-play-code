@@ -5,6 +5,14 @@ interface GymExtraHall {
   npc_id: string;
   trainer?: string;
   greeting?: string[];
+  tiers: Record<GymExtraTierName, GymExtraTierPlan>;
+}
+/** The four rank gates a hall's tiers are keyed by (gymExtraTier). */
+type GymExtraTierName = "platinum" | "gold" | "silver" | "none";
+/** One tier of a hall: the rank_menus group and the drill ids kept from that menu. */
+interface GymExtraTierPlan {
+  group: number;
+  drills: number[];
 }
 // Extra training halls (idea I6): our own greeters in towns that have no disc gym.
 // Data: data/authored/web/assets/data/gym_extra.json (installed as assets/data/gym_extra.json).
@@ -25,7 +33,7 @@ export function gymExtraTier(inventory: InventoryRow[], cards: { platinum: numbe
 
 // Returns { tier, group, drills }: group = 0-based rank_menus index (the group argument of gym.open),
 // drills = the compact drill ids kept from that menu.
-export function gymExtraPlan(data: { cards: { platinum: number; silver: number; gold: number; }; }, hall, inventory: InventoryRow[]) {
+export function gymExtraPlan(data: { cards: { platinum: number; silver: number; gold: number; }; }, hall: GymExtraHall, inventory: InventoryRow[]) {
   const tier = gymExtraTier(inventory, data.cards);
   const t = hall.tiers[tier];
   return { tier, group: t.group, drills: t.drills };

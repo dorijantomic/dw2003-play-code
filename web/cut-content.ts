@@ -160,7 +160,7 @@ export function tickCutContent(enabled: boolean) {
  * The pad while the page is up: Left/Right turn a page (wrapping), Cross/Start close it, and every
  * other press is swallowed so nothing reaches the field under it. Returns false when it is closed.
  */
-export function cutContentPress(k) {
+export function cutContentPress(k: string) {
   if (!S.open) return false;
   const n = CUT_CONTENT.length;
   if (k === "left") S.page = (S.page + n - 1) % n;
@@ -201,7 +201,7 @@ export function cutContentLines(index = S.page) {
  * Draw the page over the whole view. `W`/`H` are the canvas box (640x480 in the game); the panel is
  * inset from them, so it also reads correctly in a smaller test canvas.
  */
-export function cutContentDraw(ctx, W = 640, H = 480) {
+export function cutContentDraw(ctx: CanvasRenderingContext2D, W = 640, H = 480) {
   if (!S.open) return false;
   const lines = cutContentLines();
   if (!lines) return false;

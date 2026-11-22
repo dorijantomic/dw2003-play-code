@@ -36,9 +36,10 @@
 export const TRIGGER_STATUSES = ["available", "active", "ready", "done"];
 
 import type { QuestSnapshot } from "./types/quest-shelf.js";
-import type { QuestTriggerContext } from "./types/quest-triggers.js";
-const inRect = (r, x: number, y: number) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
-const read = (v): QuestSnapshot => (typeof v === "function" ? v() : v);
+import type { QuestTriggerContext, QuestTriggerRow } from "./types/quest-triggers.js";
+// ETS item 9: every caller checked rect.length === 4 before asking
+const inRect = (r: readonly number[], x: number, y: number) => x >= r[0]! && x <= r[0]! + r[2]! && y >= r[1]! && y <= r[1]! + r[3]!;
+const read = <T>(v: T | (() => T) | undefined): T | undefined => (typeof v === "function" ? (v as () => T)() : v);
 
 /**
  * The pure decision: which trigger (if any) the player just walked into. No side effects, no game and no DOM: the caller
@@ -53,7 +54,7 @@ const read = (v): QuestSnapshot => (typeof v === "function" ? v() : v);
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the trigger to play, or null
  */
-export function enterTrigger(triggers, mapId: string, prev: { x: number; y: number; }, now: { x: number; y: number; }, state: QuestSnapshot, ctx: QuestTriggerContext) {
+export function enterTrigger(triggers: readonly (QuestTriggerRow | null | undefined)[] | null | undefined, mapId: string, prev: { x: number; y: number; }, now: { x: number; y: number; }, state: QuestSnapshot | undefined, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId || !prev || !now) return null;
     if (!Number.isFinite(prev.x) || !Number.isFinite(prev.y) || !Number.isFinite(now.x) || !Number.isFinite(now.y)) return null;
@@ -91,7 +92,7 @@ export function enterTrigger(triggers, mapId: string, prev: { x: number; y: numb
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the arrival row to play, or null
  */
-export function arrivalTrigger(triggers, mapId: string, state: QuestSnapshot, ctx: QuestTriggerContext) {
+export function arrivalTrigger(triggers: readonly (QuestTriggerRow | null | undefined)[] | null | undefined, mapId: string, state: QuestSnapshot | undefined, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId) return null;
     if (!read(ctx.idle)) return null;                            // a battle, a cutscene, a menu, a fade
@@ -121,8 +122,8 @@ export function arrivalTrigger(triggers, mapId: string, state: QuestSnapshot, ct
  * ctx = { enabled(), statusOf(id), idle(), dialogBusy, battle, state(), playScene(scene), save(), warn(msg) }
  * `tick` returns a promise only when a scene was started, so the caller can ignore it in the frame loop.
  */
-export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
-    const byMap = new Map();
+export function installTriggers(triggers: unknown, ctx: QuestTriggerContext = {}) {
+    const byMap = new Map<string, QuestTriggerRow[]>();
     for (const t of Array.isArray(triggers) ? triggers : []) {
         if (!t || typeof t.id !== "string" || typeof t.map !== "string") continue;
         let list = byMap.get(t.map);
@@ -133,7 +134,7 @@ export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
     let playing = false;                                     // a scene is running: no second trigger on top of it
     let arrivalMap: string | null = null;                                   // a fresh field load whose on:"enter" rows are still to be asked
     /** Start one trigger's scene and, when it really ran, keep its fired mark. Both arms end here. */
-    function fire(t) {
+    function fire(t: QuestTriggerRow) {
         playing = true;
         let p;
         try { p = ctx.playScene ? ctx.playScene(t.scene) : null; }
@@ -188,7 +189,7 @@ export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
             return fire(t);
         },
         /** How many authored triggers sit on a map (the quest lab and tests use it; the field does not). */
-        count(mapId) { const list = byMap.get(mapId); return list ? list.length : 0; },
+        count(mapId: string) { const list = byMap.get(mapId); return list ? list.length : 0; },
         /** Every trigger, grouped by map (read only). */
         byMap: () => byMap,
     };

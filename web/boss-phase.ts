@@ -32,6 +32,7 @@
 //     enemy at it, behind F2 -> Extras -> "The boss grows" (`bossgrows`, off by default);
 //     the renderer's own band is 0.1..16 (web/battle3d.js clampFighterScale).
 import { FIELD_POWER } from "./field-war.js";
+import type { FusionBossPhase } from "./battle/core/types.js";
 
 /**
  * The index of the last authored phase whose HP line the boss has reached, else -1.
@@ -44,7 +45,7 @@ import { FIELD_POWER } from "./field-war.js";
  * `maxHp <= 0` (no record), `hp < 0` (no HP read) and a missing phase list all mean
  * "no phase" — the caller then behaves exactly as today.
  */
-export function phaseFor(maxHp: number, hp: number, phases) {
+export function phaseFor(maxHp: number, hp: number, phases: readonly FusionBossPhase[] | null | undefined) {
   const max = Number(maxHp);
   const cur = Number(hp);
   if (!Array.isArray(phases) || !(max > 0) || !(cur >= 0)) return -1;
@@ -70,7 +71,7 @@ export function phaseFor(maxHp: number, hp: number, phases) {
  * not own (or an empty phase) returns [] — the builder refuses such a phase first, so
  * the battle never has to guess a row.
  */
-export function phaseRows(phase, bossMoves) {
+export function phaseRows(phase: FusionBossPhase | null | undefined, bossMoves: readonly number[] | null | undefined) {
   const moves = Array.isArray(phase?.moves) ? phase.moves : [];
   const known = Array.isArray(bossMoves) ? bossMoves : [];
   if (!moves.length) return [];
@@ -99,7 +100,7 @@ export function phaseRows(phase, bossMoves) {
  * means the screen's own track keeps playing, and no size means the body keeps the size
  * the renderer drew it at.
  */
-export function phaseEffects(phase) {
+export function phaseEffects(phase: FusionBossPhase | null | undefined) {
   return {
     element: phase?.field ?? null,
     power: FIELD_POWER,

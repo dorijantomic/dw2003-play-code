@@ -1,9 +1,9 @@
 // web/editor.js
 import { CELL, setBlocked, toJSON } from "./vendor/engine.js";
 import { canvasEventToLogical } from "./canvas-resolution.js";
-import type { EditorState } from "./types/editor.js";
+import type { EditorContext, EditorState } from "./types/editor.js";
 
-export function createEditor(canvas: HTMLCanvasElement, getCtx) {
+export function createEditor(canvas: HTMLCanvasElement, getCtx: () => EditorContext) {
   // getCtx: () => ({ grid, mapId, camX, camY, zoom })
   const ed = { enabled: false, painting: 0 } as EditorState;
 

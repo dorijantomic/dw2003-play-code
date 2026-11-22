@@ -5,9 +5,9 @@ export interface SceneSkipBeat {
   stage: string;
   name: string;
   /** the flags this beat clears so its scenes can fire again */
-  clearFlags: string[];
-  /** the actors to talk to after the jump */
-  sayActors: string[];
+  clearFlags: number[];
+  /** the npc ids to talk to after the jump */
+  sayActors: number[];
   eventCount?: number;
 }
 
@@ -30,7 +30,18 @@ export interface SceneSkipState {
   ready: boolean;
   sel: number;
   spine: SceneSkipBeat[];
-  talkActors?: (i: number) => string[];
+  talkActors?: (i: number) => number[];
   toggle?: () => void;
   top: number;
+}
+
+/** What the skipper is handed to change the game with (web/game/vars.ts builds it). */
+export interface SceneSkipDeps {
+  setOrdinal: (n: number) => void;
+  getOrdinal: () => number | undefined;
+  clearFlag: (id: number) => void;
+  warpToStage: (stageId: string) => void;
+  fireStageEnter: (stageId: string) => unknown;
+  /** true when the npc had a talk event to fire */
+  talk: (npcId: number) => boolean;
 }

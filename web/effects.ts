@@ -62,7 +62,7 @@ export {
 setStageObjectPoleRecords((stageId: string | number) => {
     const s = S.data?.[stageId];
     if (!s) return null;
-    return s.records.map((r) => ({ type: r.atlasFlag, size: r.size }));
+    return s.records.map((r: { atlasFlag: number; size: number; }) => ({ type: r.atlasFlag, size: r.size }));
 });
 // The ordering-table bucket at or above which a record draws BEHIND the ground
 // map-tile layer, which the field submits at bucket 7. Records at or above this

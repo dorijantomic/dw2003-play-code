@@ -11,11 +11,13 @@
 // Each is filled from the colours around it into a PATCH canvas (the filler
 // pixels only), which game.js draws over the ground. The map image itself is
 // never touched, so the Effects panel can switch the fix on and off instantly.
+import type { SeamPatch } from "./types/rest-b.js";
+
 const MAX_AREA = 80;       // any enclosed hole this small is a seam
 const MAX_CRACK = 6000;    // a crack longer than this is treated as real art
-const patches = new Map(); // stageId -> { canvas, regions, pixels } | null
+const patches = new Map<string, SeamPatch | null>(); // stageId -> { canvas, regions, pixels } | null
 
-export function seamPatchFor(stageId, img: HTMLImageElement) {
+export function seamPatchFor(stageId: string, img: HTMLImageElement) {
     let p = patches.get(stageId);
     if (p !== undefined) return p;
     p = build(img);
@@ -37,8 +39,8 @@ function build(img: HTMLImageElement) {
     if (!any) return null;
 
     const seen = new Uint8Array(W * H);
-    const stack = [];
-    const fix = [];                     // pixel indices to fill
+    const stack: number[] = [];
+    const fix: number[] = [];                     // pixel indices to fill
     let regions = 0;
     const thick = (i: number) => {              // is the 5x5 window around i all see-through?
         const x = i % W, y = (i / W) | 0;
@@ -48,11 +50,11 @@ function build(img: HTMLImageElement) {
     };
     for (let start = 0, n = W * H; start < n; start++) {
         if (!hole[start] || seen[start]) continue;
-        const comp = [];
+        const comp: number[] = [];
         let border = false, big = false;
         stack.length = 0; stack.push(start); seen[start] = 1;
         while (stack.length) {
-            const i = stack.pop();
+            const i = stack.pop()!;
             if (!big) { comp.push(i); if (comp.length > MAX_CRACK) { big = true; comp.length = 0; } }
             const x = i % W, y = (i / W) | 0;
             if (x === 0 || y === 0 || x === W - 1 || y === H - 1) border = true;
@@ -76,7 +78,7 @@ function build(img: HTMLImageElement) {
     const col = (i: number) => (out[i * 4 + 3] ? out : src);
     let todo = fix;
     for (let pass = 0; pass < 40 && todo.length; pass++) {
-        const rest = [], paint = [];
+        const rest: number[] = [], paint: number[] = [];
         for (const i of todo) {
             const x = i % W, y = (i / W) | 0;
             let r = 0, g = 0, b = 0, c = 0;
@@ -92,8 +94,9 @@ function build(img: HTMLImageElement) {
             if (c) paint.push(i, r / c, g / c, b / c); else rest.push(i);
         }
         for (let k = 0; k < paint.length; k += 4) {
-            const i = paint[k];
-            out[i * 4] = paint[k + 1]; out[i * 4 + 1] = paint[k + 2]; out[i * 4 + 2] = paint[k + 3]; out[i * 4 + 3] = 255;
+            // ETS item 9: paint holds groups of four (index, r, g, b), so k + 1..3 exist for every k below paint.length
+            const i = paint[k]!;
+            out[i * 4] = paint[k + 1]!; out[i * 4 + 1] = paint[k + 2]!; out[i * 4 + 2] = paint[k + 3]!; out[i * 4 + 3] = 255;
             known[i] = 1;
         }
         todo = rest;

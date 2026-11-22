@@ -5,6 +5,7 @@
 //   updateEnemyTurn substates :270-297   5: entrance(id, side 1, 0) after the page; 6: wait done; 4: wait the slot empty, name page (kind 0xD)
 //   normal_battle/menu.c      :1088-1096 the next enemy after a KO: the lowest slot with an id and hp
 // The game's enemy team is its boss party (web/battle.js b.party): slot i is party[i], three slots at most.
+import type { EnemySlot, EnemyTeamRecord } from "./types/rest-b.js";
 
 /** esmfight 0x4D, kind 1 (enemy_turn.c:157-160; fightstg.s:6153 "Taking out Digimon!"). */
 export const ENEMY_SWITCH_MSG_TAKING_OUT = 0x4d;
@@ -39,19 +40,19 @@ export function enemySwitchTarget(kind: number) {
  *   -2/-3/-4: slot 0/1/2, unless its id equals the active slot's id (:17,:25,:33 break), when it has hp;
  *   else (-5): the slots != active with id != 0 and hp != 0; none -> -1, one -> it, two -> found[rand() & 1].
  */
-export function pickEnemySwitch(slots: { id: number; speciesId: number; hp: number; }[], active: number, target: number, rand: () => number) {
+export function pickEnemySwitch(slots: EnemySlot[], active: number, target: number, rand: () => number) {
   const at = (i: number) => slots?.[i] ?? { id: 0, hp: 0 };
   const named = target === -2 ? 0 : target === -3 ? 1 : target === -4 ? 2 : -1;
   if (named >= 0) {
     if (at(named).id === at(active).id) return -1;
     return at(named).hp !== 0 ? named : -1;
   }
-  const found = [];
+  const found: number[] = [];
   for (let i = 0; i < 3; i++) {
     if (active !== i && at(i).id !== 0 && at(i).hp !== 0) found.push(i);
   }
-  if (found.length === 1) return found[0];
-  if (found.length === 2) return found[rand() & 1];
+  if (found.length === 1) return found[0]!;
+  if (found.length === 2) return found[rand() & 1]!;
   return -1;
 }
 
@@ -59,14 +60,14 @@ export function pickEnemySwitch(slots: { id: number; speciesId: number; hp: numb
  * The enemy's whole self-tag decision once the table row is chosen: null when the row is not a switch (kinds 5..8),
  * else the slot to switch to or -1 ("Switch failed!"). One call = the original's one pickEnemySwitch.
  */
-export function enemySelfTagPick(move: { action: number; }, slots: { id: number; speciesId: number; hp: number; }[], active: number, rand: () => number | undefined) {
+export function enemySelfTagPick(move: { action: number; }, slots: EnemySlot[], active: number, rand: () => number) {
   const target = enemySwitchTarget(move?.action);
   if (target === 0) return null;
-  return pickEnemySwitch(slots, active, target, rand!!!!!!);
+  return pickEnemySwitch(slots, active, target, rand);
 }
 
 /** The slot the next enemy comes from after a KO (menu.c:1088-1096): the lowest with an id and hp, -1 for none. */
-export function firstAliveEnemySlot(slots: { id: number; speciesId: number; hp: number; }[]) {
+export function firstAliveEnemySlot(slots: EnemySlot[]) {
   for (let i = 0; i < 3; i++) {
     if ((slots?.[i]?.id ?? 0) !== 0 && (slots[i]!.hp ?? 0) !== 0) return i;
   }
@@ -77,10 +78,10 @@ export function firstAliveEnemySlot(slots: { id: number; speciesId: number; hp: 
  * Team records ({profile: {id}, hp} or null) -> the slot list the rules read: {id, hp}, plus `speciesId` for
  * condition 10 (engine enemyMoveCondition's enemySlots). Three slots at most.
  */
-export function enemyTeamSlots(records) {
-  const out = [];
+export function enemyTeamSlots(records: ReadonlyArray<EnemyTeamRecord | null | undefined> | null | undefined) {
+  const out: EnemySlot[] = [];
   for (let i = 0; i < Math.min(3, records?.length ?? 0); i++) {
-    const rec = records[i];
+    const rec = records![i];
     // an enemies.json profile carries no id: the record keeps the disc id as speciesId (battle.js buildEnemyRecord)
     const id = rec ? (Number(rec.profile?.id) || Number(rec.speciesId) || 0) : 0;
     out.push({ id, speciesId: id, hp: rec ? Math.max(0, rec.hp | 0) : 0 });

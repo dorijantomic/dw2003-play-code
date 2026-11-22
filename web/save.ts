@@ -28,9 +28,9 @@ import { checkSlot } from "./slot-check.js";
 // flow have no walker equivalent and are not faked — their strings ship in the
 // layout json but the screen never enters those states.
 import { CHARID_TO_DIGID } from "./party.js";
-import type { SaveEntry, SaveRecordOpts, SaveSlotWrite } from "./types/save.js";
+import type { SaveBuildState, SaveEntry, SaveRecordOpts, SaveSlotWrite, StgmcardLayout } from "./types/save.js";
 
-let LAYOUT = null;
+let LAYOUT: StgmcardLayout | null = null;
 // Guarded so this module stays importable under `node --test` (no DOM there) —
 // the same pattern as uifont.js / screenpack.js.
 if (typeof Image !== "undefined") {
@@ -41,7 +41,7 @@ if (typeof Image !== "undefined") {
 }
 
 /** Test seam: install the layout json without a browser fetch. */
-export function __setLayout(json) { LAYOUT = json; }
+export function __setLayout(json: StgmcardLayout | null) { LAYOUT = json; }
 
 /**
  * Test seams for the storage shim: seed and inspect raw slot bytes without a
@@ -49,7 +49,7 @@ export function __setLayout(json) { LAYOUT = json; }
  * snapshot is given, including keys no screen understands, must round-trip
  * unchanged — so the test needs raw string access, not parsed values.
  */
-export function __setStoreItem(k: string, v) { store.setItem(k, String(v)); }
+export function __setStoreItem(k: string, v: string | number | boolean) { store.setItem(k, String(v)); }
 export function __getStoreItem(k: string) { return store.getItem(k); }
 export function __clearStore() {
   for (let i = store.length - 1; i >= 0; i--) store.removeItem(store.key(i));
@@ -59,13 +59,13 @@ export function __readSlotRaw(i: number) { return store.getItem(SLOT_KEY(i)); }
 
 // Slot storage. Falls back to an in-memory map outside a browser so the
 // save/load round trip is unit-testable.
-const memoryStore = new Map();
+const memoryStore = new Map<string, string>();
 const store = typeof localStorage !== "undefined" ? localStorage : {
   get length() { return memoryStore.size; },
-  key: (i: string | number) => [...memoryStore.keys()][i] ?? null,
-  getItem: (k) => (memoryStore.has(k) ? memoryStore.get(k) : null),
-  setItem: (k, v) => { memoryStore.set(k, String(v)); },
-  removeItem: (k) => { memoryStore.delete(k); },
+  key: (i: number) => [...memoryStore.keys()][i] ?? null,
+  getItem: (k: string) => (memoryStore.has(k) ? memoryStore.get(k) : null),
+  setItem: (k: string, v: string | number) => { memoryStore.set(k, String(v)); },
+  removeItem: (k: string) => { memoryStore.delete(k); },
 };
 
 export const SLOT_COUNT = 3;
@@ -81,7 +81,7 @@ const NON_GAME_KEYS = new Set([
 ]);
 
 function snapshotStorage() {
-  const out = {};
+  const out: Record<string, string | null> = {};
   for (let i = 0; i < store.length; i++) {
     const k = store.key(i);
     if (!NON_GAME_KEYS.has(k)) out[k] = store.getItem(k);
@@ -89,12 +89,12 @@ function snapshotStorage() {
   return out;
 }
 
-function restoreStorage(data) {
+function restoreStorage(data: Record<string, string> | null | undefined) {
   for (let i = store.length - 1; i >= 0; i--) {
     const k = store.key(i);
     if (!NON_GAME_KEYS.has(k)) store.removeItem(k);
   }
-  for (const [k, v] of Object.entries(data ?? {}) as [string, string][]) store.setItem(k, v);
+  for (const [k, v] of Object.entries(data ?? {})) store.setItem(k, v);
 }
 
 /**
@@ -179,7 +179,7 @@ function refuseSlot(i: number, check: { ok: boolean; code: number; empty: boolea
   lastRefusal = { slot: i, ...check };
   if (typeof raw !== "string") return;
   try {
-    let kept = {};
+    let kept: Record<string, string> = {};
     try { kept = JSON.parse(store.getItem(QUARANTINE_KEY) ?? "{}"); } catch { kept = {}; }
     if (kept === null || typeof kept !== "object" || Array.isArray(kept)) kept = {};
     if (kept[SLOT_KEY(i)] === raw) return;      // this raw text is already kept
@@ -227,10 +227,10 @@ export function readSlot(i: number) {
  *   +0x28/+0x2A/+0x2C play h/m/s, +0x30.. party starter types,
  *   +0x3C.. party levels.
  */
-export function buildRecord(state, opts: SaveRecordOpts = {}) {
+export function buildRecord(state: SaveBuildState | null | undefined, opts: SaveRecordOpts = {}) {
   const L = LAYOUT;
   const byType = L?.file_card?.party?.digimonIdByType ?? {};
-  const typeOf = (digimonId) => {
+  const typeOf = (digimonId: number) => {
     for (const [t, id] of Object.entries(byType)) {
       if (id === digimonId) return Number(t);
     }
@@ -248,7 +248,7 @@ export function buildRecord(state, opts: SaveRecordOpts = {}) {
   // ("Central Sector  Asuka City" -- both "Central Sector" and "Asuka City"
   // are esstarea entries). An exact hit wins; otherwise the LAST contained
   // entry wins, which picks the trailing, more specific component.
-  const bankIndex = (bank, name: string | undefined) => {
+  const bankIndex = (bank: string[] | undefined, name: string | undefined) => {
     if (!name) return 0;
     const entries = bank ?? [];
     const exact = entries.indexOf(name);

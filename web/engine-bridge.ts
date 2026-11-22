@@ -24,7 +24,12 @@
 //                         carry no game state (PlaySparkle = the bank-0x70 op-0x50 acquisition
 //                         flourish). The script is resumed immediately, exactly as before;
 //                         an unhandled op is still just skipped.
+import type { RunHandle } from "../engine/core/script/vm.js";
+
 /** What the presentation driver needs from the game: the headless engine, and the screens its script ops drive. */
+/** The event that started a pump: re-raised after each event to fire the next eligible row. */
+interface BridgeTrigger { type: string; params?: Record<string, number | string>; }
+
 interface EngineBridgeArgs {
     engine: any;                                                    // the headless GameEngine (web/vendor/engine)
     playCutscene?: (flagKey: string, onDone: (handoff: any) => void) => void;
@@ -54,7 +59,7 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
   // are self-contained, each with its own handoff.) A stage-entry re-raise skips the arrival
   // dispatcher's own rows: that chain is asked once per field load, at `onStageEnter` and at the
   // post-fight `arrive` below — see `rechain`.
-  function pump(h, trigger) {
+  function pump(h: RunHandle, trigger: BridgeTrigger | null) {
     const rechain = () => {
       if (busy || !trigger) return;
       // Re-raising the STAGE-ENTRY trigger is "later in the same visit", so it must skip the rows
@@ -171,7 +176,7 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
     isBusy: () => busy,
 
     // Stage entry: load the event table, fire any auto (OnEnterMap) cutscene.
-    onStageEnter(mapId) {
+    onStageEnter(mapId: string) {
       engine.loadStage(mapId);
       const h = engine.raise("OnEnterMap");
       if (h) { busy = true; pump(h, { type: "OnEnterMap" }); } // chains enter-path PRE→battle→POST
@@ -183,7 +188,7 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
     // shows the NPC's spoken line (the flag/give and the line both belong to the same talk). The
     // caller must read the NPC's dialogue state BEFORE calling this so a flag-set doesn't pre-advance
     // it. Side effects (flags/items) still apply regardless of the return value.
-    onTalk(npcId) {
+    onTalk(npcId: number) {
       if (busy) return true;
       const h = engine.raise("OnTalk", { npc: npcId });
       if (!h) return false;
@@ -205,7 +210,7 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
     // exit-event fires (e.g. the gondola's Blue Card check), play it — the event's bytecode
     // HANDOFF performs the actual warp via doHandoff (or it refuses and stays put). Returns true
     // if an event fired, so the caller SKIPS the plain transition; false → caller warps normally.
-    onExit(params) {
+    onExit(params: Record<string, number | string>) {
       if (busy) return true;
       const h = engine.raise("OnExit", params);
       if (!h) return false;

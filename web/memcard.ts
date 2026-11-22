@@ -39,6 +39,7 @@
 // summaries, exactly as the original writer fills them.
 
 import { encodeNativeScreenText } from "./native-screen.js";
+import type { SaveRecord } from "./types/save.js";
 
 export const DIR_BLOCK_SIZE = 0xd4;
 export const SAVE_IMAGE_SIZE = 0x26c4;
@@ -50,7 +51,7 @@ export const MCARD_RECORDS_AT = 8;
 export const MCARD_FILE_BASE = 2;
 
 /** The walker slot behind a card file number. Files 2..4 are slots 0..2. */
-export function slotForFile(file) {
+export function slotForFile(file: number | string) {
     const f = Number(file) | 0;
     return f >= MCARD_FILE_BASE && f < MCARD_FILE_BASE + 3 ? f - MCARD_FILE_BASE : f & 3;
 }
@@ -67,7 +68,7 @@ export function xor8(bytes: number[] | Uint8Array<ArrayBuffer>, from = 4, to = D
  * A null/absent record (an empty walker slot) stays all zeroes, which is the
  * screen's own "no data here" state.
  */
-export function buildSummaryRecord(rec, encodeName = encodeNativeScreenText) {
+export function buildSummaryRecord(rec: SaveRecord | null | undefined, encodeName = encodeNativeScreenText) {
     const out = new Uint8Array(MCARD_STRIDE);
     if (!rec) return out;
     const dv = new DataView(out.buffer);
@@ -117,17 +118,17 @@ export function buildDirectoryBlock(records: readonly (Parameters<typeof buildSu
  * device contract engine/native/stubs.ts declares.
  */
 /** A saved slot as the game hands it over: the card record and its picture. */
-interface WalkerSlot { record: any; image: any }
+interface WalkerSlot { record: SaveRecord | null; image: ArrayLike<number> | null }
 
 /** What the card is handed: the walker's three slots, and where a written block goes. */
 interface WalkerMemcardArgs {
     slots?: WalkerSlot[] | (() => (WalkerSlot | null)[]);
-    onStore?: (slot: number, bytes: any, kind: string) => void;
+    onStore?: ((slot: number, bytes: Uint8Array, kind: string) => void) | null;
 }
 
 export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs = {} as WalkerMemcardArgs) {
     const read = () => (typeof slots === "function" ? slots() : slots) ?? [];
-    const images = new Map(); // slot -> 0x26C4 image handed back by `block`
+    const images = new Map<number, Uint8Array>(); // slot -> 0x26C4 image handed back by `block`
     return {
         fileCount: () => 3,
         record(file: number) {
@@ -153,6 +154,6 @@ export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs
             onStore?.(slot, buf, buf.length === DIR_BLOCK_SIZE ? "header" : "image");
         },
         /** Test seam: the image a previous `store` handed back. */
-        storedImage: (slot) => images.get(slot) ?? null,
+        storedImage: (slot: number) => images.get(slot) ?? null,
     };
 }

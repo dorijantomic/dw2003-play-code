@@ -18,11 +18,12 @@
 import { partyCharismaTotal, scaledStat, equipmentBonuses } from "./vendor/engine.js";
 import { partyRosterView, CHARID_TO_DIGID } from "./party.js";
 import type { GameState } from "./game/types.js";
-import type { RosterMember } from './types/battle.js';
+import type { DigimonRecord, RosterMember } from './types/battle.js';
+import type { CharismaEntry } from "./types/rest-a.js";
 
 
-let DB = null;
-let dbPromise = null;
+let DB: Record<string, DigimonRecord> | null = null;
+let dbPromise: Promise<Record<string, DigimonRecord> | null> | null = null;
 
 /** digimon.json, keyed by id. The menu keeps its own copy; this is a second small fetch
  *  rather than a cross-import, because the flag store is created before the menu is. */
@@ -30,7 +31,7 @@ export function loadCharismaDb() {
   if (dbPromise) return dbPromise;
   dbPromise = fetch("assets/data/digimon.json")
     .then((r) => r.json())
-    .then((j) => { DB = Object.fromEntries(j.digimon.map((d) => [d.id, d])); return DB; })
+    .then((j) => { DB = Object.fromEntries(j.digimon.map((d: DigimonRecord) => [d.id, d])); return DB; })
     .catch(() => null);
   return dbPromise;
 }
@@ -56,7 +57,7 @@ export function charismaDbReady() { return !!DB; }
  * Equipment is read from `state.equipment[i]` for all three positions rather than from
  * `partnerStats.equipBonuses`, because the menu only syncs that cached block for the lead.
  */
-export function charismaMemberFor(entry, slots: Record<string, number> | Record<string, number>[] | undefined) {
+export function charismaMemberFor(entry: CharismaEntry | null | undefined, slots: Record<string, number> | Record<string, number>[] | undefined) {
   const stored = entry?.stats?.chr;
   const chip = entry?.bonuses?.chr ?? 0;
   return {
@@ -77,7 +78,7 @@ export function charismaMemberFor(entry, slots: Record<string, number> | Record<
  * walker's standing rule for a predicate it cannot answer. Returning 0 would actively
  * assert "below every threshold" and make tamers refuse for the wrong reason.
  */
-export function partyCharismaFrom(view, equipment: Record<string, number>[]) {
+export function partyCharismaFrom(view: CharismaEntry[] | null | undefined, equipment: Record<string, number>[]) {
   if (!view?.length) return null;
   return partyCharismaTotal(view.map((m, i) => charismaMemberFor(m, equipment?.[i])));
 }

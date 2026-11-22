@@ -10,11 +10,12 @@ import { WORD } from "./ui-kit-input.js";
 import { LIST_WINDOW, drawHeader, drawHelpBox, drawPanel, layoutTabs, listRowY, withFold } from "./ui-kit.js";
 import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { fitByWidth } from "./text-fit.js";
+import type { OptionsValue, OptionsViewEntry } from "./types/options-model.js";
 interface HeaderLayout {
     title: [number, number];
     l1: [number, number];
     r1: [number, number];
-    tabs: (number | undefined)[][];
+    tabs: [number, number][];
     tabStart: number;
     tabGap: number;
 }
@@ -26,11 +27,19 @@ interface OptionsView {
 
 
 /** Short names: the long F2 names ("Plain smooth (bilinear)") are too long for a value beside a row label. */
-const FILTER_SHORT = Object.freeze({ off: "Off", bilinear: "Smooth", epx: "EPX", mmpx: "MMPX", xbr: "xBR", xbrblend: "xBR blend" });
+const FILTER_SHORT: Readonly<Record<string, string>> = Object.freeze({ off: "Off", bilinear: "Smooth", epx: "EPX", mmpx: "MMPX", xbr: "xBR", xbrblend: "xBR blend" });
 /** The filters the GPU path can run, as [id, label]. */
 export const pixelFilterChoices = () => Object.keys(SPRITE_FILTERS)
     .filter((k) => k === "off" || GPU_FILTER_NAMES.includes(k))
     .map((k) => [k, FILTER_SHORT[k] ?? SPRITE_FILTERS[k]]);
+
+/** What the book is handed: the sound kit, and the settings store (live window values by default; the checks hand their own). */
+interface OptionsBookArgs {
+    sfx?: { play?: (name: string) => void } | null;
+    fx?: () => Readonly<Record<string, OptionsValue>> | null | undefined;
+    setFxMany?: (values: Record<string, OptionsValue>) => void;
+    locked?: (key: string) => boolean;
+}
 
 const ARROW_W = 10;     // room kept for one arrow
 const GAP = 4;          // between the label and the value block
@@ -53,29 +62,30 @@ export const OPTIONS_WINDOW = Object.freeze({
 export function headerLayout(widthOf: (text: string, scale?: number) => number, title: string, tabs: string[], hintW = widthOf("L1")): HeaderLayout {
     const titleX = 44, l1 = titleX + widthOf(title) + 8, tabStart = l1 + hintW + 8, tabGap = 8;
     const xs = layoutTabs(tabs, widthOf, tabStart, tabGap);
-    const tabBoxes = tabs.map((t, i) => [xs[i], xs[i] + widthOf(t)]);
+    // ETS item 9: layoutTabs() returns one x per tab, and i runs over the tabs
+    const tabBoxes: [number, number][] = tabs.map((t, i) => [xs[i]!, xs[i]! + widthOf(t)]);
     const r1 = tabBoxes.length ? tabBoxes[tabBoxes.length - 1]![1] + 8 : tabStart;
     return { title: [titleX, titleX + widthOf(title)], l1: [l1, l1 + hintW], r1: [r1, r1 + hintW], tabs: tabBoxes, tabStart, tabGap };
 }
 
 /** One row's drawn parts for a row view `r`: the label (cut only if it cannot fit) and where the value and its arrows go. */
-export function rowLayout(widthOf, r, win = OPTIONS_WINDOW) {
+export function rowLayout(widthOf: (text: string, scale?: number) => number, r: OptionsViewEntry, win = OPTIONS_WINDOW) {
     const kind = r.numeric ? 3 : 1;
     const valueW = widthOf(r.value, kind);
     const right = win.valueRight, left = right - valueW;
     const room = left - (r.canLeft ? ARROW_W : 0) - GAP - win.textX;
-    return { label: fitByWidth(r.label, (s) => widthOf(s, 1), room), valueRight: right, valueLeft: left, leftArrowX: left - ARROW_W, rightArrowX: right + 2, kind };
+    return { label: fitByWidth(r.label, (s: string) => widthOf(s, 1), room), valueRight: right, valueLeft: left, leftArrowX: left - ARROW_W, rightArrowX: right + 2, kind };
 }
 
-export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!(typeof window !== "undefined" && window.__hostRules?.locked(k)) } = {}) {
-    const store = { get: (k) => fx()?.[k], setMany: (o) => setFxMany(o), locked: (k) => locked(k) };
+export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!(typeof window !== "undefined" && window.__hostRules?.locked(k)) }: OptionsBookArgs = {}) {
+    const store = { get: (k: string) => fx()?.[k], setMany: (o: Record<string, OptionsValue>) => setFxMany(o), locked: (k: string) => locked(k) };
     const model = createOptionsModel(store, pixelFilterChoices());
     const cue = (result: string | null) => { if (result) sfx?.play?.("system02"); };
     return {
         windows: ["title", "list", "help"],
         wall: false,
         model,
-        act(buttons) {
+        act(buttons: ReadonlySet<string>) {
             if (buttons.has(WORD.back)) { if (model.back()) { cue("move"); return null; } return "back"; }
             if (buttons.has(WORD.confirm)) cue(model.select());
             else if (buttons.has(WORD.prev)) cue(model.switchPage(-1));

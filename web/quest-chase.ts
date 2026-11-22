@@ -17,6 +17,8 @@
 // The one hint it gives the host: `state.warn` turns on when the gap passes 80% of `lose` (the host blinks the target), so
 // a chase about to be lost looks different from one being kept.
 
+import type { QuestChaseSpec, QuestChaseStart } from "./types/rest-a.js";
+
 /** The face a walker shows along (dx, dy): the field's own direction names. */
 export function chaseFacing(dx: number, dy: number) {
     const x = dx > 0.5 ? 1 : dx < -0.5 ? -1 : 0;
@@ -35,8 +37,8 @@ const GRACE_FRAMES = 60;
  * @param spec  { path: [[x, y], ...], speed?, lose?, frames?, grace? } -- the step's event after compileScene resolved it
  * @param start { x, y } where the target stands when the chase begins (its own position, not path[0])
  */
-export function createQuestChase(spec, start) {
-    const path = (Array.isArray(spec?.path) ? spec.path : []).map((p) => [Number(p?.[0]) || 0, Number(p?.[1]) || 0]);
+export function createQuestChase(spec: QuestChaseSpec, start: QuestChaseStart) {
+    const path = (Array.isArray(spec?.path) ? spec.path : []).map((p: number[]): [number, number] => [Number(p?.[0]) || 0, Number(p?.[1]) || 0]);
     const speed = Number(spec?.speed) > 0 ? Number(spec.speed) : 130;
     const lose = Number(spec?.lose) > 0 ? Number(spec.lose) : 90;
     const limit = Number.isFinite(Number(spec?.frames)) && Number(spec.frames) > 0 ? Number(spec.frames) : null;
@@ -45,7 +47,7 @@ export function createQuestChase(spec, start) {
         ? { x: Number(start.x), y: Number(start.y) }
         : { x: path[0]?.[0] ?? 0, y: path[0]?.[1] ?? 0 };
     let total = 0;
-    for (let i = 1; i < path.length; i++) total += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+    for (let i = 1; i < path.length; i++) total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
     const state = {
         x: from.x, y: from.y,
         dir: "down",
@@ -60,7 +62,7 @@ export function createQuestChase(spec, start) {
     };
 
     /** One frame: move the target along the path, then judge the gap. Returns the state. */
-    function tick(playerX, playerY, dt) {
+    function tick(playerX: number, playerY: number, dt: number) {
         if (state.over) return state;
         const step = Math.max(0, Math.min(0.25, Number(dt) || 0));
         let move = speed * step;
@@ -68,7 +70,7 @@ export function createQuestChase(spec, start) {
         // Walk the path: arrive at each point in turn; a large step may cross several of them.
         let guard = 0;
         while (move > 0 && state.point < path.length && guard++ < 256) {
-            const [tx, ty] = path[state.point];
+            const [tx, ty] = path[state.point]!;
             const dx = tx - state.x, dy = ty - state.y;
             const dist = Math.hypot(dx, dy);
             if (dist <= 1e-6) { state.point += 1; continue; }

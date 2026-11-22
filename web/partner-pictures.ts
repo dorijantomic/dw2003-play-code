@@ -7,14 +7,15 @@
 // (web/extra_partners.json): the idle clip facing down-left, like the disc's pictures, three
 // frames spread over the idle loop, shrunk to fit the 32x32 cell with the feet on its bottom line.
 import { newPartnerOfSlot } from "./vendor/engine.js";
+import type { ExtraPartnerRecord, PartnerPictureEntry } from "./types/rest-b.js";
 
 const BASE = 0x400;
 const LAST = 0x47f;
 const CELL = 32;
 const FRAMES = 3;
 
-const records = new Map(); // charId -> extra_partners.json record
-const cache = new Map();   // slot -> { canvas } | { pending: true } | { none: true }
+const records = new Map<string, ExtraPartnerRecord>(); // charId -> extra_partners.json record
+const cache = new Map<number, PartnerPictureEntry>();   // slot -> { canvas } | { pending: true } | { none: true }
 let loading: Promise<void> | null = null;
 
 function loadRecords() {
@@ -27,7 +28,7 @@ function loadRecords() {
 }
 
 /** True for a picture number the engine gives a new partner. */
-export function isPartnerPicture(id) {
+export function isPartnerPicture(id: number) {
   return Number.isInteger(id) && id >= BASE && id <= LAST;
 }
 
@@ -42,7 +43,8 @@ function build(slot: number) {
     const fw = rec.clipFrameW, fh = rec.clipFrameH;
     const perRow = Math.max(1, Math.floor(img.width / fw));
     const cols = idle.cols;
-    const picks = Array.from({ length: FRAMES }, (_, i) => cols[Math.floor((i * cols.length) / FRAMES)]);
+    // ETS item 9: floor(i * cols.length / FRAMES) is below cols.length for every i < FRAMES, so the cell exists
+    const picks = Array.from({ length: FRAMES }, (_, i) => cols[Math.floor((i * cols.length) / FRAMES)]!);
     // the frames' common opaque box, so all three are cut and shrunk alike
     const src = document.createElement("canvas");
     src.width = fw * FRAMES; src.height = fh;
@@ -77,7 +79,7 @@ function build(slot: number) {
  * while the sprite is still loading or when the partner has no sprite yet (the cell stays empty,
  * as before).
  */
-export function drawPartnerPicture(ctx, id: number, x, y) {
+export function drawPartnerPicture(ctx: CanvasRenderingContext2D, id: number, x: number, y: number) {
   if (!isPartnerPicture(id)) return false;
   const slot = 8 + ((id - BASE) >> 4);
   const frame = (id - BASE) & 0xf;

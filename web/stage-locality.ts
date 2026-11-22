@@ -1,11 +1,11 @@
-import type { StageLocalityResult, StageLocalityValue } from "./types/stage-locality.js";
+import type { StageLocalityResult, StageLocalityScenes, StageLocalityValue, StageLocationInput } from "./types/stage-locality.js";
 export const FIELD_LOCATION_KEY = "fieldLocation";
 export const FIELD_LOCATION_VERSION = 1;
 
 /** Return the unique, valid stages directly reachable from one scene. */
-export function directStageNeighbors(stageId: string | number, scenes, knownStageIds = null) {
+export function directStageNeighbors(stageId: string | number, scenes: StageLocalityScenes, knownStageIds: Iterable<string> | null = null) {
   const known = knownStageIds ? new Set(knownStageIds) : null;
-  const result = [];
+  const result: string[] = [];
   const seen = new Set([stageId]);
   for (const exit of scenes?.[stageId]?.exits ?? []) {
     const id = exit?.to;
@@ -17,13 +17,13 @@ export function directStageNeighbors(stageId: string | number, scenes, knownStag
 }
 
 /** Current stage first, followed by the stages worth keeping warm. */
-export function stageWorkingSet(stageId: string | number, scenes, knownStageIds = null) {
+export function stageWorkingSet<Id extends string | number>(stageId: Id, scenes: StageLocalityScenes, knownStageIds: Iterable<string> | null = null) {
   return [stageId, ...directStageNeighbors(stageId, scenes, knownStageIds)];
 }
 
 /** Sprite sheets referenced by a collection of stage scenes. */
-export function stageSpriteIds(stageIds, scenes) {
-  const ids = new Set();
+export function stageSpriteIds(stageIds: Iterable<string | number>, scenes: StageLocalityScenes) {
+  const ids = new Set<string>();
   for (const stageId of stageIds) {
     for (const npc of scenes?.[stageId]?.npcs ?? []) {
       if (npc?.sprite) ids.add(npc.sprite);
@@ -32,7 +32,7 @@ export function stageSpriteIds(stageIds, scenes) {
   return ids;
 }
 
-export function encodeFieldLocation(location) {
+export function encodeFieldLocation(location: StageLocationInput) {
   const value = {
     version: FIELD_LOCATION_VERSION,
     mapId: location.mapId,
@@ -45,7 +45,7 @@ export function encodeFieldLocation(location) {
 }
 
 /** Parse a saved position defensively; stale/corrupt saves fall back to null. */
-export function decodeFieldLocation(raw: string | null, knownStageIds) {
+export function decodeFieldLocation(raw: string | null, knownStageIds: Iterable<string> | null | undefined) {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw);

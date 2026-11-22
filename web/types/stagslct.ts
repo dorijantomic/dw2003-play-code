@@ -19,3 +19,31 @@ export interface StageSelectState {
   scroll: number;
   show?: (onPick: StagePick | null) => void;
 }
+
+/** One row of stagslct_ui.json `menuRows` (an `entry` can be picked; headings, rules and the category tags are only drawn). */
+export interface StageMenuRow {
+  index?: number;
+  kind: string;
+  /** the record's launch code as text ("0x1500") */
+  type?: string;
+  value?: number;
+  overlay_label?: string;
+  name_jp?: string;
+}
+
+/** The layout numbers of stagslct_ui.json `chrome` the screen reads (traced from the overlay's build routine). */
+export interface StageChrome {
+  header: { title: { x: number; y: number; }; extra?: { x: number; }[]; };
+  list: { y_base: number; row_pitch: number; col_left_x: number; col_right_x: number; };
+  cursor: { x: number; y_base: number; row_pitch: number; };
+  footer: { y: number; slots_x: number[]; };
+}
+
+/** assets/data/stagslct_ui.json, the parts the screen reads. */
+export interface StageSelectData {
+  chrome?: StageChrome | null;
+  menuRows?: StageMenuRow[];
+  categories?: StageMenuRow[];
+  destinations?: StageDestination[];
+  identity: { cursor_glyph?: string; header_text_en: string; };
+}

@@ -27,7 +27,7 @@ import {
 import { drawText, fontReady } from "./uifont.js";
 import * as uiC from "./ui-c/index.js";
 import { composePlaceCard } from "./ui-c/message.js";
-import type { PlaceCard } from "./types/placecard.js";
+import type { PlaceCard, PlaceCardData } from "./types/placecard.js";
 
 let cardCount = 0;
 
@@ -35,7 +35,7 @@ const DATA_URL = "assets/data/place_card.json";
 /** The framebuffer the card's coordinates are authored in. */
 const NATIVE_W = 320;
 
-let data = null;
+let data: PlaceCardData | null = null;
 
 /** Load the bar templates and the per-stage names. Safe to call repeatedly. */
 export async function loadPlaceCard() {
@@ -71,7 +71,8 @@ export function createPlaceCard() {
             card._st = null;
             return false;
         }
-        card._st = createLocationCard(data.bars, names.area, names.place);
+        // ETS item 9: names came from placeCardNames(), which is null until the data is loaded
+        card._st = createLocationCard(data!.bars, names.area, names.place);
         card._acc = 0;
         card._held = false;
         return true;
@@ -136,7 +137,7 @@ export function createPlaceCard() {
         ctx.imageSmoothingEnabled = false;
 
         // look C (web/ui-c, task T6): the same C6b card as the translated one -- these bars, these (typed) names, the slit as the clip.
-        const quads = f.bars.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h, colour: b.color }));
+        const quads = f.bars.map((b: { x: number; y: number; w: number; h: number; color: [number, number, number] }) => ({ x: b.x, y: b.y, w: b.w, h: b.h, colour: b.color }));
         const names = [f.area, f.place].filter((n) => n.text).map((n) => ({ text: n.text, x: n.x, y: n.y }));
         card._key ??= `placecard${++cardCount}`;
         uiC.scope(card._key, ctx, { enable: true, clip: f.clip, compose: (sc) => composePlaceCard(sc, { quads, names }) }, () => {

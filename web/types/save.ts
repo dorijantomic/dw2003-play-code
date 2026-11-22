@@ -53,3 +53,20 @@ export interface SaveRecordOpts {
   placeName?: string;
   playSeconds?: number | null;
 }
+
+/** assets/data/stgmcard_ui.json, as far as web/save.ts reads it: the party starter types and the two name banks. */
+export interface StgmcardLayout {
+  file_card?: { party?: { digimonIdByType?: Record<string, number> } };
+  strings?: {
+    areaBank?: { all?: string[] };
+    placeBank?: { all?: string[] };
+  };
+}
+
+/** The part of the live game state buildRecord() reads. */
+export interface SaveBuildState {
+  playerName?: string;
+  bits?: number;
+  party?: (string | null)[] | null;
+  partyStats?: { level?: number }[] | null;
+}

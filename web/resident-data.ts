@@ -5,10 +5,11 @@
 // Also the ESDMG entry reader (the cutscene SAY bank) that the dialogue and Yes/No screens use.
 // It never executes original instructions and never requests an executable asset.
 import { ui } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 interface ResidentResources {
     font: Uint8Array;
-    ranges: ReturnType<typeof ui.dialogueRangesFromFile>;
-    cursorGlyphs: Parameters<NonNullable<typeof ui.setDefaultCursorGlyphs>>[0];
+    ranges: ReturnType<EngineUi["dialogueRangesFromFile"]>;
+    cursorGlyphs: Parameters<EngineUi["setDefaultCursorGlyphs"]>[0];
 }
 
 
@@ -24,7 +25,7 @@ export const RESIDENT_PACK_NAMES = { 0x02860000: "cmfont", 0x04550000: "pgfgc00"
 export const RESIDENT_PACKS = { 646: "cmfont", 1109: "pgfgc00" };
 
 /** Fetch assets/data/<path> as bytes. `label` names the screen in the error. */
-export const fetchBytes = async (path, label) => {
+export const fetchBytes = async (path: string, label: string) => {
     const response = await fetch(`assets/data/${path}`);
     if (!response.ok) throw new Error(`${label} ${path}: ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
@@ -51,8 +52,9 @@ export const loadResidentResources = (): Promise<ResidentResources> => {
             // setDefaultCursorGlyphs). Without it a screen's selection cursor builds its glyph
             // child with a null string and draws nothing. Optional call: a bundle built before
             // this function existed still boots (every cursor screen also forwards the table).
-            ui.setDefaultCursorGlyphs?.(catalog.cursorGlyphs);
-            return { font, ranges: ui.dialogueRangesFromFile(ranges), cursorGlyphs: catalog.cursorGlyphs };
+            // ETS item 9: the bundle's `ui` export carries no types; EngineUi is the engine source's own type of it.
+            (ui as EngineUi).setDefaultCursorGlyphs?.(catalog.cursorGlyphs);
+            return { font, ranges: (ui as EngineUi).dialogueRangesFromFile(ranges), cursorGlyphs: catalog.cursorGlyphs };
         })
         .catch((error) => { residentPromise = null; throw error; });
     return residentPromise;

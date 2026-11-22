@@ -13,3 +13,20 @@ export interface CanvasBacking {
   padX?: number;
   hd: boolean;
 }
+
+/** What computeCanvasBacking() reads: the mode, the element's CSS size and the logical box. */
+export interface CanvasBackingArgs {
+  hd: boolean;
+  cssWidth: number;
+  cssHeight: number;
+  devicePixelRatio?: number;
+  logicalWidth?: number;
+  logicalHeight?: number;
+  maxDimension?: number;
+}
+
+/** The wide overworld's shape: logical pixels of field on each side, and the stage height they are sized from. */
+export interface WideView {
+  padX: number;
+  stageHeight: number;
+}

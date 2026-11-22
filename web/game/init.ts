@@ -871,7 +871,8 @@ export async function init() {
         }
     };
 
-    const bgImg = document.getElementById("title-bg");
+    // ETS item 9: #title-bg is the <img> in web/index.html.
+    const bgImg = document.getElementById("title-bg") as HTMLImageElement | null;
     // The title is a PAL screen: it is driven by the real elapsed time of each
     // browser frame, not by the browser's frame rate. web/game.js's own frame
     // loop caps the sim at 60fps, and this loop deliberately does not — the

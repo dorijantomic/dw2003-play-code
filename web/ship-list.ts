@@ -11,7 +11,7 @@
 // Both builds start with "in" and "auto" on and "out" off. On the owner's PC every switch stays
 // changeable. In the installed copy "out" is forced off and "auto" forced on, whatever the saved
 // settings, URL flags or window setters say (lockShipped).
-import type { AmbienceSettings } from "./types/ambience.js";
+import type { AmbienceBag } from "./types/rest-b.js";
 
 const IN = [
     "sway", "grass", "grasspush", "water", "reflect", "mirror", "wetlook", "seam",
@@ -54,13 +54,13 @@ export function isInstalledBuild(win = typeof window !== "undefined" ? window : 
 }
 
 /** Defaults for both builds: "in" and "auto" on, "out" off. Writes into `fx`. */
-export function applyShipDefaults(fx: AmbienceSettings) {
+export function applyShipDefaults(fx: AmbienceBag) {
     for (const [k, c] of Object.entries(SHIP)) fx[k] = c !== "out";
     return fx;
 }
 
 /** The one-time upgrade: an old save may have an "in" key off; put every "in" key back to its default (on). */
-export function applyUpgradeDefaults(fx: AmbienceSettings) {
+export function applyUpgradeDefaults(fx: AmbienceBag) {
     for (const k of IN) fx[k] = true;
     return fx;
 }
@@ -72,7 +72,7 @@ export function needsUpgrade(markValue: string | null | undefined) { return !mar
  * on the object (so spreads and saves see the forced value) but a write is silently ignored, so
  * `fx.k = ...`, Object.assign, window.__setFx / __setFxMany / presets / "All on" can not change it.
  */
-export function lockShipped(fx: AmbienceSettings) {
+export function lockShipped(fx: AmbienceBag) {
     for (const [k, c] of Object.entries(SHIP)) {
         if (c === "in") continue;
         const v = c === "auto";
@@ -86,7 +86,7 @@ export function lockShipped(fx: AmbienceSettings) {
  * `markValue`, the stored marker, is empty) and then lock. Returns { upgraded } so the caller can store the
  * marker and the new settings. On the owner PC nothing changes (saved settings are respected).
  */
-export function finishShipLoad(fx: AmbienceSettings, { installed = false, markValue = null }: { installed?: boolean; markValue?: string | null } = {}) {
+export function finishShipLoad(fx: AmbienceBag, { installed = false, markValue = null }: { installed?: boolean; markValue?: string | null } = {}) {
     if (!installed) return { upgraded: false, installed: false };
     const upgraded = needsUpgrade(markValue);
     if (upgraded) applyUpgradeDefaults(fx);

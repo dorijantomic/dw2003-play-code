@@ -27,3 +27,15 @@ export interface StageLocalityResult {
   x: number;
   y: number;
 }
+
+/** The part of a stage's scene the neighbour and sprite lookups read. */
+export interface StageLocalityScene {
+  exits?: Array<{ to?: string | undefined; } | null | undefined>;
+  npcs?: Array<{ sprite?: string | undefined; } | null | undefined>;
+}
+
+/** The scenes table (state.scenes): a scene per stage id. */
+export type StageLocalityScenes = Record<string | number, StageLocalityScene | undefined> | null | undefined;
+
+/** The position encodeFieldLocation() saves (it adds the version). */
+export type StageLocationInput = Omit<StageLocalityValue, "version">;

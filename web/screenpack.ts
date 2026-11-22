@@ -12,6 +12,7 @@ import { registerPausePanels } from "./panel-kit.js";
 import { noteBackdropBlend } from "./battle-layer.js";
 import { clipHook } from "./ui-c/capture.js";
 import type { ScreenPack, ScreenPackLayer } from "./types/misc-game2.js";
+import type { ReadyScreenPack } from "./types/game-shared.js";
 
 const packs: Record<string, ScreenPack> = {}; // name -> { img, map, ids, patterns }
 
@@ -47,7 +48,7 @@ export function loadPack(name: string): ScreenPack {
   return p;
 }
 
-export function packReady(p: ScreenPack) { return !!(p.img && p.ids); }
+export function packReady(p: ScreenPack): p is ReadyScreenPack { return !!(p.img && p.ids); }
 
 /**
  * The native pixel size of clip `id`, taken from the sheet's own layer records.

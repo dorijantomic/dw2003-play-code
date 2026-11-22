@@ -10,3 +10,9 @@ export interface ChatQueueOptions {
 
 /** Where one waiting line is in its life; `false` means the send refused it and nothing waits. */
 export type ChatPushResult = "sent" | "queued" | false;
+
+/** One line that waits for its gap: the text and the caller's meta, passed back to `send` when it leaves. */
+export interface ChatQueuedLine {
+  text: string;
+  meta: unknown;
+}

@@ -1,3 +1,4 @@
+import type { Checkerboard, CheckerboardRecord } from "./types/rest-a.js";
 // The ordinary stage-change wipe, translated from FIELDSTG F0x8008A5E4.
 //
 // Original, read-only, `~/ddw3/asm/dw2003/pro/fieldstg.s` file 0x7934 (RAM
@@ -145,7 +146,7 @@ export function openCovered(frame: number, x: number, y: number) {
 
 // The lattice colour for a cover level: the measured RGB at the cap, scaled by
 // how far the level has come, so the lines only surface as the cover darkens.
-export function seamRgb(level) {
+export function seamRgb(level: number) {
     const t = Math.max(0, Math.min(1, (level >> 8) / (WIPE_LEVEL_MAX >> 8)));
     return WIPE_SEAM_RGB.map((c) => Math.round(c * t));
 }
@@ -268,13 +269,13 @@ export function checkerboardCell(i: number) {
 
 // The word a record points at: `(ptr - base) / 4` over the 60-word region
 // (30 cells x 2 words).  Even word = the cell's x, odd word = its y.
-export function checkerboardWordIndex(ptr) {
+export function checkerboardWordIndex(ptr: number) {
     return (ptr - WIPE_A28_GRID_BASE) / 4;
 }
 export function checkerboardRecordCell(rec: { ptr: number; mode: number; limit: number; } | undefined) {
     return Math.floor(checkerboardWordIndex(rec!.ptr) / 2);
 }
-export function checkerboardRecordAxis(rec) {
+export function checkerboardRecordAxis(rec: CheckerboardRecord) {
     return checkerboardWordIndex(rec.ptr) % 2 === 0 ? "x" : "y";
 }
 
@@ -307,7 +308,7 @@ export function createCheckerboard() {
 //    counter (asm 0x7684-0x76D0); no cell word moves.  (The captured schedule is
 //    all non-zero modes; the zero terminator the 2026-09-13 note names is not in
 //    this live read.)
-export function stepCheckerboard(cb, delta: number, held = false) {
+export function stepCheckerboard(cb: Checkerboard, delta: number, held = false) {
     if (cb.done) return { stepped: false, crossed: false, record: null };
     cb.calls += 1;
     if (held) return { stepped: false, crossed: false, record: cb.index };
@@ -345,7 +346,7 @@ export function checkerboardWalk(delta: number): { grid: number[]; order: number
 // The cells still drawn on this frame: every cell whose x AND y are not the
 // sentinel (asm 0x7688-0x7694 `beq $v0,$s0` / `beq $v0,0x200` skip), each as a
 // 64x40 quad at its current position.
-export function checkerboardQuads(cb) {
+export function checkerboardQuads(cb: Checkerboard) {
     const out = [];
     for (let i = 0; i < WIPE_A28_CELLS; i++) {
         const x = cb.grid[2 * i];

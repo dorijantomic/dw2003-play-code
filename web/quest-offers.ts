@@ -10,12 +10,13 @@
 //   offerLabels(defs, n)  -> the titles clipped the way the game's own clip() does: n-1 characters + "."
 //   pageCount(n)          -> pages of four labels, the size pagedPick() shows
 import type { QuestOfferFilters } from "./types/quest-offers.js";
+import type { QuestDef } from "./quests.js";
 
 const clipTitle = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 
 /** The jobs this person could hand out in this place right now, in file order (the offer loop's exact filters). */
-export function offersAt(defs, npcId: number, mapId: string, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
-    const out = [];
+export function offersAt(defs: readonly QuestDef[] | null | undefined, npcId: number, mapId: string, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
+    const out: QuestDef[] = [];
     for (const d of defs ?? []) {
         if (labFocus && d.id !== labFocus) continue;                       // the lab asked for one quest in particular
         if (statusOf(d) !== "available" || !d.offer) continue;

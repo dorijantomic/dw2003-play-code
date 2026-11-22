@@ -16,6 +16,8 @@
 // The scene init's variant arm sets the descriptor BGM play id (+0x40) to
 // 0x61080000 (env204 track 0) where the default is 0x61080002 (env204 track 2).
 
+import type { PointRecordRow } from "./types/fx3d.js";
+
 export const SCENE_VARIANT_TABLE_FIRST = 5;
 export const SCENE_VARIANT_TABLE_LEN = 0x23;
 export const SCENE_VARIANT_ORDINALS = [
@@ -45,11 +47,11 @@ export function sceneVariantActive(ordinal: number) {
  * (returns -1). Read from the raw words: m2c's lifted C drops record 0's tag by
  * folding the `beq` delay slot. `records` is point_sprites.json in memory order.
  */
-export function sceneVariantSlotIndex(records) {
+export function sceneVariantSlotIndex(records: readonly PointRecordRow[] | null | undefined) {
   if (!records || records.length === 0) return -1;
-  if (!records[0].size) return 0;
+  if (!records[0]!.size) return 0;
   for (let i = 0; i < records.length; i++) {
-    if (records[i].atlasFlag === SCENE_VARIANT_SLOT_TAG) return i;
+    if (records[i]!.atlasFlag === SCENE_VARIANT_SLOT_TAG) return i;
     const next = records[i + 1];
     if (!next || !next.size) return -1;
   }

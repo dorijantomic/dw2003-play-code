@@ -26,8 +26,10 @@
 // fallbacks below rebuild the same shape from the older display fields for a
 // profile that predates that change.
 
+import type { TechLedgerRecord, TechSlotProfile } from "./types/rest-a.js";
+
 /** The six technique ids in ledger-slot order (0..4 ordinary, 5 signature). */
-export function profileTechSlots(profile) {
+export function profileTechSlots(profile: TechSlotProfile | null | undefined) {
   if (Array.isArray(profile?.tech_slots)) return profile.tech_slots.slice(0, 6).map(Number);
   const slots = [0, 0, 0, 0, 0, 0];
   (profile?.techs ?? []).slice(2, 7).forEach((id, i: number) => { if (i < 5) slots[i] = Number(id) || 0; });
@@ -36,14 +38,14 @@ export function profileTechSlots(profile) {
 }
 
 /** The six LEARN gates (profile +0x31..+0x36), aligned to the six slots. */
-export function profileLearnLevels(profile) {
+export function profileLearnLevels(profile: TechSlotProfile | null | undefined) {
   if (Array.isArray(profile?.tech_learn_levels)) return profile.tech_learn_levels.slice(0, 6).map(Number);
   return [...(profile?.tech_level_learn ?? []), (profile?.tech_level_load ?? [])[0] ?? 0]
     .slice(0, 6).map(Number);
 }
 
 /** The five non-signature LOAD gates (profile +0x37..+0x3b). */
-export function profileLoadLevels(profile) {
+export function profileLoadLevels(profile: TechSlotProfile | null | undefined) {
   if (Array.isArray(profile?.tech_load_levels)) return profile.tech_load_levels.slice(0, 5).map(Number);
   // Legacy display order: [signature learn, load0, load1, load2, load3].
   const shifted = (profile?.tech_level_load ?? []).map(Number);
@@ -65,7 +67,7 @@ export function profileLoadLevels(profile) {
  * marked loadable in a fight. Battle rewards use learnOneTechnique /
  * markOneLoadable below.
  */
-export function applyFormTechGates(record: { id: number; formLevel: number; dvexp: number; techSlots: number[]; }, profile, formLevel: number) {
+export function applyFormTechGates(record: { id: number; formLevel: number; dvexp: number; techSlots: number[]; }, profile: TechSlotProfile | null | undefined, formLevel: number) {
   const slots = profileTechSlots(profile);
   const learn = profileLearnLevels(profile);
   const load = profileLoadLevels(profile);
@@ -100,7 +102,7 @@ export function applyFormTechGates(record: { id: number; formLevel: number; dvex
  * so a form learns at most ONE technique per fight however many levels its
  * DVEXP banked.
  */
-export function learnOneTechnique(record, profile) {
+export function learnOneTechnique(record: TechLedgerRecord, profile: TechSlotProfile | null | undefined) {
   const slots = profileTechSlots(profile);
   const learn = profileLearnLevels(profile);
   if (!Array.isArray(record.techSlots)) record.techSlots = [0, 0, 0, 0, 0, 0];
@@ -122,7 +124,7 @@ export function learnOneTechnique(record, profile) {
  * loadable, or 0. The report calls it once per marked form per battle
  * (stfgtrep.s state 0x17 arm at file 0x15E0).
  */
-export function markOneLoadable(record, profile) {
+export function markOneLoadable(record: TechLedgerRecord, profile: TechSlotProfile | null | undefined) {
   const load = profileLoadLevels(profile);
   if (!Array.isArray(record.techSlots)) record.techSlots = [0, 0, 0, 0, 0, 0];
   const level = Number(record.formLevel ?? 1);

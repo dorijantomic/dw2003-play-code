@@ -13,6 +13,7 @@
 //    own 16 / 6 / 4 credit ladder); a face button, a shoulder or Start never repeats;
 //  * a button that was already down when the screen opened (the Enter that chose the row) does nothing until it is let go.
 import { ui, maskFromButtons, buttonsFromMask, isPadButton } from "./vendor/engine.js";
+import type { EngineUi } from "./types/battle.js";
 
 /** The only buttons that repeat while held. */
 export const REPEATING = Object.freeze(["up", "down", "left", "right"]);
@@ -20,14 +21,15 @@ export const REPEATING = Object.freeze(["up", "down", "left", "right"]);
 export const WORD = Object.freeze({ confirm: "circle", back: "cross", prev: "l1", next: "r1", start: "start" });
 
 export function createKitInput() {
-    const clock = new ui.MenuDisplayClock();
-    const words = new ui.MenuPadWords();
-    let blocked = new Set();
+    // ETS item 9: the bundle's `ui` export carries no types; EngineUi is the engine source's own type of it.
+    const clock = new (ui as EngineUi).MenuDisplayClock();
+    const words = new (ui as EngineUi).MenuPadWords();
+    let blocked = new Set<string>();
     const api = {
         /** Call when the screen opens, with the buttons that are down right now. */
-        reset(held = []) { blocked = new Set([...held].filter(isPadButton)); },
+        reset(held: Iterable<string> = []) { blocked = new Set([...held].filter(isPadButton)); },
         /** One displayed frame at display tick `tick`: the set of buttons that act in it. */
-        step(held, tick) {
+        step(held: Iterable<string>, tick: number) {
             const down = new Set([...held].filter(isPadButton));
             for (const b of [...blocked]) if (!down.has(b)) blocked.delete(b);
             for (const b of blocked) down.delete(b);
@@ -37,7 +39,7 @@ export function createKitInput() {
             return act;
         },
         /** `dt` seconds of real time: one Set of acting buttons per displayed frame that is due. */
-        advance(dt: number, held: Set<string>) { return clock.advance(dt).map((frame) => api.step(held, frame.tick)); },
+        advance(dt: number, held: Set<string>) { return clock.advance(dt).map((frame: { tick: number; delta: number }) => api.step(held, frame.tick)); },
     };
     return api;
 }

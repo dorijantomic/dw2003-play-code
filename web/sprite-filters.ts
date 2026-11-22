@@ -15,21 +15,27 @@ export const SPRITE_FILTERS: Record<string, string> = {
 };
 
 // ── filters: (ImageData native) -> ImageData 4x ───────────────────────────────────────────────
-export function nearest4(src) {
+/** The word of the picture at (x, y), clamped to the edge. */
+type PixelAt = (x: number, y: number) => number;
+/** One 2x2 output block: top-left, top-right, bottom-left, bottom-right. */
+type Quad = [number, number, number, number];
+export function nearest4(src: ImageData) {
   const { width: w, height: h, data } = src, out = new ImageData(w * 4, h * 4);
   for (let y = 0; y < h * 4; y++) for (let x = 0; x < w * 4; x++) {
     const s = ((y >> 2) * w + (x >> 2)) * 4, d = (y * w * 4 + x) * 4;
-    out.data[d] = data[s]; out.data[d + 1] = data[s + 1]; out.data[d + 2] = data[s + 2]; out.data[d + 3] = data[s + 3];
+    // ETS item 9: s is a pixel of the w x h source (y >> 2, x >> 2), so s..s+3 are inside data
+    out.data[d] = data[s]!; out.data[d + 1] = data[s + 1]!; out.data[d + 2] = data[s + 2]!; out.data[d + 3] = data[s + 3]!;
   }
   return out;
 }
 
 // generic 2x pass over packed RGBA (Uint32), clamp-to-edge neighbours
-function pass2x(src: ImageData, rule) {
+function pass2x(src: ImageData, rule: (at: PixelAt, x: number, y: number) => Quad) {
   const w = src.width, h = src.height;
   const px = new Uint32Array(src.data.buffer.slice(0));
   const out = new ImageData(w * 2, h * 2), o = new Uint32Array(out.data.buffer);
-  const at = (x: number, y: number) => px[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+  // ETS item 9: both coordinates are clamped into the picture, so the word exists
+  const at = (x: number, y: number) => px[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const [j, k, l, m] = rule(at, x, y);
     o[(2 * y) * 2 * w + 2 * x] = j; o[(2 * y) * 2 * w + 2 * x + 1] = k;
@@ -39,7 +45,7 @@ function pass2x(src: ImageData, rule) {
 }
 
 // Scale2x / EPX (A. Mazzoleni): the classic edge rule
-function epxRule(at, x: number, y: number) {
+function epxRule(at: PixelAt, x: number, y: number): Quad {
   const B = at(x, y - 1), D = at(x - 1, y), E = at(x, y), F = at(x + 1, y), H = at(x, y + 1);
   if (B !== H && D !== F) {
     return [D === B ? D : E, B === F ? F : E, D === H ? D : E, H === F ? F : E];
@@ -104,14 +110,15 @@ function mmpxRule(at: (x: number, y: number) => number, x: number, y: number): [
 
 // xBR 4x (Hyllian), xbr-js 2.0.1 (MIT), loaded from the CDN only when chosen.  It reads byte 0 of each
 // word as red, which is exactly a little-endian ImageData word, so the pixels go in as they are.
-let xbr4x = null;
+let xbr4x: ((px: Uint32Array, w: number, h: number, opts: { blendColors: boolean; scaleAlpha: boolean; }) => { buffer: ArrayBuffer; }) | null = null;
 export async function ensureXbr() {
   if (!xbr4x) xbr4x = (await import("https://cdn.jsdelivr.net/npm/xbr-js@2.0.1/dist/xBRjs.esm.js" as string)).xbr4x;
   return xbr4x;
 }
 export function xbr(src: ImageData, blendColors: boolean) {
   const view = new Uint32Array(src.data.buffer.slice(0));
-  const outPx = xbr4x(view, src.width, src.height, { blendColors, scaleAlpha: true });
+  // ETS item 9: callers await ensureXbr() first, which fills xbr4x
+  const outPx = xbr4x!(view, src.width, src.height, { blendColors, scaleAlpha: true });
   return new ImageData(new Uint8ClampedArray(outPx.buffer), src.width * 4, src.height * 4);
 }
 
@@ -121,7 +128,7 @@ export const mmpx4 = (s: ImageData) => pass2x(pass2x(s, mmpxRule), mmpxRule);
 // ── game side: a loaded native sheet -> a 4x Image, cached per sheet and filter ─────────────────
 const cache = new WeakMap();          // native image -> Map(filter -> Promise<Image>)
 
-function nativePixels(img) {
+function nativePixels(img: HTMLImageElement) {
   const c = document.createElement("canvas");
   c.width = img.width; c.height = img.height;
   const g = c.getContext("2d");
@@ -129,7 +136,7 @@ function nativePixels(img) {
   return g!.getImageData(0, 0, c.width, c.height);
 }
 
-async function run(img, name) {
+async function run(img: HTMLImageElement, name: string) {
   const w = img.width, h = img.height, c = document.createElement("canvas");
   c.width = w * 4; c.height = h * 4;
   const g = c.getContext("2d");

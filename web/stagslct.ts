@@ -32,9 +32,9 @@
 // the launchable rows, the window centred on the cursor, no stored state.
 
 import { drawText } from "./uifont.js";
-import type { StageSelectState } from "./types/stagslct.js";
+import type { StageDestination, StageMenuRow, StageSelectData, StageSelectState } from "./types/stagslct.js";
 
-let DATA = null;
+let DATA: StageSelectData | null = null;
 if (typeof fetch !== "undefined" && typeof location !== "undefined") {
   fetch("assets/data/stagslct_ui.json")
     .then((r) => (r.ok ? r.json() : null))
@@ -45,7 +45,7 @@ if (typeof fetch !== "undefined" && typeof location !== "undefined") {
 // Layout below is traced, not guessed: every number comes from the overlay's
 // own build routine F0x80084d9c and is carried in stagslct_ui.json `chrome`.
 // See the 2026-08-05 section of the decode doc.
-const CH = (data) => (data && data.chrome) || null;
+const CH = (data: StageSelectData | null | undefined) => (data && data.chrome) || null;
 export const VISIBLE_ROWS = 14; // chrome.list.rows_visible — row count clamp at file 0x21f4
 export const STAGE_SELECT_V2_STORE = "dw.stagslct.v2"; // cursor+scroll across visits (original D0x80048d5c/d60)
 
@@ -72,7 +72,7 @@ export function cursorStep(cursor: number, count: number, delta: number) {
  * draws the 31 category tags as their own rows too and skips those the same way.
  * Returns -1 when there is no entry left in that direction.
  */
-export function nextEntryRow(rows, from = 0, delta = 1) {
+export function nextEntryRow(rows: readonly StageMenuRow[] | null | undefined, from = 0, delta = 1) {
   if (!Array.isArray(rows) || !rows.length) return -1;
   const step = delta < 0 ? -1 : 1;
   let i = Math.trunc(from) || 0;
@@ -89,14 +89,14 @@ export function nextEntryRow(rows, from = 0, delta = 1) {
  * `categories` row inserted before the record it tags. Pure so the test can
  * prove the four kind counts against the shipped asset.
  */
-export function v2Rows(data) {
+export function v2Rows(data: StageSelectData | null | undefined) {
   const records = Array.isArray(data?.menuRows) ? data.menuRows : [];
-  const categories = new Map();
+  const categories = new Map<number, StageMenuRow>();
   for (const c of Array.isArray(data?.categories) ? data.categories : []) {
     if (c && Number.isInteger(c.index)) categories.set(c.index, c);
   }
-  const out = [];
-  records.forEach((row, at) => {
+  const out: StageMenuRow[] = [];
+  records.forEach((row: StageMenuRow, at: number) => {
     const c = categories.get(row.index ?? at);
     if (c) out.push({ ...c, kind: "category" });
     out.push(row);
@@ -118,7 +118,7 @@ export function clampScroll(cursor: number, scroll: number, rows = VISIBLE_ROWS)
   return s;
 }
 
-export function createStagslctMenu(data = null) {
+export function createStagslctMenu(data: StageSelectData | null = null) {
   const d = { open: false, cursor: 0, scroll: 0, onPick: null } as StageSelectState;
   const src = () => (data && typeof data === "object" ? data : DATA);
 
@@ -142,7 +142,7 @@ export function createStagslctMenu(data = null) {
   // gyms...), then every field screen, with rule rows between sections. Only
   // `entry` rows are selectable; separators and headings are drawn but skipped
   // by the cursor, which is how the record `type` of 0 behaves natively.
-  function rows() {
+  function rows(): StageMenuRow[] {
     const d0 = src();
     if (!d0 || !Array.isArray(d0.menuRows)) return [];
     return d0.menuRows;
@@ -154,14 +154,14 @@ export function createStagslctMenu(data = null) {
     return d0 ? v2Rows(d0) : [];
   }
 
-  function stageOf(row, from = src()) {
+  function stageOf(row: StageMenuRow | null | undefined, from = src()) {
     if (!from || !row || row.kind !== "entry") return null;
     const hits = Array.isArray(from.destinations) ? from.destinations : [];
-    const hit = hits.find((dst) => dst.type === row.type);
+    const hit = hits.find((dst: StageDestination) => dst.type === row.type);
     return hit && hit.stage != null ? hit : null;
   }
 
-  function selectable(): Extract<ReturnType<typeof rows>[number], { kind: "entry" }>[] {
+  function selectable(): StageMenuRow[] {
     return rows().filter((r) => r.kind === "entry");
   }
 
@@ -267,7 +267,7 @@ export function createStagslctMenu(data = null) {
       }
     }
     drawText(ctx, "↑↓ select  Enter warp  Esc close",
-             c ? c.footer.slots_x[0] : 16, c ? c.footer.y : H - 20, { kind: 3 });
+             c ? c.footer.slots_x[0]! : 16, c ? c.footer.y : H - 20, { kind: 3 });
     ctx.restore();
   }
 
@@ -304,7 +304,8 @@ export function createStagslctMenu(data = null) {
     // nudge only if the active row would fall outside the window.
     let top = 0;
     if (picks.length) {
-      const topEntry = picks[Math.max(0, Math.min(picks.length - 1, d.scroll))];
+      // ETS item 9: the index is clamped to 0..picks.length - 1 and picks is not empty here
+      const topEntry = picks[Math.max(0, Math.min(picks.length - 1, d.scroll))]!;
       top = all.indexOf(topEntry);
       if (top < 0) top = 0;
     }
@@ -343,7 +344,7 @@ export function createStagslctMenu(data = null) {
     }
     const place = picks.length ? `   row ${d.cursor + 1}/${picks.length}` : "";
     drawText(ctx, `↑↓ select  Enter warp  Esc close${place}`,
-             c ? c.footer.slots_x[0] : 16, c ? c.footer.y : H - 20, { kind: 3 });
+             c ? c.footer.slots_x[0]! : 16, c ? c.footer.y : H - 20, { kind: 3 });
     ctx.restore();
   }
 

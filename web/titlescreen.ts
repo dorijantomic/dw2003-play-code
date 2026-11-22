@@ -21,6 +21,8 @@ import { paintTitleVignette } from "./screendim.js";
 import { loadPack, drawClip, drawClipAtPaletteRow, packReady } from "./screenpack.js";
 import { ui } from "./vendor/engine.js";
 import { TITLE_TWINKLES } from "./title-twinkle-data.js";
+import type { ScreenPack } from "./types/misc-game2.js";
+import type { TitleLayout, TitleUiJson } from "./types/rest-a.js";
 interface TitleTwinkle {
   pack: number;
   clip: number;
@@ -53,12 +55,12 @@ interface TitleScreenState {
 
 
 const ART_PAL = loadPack("tlogopal");
-let ART_JPN = null;
-let ART_USA = null;
+let ART_JPN: ScreenPack | null = null;
+let ART_USA: ScreenPack | null = null;
 const TWINKLE_A = loadPack("ttcommpk3");
 const TWINKLE_B = loadPack("ttcommpk8");
 
-let UI = null;
+let UI: TitleUiJson | null = null;
 if (typeof fetch === "function") {
   fetch("assets/data/stdwtitl_ui.json")
     .then((r) => r.json())
@@ -67,7 +69,7 @@ if (typeof fetch === "function") {
 }
 
 // Fallback for the node tests, which have no fetch. Mirrors `title_menu`.
-const FALLBACK = {
+const FALLBACK: TitleLayout = {
   promptAt: [79, 166],
   optionAt: [[79, 154], [79, 174]],
   optionPalette: { selected: 0, unselected: 1 },
@@ -103,7 +105,7 @@ const TITLE_BG = (typeof Image !== "undefined")
 // The `eng` pack is language index 2, the same constant endscreen.js uses.
 export const LANGUAGE_ENGLISH = 2;
 
-function layout() {
+function layout(): TitleLayout {
   const t = UI?.title_menu;
   if (!t) return FALLBACK;
   const clip = (k: string) => t.clips?.[k] ?? {};
@@ -210,7 +212,7 @@ export function titleViewTransform(viewW: number, viewH: number) {
   };
 }
 
-export function drawTitleScreen(ctx: CanvasRenderingContext2D, ts: TitleScreenState, viewW: number, viewH: number, background = null) {
+export function drawTitleScreen(ctx: CanvasRenderingContext2D, ts: TitleScreenState, viewW: number, viewH: number, background: HTMLImageElement | null = null) {
   const L = layout();
   const ART = ts.isJapanese?.() ? (ART_JPN ??= loadPack("tlogojpn"))
     : ts.isUsa?.() ? (ART_USA ??= loadPack("tlogousa")) : ART_PAL;
@@ -315,7 +317,7 @@ export function drawTitleScreen(ctx: CanvasRenderingContext2D, ts: TitleScreenSt
 
 /** The screen rectangles the two options occupy, for mouse hit-testing.
  *  Derived from the same layout the draw uses — no parallel coordinate table. */
-export function titleOptionRects(ts) {
+export function titleOptionRects(ts: TitleScreenState) {
   const L = layout();
   const [uy, ly] = ts.optionY();
   const W = 164, H = 16;
