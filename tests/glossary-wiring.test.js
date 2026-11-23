@@ -23,7 +23,11 @@ test("the party reader gives rookie, form, slot and live level for the first thr
     const at = game.indexOf("function glossaryPartners()");
     assert.ok(at > 0);
     const block = game.slice(at, game.indexOf("\n}\n", at));
-    for (const word of ["rosterSlotOfCharId", "rookie:", "form: row.formName", "level:", "formLedger", "slice(0, 3)"]) assert.ok(block.includes(word), word);
+    for (const word of ["rosterSlotOf(", "rookie:", "form: row.formName", "level:", "formLevelsOf(", "slice(0, 3)"]) assert.ok(block.includes(word), word);
+    // the form ledger: the levels the glossary shows come from the record's own formLedger
+    assert.match(game, /function formLevelsOf\([\s\S]*?record\.formLedger/);
+    // the slot itself: the char id's line first, the starter species' line as the fallback (rosterSlotOf above it)
+    assert.match(game, /function rosterSlotOf\([\s\S]*?rosterSlotOfCharId\([\s\S]*?Number\(row\.rookieId\) - 1/);
 });
 
 test("the stage is made once with the fallback and a transparent renderer, and the book closes it when the host drops the book", () => {

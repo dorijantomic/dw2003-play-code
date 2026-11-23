@@ -15,7 +15,10 @@ import {
 } from "./vars.js";
 import { S } from "./state.js";
 import { manifestIndexOf } from "./session.js";
-import type { FormLedgerEntry, PartyRosterRow, SpawnPoint } from "./types.js";
+import type { PartnerStats } from "./types.js";
+import type { DriStats, EvoMember, EvoSnapshot } from "../types/misc-game.js";
+import type { GlossaryPartner } from "../types/glossary-digimon.js";
+import type { SpawnPoint } from "./types.js";
 
 export function glossarySpecies() {             // null until the tables are in
     return glossaryLoader.get();
@@ -110,44 +113,61 @@ export function parkGatheredFollowers() {
 // EXPERIMENT (Next forms planner): the party as the page reads it — each member's roster slot (the line the
 // disc's unlock routine scans) and its live ledger, level and stat record. Exactly the records web/battle.js
 // passes to engine/dw3/evo-trees.ts (statsRecord.formLedger, .level, .stats/.bonuses/.elemBonuses).
-export function plannerPartyMembers() {
+/** The line the disc's unlock routine scans for a member: the char id's slot, else the starter species' slot. */
+function rosterSlotOf(row: { charId: string; rookieId: number }): number {
+    const byCharId = row.charId === "" ? null : rosterSlotOfCharId(row.charId);
+    return byCharId ?? (Number(row.rookieId) - 1);
+}
+
+/** The record's form ledger as the engine reads it: form id -> form level. */
+function formLevelsOf(record: DriStats): Record<number, number> {
+    const levels: Record<number, number> = {};
+    for (const entry of record.formLedger ?? []) levels[Number(entry.id)] = Number(entry.formLevel ?? 1);
+    return levels;
+}
+
+/** The stat record a party position reads: the lead's live one, the others' static slot. */
+function statRecordOf(i: number): (PartnerStats & DriStats) | null | undefined {
+    return i === 0 ? state.partnerStats : state.partyStats?.[i];
+}
+
+export function plannerPartyMembers(): EvoSnapshot {
     const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
-    return view.slice(0, 3).map((row: PartyRosterRow, i: number) => {
-        const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
-        if (!record) return null;
-        const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
-        return {
-            slot,
+    const members: EvoMember[] = [];
+    view.slice(0, 3).forEach((row, i) => {
+        const record = statRecordOf(i);
+        if (!record) return;
+        members.push({
+            slot: rosterSlotOf(row),
             name: row.name,
-            live: {
-                formLevels: Object.fromEntries((record.formLedger ?? []).map((entry: FormLedgerEntry) => [Number(entry.id), Number(entry.formLevel ?? 1)])),
-                level: Number(record.level ?? 1),
-                stats: record,
-            },
-        };
-    }).filter(Boolean);
+            live: { formLevels: formLevelsOf(record), level: Number(record.level ?? 1), stats: record },
+        });
+    });
+    return { members };
 }
 
 // GLOSSARY > DIGIMON: every species the party wears now counts as owned (forms worn in battle arrive as `formWorn` events). Only
 // the current party is read: no past history is invented. Lab evolutions and loaded saves are caught by the timer.
 export function noteOwnedSpecies() {
-    try { speciesLog.noteOwned(glossaryPartners().flatMap((p) => [p.rookie, p.form]).filter(Boolean)); } catch { /* the party is not ready yet */ }
+    try { speciesLog.noteOwned(glossaryPartners().flatMap((p) => [p.rookie, p.form]).filter((name): name is string => typeof name === "string")); } catch { /* the party is not ready yet */ }
 }
 
+/** One glossary row: the party member, its starter species and the species it wears now. */
 // GLOSSARY > DIGIMON: the party as the glossary reads it. `rookie` is the starter species, `form` the species it wears now.
-export function glossaryPartners() {
+export function glossaryPartners(): GlossaryPartner[] {
     const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
-    return view.slice(0, 3).map((row: PartyRosterRow, i: number) => {
-        const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
-        if (!record) return null;
-        const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
-        return {
-            slot,
+    const rows: GlossaryPartner[] = [];
+    view.slice(0, 3).forEach((row, i) => {
+        const record = statRecordOf(i);
+        if (!record) return;
+        rows.push({
+            slot: rosterSlotOf(row),
             rookie: menu.digimonDB?.[row.rookieId]?.name ?? null,
             form: row.formName,
             formId: Number(row.digimonId),
             level: Number(record.level ?? 1),
-            live: { formLevels: Object.fromEntries((record.formLedger ?? []).map((entry: FormLedgerEntry) => [Number(entry.id), Number(entry.formLevel ?? 1)])), level: Number(record.level ?? 1), stats: record },
-        };
-    }).filter(Boolean);
+            live: { formLevels: formLevelsOf(record), level: Number(record.level ?? 1), stats: record },
+        });
+    });
+    return rows;
 }

@@ -134,9 +134,9 @@ export interface EvoMember {
   live: EvolutionLive;
 }
 
-/** The snapshot reader's answer: the members (plannerPartyMembers answers the member array itself, a snapshot object carries them as .members). */
-export interface EvoSnapshot extends Array<EvoMember | null> {
-  members?: EvoMember[];
+/** The snapshot reader's answer: the party members the planner plans for (plannerPartyMembers builds one of these). */
+export interface EvoSnapshot {
+  members: EvoMember[];
 }
 
 /** One row of the planner's list: a form the line can still learn. */
