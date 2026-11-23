@@ -48,8 +48,8 @@ export interface WorldFightScreen {
   _lastDiagnostic: string | null;
   _open: boolean;
   _pending: boolean;
-  /** the engine's loader session; update() hands tick() the display tick it does not read (a BUG-free extra argument), so tick is widened to take it */
-  _session: (Omit<WfightLoaderSession, "tick"> & { tick(displayTick?: number): void; }) | null;
+  /** the engine's loader session (its tick() takes no argument: the session counts its own frames) */
+  _session: WfightLoaderSession | null;
   /** what the last finished loader did, null until one has run */
   _summary: WfightLoaderSummary | null;
   _ticks: number;

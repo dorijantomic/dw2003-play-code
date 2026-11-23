@@ -96,10 +96,16 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
             w._pending = false;
         }
         try {
-            for (const frame of w._clock!.advance(dt)) {
-                w._session!.tick(frame.tick);
+            const session = w._session;
+            const clock = w._clock;
+            if (!session || !clock) return;
+            // the loader session runs its own frame counter (tick() takes no argument), so the display
+            // frames the clock hands back only decide HOW MANY ticks this browser frame runs
+            const frames = clock.advance(dt);
+            for (let f = 0; f < frames.length; f++) {
+                session.tick();
                 w._ticks++;
-                if (w._session!.finished()) break;
+                if (session.finished()) break;
             }
         } catch (error) {
             fail(error);
