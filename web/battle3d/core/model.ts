@@ -159,7 +159,7 @@ function loadProjMesh(id: number) {
         if (l && B$.effectPlayer) {
           const id = l.id ?? l.words?.[1];
           if (l.sub === 1 && id != null) loadProjMesh(id);
-          else if (l.sub === 0 && l.from) B$.effectPlayer.spawnProjectile(id, l.from, l.to, side);
+          else if (l.sub === 0 && id != null && l.from && l.to) B$.effectPlayer.spawnProjectile(id, l.from, l.to, side);
         }
         e.setLunge?.(l);
       },
