@@ -674,7 +674,7 @@ window.__stageObjects = {
     fireSub: (id: string, sub: string, mapId: string | undefined) => fireStageObject(mapId ?? currentMap().id, id, sub),
     // Rockfall oracle only: run the same id through the MIPS interpreter so a
     // verifier can compare the original machine code's frames with the port's.
-    nativeFire: (id: string, mapId: string | undefined) => fireNativeStageObject(mapId ?? currentMap().id, id),
+    nativeFire: (id: number, mapId: string | undefined) => fireNativeStageObject(mapId ?? currentMap().id, id),
     clear: (mapId: string | undefined) => clearStageObjects(mapId),
 };
 // Debug-only: the stage overlays' own point-record actors and the point

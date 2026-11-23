@@ -510,7 +510,7 @@ export function liveStageObjects(stageId: string) {
  * the original machine code and the translated port side by side; the game
  * itself never calls it, so the two routes cannot both own an id in play.
  */
-export function fireNativeStageObject(stageId: string, id: number | string) {
+export function fireNativeStageObject(stageId: string, id: number) {
     return fireNativeEffect(id, 821, id);
 }
 

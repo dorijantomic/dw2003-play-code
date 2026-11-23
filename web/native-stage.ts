@@ -140,7 +140,7 @@ export function nativeStage(stageId: string) {
 
 /** SETANIM ≥ 0x320 route: fire the id on the current stage's native code.
  *  Returns true when consumed (the caller skips the generic emote bubble). */
-export function fireNativeEffect(id, anim: number, facing) {
+export function fireNativeEffect(id: number, anim: number, facing: number) {
     if (!current) return false;
     const ok = current.rt.fireEffect(id, anim, facing);
     if (ok) current.effects.set(id, anim);
