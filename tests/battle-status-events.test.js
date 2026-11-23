@@ -137,11 +137,14 @@ test("CENSUS: every row's port state is decided, and each names a stager", () =>
   // The category-5 members are the three stats and the two locks -- exactly what the
   // arms stage (docs/research/battle/battle-formula-leaves.md 3b). Codes 2 and 3 are
   // ported too: they ARE the turn events, and the timeline advance in web/battle.js is
-  // their port.
+  // their port. Code 5 is the per-side status tick (endStatusEventRegen's caller side);
+  // code 6 is the per-fighter regen timer, ported as `stageStatusEventRegen` /
+  // `endStatusEventRegen` (the Auto Recover enqueue at :979-:996 of the module, freed by
+  // the code-5 consumer, wfightmn.s:2261-2342).
   const ported = STATUS_EVENT_CODES.filter((r) => r.portState === "ported")
     .map((r) => r.code).sort((a, b) => a - b);
   assert.deepEqual(ported,
-    [0x02, 0x03, 0x05, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11]);
+    [0x02, 0x03, 0x05, 0x06, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11]);
 });
 
 test("CENSUS: the consumer table has one row per code, so nothing is staged unhandled", () => {
