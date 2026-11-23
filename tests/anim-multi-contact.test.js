@@ -28,6 +28,7 @@ const DJ = JSON.parse(readFileSync(resolve(ROOT, "web/assets/data/digimon.json")
 const cf = await import(resolve(ROOT, "web/fight/clip-fallback.js"));
 const { contactPlan, contactDamager } = await import(resolve(ROOT, "web/fight/contact-damage.js"));
 const ft = await import(resolve(ROOT, "web/fight/fight-tables.js"));
+const T = JSON.parse(readFileSync(resolve(ROOT, "web/assets/data/fight_tech_table.json"), "utf8"));
 const { ANIM_DONOR_GAPS } = await import(resolve(ROOT, "web/fight/anim-donor-map.js"));
 
 ft.setTechTable(JSON.parse(readFileSync(resolve(ROOT, "web/assets/data/fight_tech_table.json"), "utf8")));
@@ -210,4 +211,22 @@ test("contactDamager pays one hit per 98, commits on the 99, and pays nothing ea
   left = Math.max(0, left - kill.remaining());   // the battle clamps at 0
   assert.equal(left, 0, "the strike takes the rest");
   assert.deepEqual(hp, [39]);
+});
+
+// B004 — a magical technique is a CAST, so the animator must hand the built clip planted=true (C5: a cast's
+// body never lunges). It used to ask the tech record for `attack_category`, a name the extracted table
+// never carries (16 fields, none of them that), so the flag was always false and every magical technique
+// was built with the physical lunge. The category is the record's `category` byte: 3 = magical.
+test("B004: planted is read from the record's category byte, so the 73 magical techs are casts", () => {
+  const { techIsMagical } = ft;
+  assert.equal(typeof techIsMagical, "function");
+  assert.equal(techIsMagical(1), false, "1 Fight is physical (category 2)");
+  assert.equal(techIsMagical(56), true, "56 Pepper Breath is magical (category 3)");
+  const skills = DJ.skills ?? DJ;
+  const rows = Object.entries(T).filter(([id]) => skills.some((s) => String(s.id) === id));
+  const byCat = { 2: "physical", 5: "physical", 6: "physical", 3: "magical", 4: "support" };
+  const wrong = rows.filter(([id, r]) => techIsMagical(Number(id)) !== (byCat[r.category] === "magical"));
+  assert.deepEqual(wrong.map(([id, r]) => `${id}:${r.category}`), [],
+    "every technique's planted flag follows its own category byte");
+  assert.equal(rows.filter(([, r]) => r.category === 3).length, 73, "the disc's 73 magical techniques");
 });

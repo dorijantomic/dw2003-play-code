@@ -19,7 +19,7 @@
 // currentFrame() is sane before tick 1 (and clips with neither op2 nor op4 fall back to idle).
 import { TimelinePlayer, PlaylistPlayer } from "./timeline-player.js";
 import { ActionVM } from "./action-vm.js";
-import { techToClip, techRecord, techEffectType, techTargetClass, techName, ITEM_USE_CLIP, itemUseEffect, itemTargetClass, throwItemEffect, skillRow } from "./fight-tables.js";
+import { techToClip, techRecord, techEffectType, techTargetClass, techName, techIsMagical, ITEM_USE_CLIP, itemUseEffect, itemTargetClass, throwItemEffect, skillRow } from "./fight-tables.js";
 import { resolveClipScript, scriptTableSeq } from "./clip-fallback.js";
 import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // The animation-slot system the original runs is ported in
@@ -490,15 +490,17 @@ export class ActorAnimator {
     // Hammer Rush...), so every built volley fired one contact instead of three (A12).
     const sk = skillRow(techId);
     const hits = (sk || rec)
-      ? basicAttackHitCount(false, { effect_id: rec?.dispatch ?? 2, hits: sk?.hits ?? rec?.hits ?? 1 })
+      ? basicAttackHitCount(false, { effect_id: rec?.dispatch ?? 2, hits: sk?.hits ?? 1 })
       : null;
     return this.setAction(techToClip(techId!), hooks, {
       currentEffect: techEffectType(rec), element: rec?.elem1 ?? 1, target: techTargetClass(techId!),
       // the technique's own hit count (the one dispatch rule the damage applier uses), so a built cast
       // fires exactly as many contacts as the record's hits
       hits,
-      // a magical technique is a cast whatever clip the record names: its body never lunges (C5)
-      planted: rec?.attack_category === "magical",
+      // a magical technique is a cast whatever clip the record names: its body never lunges (C5). The
+      // category is the record's `category` byte 3 (B004: it was probed as `attack_category` on the tech
+      // row, which never carries that name, so every magical technique lunged like a melee hit)
+      planted: techIsMagical(techId),
       // K13: the technique's NAME keys the anatomy's shots rule - how many projectiles leave and from
       // which emitter bones (a three-mouthed body fires three fireballs for Triple Fire)
       tech: techName(techId),

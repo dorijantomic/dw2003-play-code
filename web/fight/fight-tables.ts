@@ -43,9 +43,20 @@ interface ThrowItemEffectTable {
 // 52/52 partition rule (which the extracted table reproduces exactly for techs 1..104).
 let TECH_TABLE: Record<string, FightTechRow> | null = null;
 export function setTechTable(json: Record<string, FightTechRow> | null) { TECH_TABLE = json || null; }
-/** A tech table row; `hits` and `attack_category` are probed by callers but the extracted table carries neither. */
-export type TechRecord = FightTechRow & { hits?: number; attack_category?: number | string };
+/** A tech table row (the disc's 16 fields; the hit count and the category name live on the SKILLS row,
+ *  digimon.json "skills" - `hits` and `attack_category`, the latter naming the record's `category` byte). */
+export type TechRecord = FightTechRow;
 export function techRecord(techId: number): TechRecord | null { return TECH_TABLE?.[String(techId)] ?? null; }
+
+/** True when the technique's category is magical: the record's `category` byte 3 (2/5/6 physical, 4 support
+ *  - the same byte the skills table carries as attack_cat and names "magical"), the rule the walker's
+ *  battle.js uses (`rec.category === 3 ? "magical" : "physical"`). The skills row answers when the
+ *  extracted table has no row for the technique yet. */
+export function techIsMagical(techId: number | null): boolean {
+  const rec = techRecord(Number(techId) | 0);
+  if (rec) return rec.category === 3;
+  return skillRow(techId)?.attack_category === "magical";
+}
 
 export function techToClip(techId: number) {
   const rec = techRecord(techId);
