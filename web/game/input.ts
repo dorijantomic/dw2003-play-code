@@ -317,7 +317,7 @@ export function dispatchInput(k: string, e: FieldKeyEvent, raw = "") {
             return;
         }
         if (driMenu.isOpen!()) {
-            driMenu.handleKey!(k, sfx);
+            driMenu.handleKey!(k, state);
             return;
         }
         if (shop.isOpen!()) {
@@ -465,7 +465,7 @@ export function dispatchInput(k: string, e: FieldKeyEvent, raw = "") {
     // Route all keys to the DRI Select Action screen when open
     if (driMenu.isOpen!()) {
         e.preventDefault();
-        driMenu.handleKey!(k, sfx);
+        driMenu.handleKey!(k, state);
         return;
     }
 

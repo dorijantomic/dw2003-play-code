@@ -84,8 +84,8 @@ export interface LabScreen {
   close?: () => boolean;
   diagnostics?: () => Record<string, unknown>;
   draw?: (ctx: CanvasRenderingContext2D, viewW?: number, viewH?: number) => void;
-  /** `state` is typed loosely on purpose: web/game/input.ts hands it the sound player (see the report) */
-  handleKey?: (_k: string, state: any) => void;
+  /** the walker state a key falls back to when the screen was opened without one */
+  handleKey?: (_k: string, state?: WalkerState | null) => void;
   isOpen?: () => boolean;
   open?: (state: GameState, onClose?: (() => void) | null, selector?: number) => Promise<void>;
   textWidgets?: () => ReturnType<LabSession["widgets"]["textWidgets"]>;
