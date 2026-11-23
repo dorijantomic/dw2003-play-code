@@ -55,7 +55,7 @@ tools/rewrite/split-types.mjs.
 | quest-scenes.ts | 11 | types of web/quest-scenes.ts |
 | redirect-view.ts | 1 | types of web/redirect-view.ts |
 | save-translated.ts | 2 | types of web/save-translated.ts |
-| screens.ts | 43 | shared shapes of the book and screen modules: web/glossary-items.ts, glossary-stage.ts, glossary-book.ts, glossary-fallback.ts, book-host.ts, cntysel-native.ts |
+| screens.ts | 43 | shared shapes of the book and screen modules: web/glossary-items.ts, web/glossary-stage.ts, web/glossary-book.ts, web/glossary-fallback.ts, web/book-host.ts, web/cntysel-native.ts |
 | save.ts | 1 | types of web/save.ts |
 | scene-dryrun.ts | 1 | types of web/scene-dryrun.ts |
 | sceneEditor.ts | 1 | types of web/sceneEditor.ts |
@@ -105,6 +105,25 @@ tools/rewrite/split-types.mjs.
 | u-scene.ts | 0 | types added after the split — see the file's own header |
 | ui-kit.ts | 1 | types added after the split — see the file's own header |
 | uifont.ts | 2 | types added after the split — see the file's own header |
+| battle-core.ts | 2 | shapes of the battle core files (web/battle/core/*.ts, web/party.ts): DigimonTable, WalkerSentencePlan |
+| fishing-underwater.ts | 9 | the three.js objects web/fishing-underwater.ts builds: UwPlaced, UwMesh, UwGroup, UwCamera, UwSun, UwRenderer |
+| fx3d.ts | 34 | the field effects (web/effects/*) and the 3D battle renderer (web/battle3d/*): PointSpriteLayer, PointStageData, ActorPositionPatch |
+| game-shared.ts | 1 | shared by web/game/*, web/menu/*: ReadyScreenPack |
+| game-shared2.ts | 1 | shared by web/game/*: WithAnyKey (the textbox Proxy in web/game/vars.ts) |
+| map-tiles.ts | 6 | web/map-tiles.ts: TiledMapInfo, TileIndex, TileIndexState, MapTileEntry, MapTileJob, MapTileEnv |
+| misc-game.ts | 42 | web/evolution-planner.ts, web/dri-model.ts, web/fxaudio.ts, web/dev-panel.ts: EvolutionRecord, EvoPlannerTable, EvoProfile |
+| misc-game2.ts | 37 | web/fieldcom.ts, web/gpu-pixel-filter.ts, web/screenpack.ts, web/water3d.ts, web/grass3d.ts, web/fishing-extras.ts, web/treesway.ts, web/extra-roster.ts, web/quest-ghost.ts, web/species-log.ts: FieldcomManifest, ScreenPack |
+| mount.ts | 16 | web/mount.ts: MountSpot, MountDef, MountHost, the rider's place |
+| mp-match.ts | 33 | the many-vs-many fight (web/mpbattle-rules.ts, web/mpbattle/*.ts): MpCommand, MpSeat, MpField, MpKit |
+| quest-fx.ts | 18 | web/quest-fx.ts: QuestFxLayer, QuestFxClip, QuestFxSheetDef, QuestFxSheet |
+| quest-lab.ts | 6 | web/quest-lab.ts: QuestLabRecord, QuestLabGiver, QuestLabObjective, QuestLabDef |
+| quest-walk.ts | 4 | web/quest-walk.ts: QuestWalkPoint, QuestGridSource, QuestRouteResult, QuestStandInPost |
+| rest-a.ts | 40 | the "rest A" group, the small leaf modules of web/*.ts: PauseBookSwitches, PanelFrame, PanelFrames |
+| rest-b.ts | 11 | the "rest-b" group (web/map-screen-model.ts, web/newmaps.ts, ...): NewMapExit, NewMapFile, AmbienceBag, ExtraPartnerRecord |
+| rest-c.ts | 11 | the "rest-c" group (web/native-stage.ts, web/scenery3.ts, web/gpu-pixel-filter.ts, ...): NativeExeTables, NativeStageCurrent, Scenery3Scene |
+| scenery.ts | 28 | web/scenery.ts and web/scenery2.ts read the scene object web/ambience.ts hands them: SceneryScene, SceneryProfile, SceneryFx |
+| scenery2.ts | 20 | the particles, lamps and state web/scenery2.ts keeps: LampLayer, StageLightRecord, GameLamp |
+| translated-screens.ts | 7 | shared by the translated screens (the web files named -translated): PackedSfx, ResidentGlyphs, BattleMenuData |
 
 Where to look for:
 - the shape of an object a module builds and fills in -> that module's file here

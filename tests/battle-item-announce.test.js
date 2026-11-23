@@ -150,9 +150,9 @@ test("both item paths put up the kind-14 announcement instead of a typed sentenc
 });
 
 test("the announcement page is the shared box's spec, filled from bank 0x6a", () => {
-  assert.match(battle, /itemAnnouncementPage\(\s*b\.player\.profile\.name, item\.id,\s*battleMsgText\(ui\.BATTLE_MESSAGE_BANK_FIELD, item\.id\)\)/,
+  assert.match(battle, /itemAnnouncementPage\(\s*b\.player\.profile\.name, item\.id,\s*battleMsgText\(\(?ui\)?\.BATTLE_MESSAGE_BANK_FIELD, item\.id\)\)/,
     "web/battle.js no longer builds the announcement out of the loaded bank 0x6a");
   // The bank has to be loaded before the first item page, not after.
-  assert.match(battle, /await battleMsgBank\(ui\.BATTLE_MESSAGE_BANK_FIELD\);/,
+  assert.match(battle, /await battleMsgBank\(\(?ui\)?\.BATTLE_MESSAGE_BANK_FIELD\);/,
     "web/battle.js never loads the item-name bank");
 });
