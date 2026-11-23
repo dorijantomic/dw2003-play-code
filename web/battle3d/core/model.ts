@@ -12,7 +12,7 @@ import { resolveContactSoundType } from "../../battle3d.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
 
 import type { BattleSide } from "../../types/audio.js";
-import type { SkelBufs } from "../../types/battle3d.js";
+import type { ActorResources, SkelBufs } from "../../types/battle3d.js";
 import type { LungeRecord, ProjDrawGroup } from "../../types/fx3d.js";
 interface EffectSpawnRecord {
   type: number | string;
@@ -178,19 +178,24 @@ function freeSkelBufs(bufs: SkelBufs) {
   // the model data (+0x80); the release now runs THROUGH the port rather than a hand-written
   // `if (tex) deleteTexture; freeSkelBufs; null`, so the guard and the zero test are the
   // original's. `free` does the browser-side release — that half is genuinely browser-side.
-  function releaseActorResources(resources: unknown[]) {
-    const slots = resources.slice();
+  function releaseActorResources(resources: ActorResources) {
+    // The disc's word at each slot is a VRAM pointer, so "non-zero = the actor owns this". The
+    // browser's slots hold OBJECT handles instead (a WebGLTexture, the SkelBufs, the model),
+    // and every object reads as 0 through the port's numeric word — which is why nothing was
+    // ever freed. Report the slot's own 1-based number instead, so an occupied slot is non-zero
+    // exactly when the disc's word is: 0 = nothing here, 1 = +0x78, 2 = +0x7c, 3 = +0x80.
+    const slots: ActorResources = [resources[0] ?? null, resources[1] ?? null, resources[2]];
     actorTeardown({
       // The browser tears its actor down when it is replaced, which is the original's state 3.
       getState: () => ACTOR_TEARDOWN_STATE,
-      getResource: (off: number) => slots[ACTOR_RES_OFFSETS.indexOf(off)] ?? 0,
-    }, (ptr) => {
-      const i = slots.indexOf(ptr);
-      if (i < 0) return;
-      slots[i] = 0;
-      if (i === 0) B$.gl!.deleteTexture(ptr);   // actor +0x78: the texture
-      else if (i === 1) freeSkelBufs(ptr);   // actor +0x7c: the skeleton GL buffers
-      // i === 2: actor +0x80 is plain JS model data — dropping the reference frees it.
+      getResource: (off: number) => {
+        const i = ACTOR_RES_OFFSETS.indexOf(off);
+        return i >= 0 && slots[i] ? i + 1 : 0;
+      },
+    }, (ptr: number) => {
+      if (ptr === 1 && slots[0]) { B$.gl!.deleteTexture(slots[0]); slots[0] = null; }   // actor +0x78: the texture
+      else if (ptr === 2 && slots[1]) { freeSkelBufs(slots[1]); slots[1] = null; }   // actor +0x7c: the skeleton GL buffers
+      else if (ptr === 3) slots[2] = null;   // actor +0x80 is plain JS model data — dropping the reference frees it.
     });
   }
 // Warm the model + texture caches ahead of a presentation model swap (the DNA

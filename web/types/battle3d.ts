@@ -43,6 +43,16 @@ export interface SkelBufs extends Battle3dBuffers {
   toonNrm?: Float32Array;
 }
 
+/** The three resources one battle actor holds, in the actor teardown's (+0x78/+0x7c/+0x80)
+ *  slot order: the texture, the skeleton GL buffers (absent until the model loaded) and the
+ *  model data. The teardown works on the WORD the original reads there, so a browser slot's
+ *  presence is reported to it as a slot number by the caller, not by the handle itself. */
+export type ActorResources = [
+  WebGLTexture | null | undefined,
+  SkelBufs | null | undefined,
+  unknown,
+];
+
 // One arena/backdrop layer's GL buffers (`_arenaGroupBuf` / `_bdGroupBuf`), with the per-layer
 // extras the cull and the atmosphere moon pick keep on it.
 export interface ArenaGroupBuf {
@@ -673,7 +683,7 @@ export interface Battle3DContext {
   PROJ_BASE?: string;
   projCache?: Map<number, ProjectileMesh | "loading" | null>;
   projWorld: (pos: number[], side: BattleSide) => number[];
-  releaseActorResources: (resources: unknown[]) => void;
+  releaseActorResources: (resources: ActorResources) => void;
   removeFighter: (id: string) => void;
   render: (dt: number) => void;
   resolveArenaStage: () => void;
