@@ -115,10 +115,15 @@ def binutils() -> Path:
         build.mkdir()
         log("building mips-elf binutils (a few minutes, once)")
         env = {**os.environ, "MAKEINFO": "true"}
+        extra = []
+        if platform.system() == "Darwin":
+            # binutils' bundled zlib #defines fdopen, which clashes with the macOS 15 SDK's _stdio.h;
+            # the SDK ships a current zlib, so use that one.
+            extra.append("--with-system-zlib")
         _run([Path(work) / f"binutils-{BINUTILS_VERSION}/configure", "--target=mips-elf",
               f"--prefix={prefix}", "--disable-nls", "--disable-werror", "--disable-gdb",
               "--disable-gdbserver", "--disable-sim", "--disable-gprofng",
-              "--disable-libdecnumber", "--disable-readline", "--without-zstd",
+              "--disable-libdecnumber", "--disable-readline", "--without-zstd", *extra,
               "MAKEINFO=true"], cwd=build, env=env, stdout=subprocess.DEVNULL)
         _run(["make", f"-j{_jobs()}", "MAKEINFO=true"], cwd=build, env=env,
              stdout=subprocess.DEVNULL)

@@ -37,6 +37,7 @@ import contextlib
 import fnmatch
 import functools
 import gc
+import inspect
 import json
 import os
 import re
@@ -672,11 +673,13 @@ def export_dynamic_onnx(weights: Path, out_dir: Path, spec: ModelSpec) -> tuple[
     onnx_path = out_dir / f"{spec.key}.onnx"
     partial = onnx_path.with_suffix(".tmp")
     print(f"  {spec.key}: exporting ONNX -> {onnx_path.name}", flush=True)
+    # Newer torch defaults to the dynamo exporter (needs onnxscript, ignores dynamic_axes); keep the classic one.
+    extra = {"dynamo": False} if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
     with torch.no_grad():
         torch.onnx.export(
             net, torch.zeros(1, 3, 64, 64), str(partial), opset_version=17,
             do_constant_folding=False, input_names=["x"], output_names=["y"],
-            dynamic_axes={"x": {2: "h", 3: "w"}, "y": {2: "h4", 3: "w4"}},
+            dynamic_axes={"x": {2: "h", 3: "w"}, "y": {2: "h4", 3: "w4"}}, **extra,
         )
     os.replace(partial, onnx_path)
     info = {
