@@ -68,15 +68,18 @@ test("a basic attack selects no EFFECT pack, and the three arena branches stay e
   // MEFT1001-1029 shipped and the selector was decoded -- a battle's arena is the encounter
   // record's param -- so an ordinary attack now draws its AREA's arena. The three draw branches
   // must stay mutually exclusive: the EFFECT pack (dfActive), the void (dnaVoidActive), the
-  // AREA arena (arenaActive), and only then the generated floor.
+  // AREA arena (arenaActive), and only then the generated floor. The viewer's isolated mode
+  // (the Arena Viewer of a built stage) is a fourth negative: there the neutral grid is the
+  // ground, so the generated floor stays down.
   assert.match(battle3d, /const arenaActive = !dfActive && !dnaVoidActive/,
     "web/battle3d.js no longer derives arenaActive from !dfActive && !dnaVoidActive; the area " +
     "arena would then compete with the effect pack or the void");
-  assert.match(battle3d, /if \(!dfActive && !dnaVoidActive && !arenaActive\)\s*\n\s*drawQuad\(gl, texP, pv, floorBufs, arenaTexture/,
-    "the generated arena floor is no longer gated on all three negatives; it would then compete " +
-    "with a loaded pack or with the disc's own area arena");
+  assert.match(battle3d, /if \(!dfActive && !dnaVoidActive && !arenaActive && !B\$\.isolatedMode\)\s*\n\s*drawQuad\(B\$\.gl, B\$\.texP, pv, B\$\.floorBufs, B\$\.arenaTexture/,
+    "the generated arena floor is no longer gated on the three negatives and the viewer's " +
+    "isolated mode; it would then compete with a loaded pack, with the disc's own area arena, " +
+    "or with the viewer's grid");
   // And the special backdrop uses its own pack's meshes through the live camera.
-  assert.match(battle3d, /drawProjLayer\(gl, texP, mvp, g, g\.page === "floor" \? activeBackdrop\.floorTex/,
+  assert.match(battle3d, /drawProjLayer\(B\$\.gl, B\$\.texP, mvp, g, g\.page === "floor" \? B\$\.activeBackdrop\.floorTex/,
     "the per-element backdrop draw changed shape; re-read the route before trusting this test");
   // The area arena draws its own meshes over the disc's sky colour read from the record.
   assert.match(battle3d, /setArenaStage/,

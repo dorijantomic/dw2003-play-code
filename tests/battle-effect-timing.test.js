@@ -37,11 +37,12 @@ const sfstdata = JSON.parse(readFileSync(
 const TECH = JSON.parse(readFileSync(resolve("web/assets/data/fight_tech_table.json"), "utf8"));
 
 test("the four attack entry points arm the backdrop from the clip's op4, not a timer", () => {
-  // setPlayerAnimByTech / setEnemyAnimByTech / playerAttack / enemyAttack.
+  // setPlayerAnimByTech / setEnemyAnimByTech / playerAttack / enemyAttack, plus the
+  // multi-fighter special (web/battle3d/core/fighters.ts, fighterAttack) -- the same arm.
   const arms = battle3d.match(/armDataField\(techId\);/g) || [];
-  assert.equal(arms.length, 4,
-    `expected the four attack entry points to arm the backdrop from the clip's op4 ` +
-    `(armDataField), found ${arms.length}`);
+  assert.equal(arms.length, 5,
+    `expected the four attack entry points (and the multi-fighter attacker) to arm the ` +
+    `backdrop from the clip's op4 (armDataField), found ${arms.length}`);
   // NO attack entry point may trigger the wall-clock window any more. `triggerDataField`
   // survives only for the lab/debug `setDataField` (which passes an explicit `now`).
   assert.ok(!/triggerDataField\(techId\)/.test(battle3d),
@@ -49,7 +50,7 @@ test("the four attack entry points arm the backdrop from the clip's op4, not a t
     "would again appear on a timer instead of at the clip's own play-motion op");
   assert.match(battle3d, /function dataFieldMotion\(motion\) \{[\s\S]{0,400}?else if \(m > 0\)/,
     "dataFieldMotion must resolve the op4 motion into the backdrop's on/off state");
-  assert.match(battle3d, /dataFieldPinned \|\| dataFieldOn \|\| \(now >= dataFieldOnAt/,
+  assert.match(battle3d, /B\$\.dataFieldPinned \|\| B\$\.dataFieldOn \|\| \(now >= B\$\.dataFieldOnAt/,
     "dataFieldIsActive no longer honours the op4-driven `dataFieldOn`; the op-selected backdrop " +
     "would never draw");
 });
@@ -57,10 +58,13 @@ test("the four attack entry points arm the backdrop from the clip's op4, not a t
 test("both attackers feed their own clip's motion to the backdrop, the defenders do not", () => {
   // The attacker hooks carry `onMotion: dataFieldMotion`; the defender hooks must not, or a
   // reaction clip's op4 would take the backdrop down under the attacker's own effect.
-  const atk = battle3d.match(/_impactContact\(\{ \.\.\.hooks, onMotion: dataFieldMotion \}\)/g) || [];
-  assert.equal(atk.length, 2,
-    `expected the player and enemy attacker hooks to carry onMotion: dataFieldMotion, found ${atk.length}`);
-  assert.match(battle3d, /function dataFieldMotion\(motion\) \{\s*\n\s*if \(!dataFieldArmed\) return;/,
+  // Three attackers: playerAttack / enemyAttack (web/battle3d/core/anim.ts) and the
+  // multi-fighter fighterAttack (web/battle3d/core/fighters.ts).
+  const atk = battle3d.match(/_impactContact\(\{ \.\.\.hooks, onMotion: B\$\.dataFieldMotion \}\)/g) || [];
+  assert.equal(atk.length, 3,
+    `expected the player, enemy and multi-fighter attacker hooks to carry onMotion: ` +
+    `dataFieldMotion, found ${atk.length}`);
+  assert.match(battle3d, /function dataFieldMotion\(motion\) \{\s*\n\s*if \(!B\$\.dataFieldArmed\) return;/,
     "dataFieldMotion must do nothing when the cast in flight has no element pack (a basic attack)");
 });
 

@@ -45,7 +45,9 @@ test("the far-plane gap is why a co-located fighter tests BEHIND the arena", () 
   // The two projections the frame actually uses: the arena through a 60000 far plane, the
   // ordinary fighters through 8000.
   assert.match(B3D, /mat4Perspective\(fovRad, W \/ H, 1, 60000\)/, "the arena uses a 60000 far plane");
-  assert.match(B3D, /farPlane = explicitShot \? 60000 : 8000/, "ordinary fighters use an 8000 far plane");
+  assert.match(B3D, /const farPlane = explicitShot \|\| B\$\.giantNearCam \|\| B\$\.camMode === "free" \|\| battleWide \? 60000 : 8000/,
+    "ordinary fighters use an 8000 far plane (the 60000 one is for an explicit shot, the " +
+    "giant/near camera, the free camera and the battle-wide dolly)");
   // A larger far plane maps the same distance to a SMALLER window depth (nearer). So at any world
   // point the arena fragment is nearer than the fighter fragment and LEQUAL rejects the fighter —
   // this is the rejection the clear must remove.

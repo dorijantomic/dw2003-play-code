@@ -131,7 +131,8 @@ test("the ending exit is a host hand-off with its own finish, and the guards hol
     "the chain's end closes the win exactly like the report's");
   // The ending phase swallows keys and the battle stops painting while hosted.
   assert.ok(src.includes("if (b._victoryPhase === \"ending\") {"));
-  assert.ok(src.includes("if (b._endingHosted) return;"));
+  assert.ok(src.includes("if (b._endingHosted) { uiC.hide(\"ui-battle\"); return; }"),
+    "the hosted ending hides the battle UI and stops painting (web/battle/core/draw.ts)");
 });
 
 test("the host plays the chain through the movie plumbing and warps to its end", () => {

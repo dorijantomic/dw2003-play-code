@@ -754,7 +754,8 @@ test("the per-action clear still runs once for every category-5 arm", () => {
   battleScriptedPlanFor(b, 0, record(198), 198, { name: "Marsmon" });
   assert.equal(b.player.affinity, 0, "a stat change throws the charge away too");
   const clears = BATTLE_JS.match(/clearActionAffinity\(b, side\)/g) ?? [];
-  assert.equal(clears.length, 3,
-    "one definition, the category-4 gate, and this one gate");
+  assert.equal(clears.length, 4,
+    "one definition, the category-4 gate, the category-5 (scripted) gate, and the " +
+    "field-technique gate (a field tech clears the byte too, fightstg.s:13092)");
   assert.equal(typeof clearActionAffinity, "function");
 });
