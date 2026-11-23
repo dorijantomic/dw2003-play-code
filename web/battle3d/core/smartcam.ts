@@ -3,27 +3,27 @@ import type { Battle3DContext } from "../../types/battle3d.js";
 
 import type { Battle3dAABB, Battle3dFighter } from "./types.js";
 import type { ArenaGroupBuf } from "../../types/battle3d.js";
-import type { CamShot, SmartJob, SmartScore, Vec3 } from "../../types/fx3d.js";
+import type { CamShot, SmartJob, SmartPick, SmartScore, Vec3 } from "../../types/fx3d.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeSmartcam(B$: Battle3DContext) {
-function _smartApply(base: CamShot, p): CamShot {
+function _smartApply(base: CamShot, p: SmartPick): CamShot {
     const v = [base.eye[0] - base.look[0], base.eye[1] - base.look[1], base.eye[2] - base.look[2]];
     const a = p.yaw * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
     return { eye: [base.look[0] + (v[0]! * c - v[2]! * s) * p.d, base.look[1] + v[1]! * p.h * p.d, base.look[2] + (v[0]! * s + v[2]! * c) * p.d], look: base.look, fov: base.fov };
   }
 // one camera spot's numbers (all 0..1)
-  function _smartScore(groups: ArenaGroupBuf[], scale: number, cam: CamShot, fs: { aabb: Battle3dAABB }[], aspect: number): SmartScore {
+  function _smartScore(groups: ArenaGroupBuf[], scale: number | undefined, cam: CamShot, fs: Battle3dFighter[], aspect: number): SmartScore {
     // ETS item 9: a vec3 holds three numbers, and the box corners and the triangle buffers are read inside their own bounds.
     const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
     const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0]!, a[1]!, a[2]!) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2]!, 0, fwd[0]]);
     const up = [right[1]! * fwd[2]! - right[2]! * fwd[1]!, right[2]! * fwd[0]! - right[0]! * fwd[2]!, right[0]! * fwd[1]! - right[1]! * fwd[0]!];
-    const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * scale;
+    const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * (scale ?? NaN);
     const scr = (p: Vec3): Vec3 | null => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
     let near = Infinity, feet = Infinity, off = 0, corners = 0;
     const boxes = new Uint8Array(GW * GH);
     for (const f of fs) {
-      const b = f.aabb;
+      const b = f.aabb; if (!b) continue;
       near = Math.min(near, dot(sub([(b.min[0]! + b.max[0]!) / 2, (b.min[1]! + b.max[1]!) / 2, (b.min[2]! + b.max[2]!) / 2], cam.eye), fwd));
       feet = Math.min(feet, b.min[1]!);
       let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -75,15 +75,16 @@ function _smartApply(base: CamShot, p): CamShot {
     for (let i = 0; i < hit.length; i++) { n += hit[i]!; if (boxes[i]) { nb++; nbh += hit[i]!; } }
     return { cover: n / hit.length, onFighters: nb ? nbh / nb : 0, offscreen: off / Math.max(1, corners) };
   }
-function _smartTotal(m: SmartScore, p) {
+function _smartTotal(m: SmartScore, p: SmartPick) {
     return 8 * m.onFighters + 4 * m.cover + 6 * m.offscreen
       + 0.004 * Math.abs(p.yaw) + 0.5 * Math.abs(Math.log(p.h)) + 0.6 * Math.abs(Math.log(p.d));
   }
 // scores `n` more candidates of a job; returns true when the job is finished
-  function _smartStep(job, n: number) {
+  function _smartStep(job: SmartJob, n: number) {
     const t0 = performance.now();
     for (; n > 0 && job.i < B$.SMART_CANDS!.length; n--, job.i++) {
-      const p = B$.SMART_CANDS![job.i], m = _smartScore(job.groups, job.scale, _smartApply(job.base, p), job.fs, job.aspect), s = _smartTotal(m, p);
+      const p = B$.SMART_CANDS![job.i]; if (!p) break;
+      const m = _smartScore(job.groups, job.scale, _smartApply(job.base, p), job.fs, job.aspect), s = _smartTotal(m, p);
       if (!job.def) job.def = { p, m, s };
       if (!job.best || s < job.best.s) job.best = { p, m, s };
     }
@@ -107,8 +108,9 @@ function _smartCameraShot() {
     }
     const dt = Math.min(0.25, Math.max(0, B$.orbitClock! - B$.smartLastClock!)); B$.smartLastClock = B$.orbitClock;
     const p = B$.smartPick || { yaw: 0, h: 1, d: 1 }, k = 1 - Math.exp(-dt * 2.5);
-    B$.smartCur!.yaw += (p.yaw - B$.smartCur!.yaw) * k; B$.smartCur!.h += (p.h - B$.smartCur!.h) * k; B$.smartCur!.d += (p.d - B$.smartCur!.d) * k;
-    return _smartApply(base, B$.smartCur);
+    const cur = B$.smartCur; if (!cur) return base;   // no eased pick yet: the plain multi-camera shot is the shot
+    cur.yaw += (p.yaw - cur.yaw) * k; cur.h += (p.h - cur.h) * k; cur.d += (p.d - cur.d) * k;
+    return _smartApply(base, cur);
   }
 /** (checks) the smart camera's numbers: the last pick in the live fight, or a fresh pick for arena pack `name`
    *  at `scale` (default: the scale that pack would get) with the current fighters; null while the pack loads. */
@@ -118,6 +120,7 @@ function _smartCameraShot() {
     const base = _multiCameraShot(), fs = [...B$.extras!.values()].filter((f) => f.model && f.visible && f.aabb);
     if (!base || !fs.length) return null;
     const job = _smartJob(base, fs, pk, scale ?? B$._arenaScaleClear(want!, pk));
+    if (!job) return null;            // a pack with no mesh groups (geometry.json missing) scores nothing
     _smartStep(job, B$.SMART_CANDS!.length);
     return B$._smartResult(job);
   }
