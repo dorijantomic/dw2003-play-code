@@ -351,7 +351,7 @@ function coopSetEnemyHp(index: number, hp: number) {
     if (fusionBoss) {
       // The stream is the disc's RAND_U16 word, exactly as rollBattleDrop does.
       // One live draw per owed row; every item that lands joins the loot list the report banks.
-      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, B.enemiesDB, RAND_U16!!!!!!, true)) {
+      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, B.enemiesDB, RAND_U16, true)) {
         b._loot.drops.push(item);
       }
     } else {
@@ -396,7 +396,7 @@ function coopSetEnemyHp(index: number, hp: number) {
     const nextEnemy = step.done ? null : (team ? B.enemyTeamRecord(b, step.index!) : B.buildEnemyRecord(step.entry!));
     if (!nextEnemy) {
       // The battle's single disc drop roll: pick one candidate (RAND % count), then its rate.
-      const drop = rollBattleDrop(b._loot.candidates, RAND_U16!!!!!!);
+      const drop = rollBattleDrop(b._loot.candidates, RAND_U16);
       if (drop) b._loot.drops.push(drop);
       b._loot.candidates = [];
       b.state = ST.WIN;
