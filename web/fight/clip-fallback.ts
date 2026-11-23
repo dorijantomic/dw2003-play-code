@@ -134,7 +134,7 @@ import { prepareDw2Motion, dw2MotionFor, dw2MotionEnabled } from "./dw2-motion.j
 // The hand-picked clips (web/dw2-motion-picks.json, written by the animation viewer): with DW2 motion
 // on, a listed clip overrides the automatic rule ("dw2" even over an own clip, "dw3" never DW2).
 import { dw2Pick } from "./dw2-picks.js";
-import { skillRow } from "./fight-tables.js";
+import { skillRowsForName } from "./fight-tables.js";
 // OWN CLIPS FIRST (the operator's rule, 2026-10-26): a missing technique slot takes the model's OWN
 // clip of the matching kind before anything else. OFF by default (?ownclips=1 / setOwnClipsEnabled);
 // every call below is a no-op until a scope turns it on, so the build is byte-identical without it.
@@ -1217,7 +1217,10 @@ export function withDw2Body(model: ClipScriptModel, base: ClipScript | null, cli
   // `force` = the user hand-picked DW2 for this clip (dw2-motion-picks.json): the own clip's ops stay,
   // only its body binds take the DW2 table, exactly as for a donor build.
   if (!force && hasOps(model?.actions?.[clip])) return base;
-  const magical = skillRow(tech as unknown as number)?.attack_category === "magical";
+  // `tech` is the technique NAME (techName), so the skills rows are found by name and narrowed by the clip;
+  // the technique is magical only when every row that matches says so (same rule as own-clips moveKind).
+  const techRows = (tech ? skillRowsForName(tech) : []).filter((r) => (r.clip | 0) === (clip | 0));
+  const magical = techRows.length > 0 && techRows.every((r) => r.attack_category === "magical");
   const dw2 = dw2MotionFor(model, clip, { tech, magical });
   if (!dw2 || !base?.ops?.length) return base;
   // Only a script that PLAYS a body table can take another body. A clip whose own presentation is an
