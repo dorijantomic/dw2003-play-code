@@ -82,7 +82,13 @@ function startAuctionLot(lot: AuctionLot) {
     };
     runAuctionLot(lot, host, (handoff?: StoryHandoff | null) => {
         // The answer script's own HANDOFF is the tower's force-exit (530 → s275).
-        if (handoff) doStoryHandoff(answerRow, handoff);
+        // runAuctionLot reports a handoff only from the answer script, whose row
+        // playScript stored above; a lot naming an event with no script never
+        // plays, so the row is there whenever this fires.
+        if (!handoff) return;
+        const row = answerRow;
+        if (!row) { storyDbg("AUCTION HANDOFF without an answer row", handoff.screenId); return; }
+        doStoryHandoff(row, handoff);
     });
 }
 
