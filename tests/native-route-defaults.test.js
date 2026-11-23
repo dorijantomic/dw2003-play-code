@@ -23,44 +23,50 @@ const read = (rel) => readFileSync(join(repo, rel), "utf8");
 
 const NO_HOST = /openNativeScreen|preloadNativeScreens|bootNativeScreen|native-screen\.js|native-screen-host/;
 
+/** The check that an adapter runs its session, `/new ui\.XSession\(/`.
+ *  A typed call emits its annotation as blanks: `new (ui as EngineUi).ShopRootSession(`
+ *  builds to `new (ui            ).ShopRootSession(`, so the plain `new ui\.` form is gone.
+ *  Accept both the plain and the parenthesised form. */
+const runsSession = (name) => new RegExp(`new (?:\\(ui\\s*\\)|ui)\\.${name}\\(`);
+
 /** Every in-scope route: module, ordinary adapter, focused proof, the session it runs, and the line
  *  in web/game.js (or web/battle.js) that builds it. */
 export const ROUTES = [
     {
         module: "pro/stitshop", adapter: "web/shop-translated.js", proof: "tools/verify_browser_shop.mjs",
-        session: /new ui\.ShopRootSession\(/, built: /const shopTranslated = createShopTranslated\(sfx,[\s\S]*?const shop = shopTranslated;/,
+        session: runsSession("ShopRootSession"), built: /const shopTranslated = createShopTranslated\(sfx,[\s\S]*?const shop = shopTranslated;/,
     },
     {
         module: "pro/stgtrain", adapter: "web/gym-translated.js", proof: "tools/verify_translated_gym.mjs",
-        session: /new ui\.GymSession\(/, built: /const gym = createGymTranslated\(sfx\);/,
+        session: runsSession("GymSession"), built: /const gym = createGymTranslated\(sfx\);/,
     },
     {
         module: "pro/stgdglab", adapter: "web/lab-translated.js", proof: "tools/verify_translated_lab.mjs",
-        session: /new ui\.LabSession\(/, built: /const driMenu = createLabTranslated\(sfx\);/,
+        session: runsSession("LabSession"), built: /const driMenu = createLabTranslated\(sfx\);/,
     },
     {
         module: "pro/ststatus", adapter: "web/status-translated.js", proof: "tools/verify_native_status.mjs", allowHost: true,
-        session: /new ui\.PauseRootSession\(/, built: /const status = createStatusTranslated\(sfx, statusOptions\);/,
+        session: runsSession("PauseRootSession"), built: /const status = createStatusTranslated\(sfx, statusOptions\);/,
     },
     {
         module: "pro/stgmcard", adapter: "web/save-translated.js", proof: "tools/verify_translated_save.mjs",
-        session: /new ui\.MemcardSession\(/, built: /const saveScreenNative = createSaveTranslated\(sfx\);\s*(?:export )?const saveScreen = saveScreenNative;/,
+        session: runsSession("MemcardSession"), built: /const saveScreenNative = createSaveTranslated\(sfx\);\s*(?:export )?const saveScreen = saveScreenNative;/,
     },
     {
         module: "pro/stfgtrep", adapter: "web/fightreport-translated.js", proof: "tools/verify_translated_report.mjs",
-        session: /new ui\.FightReportSession\(/, built: /const fightReportNative = createFightReportTranslated\(sfx, \{ getState: \(\) => state \}\);\s*(?:export )?const fightReport = fightReportNative;/,
+        session: runsSession("FightReportSession"), built: /const fightReportNative = createFightReportTranslated\(sfx, \{ getState: \(\) => state \}\);\s*(?:export )?const fightReport = fightReportNative;/,
     },
     {
         module: "pro/stcrdabm", adapter: "web/cardalbum-translated.js", proof: "tools/verify_translated_album.mjs",
-        session: /new ui\.AlbumSession\(/, built: /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\s*(?:export )?const cardAlbum = cardAlbumTranslated;/,
+        session: runsSession("AlbumSession"), built: /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\s*(?:export )?const cardAlbum = cardAlbumTranslated;/,
     },
     {
         module: "pro/stcrddek", adapter: "web/carddeck-translated.js", proof: "tools/verify_translated_folder.mjs",
-        session: /new ui\.FolderSession\(/, built: /const cardDeckTranslated = createCardDeckTranslated\(sfx\);\s*(?:export )?const cardDeck = cardDeckTranslated;/,
+        session: runsSession("FolderSession"), built: /const cardDeckTranslated = createCardDeckTranslated\(sfx\);\s*(?:export )?const cardDeck = cardDeckTranslated;/,
     },
     {
         module: "pro/stcrdshp", adapter: "web/cardshop-translated.js", proof: "tools/verify_translated_cardshop.mjs",
-        session: /new ui\.CardShopSession\(/, built: /const cardShop = cardShopTranslated;/,
+        session: runsSession("CardShopSession"), built: /const cardShop = cardShopTranslated;/,
     },
     {
         module: "pro/cardgame", adapter: "web/cardduel-native.js", proof: "tools/verify_native_duel.mjs",
@@ -68,15 +74,15 @@ export const ROUTES = [
     },
     {
         module: "pro/stdwtitl", adapter: "web/titlescreen.js", proof: "tools/verify_translated_title.mjs",
-        session: /new ui\.TitleSession\(/, built: /let ts = createTitleScreen\(\{ language: state\.languageByte \?\? 2, previousScreenCode \}\);/,
+        session: runsSession("TitleSession"), built: /let ts = createTitleScreen\(\{ language: state\.languageByte \?\? 2, previousScreenCode \}\);/,
     },
     {
         module: "pro/stdgname", adapter: "web/nameentry-translated.js", proof: "tools/verify_native_nameentry.mjs", allowHost: true,
-        session: /new ui\.NameRootSession\(/, built: /const nameEntryNative = createNameEntryTranslated\(sfx,/,
+        session: runsSession("NameRootSession"), built: /const nameEntryNative = createNameEntryTranslated\(sfx,/,
     },
     {
         module: "pro/stplnmet", adapter: "web/packselect-translated.js", proof: "tools/verify_translated_packselect.mjs", allowHost: true,
-        session: /new ui\.WizardRootSession\(/, built: /const packSelectNative = createPackSelectTranslated\(sfx\);/,
+        session: runsSession("WizardRootSession"), built: /const packSelectNative = createPackSelectTranslated\(sfx\);/,
     },
     {
         module: "pro/cnty_sel", adapter: "web/cntysel-native.js", proof: "tools/verify_translated_language.mjs",
@@ -88,12 +94,12 @@ export const ROUTES = [
     },
     {
         module: "pro/fightstg", adapter: "web/battlecmd-translated.js", proof: "tools/verify_translated_battlecmd.mjs",
-        source: "web/battle.js", session: /new ui\.FightCommandSession\(/,
+        source: "web/battle.js", session: runsSession("FightCommandSession"),
         built: /(?:[A-Za-z_$][\w$]*\.)?commandNative = createBattleCommandTranslated\(sfx, \{ getState \}\);/,
     },
     {
         module: "pro/wfightmn", adapter: "web/wfight-translated.js", proof: "tools/verify_translated_wfight.mjs",
-        source: "web/battle.js", session: /new ui\.WfightLoaderSession\(/,
+        source: "web/battle.js", session: runsSession("WfightLoaderSession"),
         built: /(?:[A-Za-z_$][\w$]*\.)?wfightNative = createWfightTranslated\(\{ getState \}\);/,
     },
 ];
