@@ -267,8 +267,7 @@ export interface BookHostArgs {
 // ---------------------------------------------------------------- language screen (web/cntysel-native.ts)
 
 /** Called when a language is chosen: the row, the language and the code of the screen it launches. */
-/** game.ts reads the row as text, so the callback may take either */
-export type CntyselPick = (row: string | number, language: number, launchCode: number) => void;
+export type CntyselPick = (row: number, language: number, launchCode: number) => void;
 
 /** One recorded draw call of the language screen: the picture-service method and its numbers. */
 export interface CntyselDraw {

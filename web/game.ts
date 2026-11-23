@@ -968,7 +968,7 @@ window.__labOpen = (name, arg) => {
             window.__reportNative = fightReportNative;
             break;
         case "cntysel":
-            cntyselNative.open((row: string | number, language: number) => {
+            cntyselNative.open((row: number, language: number) => {
                 window.__labLanguage = row;
                 window.__labLanguageByte = language;
             });
