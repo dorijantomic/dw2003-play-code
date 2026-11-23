@@ -6,7 +6,7 @@ import { readSource } from "./helpers/source.js";
 const SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 
 test("All on / All off set every FX_DEFS key, no MANUAL exclusion", () => {
-    const m = SRC.match(/closest\("\[data-all\]"\)[\s\S]{0,200}?for \(const \[k\] of FX_DEFS\) (.*);/);
+    const m = SRC.match(/closest\s*(?:<[^>]*>\s*)?\(\s*"\[data-all\]"\s*\)[\s\S]{0,200}?for \(const \[k\] of FX_DEFS\) (.*);/);
     assert.ok(m, "all-button loop exists");
     assert.equal(m[1].replace(/\s/g, ""), "fx[k]=b.dataset.all===\"1\"");
     assert.ok(!/MANUAL/.test(m[1]));

@@ -244,6 +244,23 @@ const QUALITY: Record<string, number> = { low: 0.4, medium: 0.7, high: 1 };
 // "Time" setting: pins the time-of-day phase (0 = daylight, 0.77 = deepest dusk); auto = the slow cycle
 const TODMODES: Record<string, number | undefined> = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
 const STORE_KEY = "dw.fx.v1";
+
+/** True for a saved value that is a plain object (a settings blob or a profile), false for null, a list,
+ *  a number, a string or anything else a corrupt or hand-edited localStorage entry can hold. */
+function isStoredRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A saved blob read back as an object: an unreadable, missing or non-object value reads as empty, so an old
+ *  or broken localStorage entry can never crash the panel (it falls back to the defaults already in fx). */
+function storedObject(key: string): Record<string, unknown> {
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(key); } catch { return {}; }
+    if (raw === null || raw === "") return {};
+    let value: unknown;
+    try { value = JSON.parse(raw); } catch { return {}; }
+    return isStoredRecord(value) ? value : {};
+}
 export const fx: FxBag = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
 const EXPERIMENTAL = ["showfps", "villagers", "hd2d", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "battlespeed", "movetheatre", "showfps", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
@@ -258,7 +275,7 @@ fx.mapScreen = "classic";   // OPTIONS > GAME > Map screen: "classic" (the game'
 fx.musicVolume = 1;         // OPTIONS music volume, 0..1; 1 = the game's own gain (web/volume-levels.js)
 fx.soundVolume = 1;         // OPTIONS sound volume, 0..1; 1 = the game's own gain
 fx.encounterDialMode = "normal";  // Encounter dial setting (only read while F2 -> Extras -> Encounter dial is on; web/encounter-dial.js)
-try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
+Object.assign(fx, storedObject(STORE_KEY));
 // Animals were removed: no switch, and an old saved "on" can never bring them back.
 for (const k of ["butterflies", "birds", "dragonflies", "fish", "critters", "wildlife"]) fx[k] = false;
 // Old saves: the Battle ideas row used to switch practice2v2 on (every wild fight 2 vs 2). Reset it once; a dev who turns it on again on F2 keeps it.
@@ -1208,16 +1225,18 @@ function snapshot() {
     return o;
 }
 function profileAct(kind: string, slot: string) {
-    let all: Record<string, ProfileSnapshot> = {};
-    try { all = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}"); } catch { }
+    // an old or hand-edited blob (null, a list, a number) reads as empty instead of throwing on all[slot] =
+    const all = storedObject(PROFILE_KEY);
     if (kind === "save") {
         all[slot] = snapshot();
         try { localStorage.setItem(PROFILE_KEY, JSON.stringify(all)); } catch { }
         toast(`Saved as profile ${slot}`);
-    } else if (all[slot]) {
-        Object.assign(fx, all[slot]); syncLegacyFlags(); save(); refreshPanel();
+    } else {
+        const prof = all[slot];
+        if (!isStoredRecord(prof)) { toast(`Profile ${slot} is empty`); return; }
+        Object.assign(fx, prof); syncLegacyFlags(); save(); refreshPanel();
         toast(`Loaded profile ${slot}`);
-    } else toast(`Profile ${slot} is empty`);
+    }
 }
 
 // ------------------------------------------------------------ photo mode

@@ -93,7 +93,7 @@ test("the encounter dial sits in its Battle row and follows its switch", () => {
 });
 
 test("ambience.js: All on / All off still sit behind data-all and the page is built lazily", () => {
-    assert.match(AMB, /closest\("\[data-all\]"\)/);
+    assert.match(AMB, /closest\s*(?:<[^>]*>\s*)?\(\s*"\[data-all\]"\s*\)/);
     assert.ok(!/panel\.innerHTML\s*=/.test(AMB), "the panel starts empty; dev-panel.js builds it");
     assert.match(AMB, /if \(!panel\.hidden\) dev\.show\(\)/);
     assert.match(AMB, /if \(!panel \|\| panel\.hidden \|\| !dev \|\| !dev\.isBuilt\(\)\) return;/, "a closed page is never refreshed");
@@ -108,7 +108,7 @@ test("keys: typing never reaches the game; F2 and Escape close the page", () => 
 });
 
 test("installed copy: still no panel, no gear, no F2 (SHIPPED guard untouched)", () => {
-    assert.match(AMB, /export function installFxPanel\(stageEl\) \{\s*\n\s*if \(panel \|\| !stageEl \|\| SHIPPED\) return;/);
+    assert.match(AMB, /export function installFxPanel\(stageEl\s*(?::[^)]*)?\)\s*\{\s*\n\s*if \(panel \|\| !stageEl \|\| SHIPPED\) return;/);
 });
 
 test("the page is DOM only: no canvas, no GPU, no timers; readable and scrolling", () => {
