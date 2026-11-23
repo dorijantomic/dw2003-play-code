@@ -12,6 +12,8 @@ Short pointers to knowledge that is easy to lose. Read the linked file before to
 - After any type edit: `node tools/rewrite/same-js.mjs` (must say all same) and `npm run check:types` (web/ is at 0 tsc errors).
   Type syntax only; no `@ts-ignore`; class fields only as `declare x: T;`.
   Strict ratchet: `check:types` also runs tsconfig.web.strict.json against tools/rewrite/ts-strict-baseline.json (per-file strict errors and explicit any may only go down; `ts-ratchet.mjs --update` lowers it). `node tools/rewrite/strict-count.mjs` prints the numbers; `infer-types.mjs` and `any-to-unknown.mjs` are the machine passes.
+- **Type the file you touch (user, 2026-11-23).** When you change a `.ts` file, also make that file's types proper: named interfaces, no new any / unknown / `as` / `!`, except the Effective TypeScript cases with a comment "// ETS item N: reason" (42 outside data = unknown + check; 9 you know something TS cannot; 40 cast inside a small typed function; 38/39 narrowest any). Never add a guessing `!`: where your change touches one, replace it with a real check. Keep the type-only edit and the real change apart (same-js shows the type-only part is "same"). Leftovers and the full rules: `C:\Users\dorij\scratch\strict-ts\night\REPORT.md`.
+- **Bugs go on the bug board (user, 2026-11-23).** A bug you see while working (typing shows one, or you read one) is added as a card to `C:\Users\dorij\dw-bugs\new\` (WSL `/mnt/c/Users/dorij/dw-bugs/new/`; rules in its BOARD.md). Do not fix it quietly on the side.
 
 ## Extra quests and new characters (a layer on top of the game, never part of the story)
 
