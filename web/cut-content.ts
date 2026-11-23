@@ -8,7 +8,7 @@
 // ACTUAL-GAME.md, docs/research/ui/stagslct-full-decode-2026-08-05.md §"Two dead branches",
 // docs/research/field/repeat-examine-search-points-2026-07-26.md); the ledger entry is what the
 // repo can check without that tree. The seventh exhibit counts the shipped animation packs from
-// web/assets/battle/models and records the census in docs/fight3d-animation-census.md.
+// web/assets/battle/models and cites the pack index it counts.
 //
 // Nothing here is a to-do item: the game cancels the arena in dialogue, and the walker recreates
 // the game that shipped. The page is OFF unless F2 -> Extras -> Cut-content gallery is switched on
@@ -101,7 +101,7 @@ export const CUT_CONTENT = [
       "still. And 13 of the 62 timeline tables - 7, 8, 9, 41, 42, 43, 46, 47, 48, 49, 59, 60, 61 - are authored by " +
       "no pack at all. These are shipped, not cut content: the bodies render and the fights run; they have no motion " +
       "to play.",
-    evidence: "docs/fight3d-animation-census.md",
+    evidence: "web/assets/battle/models/index.json",
   },
 ];
 

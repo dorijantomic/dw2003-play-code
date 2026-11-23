@@ -104,14 +104,12 @@ test("the Card Album addresses 314 cards even though the raw catalog holds 316",
     "ids 315/316 are the two records past the bound");
 });
 
-test("no shipped file or doc labels the collection 315 any more", () => {
+test("no shipped file labels the collection 315 any more", () => {
   for (const f of [
-    "web/cardalbum-translated.js", "docs/research/systems-plain/cards.md",
+    "web/cardalbum-translated.js",
   ]) {
     const text = readFileSync(new URL(f, root), "utf8");
     assert.equal(/315-card|315 cards|full 315/.test(text), false,
       `${f} still labels the collection 315 (the album addresses 314)`);
   }
-  assert.match(readFileSync(new URL("docs/research/systems-plain/cards.md", root), "utf8"),
-    /314 cards/, "cards.md states the settled 314");
 });

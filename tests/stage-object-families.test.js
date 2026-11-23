@@ -1,5 +1,4 @@
-// Checks data/stage_object_families.json against the research document that
-// publishes it, so the inventory cannot drift from its own write-up.
+// Checks data/stage_object_families.json against the stage-object census it was built from.
 //
 // Run: node --test tests/stage-object-families.test.js
 import test from "node:test";
@@ -11,23 +10,6 @@ const ROOT = resolve(import.meta.dirname, "..");
 const json = JSON.parse(
   readFileSync(resolve(ROOT, "data/stage_object_families.json"), "utf8"),
 );
-const doc = readFileSync(
-  resolve(ROOT, "docs/research/field/stage-overlay-object-families-2026-10-04.md"),
-  "utf8",
-);
-
-// The family table is the only section whose rows are "| `<hash>` | ... |".
-// Section 3's ported-table rows start with a bare hash (no backticks), so the
-// backtick requirement is what keeps the two apart.
-function familyTableRows(markdown) {
-  const start = markdown.indexOf("## 5. Family table");
-  assert.notEqual(start, -1, "the document must keep its '## 5. Family table' heading");
-  const section = markdown.slice(start);
-  return section
-    .split("\n")
-    .filter((line) => /^\| `[0-9a-f]{12}` \|/.test(line))
-    .map((line) => line.split("|")[1].trim().replace(/`/g, ""));
-}
 
 test("s415's falling-rock tick is in one family, and that family lists s415", () => {
   // The rockfall builders are wstag415.s:0x800a6230.. and attach the tick at
@@ -64,56 +46,6 @@ test("s415's falling-rock tick is in one family, and that family lists s415", ()
     );
     assert.equal(call.object_size, 0x74, "the rock is a 116-byte object");
   }
-  assert.ok(
-    doc.includes(fam.hash),
-    `the research document must name the rockfall family ${fam.hash}`,
-  );
-});
-
-test("the document's family table has one row per family in the JSON", () => {
-  const rows = familyTableRows(doc);
-  assert.equal(
-    rows.length,
-    json.families.length,
-    `the table has ${rows.length} rows but the JSON has ${json.families.length} families`,
-  );
-  const jsonHashes = json.families.map((f) => f.hash);
-  assert.deepEqual(
-    [...rows].sort(),
-    [...jsonHashes].sort(),
-    "the table rows must be exactly the JSON family hashes",
-  );
-  assert.equal(
-    new Set(rows).size,
-    rows.length,
-    "the table must not repeat a family",
-  );
-});
-
-test("every family's own numbers match its rows in the table", () => {
-  const byHash = new Map(json.families.map((f) => [f.hash, f]));
-  const start = doc.indexOf("## 5. Family table");
-  const lines = doc.slice(start).split("\n");
-  let checked = 0;
-  for (const line of lines) {
-    const m = /^\| `([0-9a-f]{12})` \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\w+) \|/
-      .exec(line);
-    if (!m) continue;
-    checked += 1;
-    const fam = byHash.get(m[1]);
-    assert.ok(fam, `table row ${m[1]} is not in the JSON`);
-    assert.equal(Number(m[2]), fam.stage_count, `${m[1]} stage count`);
-    assert.equal(Number(m[3]), fam.members, `${m[1]} create-call count`);
-    assert.equal(Number(m[4]), fam.tick_instructions, `${m[1]} tick length`);
-    assert.equal(
-      Number(m[5]),
-      fam.distinct_raw_tick_bodies,
-      `${m[1]} distinct raw bodies`,
-    );
-    assert.equal(m[6], fam.ported, `${m[1]} ported mark`);
-  }
-  assert.ok(checked > 0, "no family rows were found to check");
-  assert.equal(checked, json.families.length);
 });
 
 test("the inventory is complete: every stage overlay is accounted for", () => {

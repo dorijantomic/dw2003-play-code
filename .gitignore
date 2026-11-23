@@ -107,3 +107,14 @@ web/**/*.js
 web/**/*.mjs
 !web/lib3d/**
 !web/biome/vendor/**
+
+# Developer notes live in the private dw2003-notes repo (moved 2026-11-23). The public repo keeps only
+# the .md files that help people install or play the game; every other .md stays on disk, untracked.
+*.md
+!/README.md
+!/PLAYING.md
+!/CHANGELOG.md
+!/packaging/RELEASE_NOTES.md
+!/.github/ISSUE_TEMPLATE/bug_report.md
+!/docs/third-party-and-generated.md
+!/tools/byod/README.md

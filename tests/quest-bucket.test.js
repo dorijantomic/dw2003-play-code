@@ -123,12 +123,8 @@ test("fixture: the override beats an op-5 tile that writes 4; with no override t
   assert.equal(behind.tick(), 8, "a tile that writes 8 still puts the player behind the ground");
 });
 
-test("authoring: a bucket(n) helper in the DSL and the fx brief's row name the two shipped values", () => {
+test("authoring: a bucket(n) helper in the DSL writes the step the compiler reads", () => {
   const dsl = readFileSync(new URL("../data/authored/quests/dsl.py", import.meta.url), "utf8");
   assert.match(dsl, /^def bucket\(n\):/m, "dsl.py offers bucket(n)");
   assert.match(dsl, /return \{"bucket": int\(n\)\}/, "the helper writes the step the compiler reads");
-  const brief = readFileSync(new URL("../docs/quests-fx-brief.md", import.meta.url), "utf8");
-  assert.match(brief, /\| `bucket` \|/, "the step has its row in the brief");
-  assert.match(brief, /`bucket\(8\)`/, "the brief shows 8, behind the map band");
-  assert.match(brief, /`bucket\(4\)`/, "and 4, back in front");
 });

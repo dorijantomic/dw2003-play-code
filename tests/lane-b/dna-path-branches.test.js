@@ -8,13 +8,6 @@ const fight = readFileSync('web/assets/native/screens/pro_fightstg.bin');
 const resident = readFileSync('web/assets/native/screens/resident.bin');
 const word = a => fight.readUInt32LE(a - 0x80082cb0);
 
-test('DNA branch census equals the independently quoted canonical table', () => {
-  const doc = readFileSync('docs/research/battle/dna-path-branches-2026-10-04.md', 'utf8');
-  const ids = [...doc.matchAll(/^\| `([a-z0-9-]+)` \|/gm)].map(x => x[1]);
-  assert.deepEqual(ids.sort(), DNA_PATH_BRANCHES.map(x => x.id).sort());
-  assert.equal(new Set(ids).size, ids.length);
-});
-
 test('every raw Switch and DNA refusal branch has one census member', () => {
   // Independent population: all conditional branches from first Switch status
   // read to the first MP store, before ANY successful-confirm side effect.

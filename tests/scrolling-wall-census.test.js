@@ -18,10 +18,6 @@ import { WALL_SCREENS } from "../tools/scrolling-walls.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const census = JSON.parse(readFileSync(resolve(ROOT, "data/scrolling_walls.json"), "utf8"));
-const doc = readFileSync(
-    resolve(ROOT, "docs/research/ui/scrolling-backdrop-walls-2026-08-14.md"),
-    "utf8",
-);
 
 /**
  * The decode, pinned. Every value is read out of the assembly at the file line
@@ -99,14 +95,4 @@ test("each row asks for the clip the original draws", () => {
         assert.equal(row.wallClip, Number.parseInt(want, 16), `${row.name}: the wall clip`);
         assert.ok(row.session, `${row.name}: a position row needs the session that holds the picture calls`);
     }
-});
-
-test("the research document's member table names the same ten screens", () => {
-    const start = doc.indexOf("## The ten");
-    assert.notEqual(start, -1, "the document keeps its '## The ten' heading");
-    const end = doc.indexOf("\n## ", start + 1);
-    const section = doc.slice(start, end === -1 ? undefined : end);
-    const named = [...section.matchAll(/^\| `(st[a-z0-9]+)` \|/gm)].map((m) => m[1]);
-    assert.deepEqual(named.sort(), Object.keys(DECODED).sort(),
-        "the document's table must list every wall site the asm census finds");
 });

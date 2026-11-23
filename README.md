@@ -14,8 +14,6 @@ matching decompilation of the game's original code. It is still in progress:
 - 13 of 34 systems work fully, 21 work partly.
 - 105 of 121 game screens are rebuilt from the original game's code (87%).
 - 36% of the 2119 documented facts about the original game are fully checked against its code.
-
-Per-feature breakdown: [PROGRESS.md](PROGRESS.md).
 <!-- progress:end -->
 
 ## Quick Start
@@ -222,10 +220,9 @@ Known limitations:
 - One battle-HUD image (`assets/ui/fight_ui.png`) is not reproducible from
   public data, so the battle HUD falls back to a plain style and the browser
   logs a 404 for that one image — that is expected.
-- The s415 backdrop research note
-  (`docs/research/field/stage-object-registry-2026-10-04.md`) references a
-  companion decode document (`s415-deeper-crevice-ride-decode.md`) that is
-  not part of this repository, and the s415 fixed-viewport background shows
+- The s415 backdrop research note references a companion decode document
+  (`s415-deeper-crevice-ride-decode.md`) that is not part of this repository,
+  and the s415 fixed-viewport background shows
   the raw bg01 decode (the author's hand-made capture is not shipped, by
   design).
 

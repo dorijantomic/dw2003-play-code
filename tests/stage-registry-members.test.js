@@ -1,6 +1,5 @@
 // Census for the field stage-object registry: data/stage_registry_members.json
-// must list exactly the members the decoded system has, the research document
-// must list the same ones, and the port column must agree with the shipped
+// must list exactly the members the decoded system has, and the port column must agree with the shipped
 // translated modules.
 //
 // Run: node --test tests/stage-registry-members.test.js
@@ -12,10 +11,6 @@ import { resolve } from "node:path";
 const ROOT = resolve(import.meta.dirname, "..");
 const json = JSON.parse(
   readFileSync(resolve(ROOT, "data/stage_registry_members.json"), "utf8"),
-);
-const doc = readFileSync(
-  resolve(ROOT, "docs/research/field/stage-object-registry-2026-10-04.md"),
-  "utf8",
 );
 const falling = JSON.parse(
   readFileSync(resolve(ROOT, "web/assets/data/falling_objects.json"), "utf8"),
@@ -32,33 +27,6 @@ function memberRows() {
 
 const ROWS = memberRows();
 const byKey = new Map(ROWS.map((r) => [`${r.stage}/${r.id_hex}`, r]));
-
-/** The `## 6.` per-stage table's rows: "| s415 | `0x330` | ... | ported |". */
-function stageTableRows(markdown) {
-  const start = markdown.indexOf("## 6. Every member on every stage");
-  assert.notEqual(start, -1, "the document must keep its '## 6.' heading");
-  const end = markdown.indexOf("\n## ", start + 1);
-  const section = markdown.slice(start, end === -1 ? undefined : end);
-  const rows = [];
-  for (const line of section.split("\n")) {
-    const m = /^\| (s\d+) \| `(0x[0-9a-f]{3})` \|.*\| (\w[\w ]*) \|$/.exec(line);
-    if (m) rows.push({ stage: m[1].slice(1), id: m[2], port: m[3].trim() });
-  }
-  return rows;
-}
-
-/** The `## 5.` record table's rows, one per registry record. */
-function recordTableRows(markdown) {
-  const start = markdown.indexOf("## 5. The 56 records");
-  assert.notEqual(start, -1, "the document must keep its '## 5.' heading");
-  const end = markdown.indexOf("\n## ", start + 1);
-  const section = markdown.slice(start, end === -1 ? undefined : end);
-  return section
-    .split("\n")
-    .map((line) => /^\| `(0x[0-9a-f]{3})` \((\d+)\) \|/.exec(line))
-    .filter(Boolean)
-    .map((m) => ({ id: m[1], dec: Number(m[2]) }));
-}
 
 test("the registry has 56 records, 0x320..0x357, and no gaps", () => {
   assert.equal(json.records.length, 56);
@@ -403,36 +371,6 @@ test("every stage-owned id is fired by exactly one stage, and 813 is shared", ()
   );
   for (const row of scene) {
     assert.equal(row.record.ctor, "0x80083cd8", "813 is fieldstg's own object");
-  }
-});
-
-test("the document's per-stage table lists the same members as the JSON", () => {
-  const rows = stageTableRows(doc);
-  assert.equal(
-    rows.length,
-    ROWS.length,
-    `the document lists ${rows.length} members, the JSON has ${ROWS.length}`,
-  );
-  assert.equal(new Set(rows.map((r) => `${r.stage}/${r.id}`)).size, rows.length,
-    "the document must not repeat a member");
-  for (const row of rows) {
-    const found = byKey.get(`${row.stage}/${row.id}`);
-    assert.ok(found, `${row.stage}/${row.id} is in the document but not the JSON`);
-    assert.equal(
-      row.port,
-      found.port,
-      `${row.stage}/${row.id} port mark differs between document and JSON`,
-    );
-  }
-});
-
-test("the document's record table lists all 56 records with their decimal ids", () => {
-  const rows = recordTableRows(doc);
-  assert.equal(rows.length, json.records.length);
-  for (const row of rows) {
-    const rec = json.records.find((r) => r.id_hex === row.id);
-    assert.ok(rec, `${row.id} is in the document but not the JSON`);
-    assert.equal(rec.id, row.dec, `${row.id} decimal spelling`);
   }
 });
 

@@ -229,22 +229,3 @@ test("the two typed sites now build the original's page, not a walker sentence",
   assert.match(src, /battleMessagePage\(18,/,
     "the weapon's drain asks for the original's drain page");
 });
-
-test("the census: the research document, the arm table and the port list one kind set", () => {
-  const doc = readFileSync(
-    new URL("../docs/research/battle/battle-message-page-kinds-2026-10-04.md", import.meta.url),
-    "utf8");
-  const rows = [...doc.matchAll(/^\|\s*(\d+)\s*\|\s*`(0x[0-9a-f]{8})`\s*\|/gm)]
-    .map((m) => ({ kind: Number(m[1]), at: m[2] }));
-  assert.equal(rows.length, 22, "one table row per kind, and nothing else in that shape");
-  assert.deepEqual(rows.map((r) => r.kind), BATTLE_MESSAGE_PAGE_KINDS);
-  assert.deepEqual(rows.map((r) => Number(r.at)),
-    BATTLE_MESSAGE_ARMS.map((a) => a.at),
-    "the document's arm addresses are the arm table's");
-  // The caller census in the same document must name every kind that has a caller and
-  // must not claim one for the three arms nothing asks for.
-  const called = [...doc.matchAll(/^\|\s*(\d+)\s*\|\s*\d+\s*\|/gm)].map((m) => Number(m[1]));
-  for (const kind of called) {
-    assert.ok(kind >= 1 && kind <= 22, `caller row ${kind} is a real kind`);
-  }
-});

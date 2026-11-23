@@ -34,9 +34,9 @@ test("the gallery has exactly seven exhibits, each with a title, a body and an e
   }
 });
 
-test("every evidence path is a real file under docs/ or web/assets/data/", () => {
+test("every evidence path is a real file under docs/, web/assets/data/ or web/assets/battle/models/", () => {
   for (const e of CUT_CONTENT) {
-    assert.match(e.evidence, /^(docs|web\/assets\/data)\//, `"${e.title}" cites docs/ or web/assets/data/`);
+    assert.match(e.evidence, /^(docs|web\/assets\/data|web\/assets\/battle\/models)\//, `"${e.title}" cites docs/, web/assets/data/ or web/assets/battle/models/`);
     assert.ok(existsSync(e.evidence), `"${e.title}" cites a path that exists: ${e.evidence}`);
   }
 });
@@ -110,11 +110,11 @@ test("the stage-select paragraph's shop numbers are the shipped table's own", ()
   assert.doesNotMatch(body, /values 0-29 plus 30/);
 });
 
-test("the seventh exhibit is the bodies that cannot move, and the census note is its evidence", () => {
+test("the seventh exhibit is the bodies that cannot move, and the pack index is its evidence", () => {
   const exhibit = CUT_CONTENT[6];
   assert.match(exhibit.title, /no motion/);
-  assert.equal(exhibit.evidence, "docs/fight3d-animation-census.md");
-  assert.ok(existsSync(exhibit.evidence), "the census note exists");
+  assert.equal(exhibit.evidence, "web/assets/battle/models/index.json");
+  assert.ok(existsSync(exhibit.evidence), "the pack index exists");
 
   // the counts the page states, and the still body it names
   for (const token of ["249", "23", "111", "13", "m466rgn2"]) {
@@ -130,7 +130,7 @@ test("the seventh exhibit is the bodies that cannot move, and the census note is
   assert.match(exhibit.body, /not cut content/i);
 });
 
-test("the census note's numbers match a fresh count of the shipped animation data", () => {
+test("the exhibit's numbers match a fresh count of the shipped animation data", () => {
   const root = "web/assets/battle/models";
   const folders = JSON.parse(readFileSync(`${root}/index.json`, "utf8"));
   assert.equal(folders.length, 249);
@@ -162,20 +162,6 @@ test("the census note's numbers match a fresh count of the shipped animation dat
     .map((rec) => rec[rec.length - 1]);
   assert.deepEqual([...new Set(frames)].sort((a, b) => a - b), [0, 30000]);
   assert.equal(still.timeline.filter((t) => t.table.length > 0).length, 12);
-
-  const doc = readFileSync("docs/fight3d-animation-census.md", "utf8");
-  for (const line of [
-    `${folders.length} battle model packs`,
-    `${present.get(18)} packs carry all 18 action clips`,
-    `${present.get(6)} packs carry exactly 6`,
-    `${never.length} of the 62 timeline tables`,
-    "m466rgn2: total_frames 0",
-  ]) {
-    assert.ok(doc.includes(line), `the census note says "${line}"`);
-  }
-  for (const folder of ["m468agnm", "m469garm", "m470agry"]) {
-    assert.ok(doc.includes(folder), `the census note names ${folder}`);
-  }
 });
 
 test("the panel wraps its text and every page carries its title, body and evidence", () => {
