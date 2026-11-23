@@ -509,9 +509,17 @@ export function liveStageObjects(stageId: string) {
  * (the native-stage research path). Only the rockfall oracle uses this, to run
  * the original machine code and the translated port side by side; the game
  * itself never calls it, so the two routes cannot both own an id in play.
+ *
+ * The registry record's constructor and draw function are addresses inside the
+ * stage image that is booted, so an id only means what the table says while its
+ * own stage is the loaded one: a request for any other stage is refused rather
+ * than fired against the wrong image. The third operand is the script's own
+ * (`SETANIM 0x330 821 816` fires with 821 and the id), so it defaults to the id
+ * and a caller with a different opcode passes its own.
  */
-export function fireNativeStageObject(stageId: string, id: number) {
-    return fireNativeEffect(id, 821, id);
+export function fireNativeStageObject(stageId: string, id: number, facing = id): boolean {
+    if (!nativeStage(stageId)) return false;
+    return fireNativeEffect(id, 821, facing);
 }
 
 /** Drop every actor on a stage — on stage change, and when a test resets. */
