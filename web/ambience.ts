@@ -247,6 +247,7 @@ const STORE_KEY = "dw.fx.v1";
 
 /** True for a saved value that is a plain object (a settings blob or a profile), false for null, a list,
  *  a number, a string or anything else a corrupt or hand-edited localStorage entry can hold. */
+// ETS item 42: a saved blob comes from localStorage, so it enters as unknown and this predicate is the check.
 function isStoredRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -257,6 +258,7 @@ function storedObject(key: string): Record<string, unknown> {
     let raw: string | null = null;
     try { raw = localStorage.getItem(key); } catch { return {}; }
     if (raw === null || raw === "") return {};
+    // ETS item 42: JSON.parse reads a saved blob, so its value is unknown until isStoredRecord below keeps it.
     let value: unknown;
     try { value = JSON.parse(raw); } catch { return {}; }
     return isStoredRecord(value) ? value : {};

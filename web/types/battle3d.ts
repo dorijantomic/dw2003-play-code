@@ -46,11 +46,14 @@ export interface SkelBufs extends Battle3dBuffers {
 /** The three resources one battle actor holds, in the actor teardown's (+0x78/+0x7c/+0x80)
  *  slot order: the texture, the skeleton GL buffers (absent until the model loaded) and the
  *  model data. The teardown works on the WORD the original reads there, so a browser slot's
- *  presence is reported to it as a slot number by the caller, not by the handle itself. */
+ *  presence is reported to it as a slot number by the caller, not by the handle itself.
+ *  The model data is the loaded anim.json model object (web/battle3d/skeleton.ts
+ *  loadSkeletalModel); the teardown only tests the slot and drops the reference, so it is
+ *  held here as the opaque object it is. */
 export type ActorResources = [
   WebGLTexture | null | undefined,
   SkelBufs | null | undefined,
-  unknown,
+  object | null | undefined,
 ];
 
 // One arena/backdrop layer's GL buffers (`_arenaGroupBuf` / `_bdGroupBuf`), with the per-layer

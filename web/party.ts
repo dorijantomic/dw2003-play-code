@@ -8,8 +8,12 @@ interface ElementProfile {
 }
 
 
-/** The six core stats, in the original's own order. */
-const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];
+/** The six core stats, in the original's own order. Each one is a key of the roster record's core
+ *  halfwords and a numeric field of a digimon.json row. */
+const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"] as const;
+
+/** One of the six core stats: a key of CORE_STATS and a numeric field of a digimon.json row. */
+type CoreStat = (typeof CORE_STATS)[number];
 
 // Keep the lead's cached battle bonus block in sync with the worn slots. The
 // status sheet, shop preview and battle all read equipmentBonuses; battle.js now
@@ -83,8 +87,8 @@ export function baseStatsFor(digimonProfile: Pick<DigimonRecord, "id" | "hp" | "
 export function storedNumbers(charId: string, stats: DriStats | null | undefined, digimonDB: DigimonTable | null | undefined, fallbackProfile: DigimonRecord | null = null) {
   const speciesId = CHARID_TO_DIGID[charId];
   const rookie = (speciesId === undefined ? undefined : digimonDB?.[speciesId]) ?? fallbackProfile ?? null;
-  const baseOf = (key: string): number => {
-    const value: unknown = rookie === null ? undefined : Reflect.get(rookie, key);
+  const baseOf = (key: CoreStat): number => {
+    const value = rookie === null ? undefined : rookie[key];
     return typeof value === "number" ? value : 0;
   };
   return {
