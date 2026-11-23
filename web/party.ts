@@ -80,9 +80,14 @@ export function baseStatsFor(digimonProfile: Pick<DigimonRecord, "id" | "hp" | "
 // reached only when the char id has no row in digimonDB (old callers fell back
 // to the profile they had).
 export function storedNumbers(charId: string, stats: DriStats | null | undefined, digimonDB: DigimonTable | null | undefined, fallbackProfile: DigimonRecord | null = null) {
-  const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? fallbackProfile ?? null;
+  const speciesId = CHARID_TO_DIGID[charId];
+  const rookie = (speciesId === undefined ? undefined : digimonDB?.[speciesId]) ?? fallbackProfile ?? null;
+  const baseOf = (key: string): number => {
+    const value: unknown = rookie === null ? undefined : Reflect.get(rookie, key);
+    return typeof value === "number" ? value : 0;
+  };
   return {
-    core: CORE_STATS.map((k) => (Number(stats?.stats?.[k] ?? rookie?.[k] ?? 0) || 0)
+    core: CORE_STATS.map((k) => (Number(stats?.stats?.[k] ?? baseOf(k)) || 0)
       + (Number(stats?.bonuses?.[k] ?? 0) || 0)),
     elements: elementValues(rookie, stats?.elemBonuses),
   };
@@ -96,7 +101,8 @@ export function storedNumbers(charId: string, stats: DriStats | null | undefined
 // the chips off the core halfwords and the STARTER's base off the element
 // halfwords instead.
 export function storedFromRecord(charId: string, recCore: ArrayLike<number> | null | undefined, recElements: ArrayLike<number> | null | undefined, stats: DriStats | null | undefined, digimonDB: DigimonTable | null | undefined) {
-  const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? null;
+  const speciesId = CHARID_TO_DIGID[charId];
+  const rookie = speciesId === undefined ? null : digimonDB?.[speciesId] ?? null;
   const base = elementValues(rookie, null);
   return {
     stats: Object.fromEntries(CORE_STATS.map((k, i) =>
@@ -138,13 +144,19 @@ export function elementValueWithGear(profile: ElementProfile | null | undefined,
 // keyed by digimon.json id.
 export function partyRosterView(party, partnerStats, partyStats, digimonDB, names) {
   return (party ?? []).map((charId, i) => {
-    const rookieId = CHARID_TO_DIGID[charId];
+    // A save can carry an empty slot (pendingParty is written with nulls upstream), so the lookups are
+    // done on a real id string and the row keeps an empty name rather than the text "null".
+    const id = charId == null ? "" : String(charId);
+    const speciesId = CHARID_TO_DIGID[id];
+    const rookieId = typeof speciesId === "number" ? speciesId : 0;
     const rookie = digimonDB?.[rookieId];
     const stats = i === 0 ? partnerStats : (partyStats?.[i] ?? baseStatsFor(rookie));
     const digId = Number(stats?.digimonId ?? rookieId);
     const prof = digimonDB?.[digId] ?? rookie;
+    const ownedName = id === "" ? undefined : names?.[id];
     return {
-      charId, rookieId, digimonId: digId, profile: prof,
+      // `charId` is the slot's id as the menus key it: a string, "" for an empty slot (never null).
+      charId: id, rookieId, digimonId: digId, profile: prof,
       // names = player-given names (Baronmon's Change Account desk — launcher bank
       // 0x7c index 1); falls back to the species name.
       // The menus name the BASE Digimon, never the form it is wearing. Every
@@ -152,8 +164,8 @@ export function partyRosterView(party, partnerStats, partyStats, digimonDB, name
       // three digivolutions sit in their own slots beside it — captures
       // docs/research/ui/captures/original-status-2026-09-03/. `formName` is
       // the current form, for the places that really do want it.
-      name: names?.[charId] ?? rookie?.name ?? prof?.name ?? charId,
-      formName: prof?.name ?? rookie?.name ?? charId,
+      name: ownedName ?? rookie?.name ?? prof?.name ?? id,
+      formName: prof?.name ?? rookie?.name ?? id,
       level: stats?.level ?? 1,
       xp: stats?.xp ?? 0,
       tp: stats?.tp ?? 0,
@@ -179,7 +191,7 @@ export function partyRosterView(party, partnerStats, partyStats, digimonDB, name
       // (species base + every trained point, 999-capped) — the worn gear's
       // resist is added by F0x80017174 itself, so it is deliberately NOT here.
       // The base is the STARTER's row, as the record holds it (pro/ststatus.s:9547 F0x80017174 fills from the record).
-      ...storedNumbers(charId, stats, digimonDB, prof),
+      ...storedNumbers(id, stats, digimonDB, prof),
     };
   });
 }
