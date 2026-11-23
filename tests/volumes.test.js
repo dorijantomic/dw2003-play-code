@@ -40,16 +40,19 @@ test("fxaudio.js: the weather master is 0.55 times the level, at build and on ev
     const src = read("../web/fxaudio.js");
     assert.match(src, /master\.gain\.value = 0\.55 \* level;/);
     assert.match(src, /ease\(master\.gain, on \? 0\.55 \* level : 0, ac, 0\.2\);/);
-    assert.match(src, /export function setWeatherVolume\(v\)/);
+    // `v: number` is erased by the build, which leaves blanks after the parameter name.
+    assert.match(src, /export function setWeatherVolume\(v\s*\)/);
 });
 
 test("ambience.js: both volumes start at 1, setFxMany saves once, and every settings change re-applies the volumes", () => {
     const src = read("../web/ambience.js");
     assert.match(src, /fx\.musicVolume = 1;/);
     assert.match(src, /fx\.soundVolume = 1;/);
-    assert.match(src, /export function setFxMany\(values\) \{\s*Object\.assign\(fx, values\);\s*syncLegacyFlags\(\);\s*save\(Object\.keys\(values\)\);/);
+    // `values: Record<string, unknown>` is erased by the build, which leaves blanks after the parameter name.
+    assert.match(src, /export function setFxMany\(values\s*\) \{\s*Object\.assign\(fx, values\);\s*syncLegacyFlags\(\);\s*save\(Object\.keys\(values\)\);/);
     assert.match(src, /window\.__setFxMany = setFxMany;/);
-    assert.match(src, /window\.__lightGain = fx\.lightGain;[^\n]*\n\s*applyVolumes\(\);/);
+    // `fx.lightGain!` (a non-null assertion) is erased by the build, which leaves a space before the semicolon.
+    assert.match(src, /window\.__lightGain = fx\.lightGain\s*;[^\n]*\n\s*applyVolumes\(\);/);
     assert.match(src, /window\.__bgm\?\.setVolume\?\.\(fx\.musicVolume\);/);
     assert.match(src, /window\.__sfx\?\.setVolume\?\.\(fx\.soundVolume\);/);
     const experimental = src.match(/const EXPERIMENTAL = \[([^\]]*)\];/)[1];
@@ -58,7 +61,8 @@ test("ambience.js: both volumes start at 1, setFxMany saves once, and every sett
 
 test("game.js applies the saved volumes to the players it creates", () => {
     const src = read("../web/game.js");
-    assert.match(src, /bgm\.setVolume\(window\.__fx\?\.musicVolume\);[^\n]*\n\s*sfx\.setVolume\(window\.__fx\?\.soundVolume\);/);
+    // `setVolume!` (the non-null assertion) is erased by the build, which leaves a space before the call.
+    assert.match(src, /bgm\.setVolume\s*\(window\.__fx\?\.musicVolume\);[^\n]*\n\s*sfx\.setVolume\s*\(window\.__fx\?\.soundVolume\);/);
 });
 
 // ---- real gain code with a fake AudioContext: fxaudio.js music path (musicfx on) and audio.js element path (musicfx off)

@@ -199,7 +199,8 @@ test("lockShipped keeps keys visible to spread and JSON, and ignores writes", ()
 test("installed: F2 builds no panel, no gear and no key handler (source)", () => {
     const src = read("../web/ambience.js");
     assert.match(src, /const SHIPPED = isInstalledBuild\(\)/);
-    assert.match(src, /export function installFxPanel\(stageEl\) \{\s*\n\s*if \(panel \|\| !stageEl \|\| SHIPPED\) return;/);
+    // `stageEl: HTMLElement | null` is erased by the build, which leaves blanks after the parameter name.
+    assert.match(src, /export function installFxPanel\(stageEl\s*\) \{\s*\n\s*if \(panel \|\| !stageEl \|\| SHIPPED\) return;/);
 });
 
 // ---------------------------------------------------------------- battle bridge (reads the store directly)
