@@ -127,7 +127,8 @@ test("css: the tick layers spin and the full DV arc pulses by CSS keyframes alon
     assert.match(read("web/ui-c/ui-c.css"), /@import url\("ring\.css"\);/);
     const parts = read("web/ui-c/parts.js");
     assert.doesNotMatch(parts.slice(parts.indexOf("function fillRing"), parts.indexOf("export function fillPart")), /requestAnimationFrame|setInterval|setTimeout|\.animate\(/);
-    assert.match(parts, /if \(desc\.kind === "ring"\) \{ fillRing\(root, desc, g\); return; \}/, "the arcs move in place, the spin is never restarted");
+    // the built .js erases the cast (`desc as UiRingPart`) as blanks, so match across them
+    assert.match(parts, /if \(desc\.kind === "ring"\) \{ fillRing\(root, desc\s*, g\); return; \}/, "the arcs move in place, the spin is never restarted");
 });
 
 test("wiring: battle.js hands the ring numbers over as one read-only part, only inside a capture, the HP being the game's eased plate value", () => {

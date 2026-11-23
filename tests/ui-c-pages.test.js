@@ -60,7 +60,8 @@ test("wiring: every T7 owner paints in its scope; the deck knows the namedt pack
     assert.match(src("packselect-translated.js"), /ui: \{ key: "ui-pack", compose: composeWizard \}/);
     assert.match(src("endscreen-translated.js"), /ui: \{ key: "ui-end", compose: composeEnd \}/);
     assert.match(src("cntysel-native.js"), /uiC\.scope\("ui-lang", ctx, \{ enable: true, compose: composeLanguage/);
-    assert.match(src("carddeck-translated.js"), /const PACKS = \{ 1598: "stcdsp", 1904: "namedt" \}/, "without it the rename keyboard draws text only");
+    // the built .js keeps the type annotation as blanks (`const PACKS      = ...`), so match across the erased spacing
+    assert.match(src("carddeck-translated.js"), /const PACKS\s*=\s*\{ 1598: "stcdsp", 1904: "namedt" \}/, "without it the rename keyboard draws text only");
     assert.match(src("carddeck-translated.js"), /compose: composeDeck/);
     assert.equal(pickPauseScreen([call(STSTAT_DIR, 29), call(STSTAT_DIR, 59)]).id, "map");
     // the deck: the keyboard page goes to the name composer, the other deck pages to the window page

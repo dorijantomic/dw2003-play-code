@@ -169,12 +169,13 @@ test("wiring: the pause draws through the capture scope; the capture hooks are i
     assert.match(st, /uiC\.hide\(st\._uiKey\)/);
     const sp = src("screenpack.js");
     for (const fn of ["drawClip", "drawClipOpaque", "drawClipWidth"]) assert.match(sp, new RegExp(`export function ${fn}\\([^)]*\\) \\{\\n  if \\(clipHook\\(ctx, p, id, x, y, \\(c\\) => ${fn}\\(c,`), fn);
-    assert.match(sp, /const p = \{ name, img: null/, "the pack name is stored for the claim lookup");
+    // the built .js erases `p: ScreenPack` as blanks, so match across them
+    assert.match(sp, /const p\s*=\s*\{ name, img: null/, "the pack name is stored for the claim lookup");
     const nt = src("native-screen-text.js");
     assert.match(nt, /if \(capturing\(\)\) \{[\s\S]*runsHook\(runs\);/);
     assert.match(nt, /right: w\.alignWidth \? w\.penX : null/, "number runs know their right edge");
     for (const f of ["ui-c/index.js", "ui-c/capture.js", "ui-c/home.js"]) assert.doesNotMatch(src(f), /location\.search|URLSearchParams|localStorage/, `${f} reads no flag and keeps no setting`);
-    assert.match(src("ui-c/index.js"), /setEnabled: \(on\) =>/);
+    assert.match(src("ui-c/index.js"), /setEnabled: \(on\s*\) =>/);
 });
 
 test("the C1 numbers: native units from the design file (3 px per native px)", () => {

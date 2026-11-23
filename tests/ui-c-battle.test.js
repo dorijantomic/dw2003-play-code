@@ -262,5 +262,6 @@ test("wiring: one top scope round the battle chrome; bar / notice / focus handed
     assert.match(g, /uiC\.cover\(skipField\)/);
     assert.match(g, /if \(battle\.isActive\(\)\) battle\.draw\(\);\s*\n\s*uiC\.cover\(false\);/);
     assert.match(read("web/uifont.js"), /if \(fontReady\(\) && capturingText\(ctx\)\)/);
-    assert.match(read("web/screenpack.js"), /export function drawClipWidth.*\n\s*if \(clipHook\(ctx, p, id, x, y, .*, width\)\) return true;/);
+    // the built .js erases `width: number | null | undefined` as blanks, so `width` and `))` are not adjacent
+    assert.match(read("web/screenpack.js"), /export function drawClipWidth.*\n\s*if \(clipHook\(ctx, p, id, x, y, .*, width\s*\)\) return true;/);
 });
