@@ -197,3 +197,26 @@ test("the Greymon last resort still covers clips and models outside the map", { 
   assert.equal(script.ops.filter((o) => o.op === 5).length, 0);
   assert.ok(script.ops.some((o) => o.op === 3 && (o.words?.[1] | 0) === 9999), "the technique's effect is spawned");
 });
+
+test("the last resort turns a donor by the DONOR's side, not by the target's", () => {
+  // an enemy-authored donor record: arena-space z negative, projectile yaw 0 (side-mirror's own signs)
+  const pad = (x) => Array.from({ length: 9 }, () => ({ ops: [] })).concat([x]);
+  const enemyDonor = pad({ ops: [{ op: 3, words: [0, 1, 100, -896, -5120] },
+                                 { op: 6, words: [0, 0, 100, -896, -5120, 0, 0, 0] }] });
+  // a player-authored model (its own basic attack launches with yaw 2048) with no body table at all,
+  // so the build lands on the last resort's donor-shape fallback
+  const model = { folder: "m000none", timeline: [], actions: [{ ops: [{ op: 6, words: [0, 0, 0, 0, 0, 0, 2048, 0] }] }] };
+  assert.equal(authoredSide(model), "player");
+  setFallbackDonor(enemyDonor);
+  try {
+    const script = resolveClipScript(model, 9, { element: 1 });
+    assert.ok(script && script.ops.length, "a script is still built");
+    const arena = script.ops.filter((o) => (o.op === 6 || (o.op === 3 && (o.words?.[0] | 0) === 0 && (o.words?.[1] | 0) === 1)));
+    assert.equal(arena.length, 2, "the donor's two arena ops survive");
+    // before the fix the side was read off the ACTIONS ARRAY (never a model, so always "player") and the
+    // fallback assumed a player-authored donor: the enemy record ran unturned and aimed backwards (z < 0)
+    assert.ok(arena.every((o) => (o.words[4] | 0) > 0), "turned into the player convention (z > 0)");
+  } finally {
+    setFallbackDonor([]);
+  }
+});

@@ -1348,13 +1348,16 @@ export function resolveClipScriptBase(model: ClipScriptModel, clip: number | nul
   // MOVING table (never the idle/return base tables, and never a one-frame hold — tableMotion)
   const anyTables = byMotion(model, tableIndices(model).filter((i) => !isBaseTable(i)));
   const synthRow = { m: "own-table-body", d: "m005grey", t: attackTables.length ? attackTables : anyTables };
-  const synthGap = { script: donor, side: authoredSide(donorActions as unknown as { actions?: unknown }) || "player" };
+  // the donor's side is a property of the donor's own actions, not of the array we hold them in: m005grey
+  // (the stock donor) is player-authored, but setFallbackDonor takes any species' actions
+  const donorSide = authoredSide({ actions: donorActions });
+  const synthGap = { script: donor, side: donorSide };
   const built = buildGapScript(model, clip, synthRow, synthGap, element, "enemy", hits, planted, tech);
   if (built) return built;
   // a pack with no body table at all (a stub, or a dataless model): play the donor's shape on the idle table
   // so the fighter still has a script to run; a "wait for the bound table" that can never finish (the idle
   // loops) becomes a short fixed beat, exactly as the old last resort did
-  const turn = authoredSide(model) === "enemy";
+  const turn = donorSide !== authoredSide(model);
   const ops = (turn ? mirrorOps(donor.ops) : donor.ops).map((o) => ({ ...o, words: (o.words ?? []).slice() }));
   for (const o of ops) {
     if (o.op === 2 && (o.words[0]! | 0) === 0 && (o.words[2]! | 0) > 1) o.words[2] = 1;
