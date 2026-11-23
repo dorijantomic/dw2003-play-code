@@ -275,13 +275,14 @@ export function markFormTaken(b: BattleState, position: number, speciesId: numbe
  * and the disc's `form >= 4` guard drops anything that is not an acquired form.
  * In the walker's id space the rookies are 1..8, so `> 8` is the same guard.
  */
-export function markedEquippedForms(flags: readonly number[] | null | undefined, equipped: readonly (number | string)[] | null | undefined) {
-  const out: (number | undefined)[] = [];
+export function markedEquippedForms(flags: readonly number[] | null | undefined, equipped: readonly (number | string)[] | null | undefined): number[] {
+  const out: number[] = [];
   const triple = equippedTriple(equipped);
   for (let i = 0; i < 3; i++) {
     if (!Number(flags?.[7 + i] ?? 0)) continue;
     const id = triple[i];
-    if (isFormDigimonId(id) && !out.includes(id)) out.push(id);
+    if (id === undefined || !isFormDigimonId(id) || out.includes(id)) continue;
+    out.push(id);
   }
   return out;
 }

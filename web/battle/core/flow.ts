@@ -147,12 +147,15 @@ export function makeFlow(B: BattleContext) {
     const en = b?.enemy;
     const boss = en?.bossId ? B.fusionBossesDB?.[en.bossId] ?? null : null;
     const phases = boss?.phases;
-    if (!en || !Array.isArray(phases) || !phases.length) return [];
+    // eStats is the disc row the turn is built from; only fused records carry a phase at all
+    // (fuseIntoBoss always writes one), so a missing row means nothing to swap.
+    const eStats = en?.eStats;
+    if (!en || !boss || !eStats || !Array.isArray(phases) || !phases.length) return [];
     const index = phaseFor(en.maxHp, en.hp, phases);
     if (!(index > (en.bossPhase ?? -1))) return [];
     en.bossPhase = index;
     const phase = phases[index];
-    en.eStats!.ai_moves = phaseRows(phase, boss.moves);
+    eStats.ai_moves = phaseRows(phase, boss.moves);
     const effects = phaseEffects(phase);
     if (effects.element) b.field = { element: effects.element, power: effects.power };
     if (effects.tint) setFighterTint("enemy", effects.tint);

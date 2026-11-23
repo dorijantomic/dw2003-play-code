@@ -75,17 +75,21 @@ export function phaseRows(phase: FusionBossPhase | null | undefined, bossMoves: 
   const moves = Array.isArray(phase?.moves) ? phase.moves : [];
   const known = Array.isArray(bossMoves) ? bossMoves : [];
   if (!moves.length) return [];
-  const actions = [];
+  const actions: number[] = [];
   for (const move of moves) {
     const at = known.indexOf(move);
     if (at < 0 || at > 2) return [];
     actions.push(at + 1);
   }
-  const rows = [];
+  const rows: { action: number; comparator: number; value: number }[] = [];
   for (let i = 0; i < 3; i++) {
-    rows.push({ action: actions[i % actions.length], comparator: 1, value: 64 });
+    const action = actions[i % actions.length];
+    if (action === undefined) return [];   // no move to repeat: impossible after the length check above
+    rows.push({ action, comparator: 1, value: 64 });
   }
-  rows.push({ action: actions[actions.length - 1], comparator: 0, value: 64 });
+  const last = actions[actions.length - 1];
+  if (last === undefined) return [];
+  rows.push({ action: last, comparator: 0, value: 64 });
   return rows;
 }
 
