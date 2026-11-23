@@ -64,8 +64,11 @@ test("web/battle.js runs the finalizer at every player→enemy damage site, and 
     src.includes("specialModeDamage(mode, true, b.enemy.hp, b.enemy.maxHp, total, 1);"),
     "the helper is the disc's own finalizer (player→enemy, mode-keyed)",
   );
-  // The enemy→player commit (b.player.hp) must NOT be clamped.
-  const combat = src.match(/b\.player\.hp = Math\.max\(0, b\.player\.hp - total\)/g) || [];
+  // The enemy→player commit (b.player.hp) must NOT be clamped. Since the split of web/battle.ts
+  // into web/battle/core/ the enemy's blow comes off contact by contact (A12), so the one commit
+  // is web/battle/core/enemy-action.ts `contact.remaining()` — still the raw damage, still not
+  // routed through finalizePlayerDamage.
+  const combat = src.match(/b\.player\.hp = Math\.max\(0, b\.player\.hp - contact\.remaining\(\)\)/g) || [];
   assert.equal(combat.length, 1, "exactly one enemy→player commit");
   assert.ok(
     !/finalizePlayerDamage[^;]*\n[^;]*b\.player\.hp/.test(src),
