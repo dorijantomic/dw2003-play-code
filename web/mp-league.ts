@@ -26,8 +26,7 @@
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
 import type { MpLeagueState, MpLeagueWire, MpNight } from "./types/mp-league.js";
-/** A finished fight as matchScore reads it: the league's own rows carry a null side for a bye or an unplayed
- *  seat, so both sides are nullable (matchScore already treats the loser as "whichever side is not the winner"). */
+/** A match as the score reads it: on a bye, a walkover or a dead match one side (or both) is null. */
 interface MatchScoreMatch { a: number | null; b: number | null; w?: number | null; g?: number[]; }
 
 interface MpLeaguePackExtra {
@@ -110,9 +109,16 @@ export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; b
     const byes = size - list.length;                          // slots with nobody opposite: first round only
     const first: MpLeagueState[] = [];
     let i = 0;
+    // The reads are exactly list.length (byes + one pairing is two reads each), but TypeScript cannot count them:
+    // take() makes the bound a real check so an undefined id can never be written into the bracket.
+    const take = (): number => {
+        const id = list[i++];
+        if (id === undefined) throw new Error("pairing read past the tamer list");
+        return id;
+    };
     for (let m = 0; m < size / 2; m++) {
-        if (m < byes) first.push({ a: list[i++], b: null, w: list[i - 1], g: [], bye: true });
-        else first.push({ a: list[i++], b: list[i++], w: null, g: [] });
+        if (m < byes) { const id = take(); first.push({ a: id, b: null, w: id, g: [], bye: true }); }
+        else { const a = take(); const b = take(); first.push({ a, b, w: null, g: [] }); }
     }
     return {
         bestOf,
@@ -316,7 +322,8 @@ export function unpackLeague(wire: MpLeagueWire | null | undefined): MpNight | n
     };
     for (const round of Array.isArray(wire.R) ? wire.R : []) {
         lg.rounds.push(round.map((row) => {
-            const [a = null, b = null, w = null, ...g] = Array.isArray(row) ? row : [];
+            const [a = null, b = null, w = null, ...rest] = Array.isArray(row) ? row : [];
+            const g = rest.filter((x): x is number => typeof x === "number");
             const m: MpLeagueState = { a, b, w, g };
             if (b == null && a != null) m.bye = true;                       // a first-round bye
             else if (a == null && b == null) m.dead = true;                 // nobody left to play it
