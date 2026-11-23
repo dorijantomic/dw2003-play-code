@@ -28,6 +28,17 @@ const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]
 const lerp3 = (a, b, t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const cl = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const ss = (x: number) => { x = cl(x); return x * x * (3 - 2 * x); };
+type Dir3 = [number, number, number];
+/** Shortest-arc interpolation between two DIRECTIONS. A plain lerp of two directions ~150 deg apart (lunge wind-up
+ *  vs thrust) passes close to zero length, so its normalised heading whips through the whole turn inside one tick and
+ *  the arm root snaps 130 deg there; slerp turns at a constant rate and keeps the hand on the arc, not under it. */
+const slerpDir = (a: Dir3, b: Dir3, t: number): Dir3 => {
+  const [ax, ay, az] = nrm(a), [bx, by, bz] = nrm(b);
+  const c = cl(ax * bx + ay * by + az * bz, -1, 1), g = Math.acos(c);
+  if (g < 1e-4) return [ax, ay, az];
+  const s = Math.sin(g), w0 = Math.sin((1 - t) * g) / s, w1 = Math.sin(t * g) / s;
+  return [ax * w0 + bx * w1, ay * w0 + by * w1, az * w0 + bz * w1];
+};
 const rx = (a: number) => axAng([1, 0, 0], a);
 const ry = (a: number) => axAng([0, 1, 0], a);
 const rz = (a: number) => axAng([0, 0, 1], a);
@@ -347,7 +358,7 @@ function runLunge(c, S, u: number) {
   if (!arms.length) S.shift([0, 0, H * 0.06 * hitA]);
   arms.slice(0, 2).forEach((a: { root: string | number; len: number; tip: string | number; }, i: number) => {
     const s = armS(a, i), hit = i === 0 ? hitA : hitB, wd = wind * (i === 0 ? 1 : 0.6);
-    const dir = nrm(lerp3([s * 0.25, 0.4, -0.7], [-s * 0.08, -0.02, 1], 0.5 + 0.5 * (hit - wd)));
+    const dir = slerpDir([s * 0.25, 0.4, -0.7], [-s * 0.08, -0.02, 1], 0.5 + 0.5 * (hit - wd));
     let T = add(c.Pr[a.root], scl(dir, a.len * 0.92));
     const dv = sub(T, c.Pr[a.tip]);                       // a hand never travels more than this far from its rest spot
     if (len(dv) > 0.5 * H) T = add(c.Pr[a.tip], scl(dv, 0.5 * H / len(dv)));
