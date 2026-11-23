@@ -112,7 +112,7 @@ function coveredBy(root: HTMLElement, rr: DOMRect) {
         const a = /^rgba\(.*,\s*([\d.]+)\)$/.exec(c.backgroundColor);
         if (c.backgroundColor === "transparent" || (a && parseFloat(a[1]!) < 0.99) || !c.backgroundColor.startsWith("rgb")) continue;
         const b = s.getBoundingClientRect();
-        if (b.width >= rr.width * 0.9 && b.height >= rr.height * 0.9) return { id: s.id, tag: (s as Element & { tag?: string; }).tag ?? s.tagName, z, bg: c.backgroundColor };
+        if (b.width >= rr.width * 0.9 && b.height >= rr.height * 0.9) return { id: s.id, tag: s.tagName, z, bg: c.backgroundColor };
     }
     return null;
 }
