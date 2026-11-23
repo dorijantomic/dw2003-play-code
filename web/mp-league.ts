@@ -26,7 +26,9 @@
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
 import type { MpLeagueState, MpLeagueWire, MpNight } from "./types/mp-league.js";
-interface MatchScoreMatch { a: number; b: number; w?: number | null; g?: number[]; }
+/** A finished fight as matchScore reads it: the league's own rows carry a null side for a bye or an unplayed
+ *  seat, so both sides are nullable (matchScore already treats the loser as "whichever side is not the winner"). */
+interface MatchScoreMatch { a: number | null; b: number | null; w?: number | null; g?: number[]; }
 
 interface MpLeaguePackExtra {
     ids: number[];

@@ -415,12 +415,12 @@ test("F2 -> Extras -> Server Champ league: off by default, and off means no butt
     assert.match(ambienceSrc, /const EXPERIMENTAL = \[[^\]]*"serverchamp"/, "serverchamp is EXPERIMENTAL");
     assert.match(ambienceSrc, /for \(const k of MANUAL\) fx\[k\] = false/, "and therefore off until switched on");
     // no message leaves a client with the switch off
-    assert.match(mpSrc, /export const sendLeague = \(o\) => serverChampOn\(\) \? sendRaw\(\{ t: "lg", \.\.\.o \}\) : false;/, "the send is gated");
+    assert.match(mpSrc, /export const sendLeague = \(o\s*\) => serverChampOn\(\) \? sendRaw\(\{ t: "lg", \.\.\.o \}\) : false;/, "the send is gated");
     assert.match(mpSrc, /window\.__fx\?\.serverchamp === true/, "the gate reads the F2 switch");
     // no button and no bracket with the switch off
     assert.match(socialSrc, /if \(serverChampOn\(\)\) el\.players\.append\(leagueStrip\(\)\)/, "the strip is gated");
     // a card that carries champ draws as a normal card: the flag is only read behind the switch
-    assert.match(socialSrc, /const isChamp = \(p\) => serverChampOn\(\) && \(p\.id === champId\(\) \|\| p\.card\?\.champ === true\)/, "the champ colour is gated");
+    assert.match(socialSrc, /const isChamp = \(p\s*\) => serverChampOn\(\) && \(p\.id === champId\(\) \|\| p\.card\?\.champ === true\)/, "the champ colour is gated");
 });
 
 test("the dock prints the winner's name and the winner's score, in the feed and in the bracket strip", () => {
@@ -428,7 +428,7 @@ test("the dock prints the winner's name and the winner's score, in the feed and 
     const feed = socialSrc.match(/else if \(ev\.k === "win"\)[^\n]*/)?.[0] ?? "";
     assert.match(feed, /lgName\(ev\.w\)\} beat \$\{lgName\(ev\.l\)\} \$\{ev\.g\}/, "the feed says who won, then the score");
     // the strip's finished match: no bracket-order score any more
-    const fn = socialSrc.match(/function matchText\(m\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    const fn = socialSrc.match(/function matchText\(\s*m[^)]*\)\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
     assert.match(fn, /matchScore\(m\)/, "the strip scores a finished fight from the winner's side");
     assert.ok(!/leagueScore\(m, m\.a\)\}-\$\{leagueScore\(m, m\.b\)/.test(fn), "no bracket-order score in the strip");
 });
