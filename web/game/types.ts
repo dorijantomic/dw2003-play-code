@@ -13,7 +13,7 @@ import type { createRetryLoader } from "../retry-loader.js";
 import type { tiledMap } from "../map-tiles.js";
 import type { FishExtrasData } from "../types/misc-game2.js";
 import type { ItemsData } from "../types/screens.js";
-import type { DriStats } from "../types/misc-game.js";
+import type { DriFormLedgerEntry, DriStats } from "../types/misc-game.js";
 import type { GymExtraHall } from "../gym-extra.js";
 
 import type { createQuestChase } from "../quest-chase.js";
@@ -685,9 +685,12 @@ export interface FormLedgerEntry {
 
 /** One row of web/party.ts partyRosterView: a party member as the menus and the field read it. */
 export interface PartyRosterRow {
-  charId: string | null;
+  /** The slot's id as the menus key it: a string, "" for an empty slot (never null). */
+  charId: string;
   rookieId: number;
   digimonId: number;
+  /** The worn form's profile, else the base Digimon's; undefined when the table has neither. */
+  profile: DigimonRecord | undefined;
   name: string;
   formName: string;
   level: number;
@@ -700,8 +703,12 @@ export interface PartyRosterRow {
   stats: Record<string, number> | null;
   bonuses: Record<string, number> | null;
   dvexpByForm: Record<string, number> | null;
-  formLedger: FormLedgerEntry[] | null;
+  formLedger: DriFormLedgerEntry[] | null;
   equippedForms: number[] | null;
+  /** The record's stored core stats + the permanent chips, in CORE_STATS order. */
+  core: number[];
+  /** The record's element values (base + every trained point), in ELEMENT_KEYS order. */
+  elements: number[];
 }
 
 

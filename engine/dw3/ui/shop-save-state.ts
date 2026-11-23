@@ -96,7 +96,12 @@ export interface ShopPartyMemberSeed {
   maxMp?: number;
   core?: readonly number[];
   elements?: readonly number[];
-  nameBytes?: Uint8Array;
+  /**
+   * The record's name bytes, capped at 23. A web screen hands the shared encoder's
+   * plain byte list; the native binder hands a Uint8Array — both are written out the
+   * same way, and the NUL terminator lands right after the last byte.
+   */
+  nameBytes?: Uint8Array | readonly number[];
 }
 
 export interface ShopSaveSeed {
@@ -185,7 +190,7 @@ export function seedShopSaveState(mem: NativeMemory, seed: ShopSaveSeed): void {
     member.elements?.forEach((value, index) => word(0x3c + index * 2, value, "element stat"));
     if (member.nameBytes) {
       if (member.nameBytes.length > 23 || member.nameBytes.includes(0)) throw new Error("Invalid shop name bytes");
-      mem.load(member.nameBytes, base + 8);
+      member.nameBytes.forEach((value, index) => mem.write8(base + 8 + index, integer(value, 0, 0xff, "shop name byte")));
       mem.write8(base + 8 + member.nameBytes.length, 0);
     }
     for (const [name, off] of ROSTER_EQUIP_ENTRIES) {

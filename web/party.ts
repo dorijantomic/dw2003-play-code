@@ -2,6 +2,7 @@ import { ELEMENT_KEYS, elementValue, elementValues } from "./vendor/engine.js";
 import type { DigimonRecord } from "./types/battle.js";
 import type { DigimonTable } from "./types/battle-core.js";
 import type { DriStats } from "./types/misc-game.js";
+import type { PartyRosterRow } from "./game/types.js";
 interface ElementProfile {
   resistances: Record<string, number | undefined>;
 }
@@ -142,7 +143,13 @@ export function elementValueWithGear(profile: ElementProfile | null | undefined,
 // Pure function: party = state.party (manifest ids, lead first), partnerStats = the
 // lead's live stat block, partyStats = array of stat blocks for indices 1.., digimonDB
 // keyed by digimon.json id.
-export function partyRosterView(party, partnerStats, partyStats, digimonDB, names) {
+export function partyRosterView(
+  party: readonly (string | number | null)[] | null | undefined,
+  partnerStats: DriStats | null | undefined,
+  partyStats: readonly (DriStats | null | undefined)[] | null | undefined,
+  digimonDB: DigimonTable | null | undefined,
+  names: Record<string, string> | null | undefined
+): PartyRosterRow[] {
   return (party ?? []).map((charId, i) => {
     // A save can carry an empty slot (pendingParty is written with nulls upstream), so the lookups are
     // done on a real id string and the row keeps an empty name rather than the text "null".

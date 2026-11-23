@@ -79,8 +79,7 @@ import { openFly } from "./ui-openers.js";
 import { checkStageCutscene, storyDbg } from "./story-events.js";
 import { runQuestSceneEvent, sceneCast } from "./quest-scenes.js";
 import { dispatchInput } from "./input.js";
-import type { Closeable, FadeState, Follower, GameState, ManifestMap, SceneNpc, SpriteRecord, TrailPoint } from "./types.js";
-import type { RosterMember } from "../types/battle.js";
+import type { Closeable, FadeState, Follower, GameState, ManifestMap, PartyRosterRow, SceneNpc, SpriteRecord, TrailPoint } from "./types.js";
 import type { BookFactoryArgs } from "../types/screens.js";
 import type { WithAnyKey } from "../types/game-shared2.js";
 
@@ -332,7 +331,7 @@ export const statusOptions = {
     // The pages draw the BASE Digimon's name out of the roster record, so the
     // adapter seeds exactly the name the menus show: the player's nickname when
     // there is one, else the species name (web/party.js partyRosterView).
-    roster: (state: GameState): RosterMember[] => partyRosterView(
+    roster: (state: GameState): PartyRosterRow[] => partyRosterView(
         state.party, state.partnerStats, state.partyStats,
         menu.digimonDB ?? {}, state.digimonNames,
     ),
