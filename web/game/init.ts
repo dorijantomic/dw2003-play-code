@@ -83,12 +83,12 @@ export async function init() {
             localStorage.removeItem(k);
         }
         for (const k in state.flags) delete state.flags[k];
-        state.party = null;
+        state.party = []; // an empty list, not null: readers index it
         state.pendingParty = null;
         state.rosterOwned = 0;
         state.reserveStats = {};
         state.reserveEquipment = {};
-        state.partyStats = null;
+        state.partyStats = []; // one stat block per member, and here there are none
         state.partnerStats = { hp: 500, maxHp: 500, mp: 100, maxMp: 100, level: 1 };
         state.equipment = [];
         syncWornFromEquipment(state); // nobody wears anything on a new game
@@ -746,12 +746,12 @@ export async function init() {
         state.chapter = null; // clear debug override → chapter derives from (now empty) flags = 1
         state.playerName = "Junior"; // placeholder until in-world registration
         state.charIdx = 0; // no partner until the s212 download scene
-        state.party = null;
+        state.party = []; // an empty list, not null: readers index it
         state.pendingParty = null;
         state.rosterOwned = 0;
         state.reserveStats = {};
         state.reserveEquipment = {};
-        state.partyStats = null;
+        state.partyStats = []; // one stat block per member, and here there are none
         state.partnerStats = { hp: 500, maxHp: 500, mp: 100, maxMp: 100, level: 1 };
         state.equipment = [];
         syncWornFromEquipment(state); // nobody wears anything on a new game
