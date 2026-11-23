@@ -157,8 +157,12 @@ test("battle.js: the phase block sits in queueAfterAction behind the toggle", ()
     "one call site");
   assert.equal((src.match(/window\.__fx\?\.bossphases === true/g) || []).length, 1,
     "the switch is read in one place");
-  const start = src.indexOf("function queueAfterAction(b, acted)");
-  assert.ok(start > 0, "queueAfterAction exists");
+  // The signature is read by shape, not literally: queueAfterAction has grown a third
+  // parameter (playerSpd, the Tag command's delay read) and readSource already joins the
+  // split battle parts, so an exact "(b, acted)" never matches again.
+  const sig = /function queueAfterAction\(b[^)]*\)/.exec(src);
+  assert.ok(sig, "queueAfterAction exists");
+  const start = sig.index;
   const pagesAt = src.indexOf("b._timelinePages = pages;", start);
   assert.ok(pagesAt > start, "the block sits before the timeline pages are published");
   const block = src.slice(start, pagesAt);
