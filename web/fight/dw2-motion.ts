@@ -24,6 +24,7 @@
 import { DW2_CLIP_MAP, dw2LetterForSlot, DW2_MOTION_LETTERS } from "./dw2-clip-map.js";
 import { battleSetting } from "./battle-settings.js";
 import { ensureDw2Picks } from "./dw2-picks.js";
+import { skillRowsForName } from "./fight-tables.js";
 import { isInstalledBuild } from "../ship-list.js";
 import type { Dw2FightCh1, Dw2FightCh2, Dw2Motion, FightBoneAnim, FightModel } from "./types.js";
 
@@ -194,15 +195,32 @@ export async function prepareDw2Motion(model: FightModel) {
 }
 
 /**
- * The generated DW2 motion for a clip slot, or null. `tech` is the technique id (only cast slots
- * and the signature slot need it: they pick F/G/H by the technique's DW2 cast type, and the
- * signature slot takes the melee clip for a physical technique).
+ * The cast type of the technique a clip belongs to.
+ *
+ * The animator hands dw2MotionFor the technique's NAME (ResolveOpts.tech is a name), while the
+ * DW2 table is keyed by DW3 skill id, so a name has to be resolved through the skills rows first.
+ * A name can carry several rows (one per clip); the slot's own clip picks the row, the same rule
+ * withDw2Body uses. A number is taken as the id itself.
+ */
+function castTypeForTech(tech: number | string | null, clip: number | null) {
+  if (tech == null) return null;
+  if (typeof tech === "number") return castTypeFor(tech);
+  const rows = skillRowsForName(tech);
+  const row = clip == null ? rows[0] : (rows.find((r) => (r.clip | 0) === (clip | 0)) ?? rows[0]);
+  return row ? castTypeFor(row.id) : null;
+}
+
+/**
+ * The generated DW2 motion for a clip slot, or null. `tech` is the technique's NAME (ResolveOpts
+ * carries the name) or its DW3 skill id — only the cast slots and the signature slot need it: they
+ * pick F/G/H by the technique's DW2 cast type, and the signature slot takes the melee clip for a
+ * physical technique.
  */
 export function dw2MotionFor(model: FightModel | null | undefined, clip: number | null, { tech = null, magical = false }: { tech?: number | string | null; magical?: boolean; } = {}) {
   if (!dw2MotionEnabled() || !model?.dw2Motion || clip == null) return null;
   const row = DW2_CLIP_MAP[clip];
   if (!row) return null;
-  const castType = castTypeFor(tech as number | null) ?? 0;
+  const castType = castTypeForTech(tech, clip) ?? 0;
   const letter = dw2LetterForSlot(clip, { castType, magical });
   const hit = letter ? model.dw2Motion[letter] : null;
   return hit ? { ...hit, slot: clip | 0, castType } : null;

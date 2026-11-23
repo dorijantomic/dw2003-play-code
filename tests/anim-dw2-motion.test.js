@@ -231,6 +231,27 @@ test("cast slots take the letter the technique's cast type names", () => {
   }
 });
 
+test("a technique NAME finds its skills row's cast type (the animator passes names, not ids)", () => {
+  const m = model();
+  const g = generated("A", 131, "idle");
+  g.motions.G = { ...g.motions.A, letter: "G", table: 132, kind: "cast" };
+  DW2.applyDw2Motion(m, g);
+  DW2.setCastTypes({ bySkill: { 7: 1 } });
+  FT.setSkillTable([{ id: 7, name: "Fireball", clip: 9, attack_category: "magical" }]);
+  DW2.setDw2MotionEnabled(true);
+  try {
+    // ("Fireball" | 0) === 0, which the table has no row for: before the fix every named technique
+    // fell back to cast type 0 and this slot stayed on its own body.
+    assert.equal(DW2.dw2MotionFor(m, 9, { tech: "Fireball" })?.letter, "G");
+    assert.equal(DW2.dw2MotionFor(m, 9, { tech: "Fireball" })?.castType, 1);
+    assert.equal(DW2.dw2MotionFor(m, 9, { tech: 7 })?.letter, "G", "an id still works");
+  } finally {
+    DW2.setDw2MotionEnabled(false);
+    DW2.setCastTypes(null);
+    FT.setSkillTable([]);
+  }
+});
+
 test("the technique table's own clip really names the slot the map keys on", () => {
   // a guard against a mapping that drifts from the engine: the basic/signature partition the repo
   // ships must land on slots 5 and 11, which the map covers with a body the batch build bakes
