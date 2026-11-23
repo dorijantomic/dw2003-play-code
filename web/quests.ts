@@ -517,7 +517,7 @@ async function perform(scene: QuestScene | undefined, name: string, lines: strin
     return { ran: false, answer: null, failed: false };
 }
 async function busy(fn: () => Promise<void>) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
-const atNpc = (ref: { npc: number; maps: MapId[] } | null | undefined, npcId: number, mapId: MapId): ref is { npc: number; maps: MapId[] } => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
+const atNpc = (ref: { npc: number; maps: MapId[] } | null | undefined, npcId: number, mapId: MapId): ref is { npc: number; maps: MapId[] } => !!ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
 const talksDone = (d: QuestDef, a: QuestActive, upTo: number) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
 // A scene that carries a `chase` step answers 1 when the player lost the target (web/quest-scenes.js). A lost chase never
 // fails a quest, so it must not complete the step it sits in either: the step stays open and the player can talk again and
@@ -581,17 +581,22 @@ export function questTalk(npcId: number, mapId: MapId | null, hasChat = false) {
     if (offers.length) {
         busy(async () => {
             let d = offers[0];
+            if (!d) return;
             if (offers.length > 1 && fx.questsecondjob === true) {
                 const pick = await pagedPick("Which job?", offerLabels(offers, 28));
                 if (pick < 0) return;                            // "Back": no job taken, nothing declined
-                d = offers[pick];
+                const chosen = offers[pick];
+                if (!chosen) return;
+                d = chosen;
             }
-            const r = await perform(d.offer.scene, d.offer.name, d.offer.lines, npcId);
+            const offer = d.offer;
+            if (!offer) return;                                      // offersAt only returns defs that have an offer
+            const r = await perform(offer.scene, offer.name, offer.lines, npcId);
             if (r.failed) return;                                    // the offer scene ended on the title screen: no quest
-            const pick = r.answer ?? await ask(d.offer.ask ?? "Take the job?", ["I will do it", "Not now"]);
+            const pick = r.answer ?? await ask(offer.ask ?? "Take the job?", ["I will do it", "Not now"]);
             if (pick === 0) {
                 accept(d.id, true);
-                if (d.acceptScene) await perform(d.acceptScene, d.offer.name, d.offer.acceptLines ?? [], npcId);
+                if (d.acceptScene) await perform(d.acceptScene, offer.name, offer.acceptLines ?? [], npcId);
             } else declined.add(d.id);
         });
         return true;
@@ -940,7 +945,7 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         get dialogBusy() { return dialogBusy; },
         get battle() { return challengeBusy; },
         state: () => st,
-        playScene: (scene) => (api?.scene ? api.scene(scene) : null),
+        playScene: (scene) => (scene && api?.scene ? api.scene(scene) : null),
         save: saveState,
         warn: (m) => console.warn(m),
     });
@@ -971,7 +976,8 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
                 for (const r of d?.unlock?.met ?? []) { const key = `${r.npc}@${canon(r.map)}`; if (!st.met.includes(key)) st.met.push(key); }
                 for (const m of d?.unlock?.visited ?? []) { const key = canon(m); if (!st.visited.includes(key)) st.visited.push(key); }
                 declined.clear(); saveState();
-                return { level: d?.unlock?.level ?? 1, status: statusOf(d) };
+                if (!d) return { level: 1, status: "missing" };      // no quest with this id: nothing to read a status from
+                return { level: d.unlock?.level ?? 1, status: statusOf(d) };
             },
             /** Meet every objective at once (taking the quest first if needed). */
             finishGoals(id: string) {
