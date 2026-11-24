@@ -211,10 +211,12 @@ export function iconOffCentre(cam: ZoomCamera, ll: LonLat): number {
     return Math.hypot(dot(d, right) / depth, dot(d, up) / depth);
 }
 
-/** The place whose icon is nearest the screen centre (index into targets, -1 when none is in sight). */
-export function nearestTarget(cam: ZoomCamera, targets: readonly ZoomTarget[]): number {
+/** The place whose icon is nearest the screen centre (index into targets, -1 when none is in sight); `shown` leaves out the
+ *  places whose icon is hidden (not visited: web/world-globe-reveal.ts iconShown). */
+export function nearestTarget(cam: ZoomCamera, targets: readonly ZoomTarget[], shown?: (target: number) => boolean): number {
     let best = -1, bestD = Infinity;
     targets.forEach((t, i) => {
+        if (shown && !shown(i)) return;
         const d = iconOffCentre(cam, t.lonLat);
         if (d < bestD) { bestD = d; best = i; }
     });
@@ -226,10 +228,10 @@ export function startZoomView(look: LonLat, home: number): ZoomView {
     return { look: { ...look }, z: 0, target: home, turned: false };
 }
 
-/** the target is kept from the swap on (its window shows); before it, the place nearest the centre (your own until you turn) */
+/** the target is kept from the swap on (its window shows); before it, the shown place nearest the centre (your own until you turn) */
 function retarget(v: ZoomView, env: ZoomStepEnv): ZoomView {
     if (v.z >= ZOOM_BANDS.swap[0] && v.target >= 0) return v;
-    const target = !v.turned && env.home >= 0 ? env.home : nearestTarget(zoomCamera(v.look, v.z), env.targets);
+    const target = !v.turned && env.home >= 0 ? env.home : nearestTarget(zoomCamera(v.look, v.z), env.targets, env.shown);
     return target === v.target ? v : { ...v, target };
 }
 

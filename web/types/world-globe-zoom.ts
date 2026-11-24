@@ -101,6 +101,8 @@ export interface ZoomStepEnv {
   fovDeg: number;
   /** is the target's picture in? (asking starts its load); the zoom stops before the swap until it is */
   ready: (target: number) => boolean;
+  /** is the target's icon shown (visited, or your own place)? The zoom only goes into shown ones; absent = all shown */
+  shown?: (target: number) => boolean;
 }
 
 /** One map of assets-hd/map-tiles/index.json as the zoom reads it, with the index's tile numbers. */

@@ -7,6 +7,10 @@
 // as the MAP book's: drag (or the arrows) turns the globe at every zoom (over a window it pans), the wheel / E / Q / the slider
 // zoom into the place whose icon is nearest the view's centre; its icon swaps for a round window with that place's screen. The
 // page plays "you are here" on West Wire Forest (s350) at the arrival spawn of the s335 exit, so that place shows its dot.
+// Reveal (web/world-globe-reveal.ts): like the MAP screen, the areas of the story's reveal tier are clear and the rest lies
+// under mist; the page has no game running, so the tier comes from the game's saved story beat (localStorage
+// "progressOrdinal", read only; none = 0) and only "you are here" counts as visited. "show all" (off at first) shows
+// every area and icon.
 import * as THREE from "three";
 import { CONTINENT_LON, GLOBE_VIEW, MAP_LON_SPAN, areaAt, bandEdgeLat, hitGlobe, areaLabel, easeInOut } from "./world-globe-map.js";
 import { makeGlobeRenderer, loadGlobeAssets, buildGlobeScene } from "./world-globe-view.js";
@@ -14,7 +18,9 @@ import { ZOOM, ZOOM_BANDS, dragTurn, slerpLonLat, startZoomView, stepZoom, stepZ
 import { buildZoomScene } from "./world-globe-zoom-view.js";
 import type { Rgb, ZoomScene } from "./world-globe-zoom-view.js";
 import { globePlaces, parsePlaceMaps, parsePlaceScenes, parseWalkerMap, placeOfMap, screenForTarget } from "./world-globe-places.js";
-import type { GlobeHit, GlobeServer, LonLat } from "./types/world-globe-map.js";
+import { revealAll } from "./world-globe-reveal.js";
+import { mapRevealAreas, mapRevealTier, mapTierThresholds } from "./menu/pure.js";
+import type { GlobeHit, GlobeReveal, GlobeServer, LonLat } from "./types/world-globe-map.js";
 import type { GlobePlacesInput, ZoomState, ZoomStepEnv, ZoomView } from "./types/world-globe-zoom.js";
 
 function el<T extends HTMLElement>(id: string, ctor: new () => T): T {
@@ -23,7 +29,7 @@ function el<T extends HTMLElement>(id: string, ctor: new () => T): T {
     return e;
 }
 const statusEl = el("status", HTMLDivElement), tip = el("tip", HTMLDivElement), info = el("info", HTMLDivElement);
-const cv = el("cv", HTMLCanvasElement), pinsBox = el("pins", HTMLInputElement);
+const cv = el("cv", HTMLCanvasElement), pinsBox = el("pins", HTMLInputElement), showAllBox = el("show-all", HTMLInputElement);
 const serverBoxes: { server: GlobeServer; box: HTMLInputElement }[] = [
     { server: "asuka", box: el("srv-asuka", HTMLInputElement) },
     { server: "amaterasu", box: el("srv-amaterasu", HTMLInputElement) },
@@ -48,8 +54,21 @@ async function fetchJson(url: string): Promise<unknown> {
     return raw;
 }
 
+/** The game's saved story beat (localStorage "progressOrdinal", the game's own fallback store; read only), 0 when none. */
+function savedOrdinal(): number {
+    try { return Number(localStorage.getItem("progressOrdinal") ?? 0) || 0; } catch { return 0; }
+}
+
+/** What the page reveals with "show all" off: the tier of `ordinal`, each server's area list for it, nothing visited (the
+ *  page's "you are here" still shows: iconShown). */
+function pageReveal(ui: unknown, ordinal: number): GlobeReveal {
+    const tier = mapRevealTier(ordinal, mapTierThresholds(ui));
+    const none: Record<GlobeServer, readonly number[]> = { asuka: [], amaterasu: [] };
+    return { tier, areas: { asuka: mapRevealAreas(0, tier, ui), amaterasu: mapRevealAreas(1, tier, ui) }, visited: none, fadeIn: none, all: false };
+}
+
 /** the game's tables for the places (status_ui walker_map, the manifest, every scene's exits) and the page's "you are here" */
-async function loadPlaces(): Promise<{ places: GlobePlacesInput; scenesRead: number }> {
+async function loadPlaces(): Promise<{ places: GlobePlacesInput; scenesRead: number; ui: unknown; own: { server: GlobeServer; record: number } | null }> {
     const [ui, manifest] = await Promise.all([fetchJson("assets/data/status_ui.json"), fetchJson("assets/manifest.json")]);
     const walker = parseWalkerMap(ui);
     const mapsRaw = typeof manifest === "object" && manifest !== null && "maps" in manifest ? manifest.maps : [];
@@ -63,7 +82,7 @@ async function loadPlaces(): Promise<{ places: GlobePlacesInput; scenesRead: num
     const p = placeOfMap(walker, DEV_MAP);
     const pos = spawn && typeof spawn.spawnX === "number" && typeof spawn.spawnY === "number" ? { x: spawn.spawnX, y: spawn.spawnY } : null;
     const here = p ? { server: p.server, record: p.record, map: DEV_MAP, pos, entry: null } : null;
-    return { places: globePlaces(walker, maps, scenes, here), scenesRead: Object.keys(raw).length };
+    return { places: globePlaces(walker, maps, scenes, here), scenesRead: Object.keys(raw).length, ui, own: p };
 }
 
 interface Turn { t0: number; from: LonLat; to: LonLat }
@@ -78,9 +97,15 @@ async function main() {
     say("loading...");
     const [assets, placeData] = await Promise.all([loadGlobeAssets(), loadPlaces()]);
     const { continents, image } = assets;
-    const { places, scenesRead } = placeData;
+    const { places, scenesRead, ui } = placeData;
     const built = buildGlobeScene(renderer, assets);
     const { scene, camera, globe, icons, pickIcon, texW, texH, maxTex } = built;
+    const ordinal = savedOrdinal(), gameReveal = pageReveal(ui, ordinal);
+    const own = placeData.own;
+    const applyReveal = (): void => built.setReveal(showAllBox.checked ? revealAll() : gameReveal, own);
+    applyReveal();
+    const markerShown = (server: GlobeServer, loc: number): boolean =>
+        built.iconList.some((s) => s.shown && s.icon.server === server && s.icon.marker.loc === loc);
     scene.background = new THREE.Color(0x05070d);
     pinsBox.addEventListener("change", () => { icons.visible = pinsBox.checked; });
     const seaOf = (s: GlobeServer): Rgb => continents.find((c) => c.data.server === s)?.data.seaRgb ?? [27, 36, 70];
@@ -94,6 +119,7 @@ async function main() {
             const t = targets[i], s = t ? screenForTarget(t.key, places) : null;
             return !!(s && zoom.pictures.get(s.map));
         },
+        shown: (i: number) => built.iconShown(i),
     };
 
     const first = serverBoxes.find((s) => s.box.checked)?.server ?? "asuka";
@@ -110,6 +136,8 @@ async function main() {
         }
         lines.push(`texture ${texW} x ${texH} (file ${image.naturalWidth} x ${image.naturalHeight}, GPU limit ${maxTex})`);
         lines.push(`places: ${places.screens.size} main screens from ${scenesRead} scenes; you are here: ${places.here ? `${places.here.map} (${places.here.how})` : "-"}`);
+        lines.push(showAllBox.checked ? "reveal: show all"
+            : `reveal: story beat ${ordinal} -> tier ${gameReveal.tier}; areas clear: Asuka ${gameReveal.areas.asuka.length}, Amaterasu ${gameReveal.areas.amaterasu.length} of 22; icons: ${built.iconList.filter((s) => s.shown).length}`);
         say(lines.join("\n"));
     };
     // radio switch: zoom out and turn the look point (shortest way) to that continent's centre, eased
@@ -122,6 +150,12 @@ async function main() {
         });
     }
     zoomSlider.addEventListener("input", () => { zWanted = Number(zoomSlider.value) / 1000; });
+    // show all: every area clear and every icon; off again: the game's reveal (a hidden place being zoomed into: back out)
+    showAllBox.addEventListener("change", () => {
+        applyReveal();
+        if (view.target >= 0 && !built.iconShown(view.target)) { zWanted = 0; view = zoomView({ ...view, z: 0, target: -1, turned: true }, 0, env); }
+        showStatus(serverBoxes.find((b) => b.box.checked)?.server ?? "asuka");
+    });
     cv.addEventListener("wheel", (ev: WheelEvent) => {
         ev.preventDefault();
         const px = ev.deltaMode === 1 ? ev.deltaY * 33 : ev.deltaMode === 2 ? ev.deltaY * 800 : ev.deltaY;
@@ -182,7 +216,9 @@ async function main() {
         }
         const hit = ray.intersectObject(globe)[0];
         if (!hit) return null;
-        return hitGlobe(continents, { x: hit.point.x, y: hit.point.y, z: hit.point.z }, icons.visible ? MARKER_PICK_PX : 0);
+        const h = hitGlobe(continents, { x: hit.point.x, y: hit.point.y, z: hit.point.z }, icons.visible ? MARKER_PICK_PX : 0);
+        // a hidden (unvisited) place keeps its name to itself
+        return h && h.marker && !markerShown(h.server, h.marker.loc) ? { ...h, marker: null } : h;
     };
     const label = (h: GlobeHit | null): string => {
         if (!h) return "";
@@ -220,6 +256,7 @@ async function main() {
         }, env, dt, GLOBE_VIEW.latMax);
         view = zoomView(view, stepZoom(view.z, zWanted, dt), env);
         const t = targets[view.target];
+        built.tickReveal(now / 1000);
         lastState = zoom.update({ view, screen: t ? screenForTarget(t.key, places) : null, hereLonLat: homeLonLat, aspect: camera.aspect, timeSec: now / 1000 });
         const shown = view.z.toFixed(3);
         if (zoomValue.textContent !== shown) {
@@ -233,6 +270,8 @@ async function main() {
     showStatus(first);
     Object.assign(window, { __worldGlobe: {
         continents, texW, texH, gpu, maxTex, icons: targets.length,
+        /** reveal hooks for checks (numbers only): the tier, show all, which icons show */
+        reveal: () => ({ tier: gameReveal.tier, ordinal, showAll: showAllBox.checked, shownIcons: built.iconList.filter((s) => s.shown).length }),
         /** zoom hooks for checks (numbers only): jump to z (no easing), turn by radians, read the view / state / screens */
         zoom: {
             setZ(z: number) { zWanted = Math.min(1, Math.max(0, z)); view = zoomView(view, zWanted, env); },

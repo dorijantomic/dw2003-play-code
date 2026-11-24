@@ -151,17 +151,43 @@ export type MapScreenChoice = "classic" | "new";
 /** The menu globe's assets: not asked for, loading, ready to draw, or failed (then the MAP row falls back to the disc's page). */
 export type GlobeStageStatus = "idle" | "loading" | "ready" | "failed";
 
+/** What the MAP globe reveals, by the disc MAP page's own rules (web/menu/pure.ts mapGlobeReveal; F0x80098B84 / F0x8009A6B8). */
+export interface GlobeReveal {
+  /** the reveal tier 0..4: how many of status_ui.json screens.map.tier_thresholds the story ordinal has reached */
+  tier: number;
+  /** each continent's revealed areas (1..22): tier_area_lists[server * 5 + tier] */
+  areas: Readonly<Record<GlobeServer, readonly number[]>>;
+  /** each continent's visited marker records (place + 1), your own place included */
+  visited: Readonly<Record<GlobeServer, readonly number[]>>;
+  /** the areas revealed now that were not at the last MAP open: they fade in when this one opens */
+  fadeIn: Readonly<Record<GlobeServer, readonly number[]>>;
+  /** the dev page's "show all": every area clear and every icon shown */
+  all: boolean;
+}
+
+/** The reveal mask (web/assets/world-globe/<REVEAL.maskFile>) as bytes: w x h texels, RGBA, row 0 = north, column 0 =
+ *  longitude -180 (the globe texture's layout). Per texel the two areas covering it most: R = id1, G = id2, B = weight 2,
+ *  A = weight 1 (0..255; id = REVEAL id, 0 = none). */
+export interface RevealMaskPixels {
+  w: number;
+  h: number;
+  data: ArrayLike<number>;
+}
+
 /** The one three.js globe as the MAP book sees it (web/world-globe-view.ts createGlobeStage); a fake in the node tests. */
 export interface GlobeStageLike {
   /** start loading the assets and building the scene; the "you are here" marker goes on `here`'s place; `places` = every
-   *  place's main screen and yours (web/world-globe-places.ts globePlaces) */
-  open(here: GlobeHereInput, places: GlobePlacesInput): void;
+   *  place's main screen and yours (web/world-globe-places.ts globePlaces); `reveal` = what the disc's MAP page would show
+   *  (web/menu/pure.ts mapGlobeReveal): the other areas lie under mist, the unvisited icons are hidden */
+  open(here: GlobeHereInput, places: GlobePlacesInput, reveal: GlobeReveal): void;
   status(): GlobeStageStatus;
   /** your place once the assets are in (null before, or when the stage has no place) */
   place(): GlobePlace | null;
   /** the places the zoom can go into (empty before ready) and your own place's index among them (-1 = none) */
   targets(): readonly ZoomTarget[];
   home(): number;
+  /** is a target's icon shown (a visited place, or yours)? The zoom only goes into shown ones. */
+  shown(target: number): boolean;
   /** ask for a target's picture (loaded lazily); true once it is ready */
   want(target: number): boolean;
   /** render one frame for `view` and copy it into (x, y, w, h) of `ctx`; false when there is nothing to draw yet */

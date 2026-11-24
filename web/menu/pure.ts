@@ -4,7 +4,7 @@ import { MS } from "./state.js";
 import { globeServerOfStage } from "../world-globe-map.js";
 import type { CoreStatKey, ElementKey, MapMarkerRecord, MapSeenRow, MenuState, RosterViewEntry } from "./types.js";
 import type { GameState } from "../game/types.js";
-import type { GlobeHereInput } from "../types/world-globe-map.js";
+import type { GlobeHereInput, GlobeReveal } from "../types/world-globe-map.js";
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
 // is string 11, the 6th entry, gated by the card-game unlock. UNKNOWN U-04:
@@ -173,6 +173,67 @@ export function mapGlobeHere(state: GameState, ui = MS.UI): GlobeHereInput {
     map: typeof map === "string" ? map : "",
     pos: Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null,
     entry: state?.globeEntry ?? null,
+  };
+}
+
+// ── what the MAP page reveals (draw F0x80098B84; the disc's page web/menu/draw-map.ts and the World Globe both read these) ──
+
+const isNumList = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => typeof n === "number");
+
+/** F0x80098B84: the reveal tier 0..4 = how many of the thresholds (status_ui.json screens.map.tier_thresholds, 7 / 0xF /
+ *  0x1B / 0x1E) the story master ordinal [0x8004B370] (state.progressOrdinal) has reached. */
+export function mapRevealTier(ordinal: number, thresholds: readonly number[]): number {
+  let tier = 0;
+  for (const th of thresholds) if (ordinal >= th) tier++;
+  return tier;
+}
+
+/** status_ui.json screens.map.tier_thresholds (empty when the table is missing: tier 0) */
+export function mapTierThresholds(ui = MS.UI): number[] {
+  // ETS item 9: MS.UI is the untyped status_ui.json
+  const t: unknown = ui?.screens?.map?.tier_thresholds;
+  return isNumList(t) ? t : [];
+}
+
+/** The areas the MAP page draws revealed for a server (0 Asuka, 1 Amaterasu) and tier: tier_area_lists[server * 5 + tier]
+ *  (the disc's pointer table 0x8009AF40, 0-terminated area-id lists). */
+export function mapRevealAreas(server: number, tier: number, ui = MS.UI): number[] {
+  // ETS item 9: MS.UI is the untyped status_ui.json
+  const lists: unknown = ui?.screens?.map?.tier_area_lists;
+  const l: unknown = Array.isArray(lists) ? lists[server * 5 + tier] : undefined;
+  return isNumList(l) ? l : [];
+}
+
+/** The marker records (place + 1) the MAP page shows on a server (0 / 1): every place the flag store says you have walked
+ *  into (flag 0x2000 | (ps1 & 0xff), filler F0x8009A6B8; visitedPs1Stages), your own map's place included. */
+export function mapVisitedRecords(state: GameState, server: number, ui = MS.UI, hasFlag: ((flagId: number) => boolean | null) | null = null): Set<number> {
+  const seenPs1 = new Set<unknown>(visitedPs1Stages(state, ui, hasFlag));
+  // ETS item 9: walker_map rows are {ps1, server, loc}; MS.UI is the untyped status_ui.json
+  const walker: Record<string, MapSeenRow> = ui?.screens?.map?.walker_map ?? {};
+  const vis = new Set<number>();
+  for (const row of Object.values(walker)) {
+    if (seenPs1.has(row.ps1) && row.server === server) vis.add(mapMarkerRecord(row.loc));
+  }
+  return vis;
+}
+
+/** What the World Globe reveals (web/world-globe-reveal.ts), by the same rules as the disc's page for both continents: the
+ *  tier from the story ordinal, each server's area list for it, each server's visited records, and the areas new since
+ *  `lastTier` (the tier at the last globe open; null = none known, nothing fades). */
+export function mapGlobeReveal(state: GameState, lastTier: number | null, ui = MS.UI, hasFlag: ((flagId: number) => boolean | null) | null = null): GlobeReveal {
+  const tier = mapRevealTier(Number(state?.progressOrdinal ?? 0) || 0, mapTierThresholds(ui));
+  const areasOf = (server: number, t: number): number[] => mapRevealAreas(server, t, ui);
+  const fadeOf = (server: number): number[] => {
+    if (lastTier === null || !(tier > lastTier)) return [];
+    const before = new Set(areasOf(server, lastTier));
+    return areasOf(server, tier).filter((a) => !before.has(a));
+  };
+  return {
+    tier,
+    areas: { asuka: areasOf(0, tier), amaterasu: areasOf(1, tier) },
+    visited: { asuka: [...mapVisitedRecords(state, 0, ui, hasFlag)], amaterasu: [...mapVisitedRecords(state, 1, ui, hasFlag)] },
+    fadeIn: { asuka: fadeOf(0), amaterasu: fadeOf(1) },
+    all: false,
   };
 }
 

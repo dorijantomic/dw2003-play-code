@@ -2,9 +2,10 @@
 // in a book (web/book-host.js) laid out like the other books: header bar "MAP" with the server's name, one wide panel holding the
 // globe, the help band with your place and the keys. It opens from the pause list's MAP row (web/status-translated.js ->
 // web/game/vars.js openBook) turned to your place on the server you are on, the "you are here" marker standing on it.
-// All places show (the disc's page hides unexplored areas; that is not decided for the globe).
-// The zoom (web/world-globe-zoom.js): one zoom value from the whole globe down to the place nearest the view's centre (your own
-// until you turn): its icon swaps for a round window with the place's screen, which grows to the whole panel. Your own place
+// It reveals what the disc's page reveals (web/world-globe-reveal.ts): the areas of the story's reveal tier are clear, the
+// others lie under mist (an area new since the last open fades in); only visited places' icons show (your own always).
+// The zoom (web/world-globe-zoom.js): one zoom value from the whole globe down to the shown place nearest the view's centre
+// (your own until you turn): its icon swaps for a round window with the place's screen, which grows to the whole panel. Your own place
 // shows your screen with the dot at your real position (indoors: the outdoor screen you came in from, the dot at that door,
 // when it is known; web/world-globe-places.js).
 //
@@ -19,7 +20,7 @@ import { artHook } from "./ui-c/capture.js";
 import { GLOBE_VIEW, globeStartView } from "./world-globe-map.js";
 import { ZOOM, startZoomView, stepZoomView } from "./world-globe-zoom.js";
 import type { Book, BookView } from "./types/screens.js";
-import type { GlobeHereInput, GlobeServer, GlobeStageLike } from "./types/world-globe-map.js";
+import type { GlobeHereInput, GlobeReveal, GlobeServer, GlobeStageLike } from "./types/world-globe-map.js";
 import type { GlobePlacesInput, ZoomStepEnv, ZoomView } from "./types/world-globe-zoom.js";
 
 const PANEL_BANDS = 8;
@@ -44,6 +45,8 @@ export interface GlobeBookArgs {
     here: () => GlobeHereInput;
     /** every place's main screen and your screen with its dot (web/world-globe-places.js globePlaces), read once when it opens */
     places: (here: GlobeHereInput) => GlobePlacesInput;
+    /** what the disc's MAP page would reveal now (web/menu/pure.ts mapGlobeReveal), read once when it opens */
+    reveal: () => GlobeReveal;
     /** the buttons held right now (web/game.js state.keys): a direction keeps turning while it stays down */
     held: () => Iterable<string>;
     /** the globe failed: the book shuts and the MAP row's own page (the disc's) opens instead */
@@ -55,9 +58,9 @@ export interface GlobeBook extends Book {
     view(): ZoomView;
 }
 
-export function createGlobeBook({ stage, here, places, held, onFail }: GlobeBookArgs): GlobeBook {
+export function createGlobeBook({ stage, here, places, reveal, held, onFail }: GlobeBookArgs): GlobeBook {
     const h = here();
-    stage.open(h, places(h));
+    stage.open(h, places(h), reveal());
     const start = globeStartView(h.server, null);
     let view: ZoomView = startZoomView({ lon: start.lon, lat: start.lat }, -1), placed = false, failed = false;
     // a move word counts once it has acted (pressed or repeated, so a button held since the book opened does nothing) and
@@ -94,7 +97,7 @@ export function createGlobeBook({ stage, here, places, held, onFail }: GlobeBook
                 // the target's picture loads when you zoom in; until it is in, the zoom stops before the icon swaps for it
                 const env: ZoomStepEnv = {
                     targets: stage.targets(), home: stage.home(), aspect: I0.w / I0.h, fovDeg: ZOOM.fovDeg,
-                    ready: (t: number) => stage.want(t),
+                    ready: (t: number) => stage.want(t), shown: (t: number) => stage.shown(t),
                 };
                 view = stepZoomView(view, {
                     left: active.has("left"), right: active.has("right"), up: active.has("up"), down: active.has("down"),

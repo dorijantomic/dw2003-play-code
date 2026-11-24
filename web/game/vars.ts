@@ -14,7 +14,7 @@ import { createFlyBook } from "../fly-book.js";
 import { createGlobeBook } from "../world-globe-book.js";
 import { createGlobeStage } from "../world-globe-view.js";
 import { effectiveMapScreen, mapScreenRoute } from "../world-globe-map.js";
-import { mapGlobeHere } from "../menu/pure.js";
+import { mapGlobeHere, mapGlobeReveal } from "../menu/pure.js";
 import { MS } from "../menu/state.js";
 import { globePlaces, parsePlaceMaps, parsePlaceScenes, parseWalkerMap } from "../world-globe-places.js";
 import {
@@ -119,6 +119,19 @@ export const glossaryStage = createStage({
 export const globeStage = createGlobeStage();
 /** The globe failed while its book was open: the book has shut and the disc's MAP page opens instead (openBook). */
 let globeFellBack = false;
+/** The reveal tier the globe showed at its last open (localStorage, so a rise while the game was shut still fades in);
+ *  null = never opened. */
+const GLOBE_TIER_KEY = "worldGlobeTier";
+function lastGlobeTier(): number | null {
+    try {
+        const v = localStorage.getItem(GLOBE_TIER_KEY);
+        const n = v === null ? NaN : Number(v);
+        return Number.isInteger(n) ? n : null;
+    } catch { return null; }
+}
+function keepGlobeTier(tier: number): void {
+    try { localStorage.setItem(GLOBE_TIER_KEY, String(tier)); } catch { /* no storage: the next open just does not fade */ }
+}
 
 export const books = createBookHost({
     sfx,
@@ -133,6 +146,12 @@ export const books = createBookHost({
             here: () => mapGlobeHere(state),
             // every place's main screen and yours, from the game's tables (status_ui walker_map, the manifest, the scenes)
             places: (h) => globePlaces(parseWalkerMap(MS.UI), parsePlaceMaps(state.manifest.maps), parsePlaceScenes(state.scenes), h),
+            // the disc MAP page's reveal (story tier areas, visited flags); the areas new since the last open fade in
+            reveal: () => {
+                const r = mapGlobeReveal(state, lastGlobeTier(), MS.UI, engineFlagSeen);
+                keepGlobeTier(r.tier);
+                return r;
+            },
             held: () => state.keys,
             onFail: () => { globeFellBack = true; },
         }),

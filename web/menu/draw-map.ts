@@ -1,7 +1,9 @@
 import { padRepeatFires, isPartyWide } from "../vendor/engine.js";
 import { loadPack, drawClip } from "../screenpack.js";
 import { drawText, drawCursor } from "../uifont.js";
-import { ITEM_CATS, VSYNC, mapHoldSpeed, mapMarkerRecord, ststat, topItems, visitedPs1Stages } from "./pure.js";
+import {
+  ITEM_CATS, VSYNC, mapHoldSpeed, mapMarkerRecord, mapRevealAreas, mapRevealTier, mapTierThresholds, mapVisitedRecords, ststat, topItems,
+} from "./pure.js";
 import { MS } from "./state.js";
 import { gold } from "./draw-common.js";
 import type { MapCursorConfig, MapMarkerRecord, MapSeenRow, MenuState } from "./types.js";
@@ -126,11 +128,9 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   const server = wm.server; // F0x8009a670: PS1 stage < 0x270 = Asuka
   const pk = server ? "stwmp1" : "stwmp0";
   const mapPack = loadPack(`${pk}map`), areaPack = loadPack(`${pk}area`), iconPack = loadPack(`${pk}icon`);
-  // reveal tier from the story ordinal (F0x80098b84 thresholds 7/0xF/0x1B/0x1E)
-  const ord = state.progressOrdinal ?? 0;
-  let tier = 0;
-  for (const th of M.tier_thresholds) if (ord >= th) tier++;
-  const areas = M.tier_area_lists[server * 5 + tier] ?? [];
+  // reveal tier from the story ordinal (F0x80098b84 thresholds 7/0xF/0x1B/0x1E); the World Globe reads the same (pure.ts)
+  const tier = mapRevealTier(state.progressOrdinal ?? 0, mapTierThresholds(MS.UI));
+  const areas = mapRevealAreas(server, tier, MS.UI);
   // the arrow sits on record place + 1 (B040); an unknown map has no place, so no arrow and the view starts centred
   const cur = known ? markers.find((r) => r.loc === mapMarkerRecord(wm.loc)) : undefined;
 
@@ -155,13 +155,9 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   // visited location markers on THIS server: every place the flag store says you have
   // been composes to a {server, loc} via walker_map (native: flag 0x2000|(ps1&0xff)
   // per stage, filler F0x8009a6b8). The current map's own marker always shows.
-  // vis holds marker RECORD numbers: place p lights record p + 1 (place 0 = Legendary Gym = record 1).
-  const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen));
-  const vis = new Set<number>();
-  // ETS item 9: walker_map rows are {ps1, server, loc}; MS.UI is the untyped status_ui.json, so Object.values gives any.
-  for (const row of Object.values(M.walker_map) as MapSeenRow[]) {
-    if (seenPs1.has(row.ps1) && row.server === server) vis.add(mapMarkerRecord(row.loc));
-  }
+  // vis holds marker RECORD numbers: place p lights record p + 1 (place 0 = Legendary Gym = record 1). The World Globe
+  // reads the same (pure.ts mapVisitedRecords).
+  const vis = mapVisitedRecords(state, server, MS.UI, m.mapSeen);
 
   drawClip(ctx, mapPack, 0, ox, oy); // base map (16px banner strip above origin)
   for (const a of areas) {

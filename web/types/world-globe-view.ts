@@ -27,3 +27,15 @@ export interface GlobeRendererCaps {
 }
 /** The WebGL renderer with them. */
 export type GlobeRenderer = THREE.WebGLRenderer & { capabilities: GlobeRendererCaps };
+
+/** One shader uniform. */
+export interface GlobeUniform<T> {
+  value: T;
+}
+/** The shader source three.js hands a material's onBeforeCompile (its JS declares the method with no parameters): the code
+ *  to edit and the uniforms the program will read. */
+export interface GlobeShaderSource {
+  vertexShader: string;
+  fragmentShader: string;
+  uniforms: Record<string, GlobeUniform<unknown>>;
+}

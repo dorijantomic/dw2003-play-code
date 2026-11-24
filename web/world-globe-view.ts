@@ -16,9 +16,15 @@
 // picking still uses the box). The icons draw without the depth test (a
 // billboard standing up from a curved surface would sink into it); the ones past the horizon are hidden and those near it
 // fade, each frame (faceIcons). The "you are here" marker draws after them, so it stays on top.
+//
+// Reveal (web/world-globe-reveal.ts, the disc MAP page's rules): the areas not revealed yet lie under a dark drifting mist
+// (the reveal mask + shader put into the globe's material), an area new since the last open fades in on the first draw;
+// only visited places' icons show (your own always), and the zoom only goes into those (setReveal, iconShown).
 import * as THREE from "./lib3d/three.module.js";
-import type { Mesh, SpriteMaterial, Texture } from "./lib3d/three.module.js";
-import type { GlobeCamera, GlobeGroup, GlobeRenderer, GlobeSprite, GlobeThreeScene } from "./types/world-globe-view.js";
+import type { Color, Mesh, SpriteMaterial, Texture } from "./lib3d/three.module.js";
+import type {
+    GlobeCamera, GlobeGroup, GlobeRenderer, GlobeShaderSource, GlobeSprite, GlobeThreeScene, GlobeUniform,
+} from "./types/world-globe-view.js";
 import {
     GLOBE_TEXTURE, GLOBE_TEX_W, GLOBE_TEX_H, GLOBE_SERVERS, ICON_PACK, continentBand, lonLatToPoint, parseGlobeMap, globePlace,
     markerIcons, parseIconSheet, parseMarkerRecords, iconArt, loadHdIcons, shownIconClips,
@@ -27,8 +33,11 @@ import { ZOOM } from "./world-globe-zoom.js";
 import { buildZoomScene } from "./world-globe-zoom-view.js";
 import type { Rgb, ZoomScene } from "./world-globe-zoom-view.js";
 import { placeKey, screenForTarget } from "./world-globe-places.js";
+import {
+    REVEAL, REVEAL_FRAG_HEAD, REVEAL_FRAG_MIX, REVEAL_SLOTS, REVEAL_VERT_HEAD, REVEAL_VERT_MAIN, iconShown, revealAll, revealValues,
+} from "./world-globe-reveal.js";
 import type {
-    GlobeContinent, GlobeHereInput, GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeServer, GlobeStageLike,
+    GlobeContinent, GlobeHereInput, GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeReveal, GlobeServer, GlobeStageLike,
     GlobeStageStatus, IconSheet, LonLat, Point3,
 } from "./types/world-globe-map.js";
 import type { GlobePlacesInput, TargetScreen, ZoomState, ZoomView } from "./types/world-globe-zoom.js";
@@ -83,6 +92,8 @@ export interface GlobeAssets {
     sheets: Record<GlobeServer, GlobeIconSheet>;
     /** the HD picture of each shown clip that loaded (a missing clip draws its disc art) */
     hdIcons: ReadonlyMap<number, HTMLImageElement>;
+    /** the reveal mask (web/world-globe-reveal.ts), decoded as is: no premultiplied alpha, no colour conversion */
+    revealMask: ImageBitmap;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -99,6 +110,19 @@ async function loadHdIconImage(src: string): Promise<HTMLImageElement> {
     const im = await loadImage(src);
     if (!(im.naturalWidth > 0) || im.naturalWidth !== im.naturalHeight) throw new Error(`${src}: ${im.naturalWidth} x ${im.naturalHeight}, not square`);
     return im;
+}
+
+/** The reveal mask: its bytes must reach the GPU exactly (ids and weights, alpha included), so it is decoded with no
+ *  premultiplied alpha and no colour conversion; the wrong size counts as a failed load (the globe then falls back). */
+async function loadRevealMask(src: string): Promise<ImageBitmap> {
+    const r = await fetch(src);
+    if (!r.ok) throw new Error(`${src}: ${r.status}`);
+    const bm = await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+    if (bm.width !== REVEAL.maskW || bm.height !== REVEAL.maskH) {
+        bm.close();
+        throw new Error(`${src}: ${bm.width} x ${bm.height}, expected ${REVEAL.maskW} x ${REVEAL.maskH}`);
+    }
+    return bm;
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -130,17 +154,18 @@ export function loadGlobeAssets(dir = GLOBE_ASSET_DIR, uiDir = GLOBE_UI_DIR, sta
         const recordsP = fetchJson(statusUi).then(parseMarkerRecords);
         // the HD icons of the shown clips, as soon as the markers are known; a failed one is left out (never rejects)
         const hdP = Promise.all([continentsP, recordsP]).then(([cs, rs]) => loadHdIcons(shownIconClips(cs, rs), dir, loadHdIconImage));
-        const [continents, image, records, asuka, amaterasu, hdIcons] = await Promise.all([
+        const [continents, image, records, asuka, amaterasu, hdIcons, revealMask] = await Promise.all([
             continentsP,
             loadImage(`${dir}${GLOBE_TEXTURE}`),
             recordsP,
             loadIconSheet("asuka", uiDir),
             loadIconSheet("amaterasu", uiDir),
             hdP,
+            loadRevealMask(`${dir}${REVEAL.maskFile}`),
         ]);
         if (image.naturalWidth !== GLOBE_TEX_W || image.naturalHeight !== GLOBE_TEX_H)
             throw new Error(`${GLOBE_TEXTURE}: ${image.naturalWidth} x ${image.naturalHeight}, expected ${GLOBE_TEX_W} x ${GLOBE_TEX_H}`);
-        return { continents, image, records, sheets: { asuka, amaterasu }, hdIcons };
+        return { continents, image, records, sheets: { asuka, amaterasu }, hdIcons, revealMask };
     })();
     assetsLoading = p;
     p.catch(() => { if (assetsLoading === p) assetsLoading = null; });
@@ -215,6 +240,8 @@ export interface GlobeIconSprite {
     material: SpriteMaterial;
     icon: GlobeMarkerIcon;
     normal: Point3;
+    /** shown by the reveal (visited, or your own place); a hidden icon is never drawn or picked */
+    shown: boolean;
 }
 
 /** One built globe: the scene, its camera, the sphere, the place icons and the "you are here" marker. */
@@ -237,9 +264,20 @@ export interface GlobeScene {
     /** the place icon under a view point (`ndc`: -1..1 across the canvas, y up) of `camera` as last rendered: the nearest one
      *  when several overlap; hidden icons do not count. null = none. */
     pickIcon(ndc: { x: number; y: number }, camera: GlobeCamera): GlobeMarkerIcon | null;
+    /** what the globe reveals (web/world-globe-reveal.ts): the mist over the other areas, the icons of the unvisited places
+     *  hidden (`own` = your place, always shown). The areas in reveal.fadeIn fade in from the next tickReveal on. */
+    setReveal(reveal: GlobeReveal, own: { server: GlobeServer | null; record: number } | null): void;
+    /** before a render: the mist's drift and the fade at `sec` (seconds, any steady clock) */
+    tickReveal(sec: number): void;
+    /** is icon i (iconList order = the zoom targets' order) shown? */
+    iconShown(i: number): boolean;
     /** free the GPU memory (textures, geometry, materials); the renderer stays */
     dispose(): void;
 }
+
+/** a mist colour (REVEAL sRGB 0..255) as a three.js colour */
+const mistColour = (c: readonly [number, number, number]): Color =>
+    new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
 
 export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): GlobeScene {
     const maxTex: number = renderer.capabilities.maxTextureSize;
@@ -256,8 +294,38 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.needsUpdate = true;
     const globeGeo = new THREE.SphereGeometry(1, 192, 128), globeMat = new THREE.MeshBasicMaterial({ map: tex });
+    // the reveal: the mask as is (read with texelFetch: no filter, no mipmaps, no flip: row 0 = north) and the mist shader
+    const maskTex = new THREE.Texture(assets.revealMask);
+    maskTex.flipY = false;
+    maskTex.generateMipmaps = false;
+    maskTex.minFilter = THREE.NearestFilter;
+    maskTex.magFilter = THREE.NearestFilter;
+    maskTex.colorSpace = THREE.NoColorSpace;
+    maskTex.premultiplyAlpha = false;
+    maskTex.needsUpdate = true;
+    const revealU: { uReveal: GlobeUniform<Float32Array>; uRevealTime: GlobeUniform<number> } = {
+        uReveal: { value: new Float32Array(REVEAL_SLOTS).fill(1) }, uRevealTime: { value: 0 },
+    };
+    // ETS item 9: three.js's JS declares onBeforeCompile with no parameters; Object.assign sets the hook with its real one
+    Object.assign(globeMat, {
+        onBeforeCompile(sh: GlobeShaderSource) {
+            sh.uniforms["uRevealMask"] = { value: maskTex };
+            sh.uniforms["uReveal"] = revealU.uReveal;
+            sh.uniforms["uRevealTime"] = revealU.uRevealTime;
+            sh.uniforms["uMistDeep"] = { value: mistColour(REVEAL.deep) };
+            sh.uniforms["uMistLight"] = { value: mistColour(REVEAL.light) };
+            sh.vertexShader = sh.vertexShader
+                .replace("#include <common>", `#include <common>${REVEAL_VERT_HEAD}`)
+                .replace("#include <begin_vertex>", `#include <begin_vertex>${REVEAL_VERT_MAIN}`);
+            sh.fragmentShader = sh.fragmentShader
+                .replace("#include <common>", `#include <common>${REVEAL_FRAG_HEAD}`)
+                .replace("#include <map_fragment>", `#include <map_fragment>${REVEAL_FRAG_MIX}`);
+        },
+        customProgramCacheKey: () => "world-globe-reveal",
+    });
     const globe = new THREE.Mesh(globeGeo, globeMat);
     scene.add(globe);
+    let reveal: GlobeReveal = revealAll(), fadeStart: number | null = null;
 
     // place icons of both continents: each marker's clip as a billboard sprite (see the head of this file): its HD picture
     // (one per clip, shared by both continents) or, when that did not load, the disc clip of the server's sheet.
@@ -280,7 +348,7 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
             sprite.scale.set(art.size.w, art.size.h, 1);
             sprite.renderOrder = ICON_ORDER;
             icons.add(sprite);
-            iconList.push({ sprite, material: mat, icon, normal: lonLatToPoint(icon.lonLat, 1) });
+            iconList.push({ sprite, material: mat, icon, normal: lonLatToPoint(icon.lonLat, 1), shown: true });
         }
     }
     scene.add(icons);
@@ -296,6 +364,7 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
     scene.add(here);
 
     renderer.initTexture(tex);
+    renderer.initTexture(maskTex);
     return {
         scene, camera, globe, icons, iconList, here, texW, texH, maxTex,
         setHere(ll: LonLat | null) {
@@ -309,7 +378,7 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
             const d = Math.hypot(cam.x, cam.y, cam.z);
             for (const s of iconList) {
                 const n = s.normal, k = d > 1 ? ((n.x * cam.x + n.y * cam.y + n.z * cam.z) - 1) / (d - 1) : -1;
-                s.sprite.visible = k > 0;
+                s.sprite.visible = s.shown && k > 0;
                 s.material.opacity = Math.min(1, Math.max(0, k / ICON_FADE));
             }
         },
@@ -330,9 +399,21 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
             }
             return best;
         },
+        setReveal(r: GlobeReveal, own: { server: GlobeServer | null; record: number } | null) {
+            reveal = r;
+            fadeStart = null;
+            for (const s of iconList) s.shown = iconShown(r, s.icon.server, s.icon.marker.loc, own);
+            revealU.uReveal.value.set(revealValues(r, 0));
+        },
+        tickReveal(sec: number) {
+            if (fadeStart === null) fadeStart = sec;
+            revealU.uRevealTime.value = sec;
+            revealU.uReveal.value.set(revealValues(reveal, sec - fadeStart));
+        },
+        iconShown: (i: number) => iconList[i]?.shown ?? false,
         dispose() {
             scene.clear();
-            for (const t of [tex, hereTex, ...iconTex.values()]) t.dispose();
+            for (const t of [tex, maskTex, hereTex, ...iconTex.values()]) t.dispose();
             globeGeo.dispose();
             for (const m of [globeMat, hereMat, ...iconList.map((s) => s.material)]) m.dispose();
         },
@@ -400,7 +481,7 @@ export function createGlobeStage(): GlobeStage {
     return {
         ensure,
         gpu: () => gpuName,
-        open(here: GlobeHereInput, placesIn: GlobePlacesInput) {
+        open(here: GlobeHereInput, placesIn: GlobePlacesInput, revealIn: GlobeReveal) {
             const mine = ++token;
             freeScene();
             if (!ensure()) { status = "failed"; return; }
@@ -408,6 +489,7 @@ export function createGlobeStage(): GlobeStage {
             loadGlobeAssets().then((assets) => {
                 if (mine !== token || !renderer) return;
                 built = buildGlobeScene(renderer, assets);
+                built.setReveal(revealIn, here.server ? { server: here.server, record: here.record } : null);
                 place = globePlace(assets.continents, here);
                 built.setHere(place ? place.lonLat : null);
                 zoom = buildZoomScene(renderer, built, { globeImage: assets.image, sea: seaColours(assets.continents) });
@@ -426,6 +508,7 @@ export function createGlobeStage(): GlobeStage {
         place: () => place,
         targets: () => zoom?.targets ?? [],
         home: () => home,
+        shown: (i: number) => built?.iconShown(i) ?? false,
         want(i: number) {
             const s = screenOf(i);
             return !!(s && zoom && zoom.pictures.get(s.map));
@@ -443,6 +526,7 @@ export function createGlobeStage(): GlobeStage {
                 size = { w: pw, h: ph };
             }
             const now = typeof performance !== "undefined" ? performance.now() : t0;
+            built.tickReveal((now - t0) / 1000);
             lastState = zoom.update({
                 view, screen: screenOf(view.target), hereLonLat: place ? place.lonLat : null, aspect: pw / ph, timeSec: (now - t0) / 1000,
             });

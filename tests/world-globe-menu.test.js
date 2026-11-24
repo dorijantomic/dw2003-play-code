@@ -29,6 +29,8 @@ const { mapGlobeHere } = await import("../web/menu/pure.js");
 /** a book's "you are here" and an empty places table (the fake stages ignore them) */
 const HERE = { server: "asuka", record: 20, name: "Asuka City", icon: null, map: "s200", pos: { x: 100, y: 100 }, entry: null };
 const NO_PLACES = { screens: new Map(), here: null };
+/** a reveal (the fake stages only pass it on) */
+const REVEAL = { tier: 0, areas: { asuka: [1], amaterasu: [] }, visited: { asuka: [20], amaterasu: [] }, fadeIn: { asuka: [], amaterasu: [] }, all: false };
 const stateOn = (stage) => ({ manifest: { maps: [{ id: stage }] }, mapIdx: 0, keys: new Set() });
 const continents = () => ["asuka", "amaterasu"].map((s) => {
     const data = G.parseGlobeMap(JSON.parse(readFileSync(`${GLOBE_DIR}/${s}.json`, "utf8")));
@@ -148,11 +150,11 @@ test("a globe that fails to load shuts the book once and the game opens the disc
     const { createGlobeBook } = await import("../web/world-globe-book.js");
     let status = "loading", fails = 0, closed = 0;
     const stage = {
-        open() {}, status: () => status, place: () => null, targets: () => [], home: () => -1, want: () => false,
+        open() {}, status: () => status, place: () => null, targets: () => [], home: () => -1, shown: () => false, want: () => false,
         draw: () => false, close() { closed++; },
     };
     const book = createGlobeBook({
-        stage, here: () => HERE, places: () => NO_PLACES, held: () => new Set(), onFail: () => { fails++; },
+        stage, here: () => HERE, places: () => NO_PLACES, reveal: () => REVEAL, held: () => new Set(), onFail: () => { fails++; },
     });
     assert.equal(book.act(new Set()), null, "still loading: stays open");
     status = "failed";
@@ -173,12 +175,12 @@ test("controls: arrows turn (at every zoom), L1 zooms in, R1 zooms out, the pict
     const targets = [{ key: "asuka:20", server: "asuka", record: 20, lonLat: { lon: 0.1, lat: 0.2 }, iconRadius: 0.09 }];
     let asked = 0, opened = null;
     const stage = {
-        open(h, p) { opened = { h, p }; }, status: () => "ready", place: () => place, targets: () => targets, home: () => 0,
-        want: () => { asked++; return true; }, draw: () => false, close() {},
+        open(h, p, r) { opened = { h, p, r }; }, status: () => "ready", place: () => place, targets: () => targets, home: () => 0,
+        shown: () => true, want: () => { asked++; return true; }, draw: () => false, close() {},
     };
     const held = new Set();
-    const book = createGlobeBook({ stage, here: () => HERE, places: () => NO_PLACES, held: () => held, onFail() {} });
-    assert.deepEqual(opened, { h: HERE, p: NO_PLACES }, "the stage gets where you are and the places");
+    const book = createGlobeBook({ stage, here: () => HERE, places: () => NO_PLACES, reveal: () => REVEAL, held: () => held, onFail() {} });
+    assert.deepEqual(opened, { h: HERE, p: NO_PLACES, r: REVEAL }, "the stage gets where you are, the places and the reveal");
     book.act(new Set());
     const v0 = book.view();
     assert.ok(Math.abs(v0.look.lon - 0.1) < 1e-9 && Math.abs(v0.look.lat - 0.2) < 1e-9, "opens turned to your place");
