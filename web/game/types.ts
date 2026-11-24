@@ -15,6 +15,7 @@ import type { FishExtrasData } from "../types/misc-game2.js";
 import type { ItemsData } from "../types/screens.js";
 import type { DriFormLedgerEntry, DriStats } from "../types/misc-game.js";
 import type { GymExtraHall } from "../gym-extra.js";
+import type { GlobeEntry } from "../types/world-globe-map.js";
 
 import type { createQuestChase } from "../quest-chase.js";
 import type { questFxGet } from "../quest-fx.js";
@@ -148,6 +149,8 @@ export interface GameState {
   flags: Record<string, boolean>;
   gondolaAutoFired?: boolean;
   gunslingerLatch?: any;
+  /** the outdoor screen you came in from while you are indoors (the World Globe MAP's dot; web/world-globe-places.ts nextGlobeEntry) */
+  globeEntry?: GlobeEntry | null;
   gymExtra?: GymExtraData | null;
   handoffHold: { ticks: number; exit: StageExit; } | null;
   iceSlide?: any;

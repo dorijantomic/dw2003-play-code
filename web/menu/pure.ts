@@ -64,8 +64,8 @@ export const SORT_HEADERS = Object.freeze({ pick: "Switch who?", with: "Switch w
 export const MAP_HOLD_FRAMES = 5;
 
 export function mapHoldSpeed(framesHeld: number | undefined, C = { speed_initial: 2, speed_max: 4 }) {
-  if (!(framesHeld! > 0)) return 0;
-  return framesHeld! >= MAP_HOLD_FRAMES ? C.speed_max : C.speed_initial;
+  if (framesHeld === undefined || !(framesHeld > 0)) return 0;
+  return framesHeld >= MAP_HOLD_FRAMES ? C.speed_max : C.speed_initial;
 }
 
 /** A walker map id ("s205", 205) as the key the decoded walker_map table uses. */
@@ -92,7 +92,7 @@ interface MapFlagStore {
  *  screen id (0x200..0x2EE in data/screen_table.json) those two spellings are the
  *  same number, so one bank-0x20 bit per place answers both. The page's own scan
  *  only reaches 0x2D6 — MAP is refused from 0x2D7 up (mapUnavailable). */
-export const mapSeenFlag = (ps1: number | undefined) => 0x2000 | (ps1! & 0xff);
+export const mapSeenFlag = (ps1: number | undefined) => 0x2000 | ((ps1 ?? 0) & 0xff);
 
 /** The PS1 stage ids the flag store says you have walked into. `hasFlag` is the
  *  engine's banked store — the same store the field entry writes. Without one (the
@@ -164,7 +164,16 @@ export function mapGlobeHere(state: GameState, ui = MS.UI): GlobeHereInput {
   const markers: MapMarkerRecord[] = Array.isArray(M?.markers) ? M.markers : [];
   const icon = markers.find((r) => r.loc === record);
   const name: unknown = server ? M?.location_names?.[server]?.[record] : undefined;
-  return { server, record, name: typeof name === "string" ? name : "", icon: icon ? { x: icon.x, y: icon.y } : null };
+  // the field's position: state.x / state.y are native map picture px (web/game/render.ts draws the map at -camera and the
+  // player at state - camera); state.globeEntry is the outdoor screen you came in from (web/game/update.ts)
+  const map: unknown = state?.manifest?.maps?.[state?.mapIdx]?.id;
+  const x = state?.x, y = state?.y;
+  return {
+    server, record, name: typeof name === "string" ? name : "", icon: icon ? { x: icon.x, y: icon.y } : null,
+    map: typeof map === "string" ? map : "",
+    pos: Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null,
+    entry: state?.globeEntry ?? null,
+  };
 }
 
 export function mapUnavailable(state: GameState, ui = MS.UI) {

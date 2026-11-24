@@ -9,8 +9,11 @@
 // Place icons: each marker shows the clip the disc's MAP page draws for its record (status_ui.json screens.map.markers ->
 // stwmp0icon Asuka / stwmp1icon Amaterasu, web/world-globe-map.ts markerIcons). Each is a billboard sprite (always faces the
 // camera, upright with the camera's up = +y), so it stays readable however the globe is turned; a decal lying on the ground
-// would squash to a line near the horizon. Pixel-sharp (nearest filter, no mipmaps). Size: the icon covers on the globe what
-// it covers on the original map (its box px times the map's local scale there). The icons draw without the depth test (a
+// would squash to a line near the horizon. The picture is the clip's HD repaint (web/assets/world-globe/icons-hd, smooth:
+// linear filter + mipmaps, web/world-globe-map.ts iconArt); a clip whose HD picture did not load draws the disc clip
+// pixel-sharp (nearest filter, no mipmaps) instead. Size: the icon covers on the globe what it covers on the original map (its
+// box px times the map's local scale there; the HD picture spans HD_ICON_SPAN px at that scale, centred on the box, and
+// picking still uses the box). The icons draw without the depth test (a
 // billboard standing up from a curved surface would sink into it); the ones past the horizon are hidden and those near it
 // fade, each frame (faceIcons). The "you are here" marker draws after them, so it stays on top.
 import * as THREE from "./lib3d/three.module.js";
@@ -18,12 +21,17 @@ import type { Mesh, SpriteMaterial, Texture } from "./lib3d/three.module.js";
 import type { GlobeCamera, GlobeGroup, GlobeRenderer, GlobeSprite, GlobeThreeScene } from "./types/world-globe-view.js";
 import {
     GLOBE_TEXTURE, GLOBE_TEX_W, GLOBE_TEX_H, GLOBE_SERVERS, ICON_PACK, continentBand, lonLatToPoint, parseGlobeMap, globePlace,
-    globeCameraPoint, markerIcons, parseIconSheet, parseMarkerRecords,
+    markerIcons, parseIconSheet, parseMarkerRecords, iconArt, loadHdIcons, shownIconClips,
 } from "./world-globe-map.js";
+import { ZOOM } from "./world-globe-zoom.js";
+import { buildZoomScene } from "./world-globe-zoom-view.js";
+import type { Rgb, ZoomScene } from "./world-globe-zoom-view.js";
+import { placeKey, screenForTarget } from "./world-globe-places.js";
 import type {
-    GlobeCamView, GlobeContinent, GlobeHereInput, GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeServer, GlobeStageLike,
+    GlobeContinent, GlobeHereInput, GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeServer, GlobeStageLike,
     GlobeStageStatus, IconSheet, LonLat, Point3,
 } from "./types/world-globe-map.js";
+import type { GlobePlacesInput, TargetScreen, ZoomState, ZoomView } from "./types/world-globe-zoom.js";
 
 /** Where the globe files are, relative to the page (both pages live in web/). */
 export const GLOBE_ASSET_DIR = "assets/world-globe/";
@@ -31,7 +39,7 @@ export const GLOBE_ASSET_DIR = "assets/world-globe/";
 export const GLOBE_UI_DIR = "assets/ui/";
 export const GLOBE_STATUS_UI = "assets/data/status_ui.json";
 /** Radius of the place icons' centres and of the "you are here" marker's foot, in globe radii. */
-const PIN_R = 1.004;
+const PIN_R = ZOOM.pinR;
 /** Icons fade out over this last share of the way from the view centre to the horizon (faceIcons). */
 const ICON_FADE = 0.12;
 /** Draw order: the globe (0), the place icons, then the "you are here" marker on top. */
@@ -73,6 +81,8 @@ export interface GlobeAssets {
     image: HTMLImageElement;
     records: GlobeMarkerRecord[];
     sheets: Record<GlobeServer, GlobeIconSheet>;
+    /** the HD picture of each shown clip that loaded (a missing clip draws its disc art) */
+    hdIcons: ReadonlyMap<number, HTMLImageElement>;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -82,6 +92,13 @@ function loadImage(src: string): Promise<HTMLImageElement> {
         im.onerror = () => rej(new Error(`${src}: not loaded`));
         im.src = src;
     });
+}
+
+/** an HD icon picture: must load and be square, else it counts as missing (the clip then draws its disc art) */
+async function loadHdIconImage(src: string): Promise<HTMLImageElement> {
+    const im = await loadImage(src);
+    if (!(im.naturalWidth > 0) || im.naturalWidth !== im.naturalHeight) throw new Error(`${src}: ${im.naturalWidth} x ${im.naturalHeight}, not square`);
+    return im;
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -109,16 +126,21 @@ let assetsLoading: Promise<GlobeAssets> | null = null;
 export function loadGlobeAssets(dir = GLOBE_ASSET_DIR, uiDir = GLOBE_UI_DIR, statusUi = GLOBE_STATUS_UI): Promise<GlobeAssets> {
     if (assetsLoading) return assetsLoading;
     const p = (async (): Promise<GlobeAssets> => {
-        const [continents, image, records, asuka, amaterasu] = await Promise.all([
-            Promise.all(GLOBE_SERVERS.map((s) => loadContinent(s, dir))),
+        const continentsP = Promise.all(GLOBE_SERVERS.map((s) => loadContinent(s, dir)));
+        const recordsP = fetchJson(statusUi).then(parseMarkerRecords);
+        // the HD icons of the shown clips, as soon as the markers are known; a failed one is left out (never rejects)
+        const hdP = Promise.all([continentsP, recordsP]).then(([cs, rs]) => loadHdIcons(shownIconClips(cs, rs), dir, loadHdIconImage));
+        const [continents, image, records, asuka, amaterasu, hdIcons] = await Promise.all([
+            continentsP,
             loadImage(`${dir}${GLOBE_TEXTURE}`),
-            fetchJson(statusUi).then(parseMarkerRecords),
+            recordsP,
             loadIconSheet("asuka", uiDir),
             loadIconSheet("amaterasu", uiDir),
+            hdP,
         ]);
         if (image.naturalWidth !== GLOBE_TEX_W || image.naturalHeight !== GLOBE_TEX_H)
             throw new Error(`${GLOBE_TEXTURE}: ${image.naturalWidth} x ${image.naturalHeight}, expected ${GLOBE_TEX_W} x ${GLOBE_TEX_H}`);
-        return { continents, image, records, sheets: { asuka, amaterasu } };
+        return { continents, image, records, sheets: { asuka, amaterasu }, hdIcons };
     })();
     assetsLoading = p;
     p.catch(() => { if (assetsLoading === p) assetsLoading = null; });
@@ -175,6 +197,17 @@ function iconTexture(sheet: GlobeIconSheet, icon: GlobeMarkerIcon): Texture {
     return tex;
 }
 
+/** One HD icon picture as a texture: smooth both ways (linear filter, mipmaps for the small sizes far out). */
+function hdIconTexture(image: HTMLImageElement): Texture {
+    const tex = new THREE.Texture(image);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    tex.needsUpdate = true;
+    return tex;
+}
+
 /** One place icon on the globe: the sprite, what it shows, and the unit normal of its place (for the horizon test). */
 export interface GlobeIconSprite {
     sprite: GlobeSprite;
@@ -213,7 +246,7 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
     // ETS item 9: three.js defines position and scale on its objects with Object.defineProperties, which gives TypeScript no
     // types for them; the scene, camera and sprite built here are typed with them (web/types/world-globe-view.ts)
     const scene = new THREE.Scene() as GlobeThreeScene;
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100) as GlobeCamera;
+    const camera = new THREE.PerspectiveCamera(ZOOM.fovDeg, 1, 0.05, 100) as GlobeCamera;
     camera.position.set(3.2, 0, 0);
     const { tex, w: texW, h: texH } = globeTexture(assets.image, maxTex);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -226,8 +259,9 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
     const globe = new THREE.Mesh(globeGeo, globeMat);
     scene.add(globe);
 
-    // place icons of both continents: the disc's map icon of each marker as a billboard sprite (see the head of this file).
-    // One texture per clip (a clip shared by several places is made once), one material per icon (each fades on its own).
+    // place icons of both continents: each marker's clip as a billboard sprite (see the head of this file): its HD picture
+    // (one per clip, shared by both continents) or, when that did not load, the disc clip of the server's sheet.
+    // One texture per picture (a clip shared by several places is made once), one material per icon (each fades on its own).
     // ETS item 9: Group is built like the scene (types/world-globe-view.ts)
     const icons = new THREE.Group() as GlobeGroup;
     const iconList: GlobeIconSprite[] = [];
@@ -235,14 +269,15 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
     for (const c of assets.continents) {
         const sheet = assets.sheets[c.data.server];
         for (const icon of markerIcons(c, assets.records, sheet.clips, { w: sheet.image.naturalWidth, h: sheet.image.naturalHeight })) {
-            const key = `${icon.server}:${icon.clip}`;
+            const art = iconArt(icon, assets.hdIcons);
+            const key = art.hd ? `hd:${icon.clip}` : `${icon.server}:${icon.clip}`;
             let map = iconTex.get(key);
-            if (!map) { map = iconTexture(sheet, icon); iconTex.set(key, map); }
+            if (!map) { map = art.hd ? hdIconTexture(art.hd) : iconTexture(sheet, icon); iconTex.set(key, map); }
             const mat = new THREE.SpriteMaterial({ map, transparent: true, depthTest: false, depthWrite: false });
             const sprite = new THREE.Sprite(mat) as GlobeSprite;
             const p = lonLatToPoint(icon.lonLat, PIN_R);
             sprite.position.set(p.x, p.y, p.z);
-            sprite.scale.set(icon.size.w, icon.size.h, 1);
+            sprite.scale.set(art.size.w, art.size.h, 1);
             sprite.renderOrder = ICON_ORDER;
             icons.add(sprite);
             iconList.push({ sprite, material: mat, icon, normal: lonLatToPoint(icon.lonLat, 1) });
@@ -305,21 +340,38 @@ export function buildGlobeScene(renderer: GlobeRenderer, assets: GlobeAssets): G
 }
 
 /** The pause MAP screen's globe (web/world-globe-book.js): one renderer on an offscreen canvas for the whole session (a new
- *  context per open makes Chrome drop old ones, maybe the battle's), the scene built per open and freed when the book shuts. */
+ *  context per open makes Chrome drop old ones, maybe the battle's), the scene and the zoom (web/world-globe-zoom-view.js,
+ *  its place pictures included) built per open and freed when the book shuts. */
 export interface GlobeStage extends GlobeStageLike {
     /** make the renderer now if there is none (sync); false = no GPU WebGL here (the MAP row then opens the disc's page) */
     ensure(): boolean;
     /** the GPU's name, once the renderer is made */
     gpu(): string | null;
+    /** the zoom's last state and the maps its picture cache holds (checks) */
+    zoomState(): ZoomState | null;
+    heldPictures(): string[];
 }
 
 /** The largest offscreen size the stage renders at (px wide). */
 const MAX_RENDER_W = 2048;
 
+/** each continent's sea colour from its data file */
+function seaColours(continents: readonly GlobeContinent[]): Record<GlobeServer, Rgb> {
+    const of = (s: GlobeServer): Rgb => continents.find((c) => c.data.server === s)?.data.seaRgb ?? [27, 36, 70];
+    return { asuka: of("asuka"), amaterasu: of("amaterasu") };
+}
+
 export function createGlobeStage(): GlobeStage {
     let canvas: OffscreenCanvas | HTMLCanvasElement | null = null, renderer: GlobeRenderer | null = null, gpuName: string | null = null;
     let failed = false, status: GlobeStageStatus = "idle", built: GlobeScene | null = null, place: GlobePlace | null = null, token = 0;
+    let zoom: ZoomScene | null = null, places: GlobePlacesInput | null = null, home = -1, lastState: ZoomState | null = null;
     let size = { w: 0, h: 0 };
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+    /** the screen a target's window shows */
+    const screenOf = (i: number): TargetScreen | null => {
+        const t = zoom?.targets[i];
+        return t && places ? screenForTarget(t.key, places) : null;
+    };
 
     const ensure = (): boolean => {
         if (renderer) return true;
@@ -339,12 +391,16 @@ export function createGlobeStage(): GlobeStage {
         }
     };
 
-    const freeScene = (): void => { built?.dispose(); built = null; place = null; };
+    const freeScene = (): void => {
+        zoom?.dispose(); zoom = null;
+        built?.dispose(); built = null;
+        place = null; places = null; home = -1; lastState = null;
+    };
 
     return {
         ensure,
         gpu: () => gpuName,
-        open(here: GlobeHereInput) {
+        open(here: GlobeHereInput, placesIn: GlobePlacesInput) {
             const mine = ++token;
             freeScene();
             if (!ensure()) { status = "failed"; return; }
@@ -354,6 +410,10 @@ export function createGlobeStage(): GlobeStage {
                 built = buildGlobeScene(renderer, assets);
                 place = globePlace(assets.continents, here);
                 built.setHere(place ? place.lonLat : null);
+                zoom = buildZoomScene(renderer, built, { globeImage: assets.image, sea: seaColours(assets.continents) });
+                places = placesIn;
+                const key = here.server ? placeKey(here.server, here.record) : null;
+                home = key ? zoom.targets.findIndex((t) => t.key === key) : -1;
                 status = "ready";
             }).catch((e: unknown) => {
                 if (mine !== token) return;
@@ -364,8 +424,14 @@ export function createGlobeStage(): GlobeStage {
         },
         status: () => status,
         place: () => place,
-        draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, view: GlobeCamView) {
-            if (status !== "ready" || !built || !renderer || !canvas || !(w > 0) || !(h > 0)) return false;
+        targets: () => zoom?.targets ?? [],
+        home: () => home,
+        want(i: number) {
+            const s = screenOf(i);
+            return !!(s && zoom && zoom.pictures.get(s.map));
+        },
+        draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, view: ZoomView) {
+            if (status !== "ready" || !built || !zoom || !renderer || !canvas || !(w > 0) || !(h > 0)) return false;
             const m = ctx.getTransform();
             const sx = Math.hypot(m.a, m.b) || 1;
             const pw = Math.max(64, Math.min(MAX_RENDER_W, Math.round(w * sx)));
@@ -376,15 +442,16 @@ export function createGlobeStage(): GlobeStage {
                 built.camera.updateProjectionMatrix();
                 size = { w: pw, h: ph };
             }
-            const p = globeCameraPoint(view);
-            built.camera.position.set(p.x, p.y, p.z);
-            built.camera.up.set(0, 1, 0);
-            built.camera.lookAt(0, 0, 0);
-            built.faceIcons(p);
+            const now = typeof performance !== "undefined" ? performance.now() : t0;
+            lastState = zoom.update({
+                view, screen: screenOf(view.target), hereLonLat: place ? place.lonLat : null, aspect: pw / ph, timeSec: (now - t0) / 1000,
+            });
             renderer.render(built.scene, built.camera);
             ctx.drawImage(canvas, 0, 0, pw, ph, x, y, w, h);
             return true;
         },
+        zoomState: () => lastState,
+        heldPictures: () => zoom?.pictures.held() ?? [],
         close() {
             token++;
             freeScene();

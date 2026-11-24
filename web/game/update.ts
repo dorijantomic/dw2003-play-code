@@ -121,6 +121,14 @@ import {
 } from "./field-steps.js";
 import { activeExitAt, addEntranceReturn, prepareStageAssets, setMap } from "./map-load.js";
 import { checkStageCutscene } from "./story-events.js";
+import { nextGlobeEntry } from "../world-globe-places.js";
+import { isOpenAirMapName } from "../map-open-air.js";
+
+/** open air by the manifest name of a map id (web/map-open-air.ts); a map the manifest does not list is not */
+function isOpenAirMapId(id: string): boolean {
+    const m: ManifestMap | undefined = state.manifest.maps.find((mm: ManifestMap) => mm.id === id);
+    return !!m && isOpenAirMapName(m.name ?? "");
+}
 import {
   advanceTreeKick,
   boxStuck,
@@ -582,6 +590,8 @@ function update(dt: number) {
             // scripted mid-cutscene warps, and self-warps.
             if (idx >= 0 && ex.spawnX != null && !ex.scripted && fromId !== ex.to)
                 addEntranceReturn(ex.to, ex.spawnX, ex.spawnY, fromId, fromPos);
+            // The World Globe MAP's dot indoors: keep the outdoor screen (and the door spot) you walked in from.
+            if (idx >= 0) state.globeEntry = nextGlobeEntry(state.globeEntry ?? null, fromId, ex.to, fromPos, isOpenAirMapId);
             fade.dir = -1;
         }
         if (fade.dir === -1 && fade.alpha <= 0) {

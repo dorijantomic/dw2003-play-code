@@ -15,6 +15,8 @@ import { createGlobeBook } from "../world-globe-book.js";
 import { createGlobeStage } from "../world-globe-view.js";
 import { effectiveMapScreen, mapScreenRoute } from "../world-globe-map.js";
 import { mapGlobeHere } from "../menu/pure.js";
+import { MS } from "../menu/state.js";
+import { globePlaces, parsePlaceMaps, parsePlaceScenes, parseWalkerMap } from "../world-globe-places.js";
 import {
   screenIdForStage,
   carriesFolderBag,
@@ -129,6 +131,8 @@ export const books = createBookHost({
         mapscreen: () => createGlobeBook({
             stage: globeStage,
             here: () => mapGlobeHere(state),
+            // every place's main screen and yours, from the game's tables (status_ui walker_map, the manifest, the scenes)
+            places: (h) => globePlaces(parseWalkerMap(MS.UI), parsePlaceMaps(state.manifest.maps), parsePlaceScenes(state.scenes), h),
             held: () => state.keys,
             onFail: () => { globeFellBack = true; },
         }),

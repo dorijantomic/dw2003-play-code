@@ -15,6 +15,8 @@
   #tip { position:fixed; pointer-events:none; display:none; padding:3px 7px; background:rgba(10,12,20,.92); border:1px solid #58a; color:#fff; white-space:nowrap; }
   #info { margin-top:8px; padding-top:6px; border-top:1px solid #2a3050; white-space:pre-wrap; }
   label { user-select:none; }
+  #zoom { margin-top:8px; padding-top:6px; border-top:1px solid #2a3050; }
+  #zoom-z { width:190px; vertical-align:middle; }
 </style>
 </head>
 <body>
@@ -22,11 +24,16 @@
 <div id="side">
   <h3>World Globe</h3>
   <div class="dim">The game's two world maps (repainted) as two continents on one globe, sea between, ice at the poles.
-    Drag = turn, wheel = zoom, hover = place name, click = details. Icons = the game's own map icons on its place markers.</div>
+    Drag or arrows = turn (at every zoom), wheel or E / Q = zoom, hover = place name, click = details. Icons = the game's own map icons on its place markers.</div>
   <div style="margin-top:6px">turn to:
     <label><input id="srv-asuka" type="radio" name="srv" value="asuka" checked> Asuka</label>
     <label><input id="srv-amaterasu" type="radio" name="srv" value="amaterasu"> Amaterasu</label></div>
   <div style="margin-top:4px"><label><input id="pins" type="checkbox" checked> place markers</label></div>
+  <div id="zoom">
+    <b>Zoom</b> <span class="dim">into the place nearest the centre; you are here: West Wire Forest (s350)</span>
+    <div><input id="zoom-z" type="range" min="0" max="1000" value="0"> z <span id="zoom-zv">0.000</span></div>
+    <div id="zoom-info" class="dim"></div>
+  </div>
   <div id="status">loading...</div>
   <div id="info"></div>
 </div>

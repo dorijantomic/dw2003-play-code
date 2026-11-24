@@ -9,7 +9,7 @@
 // three.js: the tests (tests/world-globe.test.js, tests/world-globe-menu.test.js) run it in node.
 import type {
   AreaRun, ClipBox, FramePoint, GlobeArea, GlobeCamView, GlobeContinent, GlobeHereInput, GlobeHit, GlobeMapData, GlobeMarker,
-  GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeServer, IconClip, IconLayer, IconSheet, LonLat, MapBand, MapScreenChoice,
+  GlobeIconArt, GlobeMarkerIcon, GlobeMarkerRecord, GlobePlace, GlobeServer, IconClip, IconLayer, IconSheet, LonLat, MapBand, MapScreenChoice,
   MapScreenRoute, Point3, SheetSize, SphereUv,
 } from "./types/world-globe-map.js";
 
@@ -164,18 +164,13 @@ export function globePlace(continents: readonly GlobeContinent[], here: GlobeHer
     return { server, record: here.record, frame, lonLat: frameToLonLat(c.band, frame.x, frame.y), marker };
 }
 
-/** The MAP screen's camera limits and speeds (chosen, not from the disc). Distances are in globe radii from the centre; the
- *  turn per displayed frame (50 a second) scales with the height above the ground, so it feels the same at every zoom. */
+/** The MAP screen's camera limits (chosen, not from the disc). The turn and zoom speeds are the zoom's (web/world-globe-zoom.ts
+ *  ZOOM.turnRate / zoomRate): the turn scales with the camera's height, so it feels the same at every zoom. */
 export const GLOBE_VIEW = Object.freeze({
+    /** distance from the centre the start view is given in (globe radii) */
     distStart: 2.2,
-    distMin: 1.2,
-    distMax: 3.2,
     /** the maps reach +-58.2 deg; the camera may look a little past that, never over a pole */
     latMax: (65 * Math.PI) / 180,
-    /** radians of turn per frame per globe radius above the ground: 0.86 deg a frame (43 deg a second) at the start distance */
-    turnRate: 0.0125,
-    /** zoom: the height above the ground times this per frame held (in), divided by it (out) */
-    zoomStep: 0.96,
 });
 
 /** The buttons that move the MAP globe this frame (held directions turn, L1 zooms in, R1 zooms out). */
@@ -194,24 +189,6 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export function globeStartView(server: GlobeServer | null, place: GlobePlace | null): GlobeCamView {
     if (place) return { lon: place.lonLat.lon, lat: clamp(place.lonLat.lat, -GLOBE_VIEW.latMax, GLOBE_VIEW.latMax), dist: GLOBE_VIEW.distStart };
     return { lon: CONTINENT_LON[server ?? "asuka"], lat: 0, dist: GLOBE_VIEW.distStart };
-}
-
-/** One displayed frame of turning / zooming. Right shows what lies east (longitude grows), Up what lies north. */
-export function stepGlobeView(v: GlobeCamView, m: GlobeMoves): GlobeCamView {
-    const turn = GLOBE_VIEW.turnRate * (v.dist - 1);
-    const dx = (m.right ? 1 : 0) - (m.left ? 1 : 0), dy = (m.up ? 1 : 0) - (m.down ? 1 : 0);
-    const dz = (m.zoomIn ? 1 : 0) - (m.zoomOut ? 1 : 0);
-    const height = (v.dist - 1) * Math.pow(GLOBE_VIEW.zoomStep, dz);
-    return {
-        lon: wrapLon(v.lon + dx * turn),
-        lat: clamp(v.lat + dy * turn, -GLOBE_VIEW.latMax, GLOBE_VIEW.latMax),
-        dist: clamp(1 + height, GLOBE_VIEW.distMin, GLOBE_VIEW.distMax),
-    };
-}
-
-/** The camera position for a view (it looks at the centre, up = +y). */
-export function globeCameraPoint(v: GlobeCamView): Point3 {
-    return lonLatToPoint({ lon: v.lon, lat: v.lat }, v.dist);
 }
 
 /** The Map screen value in force. The player's own pick ("classic" or "new", saved in fx) wins in both modes;
@@ -326,6 +303,43 @@ export function markerIcons(c: GlobeContinent, records: readonly GlobeMarkerReco
         const s = frameScaleAt(c.band, lonLat.lat);
         return { server: c.data.server, marker, clip: r.clip, box, centre, lonLat, size: { w: box.w * s, h: box.h * s } };
     });
+}
+
+// ---- the HD icons: Gemini's repaint of the 36 location clips (the same art on both continents) ----
+// Files web/assets/world-globe/icons-hd/clipNN.png (git-ignored, made by the scratch tool world-globe/icons/gemini/cut/cut.py):
+// square RGBA pictures that cover HD_ICON_SPAN original px, centred on the clip's 24 x 24 box (the repaint reaches a little
+// past the box), the same px per original px for every clip. The globe draws them smooth (linear filter, mipmaps), at the
+// clip's own map scale, so the size rule stays the original one. A picture that does not load leaves that clip on the disc art.
+
+/** the HD icon folder inside the globe asset folder */
+export const HD_ICON_DIR = "icons-hd/";
+/** original px one HD picture covers, both ways (the clip box is 24) */
+export const HD_ICON_SPAN = 36;
+
+/** the HD picture of a clip, relative to the globe asset folder */
+export function hdIconFile(clip: number): string {
+    return `${HD_ICON_DIR}clip${String(clip).padStart(2, "0")}.png`;
+}
+
+/** the clips the shown markers draw (each once, ascending): only these HD pictures are loaded */
+export function shownIconClips(continents: readonly GlobeContinent[], records: readonly GlobeMarkerRecord[]): number[] {
+    const locs = new Set(continents.flatMap((c) => c.data.markers.map((m) => m.loc)));
+    return [...new Set(records.filter((r) => locs.has(r.loc)).map((r) => r.clip))].sort((a, b) => a - b);
+}
+
+/** Load the HD picture of every clip in `clips` with `load` (url -> picture); one that fails is left out (that clip then
+ *  draws the disc art). Never rejects. */
+export async function loadHdIcons<T>(clips: readonly number[], dir: string, load: (url: string) => Promise<T>): Promise<Map<number, T>> {
+    const got = await Promise.all(clips.map((clip) => load(`${dir}${hdIconFile(clip)}`).then((img): [number, T] | null => [clip, img], () => null)));
+    return new Map(got.filter((e): e is [number, T] => e !== null));
+}
+
+/** What a marker's billboard shows: its clip's HD picture at HD_ICON_SPAN px of the icon's own scale, or, when there is
+ *  none, the disc clip at the box size. */
+export function iconArt<T>(icon: GlobeMarkerIcon, hd: ReadonlyMap<number, T>): GlobeIconArt<T> {
+    const pic = hd.get(icon.clip);
+    if (pic === undefined || !(icon.box.w > 0) || !(icon.box.h > 0)) return { hd: null, size: icon.size };
+    return { hd: pic, size: { w: (HD_ICON_SPAN * icon.size.w) / icon.box.w, h: (HD_ICON_SPAN * icon.size.h) / icon.box.h } };
 }
 
 // ETS item 42: status_ui.json and the sheet files come from outside, so they enter as unknown and are checked here.

@@ -1,5 +1,6 @@
 // Types only for web/world-globe-map.ts and the page web/world-globe.ts. Nothing here is emitted
 // (node's strip mode erases it), so this file must never hold runtime code.
+import type { GlobePlacesInput, ZoomTarget, ZoomView } from "./world-globe-zoom.js";
 
 /** Which world map: the game's two servers. */
 export type GlobeServer = "asuka" | "amaterasu";
@@ -107,6 +108,21 @@ export interface GlobeHereInput {
   name: string;
   /** the record's icon top-left in status_ui.json screens.map.markers (map frame px), or null */
   icon: FramePoint | null;
+  /** the map you stand on ("s350") and your position on its picture: the field's state.x / state.y, which are native map
+   *  picture px (web/game/render.ts draws the map at -camera and the player at state - camera); null when not known */
+  map: string;
+  pos: FramePoint | null;
+  /** the outdoor screen you came in from while you are indoors (state.globeEntry), else null */
+  entry: GlobeEntry | null;
+}
+
+/** The outdoor screen you came in from, kept while you are indoors (web/game/update.ts sets it on every exit). */
+export interface GlobeEntry {
+  /** the open-air map you left */
+  from: string;
+  /** where you stood on it when the exit fired (its native px: the door) */
+  x: number;
+  y: number;
 }
 
 /** Your place on the globe: the continent, the marker's frame point and where that lies on the sphere. */
@@ -137,14 +153,20 @@ export type GlobeStageStatus = "idle" | "loading" | "ready" | "failed";
 
 /** The one three.js globe as the MAP book sees it (web/world-globe-view.ts createGlobeStage); a fake in the node tests. */
 export interface GlobeStageLike {
-  /** start loading the assets and building the scene; the "you are here" marker goes on `here`'s place */
-  open(here: GlobeHereInput): void;
+  /** start loading the assets and building the scene; the "you are here" marker goes on `here`'s place; `places` = every
+   *  place's main screen and yours (web/world-globe-places.ts globePlaces) */
+  open(here: GlobeHereInput, places: GlobePlacesInput): void;
   status(): GlobeStageStatus;
   /** your place once the assets are in (null before, or when the stage has no place) */
   place(): GlobePlace | null;
+  /** the places the zoom can go into (empty before ready) and your own place's index among them (-1 = none) */
+  targets(): readonly ZoomTarget[];
+  home(): number;
+  /** ask for a target's picture (loaded lazily); true once it is ready */
+  want(target: number): boolean;
   /** render one frame for `view` and copy it into (x, y, w, h) of `ctx`; false when there is nothing to draw yet */
-  draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, view: GlobeCamView): boolean;
-  /** the book shut: free the scene's GPU memory (the WebGL context is kept for the session) */
+  draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, view: ZoomView): boolean;
+  /** the book shut: free the scene's GPU memory, place pictures included (the WebGL context is kept for the session) */
   close(): void;
 }
 
@@ -205,3 +227,7 @@ export interface GlobeMarkerIcon {
   /** the icon's size on the globe, globe radii: box px times the map's local scale there */
   size: { w: number; h: number };
 }
+
+/** What a marker's billboard shows (web/world-globe-map.ts iconArt): the clip's HD picture and the size it covers on the
+ *  globe (HD_ICON_SPAN px at the icon's scale), or `hd: null` = the disc clip at the icon's box size. */
+export type GlobeIconArt<T> = { hd: T; size: { w: number; h: number } } | { hd: null; size: { w: number; h: number } };

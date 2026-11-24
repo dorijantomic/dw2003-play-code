@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync, readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { readSource } from "./helpers/source.js";
 
 const UI_FILE = "web/assets/data/status_ui.json";
@@ -25,6 +26,9 @@ if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
 const G = await import("../web/world-globe-map.js");
 const { mapGlobeHere } = await import("../web/menu/pure.js");
 
+/** a book's "you are here" and an empty places table (the fake stages ignore them) */
+const HERE = { server: "asuka", record: 20, name: "Asuka City", icon: null, map: "s200", pos: { x: 100, y: 100 }, entry: null };
+const NO_PLACES = { screens: new Map(), here: null };
 const stateOn = (stage) => ({ manifest: { maps: [{ id: stage }] }, mapIdx: 0, keys: new Set() });
 const continents = () => ["asuka", "amaterasu"].map((s) => {
     const data = G.parseGlobeMap(JSON.parse(readFileSync(`${GLOBE_DIR}/${s}.json`, "utf8")));
@@ -144,10 +148,11 @@ test("a globe that fails to load shuts the book once and the game opens the disc
     const { createGlobeBook } = await import("../web/world-globe-book.js");
     let status = "loading", fails = 0, closed = 0;
     const stage = {
-        open() {}, status: () => status, place: () => null, draw: () => false, close() { closed++; },
+        open() {}, status: () => status, place: () => null, targets: () => [], home: () => -1, want: () => false,
+        draw: () => false, close() { closed++; },
     };
     const book = createGlobeBook({
-        stage, here: () => ({ server: "asuka", record: 20, name: "Asuka City", icon: null }), held: () => new Set(), onFail: () => { fails++; },
+        stage, here: () => HERE, places: () => NO_PLACES, held: () => new Set(), onFail: () => { fails++; },
     });
     assert.equal(book.act(new Set()), null, "still loading: stays open");
     status = "failed";
@@ -162,35 +167,52 @@ test("a globe that fails to load shuts the book once and the game opens the disc
     assert.match(home, /openPage\(state, "map", /);
 });
 
-test("controls: arrows turn, L1 zooms in, R1 zooms out, Back closes", async () => {
+test("controls: arrows turn (at every zoom), L1 zooms in, R1 zooms out, the picture is asked for only by a zoom in, Back closes", async () => {
     const { createGlobeBook } = await import("../web/world-globe-book.js");
     const place = { server: "asuka", record: 20, frame: { x: 0, y: 0 }, lonLat: { lon: 0.1, lat: 0.2 }, marker: null };
-    const stage = { open() {}, status: () => "ready", place: () => place, draw: () => false, close() {} };
+    const targets = [{ key: "asuka:20", server: "asuka", record: 20, lonLat: { lon: 0.1, lat: 0.2 }, iconRadius: 0.09 }];
+    let asked = 0, opened = null;
+    const stage = {
+        open(h, p) { opened = { h, p }; }, status: () => "ready", place: () => place, targets: () => targets, home: () => 0,
+        want: () => { asked++; return true; }, draw: () => false, close() {},
+    };
     const held = new Set();
-    const book = createGlobeBook({ stage, here: () => ({ server: "asuka", record: 20, name: "", icon: null }), held: () => held, onFail() {} });
+    const book = createGlobeBook({ stage, here: () => HERE, places: () => NO_PLACES, held: () => held, onFail() {} });
+    assert.deepEqual(opened, { h: HERE, p: NO_PLACES }, "the stage gets where you are and the places");
     book.act(new Set());
     const v0 = book.view();
-    assert.ok(Math.abs(v0.lon - 0.1) < 1e-9 && Math.abs(v0.lat - 0.2) < 1e-9, "opens turned to your place");
-    assert.equal(v0.dist, G.GLOBE_VIEW.distStart);
+    assert.ok(Math.abs(v0.look.lon - 0.1) < 1e-9 && Math.abs(v0.look.lat - 0.2) < 1e-9, "opens turned to your place");
+    assert.deepEqual([v0.z, v0.target, v0.turned], [0, 0, false], "whole globe, your place the target");
     held.add("right");
     book.act(new Set(["right"]));
-    assert.ok(book.view().lon > v0.lon, "right turns east");
+    assert.ok(book.view().look.lon > v0.look.lon, "right turns east");
     book.act(new Set());
-    assert.ok(book.view().lon > v0.lon, "held right keeps turning");
+    assert.ok(book.view().look.lon > v0.look.lon, "held right keeps turning");
     held.clear();
     book.act(new Set());
-    const lonStop = book.view().lon;
+    const lonStop = book.view().look.lon;
     book.act(new Set());
-    assert.equal(book.view().lon, lonStop, "let go: stops");
+    assert.equal(book.view().look.lon, lonStop, "let go: stops");
+    assert.equal(asked, 0, "turning loads no picture");
     held.add("l1");
     book.act(new Set(["l1"]));
-    assert.ok(book.view().dist < G.GLOBE_VIEW.distStart, "L1 zooms in");
+    for (let i = 0; i < 200; i++) book.act(new Set());
+    assert.equal(book.view().z, 1, "held L1 zooms all the way in");
+    assert.ok(asked > 0, "zooming in asks for the picture");
     held.clear();
     book.act(new Set());
-    const d = book.view().dist;
+    // turning still works with the window filling the view (it pans)
+    const z1 = book.view();
+    held.add("up");
+    book.act(new Set(["up"]));
+    for (let i = 0; i < 10; i++) book.act(new Set());
+    assert.ok(book.view().look.lat > z1.look.lat, "Up turns at z = 1");
+    held.clear();
+    book.act(new Set());
+    const z = book.view().z;
     held.add("r1");
     book.act(new Set(["r1"]));
-    assert.ok(book.view().dist > d, "R1 zooms out");
+    assert.ok(book.view().z < z, "R1 zooms out");
     assert.equal(book.act(new Set(["cross"])), "back");
 });
 
@@ -262,12 +284,93 @@ test("icon size rule: box px times the map's local scale, so an icon covers on t
     }
 });
 
-test("the globe draws the icons pixel-sharp billboards over the globe and the 'you are here' marker after them", () => {
+test("the globe draws the icons as billboards over the globe (the disc fallback pixel-sharp) and the 'you are here' marker after them", () => {
     const src = readSource(new URL("../web/world-globe-view.js", import.meta.url));
     assert.match(src, /tex\.magFilter = THREE\.NearestFilter;/);
     assert.match(src, /tex\.minFilter = THREE\.NearestFilter;/);
     assert.match(src, /new THREE\.Sprite\(mat\)/);
     assert.match(src, /const ICON_ORDER = 1, HERE_ORDER = 2;/);
-    assert.match(src, /built\.faceIcons\(p\);\s*renderer\.render/);
+    assert.match(src, /lastState = zoom\.update\(\{[^}]*\}\);\s*renderer\.render/);
+    assert.match(readSource(new URL("../web/world-globe-zoom-view.js", import.meta.url)), /globe\.faceIcons\(camera\.position\);/);
     assert.doesNotMatch(src, /InstancedMesh\(/, "the yellow pins are gone");
+});
+
+// ---- the HD icons (Gemini repaint, web/assets/world-globe/icons-hd/clipNN.png, git-ignored) ----
+const HD_DIR = `${GLOBE_DIR}/${G.HD_ICON_DIR}`;
+const haveHd = existsSync(HD_DIR);
+
+/** an 8-bit RGBA, non-interlaced PNG's size and alpha bytes (IHDR + inflated IDAT, scanline filters undone) */
+const pngAlpha = (file) => {
+    const b = readFileSync(file);
+    const w = b.readUInt32BE(16), h = b.readUInt32BE(20), depth = b[24], colour = b[25], interlace = b[28];
+    const idat = [];
+    for (let p = 8; p < b.length;) {
+        const len = b.readUInt32BE(p), type = b.toString("ascii", p + 4, p + 8);
+        if (type === "IDAT") idat.push(b.subarray(p + 8, p + 8 + len));
+        p += 12 + len;
+    }
+    if (depth !== 8 || colour !== 6 || interlace !== 0) return { w, h, depth, colour, alpha: null };
+    const raw = inflateSync(Buffer.concat(idat)), bpp = 4, stride = w * bpp;
+    const px = new Uint8Array(h * stride);
+    for (let y = 0; y < h; y++) {
+        const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, row = y * stride;
+        for (let x = 0; x < stride; x++) {
+            const a = x >= bpp ? px[row + x - bpp] : 0, up = y ? px[row - stride + x] : 0, ul = y && x >= bpp ? px[row - stride + x - bpp] : 0;
+            const pa = Math.abs(up - ul), pb = Math.abs(a - ul), pc = Math.abs(a + up - 2 * ul);
+            const pred = f === 0 ? 0 : f === 1 ? a : f === 2 ? up : f === 3 ? (a + up) >> 1 : pa <= pb && pa <= pc ? a : pb <= pc ? up : ul;
+            px[row + x] = (raw[src + x] + pred) & 255;
+        }
+    }
+    const alpha = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) alpha[i] = px[i * 4 + 3];
+    return { w, h, depth, colour, alpha };
+};
+
+test("HD icons: every clip 1..36 the markers draw has its picture on disk, square RGBA, with transparent and visible px", { skip: !(haveIcons && haveHd) }, () => {
+    const records = G.parseMarkerRecords(JSON.parse(readFileSync(UI_FILE, "utf8")));
+    assert.deepEqual(G.shownIconClips(continents(), records), [...Array(36).keys()].map((k) => k + 1), "the 45 shown markers draw clips 1..36");
+    for (let clip = 1; clip <= 36; clip++) {
+        const file = `${GLOBE_DIR}/${G.hdIconFile(clip)}`;
+        assert.ok(existsSync(file), `${file} is there`);
+        const { w, h, depth, colour, alpha } = pngAlpha(file);
+        assert.ok(w > 0 && w === h, `clip ${clip}: square (${w} x ${h})`);
+        assert.equal(depth, 8, `clip ${clip}: 8 bit`);
+        assert.equal(colour, 6, `clip ${clip}: RGBA`);
+        assert.ok(alpha, `clip ${clip}: alpha read`);
+        let clear = 0, solid = 0;
+        for (const a of alpha) { if (a === 0) clear++; else if (a === 255) solid++; }
+        assert.ok(clear > w * h * 0.25, `clip ${clip}: transparent background (${clear} px)`);
+        assert.ok(solid > w * h * 0.1, `clip ${clip}: not empty (${solid} opaque px)`);
+        // nothing touches the picture's edge: the cut kept all of the repaint
+        for (let i = 0; i < w; i++) {
+            assert.ok(alpha[i] === 0 && alpha[(h - 1) * w + i] === 0 && alpha[i * w] === 0 && alpha[i * w + w - 1] === 0, `clip ${clip}: clear edge`);
+        }
+    }
+});
+
+test("HD icons: a picture that fails to load leaves its clip on the disc art; the others draw HD at the same scale", async () => {
+    assert.equal(G.hdIconFile(7), "icons-hd/clip07.png");
+    const asked = [];
+    const hd = await G.loadHdIcons([4, 5, 6], "assets/world-globe/", (url) => {
+        asked.push(url);
+        return url.endsWith("clip05.png") ? Promise.reject(new Error("404")) : Promise.resolve({ url });
+    });
+    assert.deepEqual(asked, ["assets/world-globe/icons-hd/clip04.png", "assets/world-globe/icons-hd/clip05.png", "assets/world-globe/icons-hd/clip06.png"]);
+    assert.deepEqual([...hd.keys()], [4, 6], "the failed clip is left out, nothing rejects");
+    const icon = (clip) => ({ server: "asuka", marker: { loc: 1 }, clip, box: { x: 0, y: 0, w: 24, h: 24 }, centre: { x: 0, y: 0 }, lonLat: { lon: 0, lat: 0 }, size: { w: 0.024, h: 0.024 } });
+    const miss = G.iconArt(icon(5), hd);
+    assert.equal(miss.hd, null);
+    assert.deepEqual(miss.size, { w: 0.024, h: 0.024 }, "fallback: the disc clip at its box size");
+    const got = G.iconArt(icon(4), hd);
+    assert.deepEqual(got.hd, { url: "assets/world-globe/icons-hd/clip04.png" });
+    assert.ok(Math.abs(got.size.w - 0.024 * (G.HD_ICON_SPAN / 24)) < 1e-15 && Math.abs(got.size.h - 0.024 * (G.HD_ICON_SPAN / 24)) < 1e-15, "HD: HD_ICON_SPAN px at the icon's own scale");
+    assert.deepEqual(G.iconArt(icon(9), new Map()).hd, null, "no HD pictures at all: every clip on the disc art");
+    // the view: HD smooth (linear + mipmaps), the disc fallback stays nearest, the sprite takes the art's size, picking keeps the box
+    const src = readSource(new URL("../web/world-globe-view.js", import.meta.url));
+    assert.match(src, /function hdIconTexture\(image\) \{[^}]*tex\.magFilter = THREE\.LinearFilter;\s*tex\.minFilter = THREE\.LinearMipmapLinearFilter;\s*tex\.generateMipmaps = true;/);
+    assert.match(src, /const art = iconArt\(icon, assets\.hdIcons\);/);
+    assert.match(src, /map = art\.hd \? hdIconTexture\(art\.hd\) : iconTexture\(sheet, icon\);/);
+    assert.match(src, /sprite\.scale\.set\(art\.size\.w, art\.size\.h, 1\);/);
+    assert.match(src, /loadHdIcons\(shownIconClips\(cs, rs\), dir, loadHdIconImage\)/);
+    assert.match(src, /s\.icon\.size\.w \/ 2 \/ depth/, "picking still uses the clip box");
 });
