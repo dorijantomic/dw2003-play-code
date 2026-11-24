@@ -273,7 +273,8 @@ applyShipDefaults(fx);       // both builds: "in" and "auto" start on, "out" sta
 fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 fx.battleSpeed = 2;          // Faster battles slider (1 to 3, the x1 / x1.5 / x2 / x3 positions; web/battle-speed.js)
-fx.mapScreen = "classic";   // OPTIONS > GAME > Map screen: "classic" (the game's MAP page) or "new" (web/map-screen-book.js)
+// fx.mapScreen has no default on purpose: unset = the player never picked, so the mode decides (HD Remaster = "new" = the World Globe,
+// Authentic = "classic" = the game's MAP page; web/world-globe-map.js effectiveMapScreen). OPTIONS > GAME > Map screen saves a pick.
 fx.musicVolume = 1;         // OPTIONS music volume, 0..1; 1 = the game's own gain (web/volume-levels.js)
 fx.soundVolume = 1;         // OPTIONS sound volume, 0..1; 1 = the game's own gain
 fx.encounterDialMode = "normal";  // Encounter dial setting (only read while F2 -> Extras -> Encounter dial is on; web/encounter-dial.js)
@@ -1282,7 +1283,7 @@ export function toggleRecord() {
     const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
     recChunks = [];
     setFlatReader("record", true);      // a battle's 3D layer is not in this canvas unless the frame is flat
-    recorder = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 12e6 });
+    recorder = new MediaRecorder(cv.captureStream(30), { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 12e6 });
     recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
         const blob = new Blob(recChunks, { type: "video/webm" });

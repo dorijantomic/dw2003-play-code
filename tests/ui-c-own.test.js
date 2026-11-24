@@ -1,10 +1,10 @@
-// Look C for our own screens (T9): the books (OPTIONS, GLOSSARY, map book, FLY; web/book-host.js), the pause QUESTS page and the
+// Look C for our own screens (T9): the books (OPTIONS, GLOSSARY, World Globe MAP book, FLY; web/book-host.js), the pause QUESTS page and the
 // Digivolve Demo page (web/menu.js). Pure: synthetic parts + text runs in, descriptors out (positions and strings only, no game data).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { readSource } from "./helpers/source.js";
-import { composeBook, composeBookHeader, composeMapLinks, composeMapNode, BOOK, isDimRun, linkQuad, MAP_NODE } from "../web/ui-c/books.js";
+import { composeBook, composeBookHeader, BOOK, isDimRun } from "../web/ui-c/books.js";
 import { composeFooter } from "../web/ui-c/pages.js";
 import { pickPauseScreen, composeBookScreen, composeDemo } from "../web/ui-c/screens.js";
 import { claimFor, CMFONT_DIR, STSTAT_DIR } from "../web/ui-c/claims.js";
@@ -83,22 +83,6 @@ test("bars (GLOSSARY strength), arrows and the faint word", () => {
     assert.ok(out.some((d) => d.key === "backdrop.type"));
 });
 
-// ------------------------------------------------------------------------------------------------ map book
-test("map links: one svg for seen links, one for the rest, inside the map box (never at the screen edge)", () => {
-    const p = { part: "mapLinks", x: 40, y: 40, w: 240, h: 140, rel: IDENTITY, segs: [[60, 60, 100, 60, 1], [100, 60, 140, 90, 0]] };
-    const out = [];
-    composeMapLinks(p, out);
-    assert.deepEqual(out.map((d) => d.key), ["map.links.seen", "map.links.dim"]);
-    for (const d of out) { assert.equal(d.kind, "svg"); assert.ok(d.rect.x > 0 && right(d.rect) < 320); }
-    assert.match(linkQuad([0, 0, 10, 0], 0, 0, 2), /^M0 1L10 1L10 -1L0 -1Z$/);
-});
-
-test("map nodes: here = solid orange, seen = C chip, unseen = empty plate", () => {
-    const out = [];
-    ["here", "seen", "unseen"].forEach((state, i) => composeMapNode({ x: 10 * i, y: 0, w: 8, h: 8, state, rel: IDENTITY }, i, out));
-    out.forEach((d, i) => assert.equal(d.body, MAP_NODE[["here", "seen", "unseen"][i]].body));
-});
-
 // ------------------------------------------------------------------------------------------------ footer (shared with the pause pages)
 test("footer: three lines (QUESTS) stay inside the band; text runs to the divider; a word past it (BIT) gets its own room", () => {
     const foot = part("footer", 0, 194, 320, 38);
@@ -143,8 +127,7 @@ test("wiring: the books and the demo page draw inside a look C scope; painted pa
     assert.match(menu, /uiC\.scope\("ui-menu", ctx, \{ enable: lookC, texts: true, compose: composeDemo \}/);
     assert.match(menu, /alignRight: true/, "card numbers keep their right edge (the card reads them by it)");
     assert.match(src("web/ui-kit.js"), /partHook\(ctx, \{ part: "bookBar"/);
-    assert.match(src("web/map-screen-book.js"), /part: "mapLinks"/);
-    assert.match(src("web/map-screen-book.js"), /part: "mapNode"/);
+    assert.match(src("web/world-globe-book.js"), /if \(!artHook\(ctx, paint\)\) paint\(ctx\)/, "the globe picture goes on the art layer");
     assert.match(src("web/uifont.js"), /artHook\(ctx, paint\)/);
 });
 

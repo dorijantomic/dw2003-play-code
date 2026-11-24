@@ -236,9 +236,18 @@ export interface MenuState {
 // One row of the decoded walker_map table: the PS1 stage it answers to and the walker's own
 // server/location it stands for on the map screen.
 export interface MapSeenRow {
-  ps1?: number;
-  /** the server the location is on ("asuka"/"amaterasu") */
-  server?: string;
-  /** the location marker's index */
-  loc?: number;
+  ps1: number;
+  /** the server the location is on: 0 Asuka (PS1 stage < 0x270), 1 Amaterasu */
+  server: number;
+  /** the place number (byte table 0x8009B5FC & 0x7F, 0..45); its marker is record loc + 1 (mapMarkerRecord) */
+  loc: number;
+}
+
+/** One record of the MAP page marker table 0x8009AB60 (status_ui.json screens.map.markers keeps records 1..46). */
+export interface MapMarkerRecord {
+  /** the record number, 1..46; also the place name string id (esaskmap / esamtmap) */
+  loc: number;
+  clip: number;
+  x: number;
+  y: number;
 }

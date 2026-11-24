@@ -112,11 +112,8 @@ export interface UiRun {
 /** The page transform of a claimed clip: an identity matrix (only translation-free placements accepted by applyRel). */
 export type UiFooterRel = UiMatrix;
 
-/** One link of the map book: from (x0, y0) to (x1, y1), and whether both ends are areas the player has seen. */
-export type UiLinkSeg = readonly [number, number, number, number, boolean?];
-
 /** A claimed capture clip as the screens hand it to the composers: a drawable part plus the clip's position, size, layers and row, its page transform and the part name the claim gave it. */
-export type UiClaimedPart = { segs?: readonly UiLinkSeg[]; } & Omit<Partial<UiPart>, "part" | "rel"> & Partial<Omit<UiClaim, "part" | "layers">> & Partial<Omit<UiCapturePart, "x" | "y" | "w" | "h" | "bx" | "by" | "rel">> & { part: string; rel: UiFooterRel; x: number; y: number; w: number; h: number; bx: number; by: number };
+export type UiClaimedPart = Omit<Partial<UiPart>, "part" | "rel"> & Partial<Omit<UiClaim, "part" | "layers">> & Partial<Omit<UiCapturePart, "x" | "y" | "w" | "h" | "bx" | "by" | "rel">> & { part: string; rel: UiFooterRel; x: number; y: number; w: number; h: number; bx: number; by: number };
 
 /** One partner's progress record of the fight report (read-only look data). */
 export interface UiReportProgress {

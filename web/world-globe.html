@@ -14,7 +14,6 @@
   #status { color:#9ab; font-size:11px; white-space:pre-wrap; margin-top:6px; }
   #tip { position:fixed; pointer-events:none; display:none; padding:3px 7px; background:rgba(10,12,20,.92); border:1px solid #58a; color:#fff; white-space:nowrap; }
   #info { margin-top:8px; padding-top:6px; border-top:1px solid #2a3050; white-space:pre-wrap; }
-  .sw { display:inline-block; width:10px; height:10px; margin-right:5px; vertical-align:-1px; }
   label { user-select:none; }
 </style>
 </head>
@@ -22,10 +21,12 @@
 <canvas id="cv"></canvas>
 <div id="side">
   <h3>World Globe</h3>
-  <div class="dim">Every open-air field map stitched into one world from the maps' own exits, on a globe.
-    Drag = turn, wheel = zoom, hover = map name, click = details. Yellow dots = buildings and dungeons behind a door.</div>
-  <div style="margin-top:6px"><label><input id="pins" type="checkbox" checked> door pins (interior maps)</label></div>
-  <div id="legend" style="margin-top:6px"></div>
+  <div class="dim">The game's two world maps (repainted) as two continents on one globe, sea between, ice at the poles.
+    Drag = turn, wheel = zoom, hover = place name, click = details. Icons = the game's own map icons on its place markers.</div>
+  <div style="margin-top:6px">turn to:
+    <label><input id="srv-asuka" type="radio" name="srv" value="asuka" checked> Asuka</label>
+    <label><input id="srv-amaterasu" type="radio" name="srv" value="amaterasu"> Amaterasu</label></div>
+  <div style="margin-top:4px"><label><input id="pins" type="checkbox" checked> place markers</label></div>
   <div id="status">loading...</div>
   <div id="info"></div>
 </div>

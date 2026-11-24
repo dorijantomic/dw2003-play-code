@@ -1,6 +1,6 @@
 {
- "total": 4617,
- "any": 861,
+ "total": 4528,
+ "any": 859,
  "files": {
   "engine/dw3/ui/folder-session.ts": {
    "errors": 1,
@@ -15,7 +15,7 @@
    "any": 0
   },
   "web/ambience.ts": {
-   "errors": 1,
+   "errors": 0,
    "any": 3
   },
   "web/anim-viewer-bake.ts": {
@@ -115,11 +115,11 @@
    "any": 0
   },
   "web/battle/core/enemy-action.ts": {
-   "errors": 7,
+   "errors": 3,
    "any": 1
   },
   "web/battle/core/flow.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 2
   },
   "web/battle/core/forms.ts": {
@@ -235,7 +235,7 @@
    "any": 0
   },
   "web/battle3d/core/model.ts": {
-   "errors": 2,
+   "errors": 0,
    "any": 1
   },
   "web/battle3d/core/pano.ts": {
@@ -244,10 +244,6 @@
   },
   "web/battle3d/core/render.ts": {
    "errors": 11,
-   "any": 0
-  },
-  "web/battle3d/core/smartcam.ts": {
-   "errors": 3,
    "any": 0
   },
   "web/battle3d/core/toon.ts": {
@@ -578,6 +574,10 @@
    "errors": 4,
    "any": 0
   },
+  "web/charisma.ts": {
+   "errors": 1,
+   "any": 0
+  },
   "web/chat.ts": {
    "errors": 3,
    "any": 0
@@ -703,7 +703,7 @@
    "any": 2
   },
   "web/fight/generic-motion.ts": {
-   "errors": 116,
+   "errors": 131,
    "any": 12
   },
   "web/fight/launch-plan.ts": {
@@ -774,10 +774,6 @@
    "errors": 10,
    "any": 0
   },
-  "web/game/auction-replay.ts": {
-   "errors": 1,
-   "any": 0
-  },
   "web/game/battle-launch.ts": {
    "errors": 1,
    "any": 0
@@ -794,12 +790,8 @@
    "errors": 6,
    "any": 0
   },
-  "web/game/followers.ts": {
-   "errors": 1,
-   "any": 0
-  },
   "web/game/init.ts": {
-   "errors": 3,
+   "errors": 0,
    "any": 1
   },
   "web/game/input.ts": {
@@ -835,7 +827,7 @@
    "any": 50
   },
   "web/game/ui-openers.ts": {
-   "errors": 7,
+   "errors": 8,
    "any": 0
   },
   "web/game/update.ts": {
@@ -934,10 +926,6 @@
    "errors": 2,
    "any": 0
   },
-  "web/map-screen-book.ts": {
-   "errors": 17,
-   "any": 0
-  },
   "web/map-screen-model.ts": {
    "errors": 1,
    "any": 0
@@ -963,7 +951,7 @@
    "any": 0
   },
   "web/menu/draw-map.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 0
   },
   "web/menu/logic.ts": {
@@ -983,7 +971,7 @@
    "any": 2
   },
   "web/mp-league.ts": {
-   "errors": 10,
+   "errors": 5,
    "any": 0
   },
   "web/mpbattle-menus.ts": {
@@ -1023,7 +1011,7 @@
    "any": 0
   },
   "web/mpsocial.ts": {
-   "errors": 2,
+   "errors": 1,
    "any": 1
   },
   "web/multiplayer.ts": {
@@ -1031,7 +1019,7 @@
    "any": 1
   },
   "web/nameentry-translated.ts": {
-   "errors": 2,
+   "errors": 4,
    "any": 2
   },
   "web/native-runtime.ts": {
@@ -1066,16 +1054,8 @@
    "errors": 6,
    "any": 0
   },
-  "web/native-stage.ts": {
-   "errors": 2,
-   "any": 0
-  },
   "web/options-book.ts": {
    "errors": 3,
-   "any": 0
-  },
-  "web/options-model.ts": {
-   "errors": 19,
    "any": 0
   },
   "web/packed-sound.ts": {
@@ -1091,14 +1071,6 @@
    "any": 1
   },
   "web/panel-kit.ts": {
-   "errors": 1,
-   "any": 0
-  },
-  "web/party.ts": {
-   "errors": 10,
-   "any": 0
-  },
-  "web/pause-home.ts": {
    "errors": 1,
    "any": 0
   },
@@ -1159,7 +1131,7 @@
    "any": 0
   },
   "web/quests.ts": {
-   "errors": 19,
+   "errors": 0,
    "any": 1
   },
   "web/redirect-view.ts": {
@@ -1211,11 +1183,11 @@
    "any": 3
   },
   "web/shop-translated.ts": {
-   "errors": 2,
+   "errors": 0,
    "any": 1
   },
   "web/shop.ts": {
-   "errors": 52,
+   "errors": 53,
    "any": 0
   },
   "web/showcase.ts": {
@@ -1260,10 +1232,6 @@
   },
   "web/stagslct.ts": {
    "errors": 1,
-   "any": 0
-  },
-  "web/status-translated.ts": {
-   "errors": 5,
    "any": 0
   },
   "web/story-explorer.ts": {
@@ -1378,10 +1346,6 @@
    "errors": 0,
    "any": 6
   },
-  "web/types/lab-translated.ts": {
-   "errors": 0,
-   "any": 1
-  },
   "web/types/multiplayer.ts": {
    "errors": 0,
    "any": 1
@@ -1489,10 +1453,6 @@
   "web/world-globe-layout.ts": {
    "errors": 91,
    "any": 3
-  },
-  "web/world-globe.ts": {
-   "errors": 9,
-   "any": 1
   },
   "web/yesno-translated.ts": {
    "errors": 2,

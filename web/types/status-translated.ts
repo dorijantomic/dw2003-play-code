@@ -55,8 +55,11 @@ export interface StatusScreen {
   entry?: () => string | null;
   handleKey?: (k: string, state: GameState) => void;
   isOpen?: () => boolean;
-  open?: (state: GameState, entry?: string, onClose?: (() => void) | null, homeFlow?: boolean) => void;
+  /** `state` null = keep the state the screen already holds (a page re-opened in the same pause) */
+  open?: (state: GameState | null, entry?: string, onClose?: (() => void) | null, homeFlow?: boolean) => void;
   openHome?: (state: GameState, onClose?: (() => void) | null, row?: number) => void;
+  /** open `page` from a closed pause, over the home list on `row` (the World Globe's fallback to the disc's MAP page) */
+  openPage?: (state: GameState, page: string, onClose?: (() => void) | null, row?: number) => boolean;
   reopenPage?: (page: string, row?: number) => boolean;
   update?: (dt: number) => void;
 }
@@ -69,7 +72,7 @@ export interface StatusTranslatedOpts {
   extraRows?: (state: WalkerState) => { label: string; opens: string }[];
   /** the map the party stands on (stage 0 and the seen-map reader come from it) */
   map?: (state: WalkerState) => any | null;
-  /** true when OPTIONS > Map screen should open the new map book instead of the disc's page */
+  /** true when OPTIONS > Map screen should open the World Globe instead of the disc's page */
   newMapScreen?: () => boolean;
   /** open a book (the GLOSSARY / OPTIONS browser) on a row */
   onBook?: (book: string, row: number) => void;

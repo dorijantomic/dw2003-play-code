@@ -1,12 +1,14 @@
-// The new map screen (web/map-screen-model.js, web/map-screen-book.js): regions, links, the visited rule, layout, cursor, and the OPTIONS row.
+// The map screen model (web/map-screen-model.js, still used by the stitched World Globe layout web/world-globe-layout.js): regions,
+// links, the visited rule, layout, cursor; and the OPTIONS row that picks the MAP screen (New = the World Globe, web/world-globe-book.js).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { regionOf, buildLinks, buildGraph, regionView, openRegions, layoutNodes, nearestInDirection, createMapScreenModel } from "../web/map-screen-model.js";
-import { createMapScreenBook, MAP_BOX } from "../web/map-screen-book.js";
 import { buildRows, PAGES } from "../web/options-model.js";
 import { readSource } from "./helpers/source.js";
 
+/** the area box the old map book laid the model out in (252 x 94 native) */
+const MAP_BOX = Object.freeze({ w: 252, h: 94 });
 const D = " — ";
 const MAPS = [
     { id: "s1", name: `North${D}A` }, { id: "s2", name: `North${D}B` }, { id: "s3", name: `North${D}C` }, { id: "s4", name: `North${D}D` },
@@ -124,44 +126,24 @@ test("a player with no visited area gets an empty screen that still answers ever
     assert.equal(m.switchRegion(1), null);
 });
 
-function fakeCtx() {
-    return new Proxy({}, { get: (_t, n) => (n === "measureText" ? () => ({ width: 10 }) : () => {}), set: () => true });
-}
-const keys = (...k) => new Set(k);
-
-test("the book: Back leaves, arrows and Q / E move with a sound only when something moved, and it draws folded, half open and open", () => {
-    const sounds = [];
-    const book = createMapScreenBook({ sfx: { play: (n) => sounds.push(n) }, data: () => ({ maps: MAPS, scenes: SCENES, seen: seenOf("s1", "s2", "s5"), currentId: "s1" }) });
-    assert.equal(book.act(keys("cross")), "back");
-    assert.equal(book.act(keys("left")), null);
-    assert.deepEqual(sounds, []);
-    book.act(keys("right"));
-    book.act(keys("r1"));
-    assert.deepEqual(sounds, ["system02", "system02"]);
-    assert.equal(book.model.regionName(), "South");
-    for (const p of [0, 0.5, 1]) book.draw(fakeCtx(), { progress: () => p, ticks: 3, dt: 0.016 });
-    const empty = createMapScreenBook({ data: () => ({ maps: MAPS, scenes: SCENES, seen: seenOf(), currentId: "nowhere" }) });
-    empty.draw(fakeCtx(), { progress: () => 1, ticks: 0, dt: 0 });
-});
-
-test("OPTIONS has one Map screen row on the GAME page: Classic is the default and New is the other choice", () => {
+test("OPTIONS has one Map screen row on the GAME page: with no pick Authentic shows Classic, New is the other choice", () => {
     const rows = buildRows();
     assert.ok(PAGES[0].rows.includes("mapScreen"));
     const fx = {};
     const store = { get: (k) => fx[k], setMany: (o) => Object.assign(fx, o) };
     assert.deepEqual(rows.mapScreen.choices, ["Classic", "New"]);
-    assert.equal(rows.mapScreen.read(store), 0, "nothing saved reads Classic");
+    assert.equal(rows.mapScreen.read(store), 0, "nothing saved in Authentic reads Classic");
     rows.mapScreen.write(store, 1);
     assert.equal(fx.mapScreen, "new");
     assert.equal(rows.mapScreen.read(store), 1);
     const amb = readSource(new URL("../web/ambience.js", import.meta.url));
-    assert.match(amb, /fx\.mapScreen = "classic";/);
+    assert.doesNotMatch(amb, /fx\.mapScreen = /, "no default: unset = the player never picked, the mode decides");
 });
 
-test("the wiring: the pause list's MAP page result opens the book only when the row says New", () => {
+test("the wiring: the pause list's MAP page result opens the World Globe book only when the row says New", () => {
     const st = readSource(new URL("../web/status-translated.js", import.meta.url));
     assert.match(st, /result\.page === "map" && opts\.newMapScreen\?\.\(\)/);
     const game = readSource(new URL("../web/game.js", import.meta.url));
-    assert.match(game, /newMapScreen: \(\) => window\.__fx\?\.mapScreen === "new"/);
-    assert.match(game, /mapscreen: \(args\) => createMapScreenBook\(/);
+    assert.match(game, /newMapScreen: \(\) => mapScreenRoute\(effectiveMapScreen\(window\.__fx\?\.mapScreen, HD_MAPS\), mapGlobeHere\(state\)\.server, globeStage\.ensure\) === "globe"/);
+    assert.match(game, /mapscreen: \(\) => createGlobeBook\(/);
 });

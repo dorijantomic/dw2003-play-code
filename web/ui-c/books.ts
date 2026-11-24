@@ -1,5 +1,5 @@
-// web/ui-c/books.js -- look C kit: our own screens, the ones that are not on the disc (T9): the books (OPTIONS, GLOSSARY, the map
-// screen book, the FLY book; web/book-host.js) and the pause QUESTS page (engine/dw3/ui/native/pause-quests.ts). They are all built from
+// web/ui-c/books.js -- look C kit: our own screens, the ones that are not on the disc (T9): the books (OPTIONS, GLOSSARY, the World
+// Globe MAP book, the FLY book; web/book-host.js) and the pause QUESTS page (engine/dw3/ui/native/pause-quests.ts). They are all built from
 // the same disc pieces (web/ui-kit.js: header bar cmfont 24, the list window cmfont 36 or a panel of the pause list's tiles, the footer
 // band ststat 32), so one composer serves them all. Pure: the claimed parts + text runs of a scope in, descriptors (native units) out.
 //
@@ -7,10 +7,9 @@
 //                      orange tab, the others dim (the game draws them with the dim font row, clut 7); "L1" / "R1" become C page chips
 //   composeBookPanel   a C window per panel. A panel with the list cursor in it is a list: the shared rows (pages.js composeRows: plain
 //                      rows on the navy under-edge, the focused row solid orange and pushed out, the chevron in the cursor's pose). A line
-//                      that starts left of the cursor column (the GLOSSARY counts line) is a head line, not a row. cfg.rows = false (the map
-//                      book: the cursor points at an area box, not a row) = the chevron alone at the game's cursor.
+//                      that starts left of the cursor column (the GLOSSARY counts line) is a head line, not a row. cfg.rows = false (a book
+//                      without list rows, the World Globe MAP book) = the chevron alone at the game's cursor, if any.
 //   bars               the GLOSSARY strength bars (web/ui-kit.js drawBar hands them over: { part: "bookBar", ratio })
-//   map                the map book's links (one svg) and area boxes (web/map-screen-book.js hands them over)
 //   arrows             the game's ◀ ▶ ▲ ▼ glyphs = the small orange C triangles
 // Every string is the game's own run; every position the game's own draw position (the `rel` matrix carries the folds).
 import { applyRel } from "./geometry.js";
@@ -19,11 +18,11 @@ import { N, ID, textPart, plate, cursor, chip, tabPlate, tokenLine, stripes, typ
 import { clipRect, restOfRuns, runText } from "./generic.js";
 import { composeRows, composeFooter, runIn } from "./pages.js";
 import type { BookOpts } from "./types.js";
-import type { UiClaimedPart, UiLinkSeg, UiPart, UiRun, UiScreenContext } from './types.js';
+import type { UiClaimedPart, UiPart, UiRun, UiScreenContext } from './types.js';
 
 
-/** Sizes (design px unless named): title Russo 26 / 36, tabs 20 / 30, the L1 / R1 chip 52 x 32, a map link 0.8 native wide, a map box 8 native. */
-export const BOOK = Object.freeze({ titleDp: 26, titleLineDp: 36, tabDp: 20, tabLineDp: 30, tabIn: N(16), tabOut: N(26), chipW: N(52), chipH: N(32), chipMaxX: 318, link: 0.8 });
+/** Sizes (design px unless named): title Russo 26 / 36, tabs 20 / 30, the L1 / R1 chip 52 x 32. */
+export const BOOK = Object.freeze({ titleDp: 26, titleLineDp: 36, tabDp: 20, tabLineDp: 30, tabIn: N(16), tabOut: N(26), chipW: N(52), chipH: N(32), chipMaxX: 318 });
 const DIM = "var(--c-dim-label)";
 
 /** The game font's dim row (clut 7): inactive tabs, unknown species, "No picture", headings of the GLOSSARY pages. */
@@ -93,36 +92,8 @@ export function composeBookPanel(p: UiClaimedPart, i: number, runs: UiRun[], use
     }
 }
 
-/** A line of `w` native from (x0, y0) to (x1, y1) as a filled quad, in native units relative to (ox, oy). */
-export function linkQuad([x0, y0, x1, y1]: UiLinkSeg, ox: number, oy: number, w = BOOK.link) {
-    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, nx = (-dy / len) * (w / 2), ny = (dx / len) * (w / 2);
-    const f = (n: number) => +n.toFixed(3);
-    return `M${f(x0 - ox + nx)} ${f(y0 - oy + ny)}L${f(x1 - ox + nx)} ${f(y1 - oy + ny)}L${f(x1 - ox - nx)} ${f(y1 - oy - ny)}L${f(x0 - ox - nx)} ${f(y0 - oy - ny)}Z`;
-}
-
-/** The map book's links: one svg for the links between two seen areas (C edge), one for the rest (navy under-edge). */
-export function composeMapLinks(p: UiClaimedPart, out: UiPart[]) {
-    const rel = p.rel, rect = { x: p.x, y: p.y, w: p.w, h: p.h };
-    for (const [k, seen, fill] of [["seen", true, "var(--c-edge)"], ["dim", false, "var(--c-under)"]] as const) {
-        const d = (p.segs ?? []).filter((s) => !!s[4] === seen).map((s) => linkQuad(s, p.x, p.y)).join(" ");
-        if (d) out.push({ key: `map.links.${k}`, kind: "svg", part: "mapLinks", layer: "under", vw: p.w, vh: p.h, d, fill, rect: applyRel(rect, rel), sx: rel.a, sy: rel.d });
-    }
-}
-
-/** One area box of the map book: "here" = solid orange, seen = the C chip, not seen yet = the dim empty plate. */
-export const MAP_NODE = Object.freeze({
-    here: Object.freeze({ edge: "var(--c-orange)", body: "var(--c-orange)" }),
-    seen: Object.freeze({ edge: "var(--c-edge)", body: "var(--c-body)" }),
-    unseen: Object.freeze({ edge: "var(--c-empty-edge)", body: "var(--c-empty-body)" }),
-});
-export function composeMapNode(p: UiClaimedPart, i: number, out: UiPart[]) {
-    // ETS item 9: a node without a state is not in the table: it is "seen"
-    const c = (MAP_NODE as Readonly<Record<string, { edge: string; body: string; } | undefined>>)[p.state!] ?? MAP_NODE.seen;
-    out.push(plate(`map.node${i}`, "mapNode", applyRel({ x: p.x, y: p.y, w: p.w, h: p.h }, p.rel), p.rel, { shape: "chip", edge: c.edge, body: c.body, shadow: 0 }));
-}
-
 /**
- * A book screen or the QUESTS page. cfg = { rows (false = a free cursor, the map book), word (the big faint word on the backdrop),
+ * A book screen or the QUESTS page. cfg = { rows (false = no list rows, the World Globe MAP book), word (the big faint word on the backdrop),
  * dimClut (true = the runs come from web/uifont.js drawText, where clut 7 is the dim face) }.
  */
 export function composeBook({ parts, runs }: UiScreenContext, cfg: BookOpts = {}) {
@@ -138,8 +109,6 @@ export function composeBook({ parts, runs }: UiScreenContext, cfg: BookOpts = {}
     const header = of("header")[0];
     if (header) composeBookHeader(header, runs, used, out);
     parts.forEach((p, i) => { if (p.part === "window") composeBookPanel(p, i, runs, used, out, cfg); });
-    of("mapLinks").forEach((p) => composeMapLinks(p, out));
-    of("mapNode").forEach((p, i) => composeMapNode(p, i, out));
     of("bookBar").forEach((p, i) => out.push(cardBar(`bar${i}@${Math.round(p.x)},${Math.round(p.y)}`, applyRel({ x: p.x, y: p.y, w: p.w, h: p.h }, p.rel), p.ratio ?? 0, "var(--c-hp)", p.rel)));
     const foot = of("footer")[0];
     if (foot) composeFooter(foot, runs, used, out);

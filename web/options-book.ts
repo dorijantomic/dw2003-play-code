@@ -5,6 +5,7 @@
 // page, Back (cross) leaves. Settings are written through window.__setFxMany, the same store as F2 (web/ambience.js).
 import { SPRITE_FILTERS } from "./sprite-filters.js";
 import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
+import { assetMode, ASSET_MODE_HD } from "./assets.js";
 import { LIST_ROWS, PAGES, createOptionsModel } from "./options-model.js";
 import { WORD } from "./ui-kit-input.js";
 import { LIST_WINDOW, drawHeader, drawHelpBox, drawPanel, layoutTabs, listRowY, withFold } from "./ui-kit.js";
@@ -39,6 +40,7 @@ interface OptionsBookArgs {
     fx?: () => Readonly<Record<string, OptionsValue>> | null | undefined;
     setFxMany?: (values: Record<string, OptionsValue>) => void;
     locked?: (key: string) => boolean;
+    isHd?: () => boolean;      // HD Remaster (web/assets.js): the Map screen row's value with no pick follows it
 }
 
 const ARROW_W = 10;     // room kept for one arrow
@@ -77,9 +79,9 @@ export function rowLayout(widthOf: (text: string, scale?: number) => number, r: 
     return { label: fitByWidth(r.label, (s: string) => widthOf(s, 1), room), valueRight: right, valueLeft: left, leftArrowX: left - ARROW_W, rightArrowX: right + 2, kind };
 }
 
-export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!(typeof window !== "undefined" && window.__hostRules?.locked(k)) }: OptionsBookArgs = {}) {
+export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!(typeof window !== "undefined" && window.__hostRules?.locked(k)), isHd = () => assetMode() === ASSET_MODE_HD }: OptionsBookArgs = {}) {
     const store = { get: (k: string) => fx()?.[k], setMany: (o: Record<string, OptionsValue>) => setFxMany(o), locked: (k: string) => locked(k) };
-    const model = createOptionsModel(store, pixelFilterChoices());
+    const model = createOptionsModel(store, pixelFilterChoices(), isHd);
     const cue = (result: string | null) => { if (result) sfx?.play?.("system02"); };
     return {
         windows: ["title", "list", "help"],

@@ -8,6 +8,7 @@
 import { SPEEDS } from "./battle-speed.js";
 import { DETAIL_OFF_LOW, DETAIL_OFF_MEDIUM } from "./detail-presets.js";
 import { shipClass } from "./ship-list.js";
+import { effectiveMapScreen } from "./world-globe-map.js";
 import type { AmbienceSettings } from "./types/ambience.js";
 import type { EffectCategory, OptionsHome, OptionsOpenCategory, OptionsRow, OptionsStore, OptionsValue, OptionsViewEntry } from "./types/options-model.js";
 
@@ -137,7 +138,7 @@ export function detailOf(store: OptionsStore) {
     }
     return "custom";
 }
-export function applyDetail(store: Pick<OptionsStore, "setMany">, level: string | undefined) {
+export function applyDetail(store: Pick<OptionsStore, "setMany">, level: string) {
     const off = new Set(DETAIL_OFF[level]);
     store.setMany({ ...Object.fromEntries(DETAIL_KEYS.map((k) => [k, !off.has(k)])), quality: DETAIL_QUALITY[level] });
 }
@@ -145,7 +146,7 @@ export function applyDetail(store: Pick<OptionsStore, "setMany">, level: string 
 const DIAL: readonly OptionsValue[] = Object.freeze(["rare", "normal", "lure"]);        // fewer / normal / more (web/encounter-dial.js DIAL_MODES)
 const TODS = Object.freeze(["auto", "day", "golden", "dusk", "night"]);
 const WEATHERS = Object.freeze(["auto", "always", "storm", "clear"]);   // web/ambience.js: the F2 select's values
-const MAP_SCREENS = Object.freeze(["classic", "new"]);   // web/map-screen-book.js; classic = the game's own MAP page
+const MAP_SCREENS = Object.freeze(["classic", "new"]);   // new = the World Globe (web/world-globe-book.js); classic = the game's own MAP page
 const VOLUMES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);   // tenths; 10 = today's gain
 
 const toggleRow = (id: string, label: string, help: string, keys: string[]): OptionsRow => ({
@@ -159,11 +160,12 @@ const valueRow = (id: string, label: string, help: string, key: string, values: 
 const volumeRow = (id: string, label: string, help: string, key: string): OptionsRow => ({
     id, label, help, numeric: true, choices: VOLUMES.map((v) => String(v * 10)),
     read: (s: OptionsStore) => { const v = Number(s.get(key)); return Number.isFinite(v) ? Math.min(10, Math.max(0, Math.round(v * 10))) : 10; },
-    write: (s: OptionsStore, i: number) => s.setMany({ [key]: VOLUMES[i] / 10 }),
+    write: (s: OptionsStore, i: number) => { const v = VOLUMES[i]; if (v !== undefined) s.setMany({ [key]: v / 10 }); },
 });
 
-/** Every row, by id. `pixelFilters` = [[id, label], ...] (web/sprite-filters.js SPRITE_FILTERS limited to the GPU ones). */
-export function buildRows(pixelFilters: string[][] = [["off", "Off"]]) {
+/** Every row, by id. `pixelFilters` = [[id, label], ...] (web/sprite-filters.js SPRITE_FILTERS limited to the GPU ones).
+ *  `isHd()` true = HD Remaster: the Map screen row shows the value in force, which with no pick follows the mode. */
+export function buildRows(pixelFilters: string[][] = [["off", "Off"]], isHd: () => boolean = () => false) {
     const rows: Record<string, OptionsRow> = {
         battleSpeed: {
             id: "battleSpeed", label: "Battle speed", keys: ["battlespeed", "battleSpeed"], numeric: true, choices: SPEEDS.map((v) => `x${v}`),
@@ -187,11 +189,14 @@ export function buildRows(pixelFilters: string[][] = [["off", "Off"]]) {
             id: "detail", label: "Detail", choices: DETAIL_LABELS,
             help: "Small map effects. Original = exactly like the PlayStation game.",
             read: (s: OptionsStore) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
-            write: (s: OptionsStore, i: number) => applyDetail(s, DETAIL_LEVELS[i]),
+            write: (s: OptionsStore, i: number) => { const level = DETAIL_LEVELS[i]; if (level !== undefined) applyDetail(s, level); },
         },
         timeOfDay: valueRow("timeOfDay", "Time of day", "Keep the map at one time of day, or let it change by itself.", "todMode", TODS, ["Auto", "Day", "Golden", "Dusk", "Night"]),
         weather: valueRow("weather", "Weather", "Random weather, weather all the time, storms only, or clear skies.", "weatherMode", WEATHERS, ["Random", "Always", "Storms", "Clear"]),
-        mapScreen: valueRow("mapScreen", "Map screen", "The map the pause menu opens. New shows visited areas and links.", "mapScreen", MAP_SCREENS, ["Classic", "New"]),
+        mapScreen: {
+            ...valueRow("mapScreen", "Map screen", "The map the pause menu opens. New shows the world as a globe.", "mapScreen", MAP_SCREENS, ["Classic", "New"]),
+            read: (s: OptionsStore) => MAP_SCREENS.indexOf(effectiveMapScreen(s.get("mapScreen"), isHd())),   // no pick: HD Remaster = New, Authentic = Classic
+        },
         pixelFilter: valueRow("pixelFilter", "Pixel filter", "Smooths the blocky pixels of the whole picture.", "spriteFilter", pixelFilters.map((f) => f[0]), pixelFilters.map((f) => f[1])),
         musicVolume: volumeRow("musicVolume", "Music volume", "How loud the music is. 100 is the normal level.", "musicVolume"),
         soundVolume: volumeRow("soundVolume", "Sound volume", "How loud sound effects and place sounds are. 100 is the normal level.", "soundVolume"),
@@ -223,16 +228,21 @@ export const PAGES = Object.freeze([
  * Pages, cursor and value changes. No wrap anywhere (the pause list does not wrap: pause-menu-screen-tree-2026-08-14.md).
  * Every method returns what the screen should do: "move" (play the cursor sound), "change" (a value moved), or null.
  */
-export function createOptionsModel(store: OptionsStore, pixelFilters: string[][]) {
-    const rows = buildRows(pixelFilters);
-    const lockedRow = (r: OptionsRow) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
+export function createOptionsModel(store: OptionsStore, pixelFilters: string[][], isHd: () => boolean = () => false) {
+    const rows = buildRows(pixelFilters, isHd);
+    const lockedRow = (r: OptionsRow) => !!r.keys && r.keys.some((k) => store.locked?.(k) === true);   // the host decides this row
     const backRow: OptionsRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
     let page = 0, row = 0, top = 0, open: OptionsOpenCategory | null = null;          // open = the EFFECTS category that is showing its switches, or null
     const switchRows = (c: EffectCategory | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
-    const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page]!.rows.map((id) => rows[id]));
-    const here = (): OptionsRow => pageRows()[row];
+    const pageRows = (): OptionsRow[] => (open ? switchRows(EFFECT_CATEGORIES[open.index])
+        : (PAGES[page]?.rows ?? []).flatMap((id) => { const r = rows[id]; return r ? [r] : []; }));
+    const here = (): OptionsRow => {
+        const r = pageRows()[row];
+        if (!r) throw new Error(`options: no row ${row} on this page`);
+        return r;
+    };
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };
-    const close = () => { const c = open; open = null; row = c.cat; top = 0; };
+    const close = () => { const c = open; if (!c) return; open = null; row = c.cat; top = 0; };
     const toggleHere = () => { const r = here(); if (lockedRow(r)) return null; const i = r.read(store); r.write(store, i === 1 ? 0 : 1); return "change"; };
     return {
         page: () => page,

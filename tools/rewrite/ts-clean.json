@@ -328,7 +328,6 @@
   "web/language-desk.ts",
   "web/leave-fade.ts",
   "web/map-open-air.ts",
-  "web/map-screen-book.ts",
   "web/map-screen-model.ts",
   "web/map-tiles.ts",
   "web/mapclass.ts",
@@ -570,6 +569,8 @@
   "web/types/ui-kit.ts",
   "web/types/uifont.ts",
   "web/types/wfight-translated.ts",
+  "web/types/world-globe-map.ts",
+  "web/types/world-globe-view.ts",
   "web/types/yesno-translated.ts",
   "web/ui-c/base.ts",
   "web/ui-c/battlehud.ts",
@@ -605,7 +606,10 @@
   "web/weapon-lab.ts",
   "web/wfight-translated.ts",
   "web/wire.ts",
+  "web/world-globe-book.ts",
   "web/world-globe-layout.ts",
+  "web/world-globe-map.ts",
+  "web/world-globe-view.ts",
   "web/world-globe.ts",
   "web/yesno-translated.ts"
 ]

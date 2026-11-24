@@ -134,10 +134,13 @@ export function createStatusTranslated(sfx: PackedSfx | null = null, opts: Statu
             // sibling sessions seat: web/gym-translated.js `rosterSlotFor(party[i])`,
             // web/save-translated.js `partySlots[i]`.
             const slot = rosterSlotOfCharId(member) ?? i;
+            const name = view[i]?.name;
+            const worn = equipment[i];
             party.push({
                 rosterSlot: slot,
                 starterSlot: slot,
-                nameBytes: view[i]?.name ? encodePauseName(view[i].name) : undefined,
+                // no name / no worn gear = the field is left out (the page reads a missing one as none)
+                ...(name ? { nameBytes: encodePauseName(name) } : {}),
                 forms: {
                     digimonId: view[i]?.digimonId ?? rec?.digimonId,
                     formLedger: view[i]?.formLedger ?? rec?.formLedger,
@@ -150,7 +153,7 @@ export function createStatusTranslated(sfx: PackedSfx | null = null, opts: Statu
                 // the one shared element helper (web/party.js partyRosterView);
                 // a raw stat block carries neither.
                 core: view[i]?.core ?? rec?.core, elements: view[i]?.elements ?? rec?.elements,
-                equipment: equipment[i] ?? undefined,
+                ...(worn ? { equipment: worn } : {}),
             });
         }
         return party;
@@ -194,8 +197,8 @@ export function createStatusTranslated(sfx: PackedSfx | null = null, opts: Statu
         const request = ++st._request;
         loadShared().then(async (shared) => {
             const selected = st._state?.languageByte;
-            const language = Number.isInteger(selected) ? selected : 2;
-            if (language! < 0 || language! > 6) throw new Error("Pause language index is invalid");
+            const language = typeof selected === "number" && Number.isInteger(selected) ? selected : 2;
+            if (language < 0 || language > 6) throw new Error("Pause language index is invalid");
             const own = new Set(shared.manifest.banks.map((bank: { id: number }) => bank.id));
             const dirs = new Map(shared.manifest.sharedBanks.map((entryRow: { offset: number; dir: string }): [number, string] => [entryRow.offset, entryRow.dir]));
             const banks = new Map(await Promise.all((ui as EngineUi).PAUSE_TEXT_BANK_OFFSETS.map(async (offset): Promise<[number, Uint8Array]> => {
@@ -241,6 +244,17 @@ export function createStatusTranslated(sfx: PackedSfx | null = null, opts: Statu
         st.open!(st._state, page, st._returnClose!, true);
         return true;
     };
+    /** Open one page from a closed pause as if the home list's row `row` had opened it: the page over the list, and Back
+     *  returns to the list on that row. The World Globe's way back to the disc's MAP page when the globe cannot be drawn
+     *  (web/pause-home.js openPauseMap). Only a real page is accepted. */
+    st.openPage = (state, page, onClose = null, row = 0) => {
+        const open = st.open;
+        if (!open || page === "home" || !PAGES.has(page)) return false;
+        st._homeOverlay = true;
+        st._homeRow = row;
+        open(state, page, onClose, true);
+        return true;
+    };
     /** Buttons (words) that were down when this pause came back from a book: the list ignores each until it is let go. */
     st.blockUntilReleased = (words = []) => { st._blocked = new Set(words); };
     st.handleKey = (_k, state) => { if (state && !st._state) st._state = state; };
@@ -268,7 +282,7 @@ export function createStatusTranslated(sfx: PackedSfx | null = null, opts: Statu
                 if (st._homeFlow && st._entry === "home") {
                     const result = session.homeResult();
                     if (result?.kind === "page" && result.page === "map" && opts.newMapScreen?.()) {
-                        // OPTIONS > Map screen: New. The MAP row opens the new map book instead of the disc's page (same way out and back as a book).
+                        // OPTIONS > Map screen: New. The MAP row opens the World Globe book instead of the disc's page (same way out and back as a book).
                         st._finish!(false);
                         opts.onBook?.("mapscreen", result.row);
                     } else if (result?.kind === "page") {

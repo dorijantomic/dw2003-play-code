@@ -1,171 +1,162 @@
-// web/world-globe.js -- the page world-globe.html: the stitched world (web/world-globe-layout.js) drawn into one canvas texture and
-// mapped, equirectangular, onto a three.js sphere. Local assets only (web/assets/manifest.json, scenes, maps/*.png), as the game loads them.
+// web/world-globe.js -- the dev page world-globe.html: the game's two world maps as two continents on one three.js sphere
+// (Asuka centred at longitude 0, Amaterasu at 180, sea channels between, ice caps at the poles). The globe itself (renderer,
+// texture, place markers) is web/world-globe-view.js, the same module the pause MAP screen draws; this page adds the mouse
+// controls, the server radio (turns the globe to that continent), hover names and the side panel. Maths in web/world-globe-map.js.
 // GPU only: the renderer is made with failIfMajorPerformanceCaveat, so a software GL is refused (the page says so) instead of used.
 import * as THREE from "three";
 import { OrbitControls } from "./lib3d/addons/OrbitControls.js";
-import { buildWorld, fitWorld, textureSize, worldToTex, texToWorld, hitTest } from "./world-globe-layout.js";
+import { CONTINENT_LON, MAP_LON_SPAN, areaAt, bandEdgeLat, hitGlobe, areaLabel, viewAzimuth, angleDelta, easeInOut } from "./world-globe-map.js";
+import { makeGlobeRenderer, loadGlobeAssets, buildGlobeScene } from "./world-globe-view.js";
+import type { GlobeHit, GlobeServer } from "./types/world-globe-map.js";
 
-const $ = (id: string): any => document.getElementById(id);
-const statusEl = $("status"), tip = $("tip"), info = $("info"), cv = $("cv");
-const MAX_TEX_W = 8192;
-const SEA = "#0a1d33";
-
-const say = (t: string) => { statusEl.textContent = t; };
-const fetchJson = async (url: string | URL | Request) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); };
-const hueOf = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; };
-const regionColor = (r: string) => `hsl(${hueOf(r)} 70% 60%)`;
-
-function makeRenderer() {
-    let renderer;
-    try {
-        renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: true });
-    } catch (e) {
-        say("No GPU WebGL context (a software renderer is refused on purpose).\n" + e.message);
-        throw e;
-    }
-    const gl = renderer.getContext();
-    const ext = gl.getExtension("WEBGL_debug_renderer_info");
-    const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    if (/swiftshader|llvmpipe|software/i.test(name)) { say("Software renderer refused: " + name); throw new Error("software renderer " + name); }
-    return { renderer, gpu: name };
+function el<T extends HTMLElement>(id: string, ctor: new () => T): T {
+    const e = document.getElementById(id);
+    if (!(e instanceof ctor)) throw new Error(`world-globe.html: #${id} missing`);
+    return e;
 }
+const statusEl = el("status", HTMLDivElement), tip = el("tip", HTMLDivElement), info = el("info", HTMLDivElement);
+const cv = el("cv", HTMLCanvasElement), pinsBox = el("pins", HTMLInputElement);
+const serverBoxes: { server: GlobeServer; box: HTMLInputElement }[] = [
+    { server: "asuka", box: el("srv-asuka", HTMLInputElement) },
+    { server: "amaterasu", box: el("srv-amaterasu", HTMLInputElement) },
+];
+const SERVER_NAME: Readonly<Record<GlobeServer, string>> = { asuka: "Asuka", amaterasu: "Amaterasu" };
+const MARKER_PICK_PX = 6;      // frame px: hover snaps to a place marker this close
+const TURN_MS = 1400;          // radio switch: time to turn the globe to the other continent
 
-function loadImage(src: string) {
-    return new Promise<HTMLImageElement | null>((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
-}
+const say = (t: string): void => { statusEl.textContent = t; };
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const deg = (r: number): string => ((r * 180) / Math.PI).toFixed(1);
+
+interface Turn { t0: number; theta0: number; dTheta: number; phi0: number; dPhi: number; server: GlobeServer }
 
 async function main() {
-    const { renderer, gpu } = makeRenderer();
+    const { renderer, gpu } = (() => {
+        try { return makeGlobeRenderer(cv); } catch (e) { say(errText(e)); throw e; }
+    })();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    say("reading maps and scenes...");
-    const manifest = await fetchJson("assets/manifest.json");
-    const variants = await fetchJson("map-variants.json").catch(() => ({}));
-    const maps = manifest.maps;
-    const scenes = {};
-    await Promise.all(maps.map(async (m: { id: string | number; }) => { scenes[m.id] = await fetchJson(`assets/scenes/${m.id}.json`).catch(() => ({ exits: [] })); }));
-
-    const world = buildWorld({ maps, scenes, variants });
-    const maxTex = Math.min(MAX_TEX_W, renderer.capabilities.maxTextureSize);
-    const { w: texW, h: texH } = textureSize(world.bounds, maxTex);
-    const fit = fitWorld(world.bounds, texW, texH);
-
-    say(`drawing ${world.places.length} places into ${texW} x ${texH}...`);
-    const canvas = document.createElement("canvas");
-    canvas.width = texW; canvas.height = texH;
-    const g = canvas.getContext("2d");
-    g!.fillStyle = SEA; g!.fillRect(0, 0, texW, texH);
-    g!.imageSmoothingEnabled = true; g!.imageSmoothingQuality = "high";
-    const images = await Promise.all(world.places.map((p) => loadImage(p.image || `assets/maps/${p.id}.png`)));
-    let missing = 0;
-    world.places.forEach((p, i) => {
-        const t = worldToTex(fit, p.x, p.y), w = p.w * fit.scale, h = p.h * fit.scale;
-        if (images[i]) g!.drawImage(images[i], t.x, t.y, w, h); else { missing++; g!.fillStyle = "#334"; g!.fillRect(t.x, t.y, w, h); }
-        g!.strokeStyle = regionColor(p.region); g!.lineWidth = Math.max(2, 3 * fit.scale * 4);
-        g!.strokeRect(t.x + g!.lineWidth / 2, t.y + g!.lineWidth / 2, w - g!.lineWidth, h - g!.lineWidth);
-    });
-
-    const scene = new THREE.Scene();
+    say("loading...");
+    const assets = await loadGlobeAssets();
+    const { continents, image } = assets;
+    const { scene, camera, globe, icons, iconList, faceIcons, pickIcon, texW, texH, maxTex } = buildGlobeScene(renderer, assets);
     scene.background = new THREE.Color(0x05070d);
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
-    camera.position.set(3.2, 0, 0);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    tex.generateMipmaps = true;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    const globe = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 96), new THREE.MeshBasicMaterial({ map: tex }));
-    scene.add(globe);
-
-    // pins: same equirectangular mapping as three's SphereGeometry (u = phi / 2pi, theta = (1 - v) * pi)
-    const toSphere = (u: number, v: number, r: number) => {
-        const phi = u * Math.PI * 2, theta = (1 - v) * Math.PI;
-        return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
-    };
-    const pinPos = new Float32Array(world.pins.length * 3);
-    world.pins.forEach((p, i) => {
-        const t = worldToTex(fit, p.wx, p.wy);
-        const v = toSphere(t.x / texW, 1 - t.y / texH, 1.004);
-        pinPos.set([v.x, v.y, v.z], i * 3);
-    });
-    // pins: small instanced spheres (PointsMaterial failed program validation on ANGLE/D3D11)
-    const pinPts = new THREE.InstancedMesh(new THREE.SphereGeometry(0.006, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd24a }), Math.max(1, world.pins.length));
-    pinPts.count = world.pins.length;
-    const m4 = new THREE.Matrix4();
-    for (let i = 0; i < world.pins.length; i++) { m4.makeTranslation(pinPos[i * 3], pinPos[i * 3 + 1], pinPos[i * 3 + 2]); pinPts.setMatrixAt(i, m4); }
-    pinPts.instanceMatrix.needsUpdate = true;
-    pinPts.frustumCulled = false;
-    scene.add(pinPts);
-    $("pins").addEventListener("change", (e) => { pinPts.visible = e.target.checked; });
+    pinsBox.addEventListener("change", () => { icons.visible = pinsBox.checked; });
 
     const controls = new OrbitControls(camera, cv);
     controls.enablePan = false; controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.minDistance = 1.12; controls.maxDistance = 6;
     controls.zoomSpeed = 0.8;
 
-    const resize = () => {
+    // radio switch: turn the camera around the globe (shortest way) to look at that continent's centre, eased
+    const sph = new THREE.Spherical();
+    let turn: Turn | null = null;
+    const startTurn = (server: GlobeServer, now: number): void => {
+        sph.setFromVector3(camera.position);
+        turn = {
+            t0: now, theta0: sph.theta, dTheta: angleDelta(sph.theta, viewAzimuth(CONTINENT_LON[server])),
+            phi0: sph.phi, dPhi: Math.PI / 2 - sph.phi, server,
+        };
+    };
+    const stepTurn = (now: number): void => {
+        if (!turn) return;
+        const t = Math.min(1, (now - turn.t0) / TURN_MS), e = easeInOut(t);
+        sph.setFromVector3(camera.position);
+        sph.theta = turn.theta0 + turn.dTheta * e;
+        sph.phi = turn.phi0 + turn.dPhi * e;
+        camera.position.setFromSpherical(sph);
+        camera.lookAt(0, 0, 0);
+        if (t >= 1) turn = null;
+    };
+    controls.addEventListener("start", () => { turn = null; });   // a drag / zoom takes over from the turn
+    const showStatus = (server: GlobeServer): void => {
+        const lines = [`GPU: ${gpu}`, `facing: ${SERVER_NAME[server]}`];
+        for (const c of continents) {
+            const named = c.data.areas.filter((a) => a.names.length).length;
+            lines.push(`${SERVER_NAME[c.data.server]}: longitude ${deg(c.band.lonCentre)} +- ${deg(MAP_LON_SPAN / 2)}, latitude +- ${deg(bandEdgeLat(c.band))}; `
+                + `${c.data.areas.length} areas (${named} named), ${c.data.markers.length} markers, Gemini fit ${c.data.fitIou.toFixed(3)}`);
+        }
+        lines.push(`texture ${texW} x ${texH} (file ${image.naturalWidth} x ${image.naturalHeight}, GPU limit ${maxTex})`);
+        say(lines.join("\n"));
+    };
+    for (const { server, box } of serverBoxes) {
+        box.addEventListener("change", () => {
+            if (!box.checked) return;
+            startTurn(server, performance.now());
+            showStatus(server);
+        });
+    }
+    const first = serverBoxes.find((s) => s.box.checked)?.server ?? "asuka";
+    sph.set(camera.position.length(), Math.PI / 2, viewAzimuth(CONTINENT_LON[first]));
+    camera.position.setFromSpherical(sph);
+    camera.lookAt(0, 0, 0);
+    showStatus(first);
+    Object.assign(window, { __worldGlobe: { continents, texW, texH, gpu, maxTex, icons: iconList.length } });
+
+    const resize = (): void => {
         const w = window.innerWidth, h = window.innerHeight;
         renderer.setSize(w, h, false);
         camera.aspect = w / h; camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", resize); resize();
 
-    // picking: ray -> sphere -> uv -> texture pixel -> world pixel -> place / pin
+    // picking: a place icon under the pointer first (the front one); else ray -> sphere point -> longitude / latitude -> the
+    // continent's map frame px -> area / marker
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-    const pick = (ev: PointerEvent) => {
+    const pick = (ev: PointerEvent): GlobeHit | null => {
         const r = cv.getBoundingClientRect();
         ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -(((ev.clientY - r.top) / r.height) * 2 - 1));
         ray.setFromCamera(ndc, camera);
+        const icon = pickIcon(ndc, camera);
+        if (icon) {
+            const data = continents.find((c) => c.data.server === icon.server)?.data;
+            const m = icon.marker;
+            return { server: icon.server, frame: { x: m.x, y: m.y }, area: data ? areaAt(data, m.x, m.y) : null, marker: m };
+        }
         const hit = ray.intersectObject(globe)[0];
-        if (!hit || !hit.uv) return null;
-        const w = texToWorld(fit, hit.uv.x * texW, (1 - hit.uv.y) * texH);
-        return hitTest(world, w.x, w.y, 14 / fit.scale);
+        if (!hit) return null;
+        return hitGlobe(continents, { x: hit.point.x, y: hit.point.y, z: hit.point.z }, icons.visible ? MARKER_PICK_PX : 0);
     };
-    const label = (h) => {
+    const label = (h: GlobeHit | null): string => {
         if (!h) return "";
-        if (h.pin && pinPts.visible) return h.pin.names.slice(0, 6).join("\n") + (h.pin.names.length > 6 ? `\n+${h.pin.names.length - 6} more` : "");
-        return h.place ? h.place.names.join(" / ") : "";
+        if (h.marker) return h.marker.name;
+        return h.area ? areaLabel(h.area) : "";
     };
     cv.addEventListener("pointermove", (ev: PointerEvent) => {
         if (ev.buttons) { tip.style.display = "none"; return; }
         const t = label(pick(ev));
         if (!t) { tip.style.display = "none"; return; }
-        tip.textContent = t; tip.style.whiteSpace = "pre";
+        tip.textContent = t;
         tip.style.display = "block"; tip.style.left = ev.clientX + 14 + "px"; tip.style.top = ev.clientY + 14 + "px";
     });
-    let down = null;
-    cv.addEventListener("pointerdown", (ev) => { down = [ev.clientX, ev.clientY]; cv.classList.add("drag"); });
-    window.addEventListener("pointerup", (ev) => {
+    let down: [number, number] | null = null;
+    cv.addEventListener("pointerdown", (ev: PointerEvent) => { down = [ev.clientX, ev.clientY]; cv.classList.add("drag"); });
+    window.addEventListener("pointerup", (ev: PointerEvent) => {
         cv.classList.remove("drag");
-        if (!down || ev.target !== cv) { down = null; return; }
-        const moved = Math.hypot(ev.clientX - down[0], ev.clientY - down[1]); down = null;
-        if (moved > 4) return;
+        const d = down; down = null;
+        if (!d || ev.target !== cv) return;
+        if (Math.hypot(ev.clientX - d[0], ev.clientY - d[1]) > 4) return;
         const h = pick(ev);
-        if (!h || !h.place) { info.textContent = ""; return; }
-        const p = h.place;
-        const pins = world.pins.filter((q) => q.placeKey === p.key);
-        info.textContent = `${p.names.join(" / ")}\nregion: ${p.region}\nmaps: ${p.ids.join(", ")} (${p.w} x ${p.h})\n`
-            + (h.pin ? `door: ${h.pin.names.join("; ")}\n` : "")
-            + `door pins here: ${pins.length}`;
+        if (!h || (!h.area && !h.marker)) { info.textContent = ""; return; }
+        const lines: string[] = [`continent: ${SERVER_NAME[h.server]}`];
+        if (h.marker) lines.push(`place: ${h.marker.name}`, `maps: ${h.marker.maps.join(", ") || "-"}`);
+        if (h.area) lines.push(`area ${h.area.area}: ${areaLabel(h.area)}`, `area maps: ${h.area.maps.join(", ") || "-"}`);
+        lines.push(`map px: ${h.frame.x.toFixed(0)}, ${h.frame.y.toFixed(0)}`);
+        info.textContent = lines.join("\n");
     });
 
-    // legend: regions with place counts
-    const byRegion = new Map();
-    for (const p of world.places) byRegion.set(p.region, (byRegion.get(p.region) ?? 0) + 1);
-    $("legend").innerHTML = [...byRegion].map(([r, n]) => `<div><span class="sw" style="background:${regionColor(r)}"></span>${r} (${n})</div>`).join("");
-
-    const s = world.stats;
-    say(`GPU: ${gpu}\n${s.places} places = ${s.mapsPlaced} of ${s.openMaps} open-air maps\noverlaps: ${s.overlaps}; links touching: ${s.linksAdjacent} / ${s.links}\n`
-        + `door pins: ${s.pins} (${s.pinnedInterior} interior maps)\nworld ${world.bounds.w} x ${world.bounds.h} px -> texture ${texW} x ${texH} (scale ${fit.scale.toFixed(3)})`
-        + (missing ? `\nmissing pictures: ${missing}` : ""));
-    window.__worldGlobe = { world, fit, texW, texH, gpu };
-
-    renderer.setAnimationLoop(() => {
+    renderer.setAnimationLoop((now: number) => {
+        stepTurn(now);
         controls.rotateSpeed = Math.min(1, Math.max(0.12, (camera.position.length() - 1) * 0.45));
         controls.update();
+        faceIcons(camera.position);
         renderer.render(scene, camera);
     });
 }
 
-main().catch((e) => { console.error(e); if (!statusEl.textContent.startsWith("No GPU") && !statusEl.textContent.startsWith("Software")) say("failed: " + e.message); });
+main().catch((e: unknown) => {
+    console.error(e);
+    const t = statusEl.textContent ?? "";
+    if (!t.startsWith("No GPU") && !t.startsWith("Software")) say("failed: " + errText(e));
+});

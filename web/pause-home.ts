@@ -20,13 +20,24 @@ import type { PauseHomeArgs } from "./types/rest-a.js";
 export function openPauseHome({ state, status, menu, row = 0 }: PauseHomeArgs) {
   if (typeof status?.openHome === "function") {
     state.menuOpen = true;
-    status.openHome(state, () => { state.menuOpen = false; menu.reset(); }, row);
+    status.openHome(state, () => { state.menuOpen = false; menu.reset?.(); }, row);
     return "translated";
   }
   state.menuOpen = true;
   if (typeof menu?.openAt === "function") menu.openAt("home");
   else menu?.reset?.();
   return "rollback";
+}
+
+// The disc's MAP page over the home list on `row`, as when the list's MAP row opens it (Back returns to the list on that row).
+// The World Globe's way out when it could not be drawn (web/game/vars.js openBook). Without the translated adapter: the home list.
+export function openPauseMap({ state, status, menu, row = 0 }: PauseHomeArgs) {
+  const openPage = status?.openPage;
+  if (typeof openPage === "function") {
+    state.menuOpen = true;
+    if (openPage(state, "map", () => { state.menuOpen = false; menu.reset?.(); }, row)) return "translated";
+  }
+  return openPauseHome({ state, status, menu, row });
 }
 
 // Where the disc puts the player when the Card Album or the folder editor

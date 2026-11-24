@@ -1,8 +1,10 @@
 import { screenIdForStage, listScrollbarThumb } from "../vendor/engine.js";
 import { loadPack } from "../screenpack.js";
 import { MS } from "./state.js";
-import type { CoreStatKey, ElementKey, MapSeenRow, MenuState, RosterViewEntry } from "./types.js";
+import { globeServerOfStage } from "../world-globe-map.js";
+import type { CoreStatKey, ElementKey, MapMarkerRecord, MapSeenRow, MenuState, RosterViewEntry } from "./types.js";
 import type { GameState } from "../game/types.js";
+import type { GlobeHereInput } from "../types/world-globe-map.js";
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
 // is string 11, the 6th entry, gated by the card-game unlock. UNKNOWN U-04:
@@ -134,6 +136,35 @@ export function migrateVisitedMaps(visited: Iterable<string> | null | undefined,
     const id = 0x1e00 + screenId;
     if (!flags.get(id)) flags.set(id, true);
   }
+}
+
+/** The marker record a place number points at. F0x8009a698 gives the place (byte table 0x8009B5FC & 0x7F); the MAP page
+ *  then reads record place + 1 of the marker table 0x8009AB60, whose record 0 is a blank: the arrow (F0x8009913c
+ *  `(place + 1) * 0xC`), the visit slot `place` drawn as record slot + 1 (F0x8009a6b8 / F0x80098b84) and the hover
+ *  name, string id = record (F0x80098294 unk184). screens.map.markers holds records 1..46 with `loc` = record number. */
+export const mapMarkerRecord = (place: number): number => place + 1;
+
+/** The place number the disc's MAP page uses for a PS1 stage (F0x8009a698): the byte table 0x8009B5FC & 0x7F, decoded as
+ *  status_ui.json screens.map.stage_to_location (key = the stage id in decimal); null when it holds no byte (0x2D7 and up). */
+export function mapPlaceOfStage(ps1: number, ui = MS.UI): number | null {
+  // ETS item 9: MS.UI is the untyped status_ui.json; stage_to_location values are the table's bytes
+  const byte: unknown = ui?.screens?.map?.stage_to_location?.[String(ps1)];
+  return typeof byte === "number" ? byte & 0x7f : null;
+}
+
+/** Where you stand, for the World Globe MAP screen (web/world-globe-book.js): the same stage (mapPs1Id), server rule and place
+ *  as the disc's page, the marker record place + 1, its icon and the place name the disc's page shows for that record. */
+export function mapGlobeHere(state: GameState, ui = MS.UI): GlobeHereInput {
+  const ps1 = mapPs1Id(state, ui);
+  const server = globeServerOfStage(ps1);
+  const place = mapPlaceOfStage(ps1, ui);
+  const record = place === null ? 0 : mapMarkerRecord(place);
+  // ETS item 9: MS.UI is the untyped status_ui.json; markers are records 1..46, location_names[server][record] the hover names
+  const M = ui?.screens?.map;
+  const markers: MapMarkerRecord[] = Array.isArray(M?.markers) ? M.markers : [];
+  const icon = markers.find((r) => r.loc === record);
+  const name: unknown = server ? M?.location_names?.[server]?.[record] : undefined;
+  return { server, record, name: typeof name === "string" ? name : "", icon: icon ? { x: icon.x, y: icon.y } : null };
 }
 
 export function mapUnavailable(state: GameState, ui = MS.UI) {

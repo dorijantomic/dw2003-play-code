@@ -11,7 +11,10 @@ import { createBookHost } from "../book-host.js";
 import { createGlossaryBook } from "../glossary-book.js";
 import { createOptionsBook } from "../options-book.js";
 import { createFlyBook } from "../fly-book.js";
-import { createMapScreenBook } from "../map-screen-book.js";
+import { createGlobeBook } from "../world-globe-book.js";
+import { createGlobeStage } from "../world-globe-view.js";
+import { effectiveMapScreen, mapScreenRoute } from "../world-globe-map.js";
+import { mapGlobeHere } from "../menu/pure.js";
 import {
   screenIdForStage,
   carriesFolderBag,
@@ -44,7 +47,7 @@ import { createCardShopTranslated } from "../cardshop-translated.js";
 import { createCardAlbumTranslated } from "../cardalbum-translated.js";
 import { createCardDeckTranslated } from "../carddeck-translated.js";
 import { createCardDuelNative } from "../cardduel-native.js";
-import { openPauseHome, returnToPauseCardFolders } from "../pause-home.js";
+import { openPauseHome, openPauseMap, returnToPauseCardFolders } from "../pause-home.js";
 import { mpbVisible, mpbKey } from "../mpbattle.js";
 import { isOpenAirMapName } from "../ambience.js";
 import { createFightReportTranslated } from "../fightreport-translated.js";
@@ -109,6 +112,12 @@ export const glossaryStage = createStage({
     drawFallback: createPartnerFallback(),
 });
 
+// OPTIONS > GAME > Map screen: New = the World Globe (web/world-globe-book.js). One WebGL context for the session, made on the first
+// MAP press (the MAP row opens the disc's page when it cannot be made); the globe's scene is built per open and freed when it shuts.
+export const globeStage = createGlobeStage();
+/** The globe failed while its book was open: the book has shut and the disc's MAP page opens instead (openBook). */
+let globeFellBack = false;
+
 export const books = createBookHost({
     sfx,
     factories: {
@@ -116,13 +125,12 @@ export const books = createBookHost({
         options: (args: BookFactoryArgs) => createOptionsBook(args),
         // FLY (quest zz_fly): the visited fly points; the chosen one is flown to after the pause list has gone (openBook).
         fly: (args: BookFactoryArgs) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { S.flyChosen = p; } }),
-        // OPTIONS > GAME > Map screen: New. Read once when it opens: the manifest names, the scenes' exits, the visited flag, the current map.
-        mapscreen: (args: BookFactoryArgs) => createMapScreenBook({
-            sfx: args.sfx,
-            data: () => ({
-                maps: state.manifest.maps, scenes: state.scenes, currentId: currentMap().id,
-                seen: (id) => { const sid = screenIdForStage(S.fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); },
-            }),
+        // OPTIONS > GAME > Map screen: New: the World Globe, turned to where you stand (the same stage, server and place as the disc's page).
+        mapscreen: () => createGlobeBook({
+            stage: globeStage,
+            here: () => mapGlobeHere(state),
+            held: () => state.keys,
+            onFail: () => { globeFellBack = true; },
         }),
     },
 });
@@ -348,8 +356,9 @@ export const statusOptions = {
     // The map page asks the flag store which places you have walked into — the bits the
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
     map: (state: GameState) => pauseMapContext(state, undefined, engineFlagSeen),
-    // OPTIONS > GAME > Map screen: New makes the MAP row open web/map-screen-book.js instead of the disc's page.
-    newMapScreen: () => window.__fx?.mapScreen === "new",
+    // OPTIONS > GAME > Map screen: New makes the MAP row open the World Globe (web/world-globe-book.js) instead of the disc's page,
+    // when the stage has a map and a GPU WebGL context can be made (else it is the disc's page). No pick = the mode decides (HD = New).
+    newMapScreen: () => mapScreenRoute(effectiveMapScreen(window.__fx?.mapScreen, HD_MAPS), mapGlobeHere(state).server, globeStage.ensure) === "globe",
     // Extra rows on the pause list (after CARD FOLDERS): QUESTS, then the GLOSSARY and OPTIONS books while their dev switches are on.
     extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx, fly: questDone(FLY_QUEST) }),
     questsPage: () => questsPausePage(),
@@ -438,10 +447,13 @@ export const backToCardFolders = () => returnToPauseCardFolders({ state, status,
 // GLOSSARY / OPTIONS: the pause list ended on that row (status-translated onBook); the book runs over the frozen field and the list
 // comes back on the same row when it shuts. The confirm that chose the row is still down: the host ignores it until it is let go.
 // If a button is still down after the host's release cap, the reopened list ignores it until it is let go (blockUntilReleased).
+// The World Globe that failed while open (its files did not load) shuts, and the disc's MAP page opens on the same row instead.
 const openBook = (book: string, row: number) => {
     if (book === "fly") { openFly(row); return; }
+    globeFellBack = false;
     books.open(book, (held) => {
-        pauseHome(row);
+        if (book === "mapscreen" && globeFellBack) openPauseMap({ state, status, menu, row });
+        else pauseHome(row);
         status?.blockUntilReleased?.(held);
     }, state.keys);
 };

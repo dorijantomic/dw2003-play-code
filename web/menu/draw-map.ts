@@ -1,10 +1,10 @@
 import { padRepeatFires, isPartyWide } from "../vendor/engine.js";
 import { loadPack, drawClip } from "../screenpack.js";
 import { drawText, drawCursor } from "../uifont.js";
-import { ITEM_CATS, VSYNC, mapHoldSpeed, ststat, topItems, visitedPs1Stages } from "./pure.js";
+import { ITEM_CATS, VSYNC, mapHoldSpeed, mapMarkerRecord, ststat, topItems, visitedPs1Stages } from "./pure.js";
 import { MS } from "./state.js";
 import { gold } from "./draw-common.js";
-import type { MapCursorConfig, MapSeenRow, MenuState } from "./types.js";
+import type { MapCursorConfig, MapMarkerRecord, MapSeenRow, MenuState } from "./types.js";
 import type { SfxPlayerContext } from "../types/audio.js";
 
 import type { GameState } from "../game/types.js";
@@ -119,7 +119,10 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   const C = M.cursor;
   // walker map id -> {ps1, server, loc} (composed through screen_table).
   const walkerStage = String(Number(String(state.manifest?.maps?.[state.mapIdx]?.id ?? "").replace(/\D/g, "")) || 0);
-  const wm = M.walker_map[walkerStage] ?? { ps1: 0x200, server: 0, loc: 0 };
+  // ETS item 9: MS.UI is the untyped status_ui.json; walker_map rows are {ps1, server, loc}, markers are records 1..46.
+  const known: MapSeenRow | undefined = M.walker_map[walkerStage];
+  const markers: MapMarkerRecord[] = M.markers;
+  const wm: MapSeenRow = known ?? { ps1: 0x200, server: 0, loc: 0 };
   const server = wm.server; // F0x8009a670: PS1 stage < 0x270 = Asuka
   const pk = server ? "stwmp1" : "stwmp0";
   const mapPack = loadPack(`${pk}map`), areaPack = loadPack(`${pk}area`), iconPack = loadPack(`${pk}icon`);
@@ -128,7 +131,8 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   let tier = 0;
   for (const th of M.tier_thresholds) if (ord >= th) tier++;
   const areas = M.tier_area_lists[server * 5 + tier] ?? [];
-  const cur = M.markers[wm.loc - 1];
+  // the arrow sits on record place + 1 (B040); an unknown map has no place, so no arrow and the view starts centred
+  const cur = known ? markers.find((r) => r.loc === mapMarkerRecord(wm.loc)) : undefined;
 
   if (!m.mapInit) {
     // The native init loop pans until the cursor reaches the current-location
@@ -143,16 +147,20 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
     m.mapHoldX = 0; m.mapHoldY = 0; m.mapStepT = m.time ?? 0;
   }
   _stepMapHeld(m, C, state);
-  const ox = m.mapSX, oy = m.mapSY + M.origin_y;
+  // the init above always sets the view; a state without it (no path reaches that) draws nothing
+  const { mapSX: sx, mapSY: sy, mapCX: cx, mapCY: cy } = m;
+  if (sx === undefined || sy === undefined || cx === undefined || cy === undefined) return;
+  const ox = sx, oy = sy + M.origin_y;
 
   // visited location markers on THIS server: every place the flag store says you have
   // been composes to a {server, loc} via walker_map (native: flag 0x2000|(ps1&0xff)
   // per stage, filler F0x8009a6b8). The current map's own marker always shows.
+  // vis holds marker RECORD numbers: place p lights record p + 1 (place 0 = Legendary Gym = record 1).
   const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen));
-  const vis = new Set();
+  const vis = new Set<number>();
   // ETS item 9: walker_map rows are {ps1, server, loc}; MS.UI is the untyped status_ui.json, so Object.values gives any.
   for (const row of Object.values(M.walker_map) as MapSeenRow[]) {
-    if (seenPs1.has(row.ps1) && row.server === server && row.loc) vis.add(row.loc);
+    if (seenPs1.has(row.ps1) && row.server === server) vis.add(mapMarkerRecord(row.loc));
   }
 
   drawClip(ctx, mapPack, 0, ox, oy); // base map (16px banner strip above origin)
@@ -160,17 +168,17 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
     const p = M.area_positions[a];
     if (p) drawClip(ctx, areaPack, a - 1, p[0] + ox, p[1] + oy);
   }
-  for (const r of M.markers) if (vis.has(r.loc)) drawClip(ctx, iconPack, r.clip, r.x + ox, r.y + oy);
+  for (const r of markers) if (vis.has(r.loc)) drawClip(ctx, iconPack, r.clip, r.x + ox, r.y + oy);
 
   // hover test: 12px square at marker+(7..18) (F0x80098294), visited only
-  const cmx = m.mapCX! - m.mapSX!, cmy = m.mapCY! - m.mapSY!;
-  let hov = null;
-  for (const r of M.markers) {
+  const cmx = cx - sx, cmy = cy - sy;
+  let hov: MapMarkerRecord | null = null;
+  for (const r of markers) {
     if (!vis.has(r.loc)) continue;
     if (cmx > r.x + M.hover.box_min && cmx <= r.x + M.hover.box_max &&
         cmy > r.y + M.hover.box_min && cmy <= r.y + M.hover.box_max) { hov = r; break; }
   }
-  if (hov && hov.loc !== m.mapHover) { sfx?.play("system07"); m.mapHoverY = m.mapCY; }
+  if (hov && hov.loc !== m.mapHover) { sfx?.play("system07"); m.mapHoverY = cy; }
   m.mapHover = hov ? hov.loc : 0;
 
   // current-location arrow at marker+(12,12); flips when the cursor is left of it
@@ -178,20 +186,20 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
     const A = M.current_arrow;
     const a3 = Math.floor(t * VSYNC / A.anim_vsync) % A.anim_frames;
     const ax = cur.x + A.offset[0], ay = cur.y + A.offset[1];
-    const base = m.mapCX! < ax + m.mapSX ? A.clip_right : A.clip_left;
+    const base = cx < ax + sx ? A.clip_right : A.clip_left;
     drawClip(ctx, iconPack, base + a3, ax + ox, ay + oy);
   }
 
   // cursor: locked on a marker (clip 0x38+anim at marker+12) or free (0x32+anim)
   const anim = C.anim[Math.floor(t * VSYNC / C.anim_vsync) % C.anim.length];
   if (hov) drawClip(ctx, iconPack, C.lock_clip + anim, hov.x + C.lock_offset + ox, hov.y + C.lock_offset + oy);
-  else drawClip(ctx, iconPack, C.free_clip + anim, m.mapCX, m.mapCY + M.origin_y);
+  else drawClip(ctx, iconPack, C.free_clip + anim, cx, cy + M.origin_y);
 
   // hover name window (ststat clip 0x3b): bottom when the cursor is in the
   // top half of the screen, else top; string bank esaskmap/esamtmap[record #]
   if (hov) {
     const HV = M.hover;
-    const bottom = m.mapHoverY! < 0x78;
+    const bottom = (m.mapHoverY ?? cy) < 0x78;
     drawClip(ctx, ststat, HV.window.clip, 0, bottom ? HV.window.y_bottom : HV.window.y_top);
     const name = M.location_names[server ? "amaterasu" : "asuka"][hov.loc] ?? "";
     name.split("\\n").forEach((line: string | undefined, i: number) =>
